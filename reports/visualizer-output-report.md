@@ -1,6 +1,6 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T09:14:14.907Z
+Generated: 2026-05-27T09:32:19.536Z
 
 Generated from 19 HTML visualizers.
 
@@ -1728,7 +1728,7 @@ Step mode: btn-next
 ### Initial HUD
 
 ```text
-wordIndex:
+i:
 0 / 6
 str:
 undefined
@@ -1750,7 +1750,7 @@ const strs = ["eat", "tea", "tan", "ate", "nat", "bat"];
 
 
 HUD ON
-let wordIndex = 0;
+let i = 0;
 
 
 
@@ -1795,13 +1795,13 @@ Create an empty Map. The key will be a 26-letter frequency signature, and the va
 No words grouped yet. Step until a word gets pushed into the HashMap.
 ```
 
-### Step Snapshots (80)
+### Step Snapshots (45)
 
 #### Step 0 (next: Step Over)
 
 HUD:
 ```text
-wordIndex:
+i:
 0 / 6
 str:
 undefined
@@ -1817,7 +1817,7 @@ pending
 
 HUD:
 ```text
-wordIndex:
+i:
 0 / 6
 str:
 "eat"
@@ -1833,7 +1833,7 @@ pending
 
 HUD:
 ```text
-wordIndex:
+i:
 0 / 6
 str:
 "eat"
@@ -1849,7 +1849,7 @@ pending
 
 HUD:
 ```text
-wordIndex:
+i:
 0 / 6
 str:
 "eat"
@@ -1865,103 +1865,7 @@ pending
 
 HUD:
 ```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 5 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 6 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 7 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 8 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 9 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-0 / 6
-str:
-"eat"
-key:
-not built
-mapSize:
-0
-res:
-pending
-```
-
-#### Step 10 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
+i:
 0 / 6
 str:
 "eat"
@@ -1973,14 +1877,110 @@ res:
 pending
 ```
 
+#### Step 5 (next: Step Over)
+
+HUD:
+```text
+i:
+0 / 6
+str:
+"eat"
+key:
+a:1 | e:1 | t:1
+mapSize:
+1
+res:
+pending
+```
+
+#### Step 6 (next: Step Over)
+
+HUD:
+```text
+i:
+0 / 6
+str:
+"eat"
+key:
+a:1 | e:1 | t:1
+mapSize:
+1
+res:
+pending
+```
+
+#### Step 7 (next: Step Over)
+
+HUD:
+```text
+i:
+1 / 6
+str:
+undefined
+key:
+not built
+mapSize:
+1
+res:
+pending
+```
+
+#### Step 8 (next: Step Over)
+
+HUD:
+```text
+i:
+1 / 6
+str:
+"tea"
+key:
+not built
+mapSize:
+1
+res:
+pending
+```
+
+#### Step 9 (next: Step Over)
+
+HUD:
+```text
+i:
+1 / 6
+str:
+"tea"
+key:
+not built
+mapSize:
+1
+res:
+pending
+```
+
+#### Step 10 (next: Step Over)
+
+HUD:
+```text
+i:
+1 / 6
+str:
+"tea"
+key:
+not built
+mapSize:
+1
+res:
+pending
+```
+
 #### Step 11 (next: Step Over)
 
 HUD:
 ```text
-wordIndex:
-0 / 6
+i:
+1 / 6
 str:
-"eat"
+"tea"
 key:
 a:1 | e:1 | t:1
 mapSize:
@@ -1993,10 +1993,10 @@ pending
 
 HUD:
 ```text
-wordIndex:
-0 / 6
+i:
+1 / 6
 str:
-"eat"
+"tea"
 key:
 a:1 | e:1 | t:1
 mapSize:
@@ -2009,12 +2009,12 @@ pending
 
 HUD:
 ```text
-wordIndex:
+i:
 1 / 6
 str:
-undefined
+"tea"
 key:
-not built
+a:1 | e:1 | t:1
 mapSize:
 1
 res:
@@ -2025,10 +2025,10 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+undefined
 key:
 not built
 mapSize:
@@ -2041,10 +2041,10 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
 not built
 mapSize:
@@ -2057,10 +2057,10 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
 not built
 mapSize:
@@ -2073,10 +2073,10 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
 not built
 mapSize:
@@ -2089,12 +2089,12 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
 1
 res:
@@ -2105,14 +2105,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2121,14 +2121,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+2 / 6
 str:
-"tea"
+"tan"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2137,14 +2137,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+3 / 6
 str:
-"tea"
+undefined
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2153,14 +2153,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+3 / 6
 str:
-"tea"
+"ate"
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2169,14 +2169,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+3 / 6
 str:
-"tea"
+"ate"
 key:
-a:1 | e:1 | t:1
+not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2185,14 +2185,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+3 / 6
 str:
-"tea"
+"ate"
 key:
-a:1 | e:1 | t:1
+not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2201,14 +2201,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-1 / 6
+i:
+3 / 6
 str:
-"tea"
+"ate"
 key:
 a:1 | e:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2217,14 +2217,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+3 / 6
 str:
-undefined
+"ate"
 key:
-not built
+a:1 | e:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2233,14 +2233,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+3 / 6
 str:
-"tan"
+"ate"
 key:
-not built
+a:1 | e:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2249,14 +2249,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+undefined
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2265,14 +2265,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2281,14 +2281,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2297,14 +2297,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2313,14 +2313,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2329,14 +2329,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2345,14 +2345,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+4 / 6
 str:
-"tan"
+"nat"
 key:
-not built
+a:1 | n:1 | t:1
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2361,14 +2361,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+5 / 6
 str:
-"tan"
+undefined
 key:
 not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2377,14 +2377,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+5 / 6
 str:
-"tan"
+"bat"
 key:
-a:1 | n:1 | t:1
+not built
 mapSize:
-1
+2
 res:
 pending
 ```
@@ -2393,12 +2393,12 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+5 / 6
 str:
-"tan"
+"bat"
 key:
-a:1 | n:1 | t:1
+not built
 mapSize:
 2
 res:
@@ -2409,12 +2409,12 @@ pending
 
 HUD:
 ```text
-wordIndex:
-2 / 6
+i:
+5 / 6
 str:
-"tan"
+"bat"
 key:
-a:1 | n:1 | t:1
+not built
 mapSize:
 2
 res:
@@ -2425,12 +2425,12 @@ pending
 
 HUD:
 ```text
-wordIndex:
-3 / 6
+i:
+5 / 6
 str:
-undefined
+"bat"
 key:
-not built
+a:1 | b:1 | t:1
 mapSize:
 2
 res:
@@ -2441,14 +2441,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-3 / 6
+i:
+5 / 6
 str:
-"ate"
+"bat"
 key:
-not built
+a:1 | b:1 | t:1
 mapSize:
-2
+3
 res:
 pending
 ```
@@ -2457,14 +2457,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-3 / 6
+i:
+5 / 6
 str:
-"ate"
+"bat"
 key:
-not built
+a:1 | b:1 | t:1
 mapSize:
-2
+3
 res:
 pending
 ```
@@ -2473,14 +2473,14 @@ pending
 
 HUD:
 ```text
-wordIndex:
-3 / 6
+i:
+done
 str:
-"ate"
+undefined
 key:
 not built
 mapSize:
-2
+3
 res:
 pending
 ```
@@ -2489,567 +2489,7 @@ pending
 
 HUD:
 ```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 44 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 45 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 46 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 47 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 48 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 49 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-a:1 | e:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 50 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-a:1 | e:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 51 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-3 / 6
-str:
-"ate"
-key:
-a:1 | e:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 52 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-undefined
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 53 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 54 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 55 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 56 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 57 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 58 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 59 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 60 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 61 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 62 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-a:1 | n:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 63 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-a:1 | n:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 64 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-4 / 6
-str:
-"nat"
-key:
-a:1 | n:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 65 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-undefined
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 66 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 67 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 68 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 69 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 70 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 71 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 72 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 73 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 74 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-not built
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 75 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-a:1 | b:1 | t:1
-mapSize:
-2
-res:
-pending
-```
-
-#### Step 76 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-a:1 | b:1 | t:1
-mapSize:
-3
-res:
-pending
-```
-
-#### Step 77 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
-5 / 6
-str:
-"bat"
-key:
-a:1 | b:1 | t:1
-mapSize:
-3
-res:
-pending
-```
-
-#### Step 78 (next: Step Over)
-
-HUD:
-```text
-wordIndex:
+i:
 done
 str:
 undefined
@@ -3061,11 +2501,11 @@ res:
 pending
 ```
 
-#### Step 79 (next: Step Over)
+#### Step 44 (next: Finished!)
 
 HUD:
 ```text
-wordIndex:
+i:
 done
 str:
 undefined
@@ -3074,14 +2514,14 @@ not built
 mapSize:
 3
 res:
-pending
+[["eat","tea","ate"],["tan","nat"],["bat"]]
 ```
 
 ### Final Snapshot
 
 HUD:
 ```text
-wordIndex:
+i:
 done
 str:
 undefined
@@ -3090,13 +2530,13 @@ not built
 mapSize:
 3
 res:
-pending
+[["eat","tea","ate"],["tan","nat"],["bat"]]
 ```
 
 ### After Step Back
 
 ```text
-wordIndex:
+i:
 done
 str:
 undefined
@@ -6046,7 +5486,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6085,7 +5525,7 @@ nonzero counts = all zero;
 
 
 HUD ON
-return result = pending;
+return ans = pending;
 ```
 
 ### Initial Narration
@@ -6100,7 +5540,7 @@ Start the function with two strings: s and t. An anagram must have the same lett
 No iterations yet. Step into the frequency loop to start the trace.
 ```
 
-### Step Snapshots (80)
+### Step Snapshots (35)
 
 #### Step 0 (next: Step Over)
 
@@ -6112,7 +5552,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6133,7 +5573,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6154,7 +5594,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6175,7 +5615,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6196,7 +5636,7 @@ s[i]:
 'a'
 t[i]:
 'n'
-result:
+ans:
 pending
 ```
 
@@ -6217,7 +5657,7 @@ s[i]:
 'a'
 t[i]:
 'n'
-result:
+ans:
 pending
 ```
 
@@ -6238,7 +5678,7 @@ s[i]:
 'a'
 t[i]:
 'n'
-result:
+ans:
 pending
 ```
 
@@ -6259,7 +5699,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6280,7 +5720,7 @@ s[i]:
 'n'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6301,7 +5741,7 @@ s[i]:
 'n'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6322,7 +5762,7 @@ s[i]:
 'n'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6343,7 +5783,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6364,7 +5804,7 @@ s[i]:
 'a'
 t[i]:
 'g'
-result:
+ans:
 pending
 ```
 
@@ -6385,7 +5825,7 @@ s[i]:
 'a'
 t[i]:
 'g'
-result:
+ans:
 pending
 ```
 
@@ -6406,7 +5846,7 @@ s[i]:
 'a'
 t[i]:
 'g'
-result:
+ans:
 pending
 ```
 
@@ -6427,7 +5867,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6448,7 +5888,7 @@ s[i]:
 'g'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6469,7 +5909,7 @@ s[i]:
 'g'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6490,7 +5930,7 @@ s[i]:
 'g'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6511,7 +5951,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6532,7 +5972,7 @@ s[i]:
 'r'
 t[i]:
 'r'
-result:
+ans:
 pending
 ```
 
@@ -6553,7 +5993,7 @@ s[i]:
 'r'
 t[i]:
 'r'
-result:
+ans:
 pending
 ```
 
@@ -6574,7 +6014,7 @@ s[i]:
 'r'
 t[i]:
 'r'
-result:
+ans:
 pending
 ```
 
@@ -6595,7 +6035,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6616,7 +6056,7 @@ s[i]:
 'a'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6637,7 +6077,7 @@ s[i]:
 'a'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6658,7 +6098,7 @@ s[i]:
 'a'
 t[i]:
 'a'
-result:
+ans:
 pending
 ```
 
@@ -6679,7 +6119,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6700,7 +6140,7 @@ s[i]:
 'm'
 t[i]:
 'm'
-result:
+ans:
 pending
 ```
 
@@ -6721,7 +6161,7 @@ s[i]:
 'm'
 t[i]:
 'm'
-result:
+ans:
 pending
 ```
 
@@ -6742,7 +6182,7 @@ s[i]:
 'm'
 t[i]:
 'm'
-result:
+ans:
 pending
 ```
 
@@ -6763,7 +6203,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6784,7 +6224,7 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
+ans:
 pending
 ```
 
@@ -6805,18 +6245,18 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
-pending
+ans:
+true
 ```
 
 Result:
 ```text
 return value
-pending
-pending
+true
+true
 ```
 
-#### Step 34 (next: Step Over)
+#### Step 34 (next: Finished!)
 
 HUD:
 ```text
@@ -6826,967 +6266,22 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
-pending
+ans:
+true
 ```
 
 Result:
 ```text
 return value
-pending
-pending
-```
-
-#### Step 35 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 36 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 37 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 38 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 39 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 40 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 41 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 42 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 43 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 44 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 45 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 46 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 47 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 48 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 49 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 50 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 51 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 52 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 53 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 54 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 55 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 56 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 57 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 58 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 59 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 60 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 61 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 62 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 63 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 64 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 65 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 66 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 67 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 68 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 69 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 70 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 71 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 72 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 73 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 74 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 75 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 76 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 77 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 78 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
-```
-
-#### Step 79 (next: Step Over)
-
-HUD:
-```text
-i:
-done
-s[i]:
-undefined
-t[i]:
-undefined
-result:
-pending
-```
-
-Result:
-```text
-return value
-pending
-pending
+true
+true
 ```
 
 ### Final Snapshot
 
 return value: return value
-pending
-pending
+true
+true
 
 HUD:
 ```text
@@ -7796,8 +6291,8 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
-pending
+ans:
+true
 ```
 
 ### After Step Back
@@ -7809,8 +6304,8 @@ s[i]:
 undefined
 t[i]:
 undefined
-result:
-pending
+ans:
+true
 ```
 
 ### Controls

@@ -199,6 +199,13 @@ async function captureVisualizer(page, filePath) {
     });
   }
 
+  if (step >= MAX_STEPS) {
+    const nextButtonState = await getNextButtonState(page);
+    if (!shouldStopStepping(nextButtonState)) {
+      fileErrors.push(`Hit MAX_STEPS=${MAX_STEPS} before visualizer finished`);
+    }
+  }
+
   const finalRaw = await captureSnapshot(page);
   const finalSnapshot = limitSnapshotFields(finalRaw);
   report.finalSnapshot = {
