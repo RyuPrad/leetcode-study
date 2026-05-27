@@ -215,7 +215,7 @@
       <button class="btn-dock" onclick="dockLeft()">Dock Left</button>
       <button class="btn-dock" onclick="dockRight()">Dock Right</button>
     </div>
-    <div id="hud" class="hud"></div>
+    <div id="hud-ui" class="hud"></div>
     <div class="btn-row">
       <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">[3,2,0,-4], pos=1</button>
       <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">[1,2], pos=0</button>
@@ -236,7 +236,7 @@
     <div class="btn-row">
       <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
       <button id="btn-next" onclick="nextStep()">Step Over</button>
-      <button onclick="reset()">Reset</button>
+      <button id="btn-reset" onclick="reset()">Reset</button>
     </div>
   </div>
 
@@ -321,7 +321,7 @@
     let state = State.INIT;
     let slowId = null;
     let fastId = null;
-    let answer = 'pending';
+    let ans = 'pending';
     let condition = 'not checked';
     let cycleNesting = 'reference'; // 'reference' = nested refs, 'memory' = declarations
     let memoryLabels = true;
@@ -400,7 +400,7 @@
       state = State.INIT;
       slowId = null;
       fastId = null;
-      answer = 'pending';
+      ans = 'pending';
       condition = 'not checked';
       history = [];
       lastAction = {};
@@ -409,7 +409,7 @@
 
     function saveState() {
       history.push({
-        state, slowId, fastId, answer, condition,
+        state, slowId, fastId, ans, condition,
         lastAction: JSON.parse(JSON.stringify(lastAction || {}))
       });
     }
@@ -418,7 +418,7 @@
       state = s.state;
       slowId = s.slowId;
       fastId = s.fastId;
-      answer = s.answer;
+      ans = s.ans;
       condition = s.condition;
       lastAction = s.lastAction || {};
     }
@@ -436,7 +436,7 @@
       if (state === State.INIT) {
         slowId = headId;
         fastId = headId;
-        answer = 'pending';
+        ans = 'pending';
         condition = 'not checked';
         lastAction = { type: 'assign', nodeId: headId };
         state = State.ASSIGN;
@@ -448,7 +448,7 @@
         lastAction = { type: 'check', fastId, fastNextId: fastNext, result: canContinue };
         state = State.CHECK;
         if (!canContinue) {
-          answer = 'false';
+          ans = 'false';
           state = State.RETURN_FALSE;
           lastAction = { type: 'returnFalse', fastId, fastNextId: fastNext };
         }
@@ -471,7 +471,7 @@
         condition = 'checked slow === fast';
         state = State.COMPARE;
         if (same) {
-          answer = 'true';
+          ans = 'true';
           state = State.RETURN_TRUE;
           lastAction = { type: 'returnTrue', meetingId: slowId };
         }
@@ -619,13 +619,12 @@
     }
 
     function renderHud() {
-      const cls = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
-      document.getElementById('hud').innerHTML = `
+      const cls = ans === 'true' ? 'true' : ans === 'false' ? 'false' : 'warn';
+      document.getElementById('hud-ui').innerHTML = `
         <div class="hud-line"><span>head:</span><span class="hud-val">${nodeLabel(headId)}</span></div>
         <div class="hud-line"><span>slow:</span><span class="hud-val">${state === State.INIT ? 'unassigned' : nodeLabel(slowId)}</span></div>
         <div class="hud-line"><span>fast:</span><span class="hud-val">${state === State.INIT ? 'unassigned' : nodeLabel(fastId)}</span></div>
-        <div class="hud-line"><span>condition:</span><span class="hud-val warn">${condition}</span></div>
-        <div class="hud-line"><span>answer:</span><span class="hud-val ${cls}">${answer}</span></div>
+        <div class="hud-line"><span>ans:</span><span class="hud-val ${cls}">${ans}</span></div>
       `;
     }
 
@@ -651,7 +650,7 @@
     }
 
     function renderConsole() {
-      const answerClass = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
+      const answerClass = ans === 'true' ? 'true' : ans === 'false' ? 'false' : 'warn';
       const started = state !== State.INIT;
       document.getElementById('console').innerHTML = `
         <div class="console-grid">
@@ -660,7 +659,7 @@
           <div class="console-key">slow</div><div class="console-val">${started ? nodeLabel(slowId) : 'unassigned'}</div>
           <div class="console-key">fast</div><div class="console-val">${started ? nodeLabel(fastId) : 'unassigned'}</div>
           <div class="console-key">condition</div><div class="console-val warn">${condition}</div>
-          <div class="console-key">answer</div><div class="console-val ${answerClass}">${answer}</div>
+          <div class="console-key">ans</div><div class="console-val ${answerClass}">${ans}</div>
           <div class="console-key">last action</div><div class="console-val">${describeLastAction()}</div>
         </div>
       `;
@@ -918,7 +917,7 @@ ${indent}}</span>`;
     }
 
     function renderActionCard(h) {
-      const answerClass = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
+      const answerClass = ans === 'true' ? 'true' : ans === 'false' ? 'false' : 'warn';
       let modeNote = cycleNesting === 'reference'
         ? 'Nested refs mode shows acyclic lists fully nested, and cyclic lists end exactly where the next field points back to an existing object.'
         : 'Memory graph mode shows every node object once with next references, which is the most accurate finite view of cyclic JavaScript data.';
@@ -927,7 +926,7 @@ ${indent}}</span>`;
         <div class="action-title">${escapeHtml(h.messageTitle)}</div>
         <div class="action-row"><div class="action-key">touching</div><div class="action-val">${describeTouchedObject()}</div></div>
         <div class="action-row"><div class="action-key">meaning</div><div class="action-val">${escapeHtml(h.messageBody)}</div></div>
-        <div class="action-row"><div class="action-key">answer</div><div class="action-val ${answerClass}">${escapeHtml(answer)}</div></div>
+        <div class="action-row"><div class="action-key">ans</div><div class="action-val ${answerClass}">${escapeHtml(ans)}</div></div>
         <div class="small-note">${escapeHtml(modeNote)}</div>
       `;
     }
