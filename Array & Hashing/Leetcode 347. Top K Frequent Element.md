@@ -192,3 +192,13 @@ not:
 ```
 const buckets = new Array(nums.length + 1).fill([]);
 ```
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| nums | input array |
+| k | number of most frequent elements to return |
+| freq | map of value → frequency count |
+| buckets | array where index = frequency |
+| res | top k frequent elements |

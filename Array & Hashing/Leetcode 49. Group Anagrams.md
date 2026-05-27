@@ -36,3 +36,12 @@ So visually I shortened it to:
 ```
 a:1 | e:1 | t:1 → ["eat", "tea"]
 ```
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| strs | input word list |
+| groups | map from frequency key → word group |
+| key | encoded letter-count signature |
+| res | array of grouped words |

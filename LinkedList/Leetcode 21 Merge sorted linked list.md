@@ -18,3 +18,13 @@ Each one is a pointer that walks through its own list independently. At every it
 That's the defining feature of the two-pointer pattern: two independent cursors moving through data, each advancing based on a condition rather than in lockstep.
 
 `tail` isn't one of the two pointers — it's a separate bookkeeping pointer tracking where to append next in the output list.
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| list1 | first sorted list |
+| list2 | second sorted list |
+| dummy | sentinel head node |
+| tail | end of merged list |
+| curr | node being attached |

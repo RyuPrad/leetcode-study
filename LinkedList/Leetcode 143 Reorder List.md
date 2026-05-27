@@ -52,10 +52,10 @@ var reorderList = function(head) {
   let curr = second;
 
   while (curr) {
-    let nextTemp = curr.next;
+    let next = curr.next;
     curr.next = prev;
     prev = curr;
-    curr = nextTemp;
+    curr = next;
   }
 
   let first = head;
@@ -98,3 +98,15 @@ Object: Memory / Nested
 ```
 
 Use **Phase + Learning** for studying. Use **Debugger + All** when you want to inspect every pointer at once.
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| head | list head |
+| slow | slow pointer for midpoint |
+| fast | fast pointer for midpoint |
+| prev | previous node while reversing |
+| curr | current node while reversing |
+| next | saved next pointer |
+| second | start of second half |

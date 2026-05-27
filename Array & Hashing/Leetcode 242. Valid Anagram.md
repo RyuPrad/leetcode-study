@@ -6,3 +6,12 @@
   allow="fullscreen"
   allowfullscreen>
 </iframe>
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| s | first string |
+| t | second string |
+| freq | letter frequency array |
+| i | current index |

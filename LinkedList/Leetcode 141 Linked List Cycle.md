@@ -29,3 +29,11 @@ return false;
 ```
 
 The important part is that `slow === fast` compares whether both pointers reference the exact same node object, not whether their values are equal.
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| head | list head |
+| slow | slow pointer |
+| fast | fast pointer |

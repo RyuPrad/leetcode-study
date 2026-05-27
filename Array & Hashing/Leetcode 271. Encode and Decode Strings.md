@@ -6,3 +6,13 @@
   allow="fullscreen"
   allowfullscreen>
 </iframe>
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| strs | strings to encode |
+| encoded | length-prefixed encoded string |
+| decoded | decoded string array |
+| i | read pointer in encoded string |
+| len | parsed word length |

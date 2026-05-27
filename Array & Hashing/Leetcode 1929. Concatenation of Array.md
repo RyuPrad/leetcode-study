@@ -7,3 +7,12 @@
   allow="fullscreen"
   allowfullscreen>
 </iframe>
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| nums | input array |
+| res | concatenated output |
+| i | loop index |
+| n | length of nums |

@@ -8,3 +8,11 @@
   allowfullscreen>
 </iframe>
 
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| nums | input array |
+| seen | set of values already visited |
+| num | value at nums[i] |
+| i | current index |
