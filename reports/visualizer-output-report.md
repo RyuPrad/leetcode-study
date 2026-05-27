@@ -1,8 +1,17 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T09:32:19.536Z
+Generated: 2026-05-27T20:35:57.821Z
 
 Generated from 19 HTML visualizers.
+
+## Summary
+
+- Visualizers captured: 19
+- Visualizers with errors: 0
+- Max step limit: 80
+- Highest steps used: 67
+- Visualizers at max step limit: 0
+- Total step snapshots: 483
 
 ## Array & Hashing/concatenation_of_array_visualizer.html
 
@@ -36,35 +45,17 @@ const nums = [ 1, 2, 1 ];
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 const n = 3;
 
-
-
-HUD ON
 let value = undefined;
 
-
-
-HUD ON
 let firstIndex = undefined;
 
-
-
-HUD ON
 let secondIndex = undefined;
 
-
-
-HUD ON
 const res = [ _, _, _, _, _, _ ];
-
 
 // Output
 return res = [ _, _, _, _, _, _ ];
@@ -104,8 +95,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -129,8 +118,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -154,8 +141,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -179,8 +164,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -204,8 +187,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -229,8 +210,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -254,8 +233,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -279,8 +256,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -304,8 +279,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -329,8 +302,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -354,8 +325,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -379,8 +348,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -404,8 +371,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -429,8 +394,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -454,8 +417,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -479,8 +440,6 @@ res:
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -504,8 +463,6 @@ res:
 
 Result:
 ```text
-return value
-[ 1, 2, 1, 1, 2, 1 ]
 [ 1, 2, 1, 1, 2, 1 ]
 ```
 
@@ -529,16 +486,12 @@ res:
 
 Result:
 ```text
-return value
-[ 1, 2, 1, 1, 2, 1 ]
 [ 1, 2, 1, 1, 2, 1 ]
 ```
 
 ### Final Snapshot
 
-return value: return value
-[ 1, 2, 1, 1, 2, 1 ]
-[ 1, 2, 1, 1, 2, 1 ]
+return value: [ 1, 2, 1, 1, 2, 1 ]
 
 HUD:
 ```text
@@ -588,12 +541,6 @@ res:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
 
 ### Errors
 
@@ -626,28 +573,16 @@ const nums = [ 1, 2, 3, 1 ];
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let num = undefined;
 
-
-
-HUD ON
 const seen = new Set();
 
-
-INFO
 seen.has(num) = not checked;
 
 // Output
 
-
-HUD ON
 return result = pending;
 ```
 
@@ -681,8 +616,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -702,8 +635,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -723,8 +654,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -744,8 +673,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -765,8 +692,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -786,8 +711,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -807,8 +730,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -828,8 +749,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -849,8 +768,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -870,8 +787,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -891,8 +806,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -912,8 +825,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -933,8 +844,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -954,8 +863,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -975,8 +882,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -996,8 +901,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -1017,8 +920,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -1038,8 +939,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -1059,8 +958,6 @@ true
 
 Result:
 ```text
-return value
-true
 true
 ```
 
@@ -1080,16 +977,12 @@ true
 
 Result:
 ```text
-return value
-true
 true
 ```
 
 ### Final Snapshot
 
-return value: return value
-true
-true
+return value: true
 
 HUD:
 ```text
@@ -1131,11 +1024,6 @@ true
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 
@@ -1171,35 +1059,19 @@ const encodedSource = "4#neet4#code4#love3#you";
 
 // Live state
 
-
-HUD ON
 let mode = "encode";
 
-
-
-HUD ON
 let index = 0;
 
-
-
-HUD ON
 let i = 0;
 
-
-INFO
 let j = 0;
-INFO
 let start = undefined;
 
-
-HUD ON
 let len = undefined;
-
 
 // Output
 
-
-HUD OFF
 return encoded = "4#neet4#code4#love3#you";
 ```
 
@@ -1235,8 +1107,6 @@ result:
 
 Result:
 ```text
-encoded output
-""
 ""
 ```
 
@@ -1258,8 +1128,6 @@ result:
 
 Result:
 ```text
-encoded output
-""
 ""
 ```
 
@@ -1281,8 +1149,6 @@ result:
 
 Result:
 ```text
-encoded output
-""
 ""
 ```
 
@@ -1304,8 +1170,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet"
 "4#neet"
 ```
 
@@ -1327,8 +1191,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet"
 "4#neet"
 ```
 
@@ -1350,8 +1212,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet"
 "4#neet"
 ```
 
@@ -1373,8 +1233,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet"
 "4#neet"
 ```
 
@@ -1396,8 +1254,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code"
 "4#neet4#code"
 ```
 
@@ -1419,8 +1275,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code"
 "4#neet4#code"
 ```
 
@@ -1442,8 +1296,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code"
 "4#neet4#code"
 ```
 
@@ -1465,8 +1317,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code"
 "4#neet4#code"
 ```
 
@@ -1488,8 +1338,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love"
 "4#neet4#code4#love"
 ```
 
@@ -1511,8 +1359,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love"
 "4#neet4#code4#love"
 ```
 
@@ -1534,8 +1380,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love"
 "4#neet4#code4#love"
 ```
 
@@ -1557,8 +1401,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love"
 "4#neet4#code4#love"
 ```
 
@@ -1580,8 +1422,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love3#you"
 "4#neet4#code4#love3#you"
 ```
 
@@ -1603,8 +1443,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love3#you"
 "4#neet4#code4#love3#you"
 ```
 
@@ -1626,8 +1464,6 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love3#you"
 "4#neet4#code4#love3#you"
 ```
 
@@ -1649,16 +1485,12 @@ result:
 
 Result:
 ```text
-encoded output
-"4#neet4#code4#love3#you"
 "4#neet4#code4#love3#you"
 ```
 
 ### Final Snapshot
 
-return value: encoded output
-"4#neet4#code4#love3#you"
-"4#neet4#code4#love3#you"
+return value: "4#neet4#code4#love3#you"
 
 HUD:
 ```text
@@ -1706,13 +1538,6 @@ result:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): INFO
-- (no id): HUD ON
-- (no id): HUD OFF
 
 ### Errors
 
@@ -1748,38 +1573,22 @@ const strs = ["eat", "tea", "tan", "ate", "nat", "bat"];
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let str = undefined;
 
-
-INFO
 let charIndex = 0;
-INFO
 let count = all zeros;
 
-
-HUD ON
 const key = not built;
 
-
-
-HUD OFF
 const groups.size = 0;
-
 
 // HashMap
 new Map()
 
 // Output
 
-
-HUD ON
 return res = pending;
 ```
 
@@ -2563,13 +2372,6 @@ pending
 - #btn-fullscreen: Fullscreen
 - #btn-prev: Step Back
 - #btn-next: Step Over
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): INFO
-- (no id): HUD ON
-- (no id): HUD OFF
-- (no id): HUD ON
 
 ### Errors
 
@@ -2603,30 +2405,16 @@ const strs = ["flower", "flow", "flight"];
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let j = 1;
 
-
-
-HUD ON
 const char = undefined;
 
-
-
-HUD ON
 let prefix = pending;
-
 
 // Output
 
-
-HUD ON
 return prefix = pending;
 ```
 
@@ -3092,11 +2880,6 @@ prefix:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
 
 ### Errors
 
@@ -3134,20 +2917,14 @@ const n = 4;
 
 // Live state
 
-HUD ON
 let phase = "INIT";
-HUD ON
 let i = null;
-HUD ON
 let nums[i] = undefined;
-HUD ON
 let prefix = 1;
-HUD ON
 let suffix = 1;
 
 // Output
 
-HUD ON
 return res = [ 1, 1, 1, 1 ];
 ```
 
@@ -3703,12 +3480,6 @@ res:
 - (no id): Dock Left
 - (no id): Dock Right
 - #btn-fullscreen: Fullscreen
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
 
 ### Errors
 
@@ -3746,22 +3517,15 @@ const k = 2;
 
 // Live state
 
-HUD ON
 let phase = "INIT";
-HUD ON
 let i = null;
-HUD ON
 let num = undefined;
-HUD ON
 let freq = null;
-HUD ON
 const freq = new Map();
-HUD ON
 const buckets = <span class="kw">empty buckets</span>;
 
 // Output
 
-HUD ON
 return res = [  ];
 ```
 
@@ -3799,8 +3563,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3824,8 +3586,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3849,8 +3609,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3874,8 +3632,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3899,8 +3655,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3924,8 +3678,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3949,8 +3701,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3974,8 +3724,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -3999,8 +3747,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4024,8 +3770,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4049,8 +3793,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4074,8 +3816,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4099,8 +3839,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4124,8 +3862,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4149,8 +3885,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4174,8 +3908,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4199,8 +3931,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4224,8 +3954,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4249,8 +3977,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4274,8 +4000,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4299,8 +4023,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4324,8 +4046,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4349,8 +4069,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4374,8 +4092,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4399,8 +4115,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ ]
 [ ]
 ```
 
@@ -4424,8 +4138,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1 ]
 [ 1 ]
 ```
 
@@ -4449,8 +4161,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1 ]
 [ 1 ]
 ```
 
@@ -4474,8 +4184,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1 ]
 [ 1 ]
 ```
 
@@ -4499,8 +4207,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1 ]
 [ 1 ]
 ```
 
@@ -4524,8 +4230,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1, 2 ]
 [ 1, 2 ]
 ```
 
@@ -4549,8 +4253,6 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1, 2 ]
 [ 1, 2 ]
 ```
 
@@ -4574,16 +4276,12 @@ res:
 
 Result:
 ```text
-return value / result
-[ 1, 2 ]
 [ 1, 2 ]
 ```
 
 ### Final Snapshot
 
-return value: return value / result
-[ 1, 2 ]
-[ 1, 2 ]
+return value: [ 1, 2 ]
 
 HUD:
 ```text
@@ -4635,13 +4333,6 @@ res:
 - (no id): Dock Left
 - (no id): Dock Right
 - #btn-fullscreen: Fullscreen
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
 
 ### Errors
 
@@ -4678,33 +4369,18 @@ const target = 9;
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let num = undefined;
 
-
-
-HUD ON
 let need = undefined;
 
-
-
-HUD ON
 const seen = new Map();
 
-
-INFO
 seen.has(need) = not checked;
 
 // Output
 
-
-HUD ON
 return res = pending;
 ```
 
@@ -4740,8 +4416,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4763,8 +4437,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4786,8 +4458,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4809,8 +4479,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4832,8 +4500,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4855,8 +4521,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4878,8 +4542,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4901,8 +4563,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4924,8 +4584,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4947,8 +4605,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -4970,8 +4626,6 @@ res:
 
 Result:
 ```text
-return value
-[0, 1]
 [0, 1]
 ```
 
@@ -4993,16 +4647,12 @@ res:
 
 Result:
 ```text
-return value
-[0, 1]
 [0, 1]
 ```
 
 ### Final Snapshot
 
-return value: return value
-[0, 1]
-[0, 1]
+return value: [0, 1]
 
 HUD:
 ```text
@@ -5048,12 +4698,6 @@ res:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 
@@ -5090,33 +4734,18 @@ const target = 9;
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let num = undefined;
 
-
-
-HUD ON
 let need = undefined;
 
-
-
-HUD ON
 const seen = new Map();
 
-
-INFO
 seen.has(need) = not checked;
 
 // Output
 
-
-HUD ON
 return res = pending;
 ```
 
@@ -5152,8 +4781,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5175,8 +4802,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5198,8 +4823,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5221,8 +4844,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5244,8 +4865,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5267,8 +4886,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5290,8 +4907,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5313,8 +4928,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5336,8 +4949,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5359,8 +4970,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5382,8 +4991,6 @@ res:
 
 Result:
 ```text
-return value
-[0, 1]
 [0, 1]
 ```
 
@@ -5405,16 +5012,12 @@ res:
 
 Result:
 ```text
-return value
-[0, 1]
 [0, 1]
 ```
 
 ### Final Snapshot
 
-return value: return value
-[0, 1]
-[0, 1]
+return value: [0, 1]
 
 HUD:
 ```text
@@ -5460,12 +5063,6 @@ res:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 
@@ -5499,32 +5096,18 @@ const t = "nagaram";
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let s[i] = undefined;
 
-
-
-HUD ON
 let t[i] = undefined;
 
-
-INFO
 length check = pass;
-INFO
 checking letter = a;
-INFO
 nonzero counts = all zero;
 
 // Output
 
-
-HUD ON
 return ans = pending;
 ```
 
@@ -5558,8 +5141,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5579,8 +5160,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5600,8 +5179,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5621,8 +5198,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5642,8 +5217,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5663,8 +5236,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5684,8 +5255,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5705,8 +5274,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5726,8 +5293,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5747,8 +5312,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5768,8 +5331,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5789,8 +5350,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5810,8 +5369,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5831,8 +5388,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5852,8 +5407,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5873,8 +5426,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5894,8 +5445,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5915,8 +5464,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5936,8 +5483,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5957,8 +5502,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5978,8 +5521,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -5999,8 +5540,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6020,8 +5559,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6041,8 +5578,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6062,8 +5597,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6083,8 +5616,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6104,8 +5635,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6125,8 +5654,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6146,8 +5673,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6167,8 +5692,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6188,8 +5711,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6209,8 +5730,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6230,8 +5749,6 @@ pending
 
 Result:
 ```text
-return value
-pending
 pending
 ```
 
@@ -6251,8 +5768,6 @@ true
 
 Result:
 ```text
-return value
-true
 true
 ```
 
@@ -6272,16 +5787,12 @@ true
 
 Result:
 ```text
-return value
-true
 true
 ```
 
 ### Final Snapshot
 
-return value: return value
-true
-true
+return value: true
 
 HUD:
 ```text
@@ -6323,13 +5834,6 @@ true
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): INFO
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 
@@ -6368,37 +5872,18 @@ const target = 9;
 
 // Live state
 
-
-HUD ON
 let left = 0;
 
-
-
-HUD ON
 let right = 5;
 
-
-
-HUD ON
 let mid = undefined;
 
-
-
-HUD ON
 let nums[mid] = undefined;
 
-
-
-HUD ON
 let target = 9;
 
-
-
-HUD ON
 let ans = undefined;
 
-
-INFO
 let state = "INIT";
 ```
 
@@ -6629,13 +6114,6 @@ ans:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
 
 ### Errors
 
@@ -6674,37 +6152,18 @@ const target = 5;
 
 // Live state
 
-
-HUD ON
 let left = 0;
 
-
-
-HUD ON
 let right = 3;
 
-
-
-HUD ON
 let mid = undefined;
 
-
-
-HUD ON
 let nums[mid] = undefined;
 
-
-
-HUD ON
 let target = 5;
 
-
-
-HUD ON
 let ans = undefined;
 
-
-INFO
 let state = "INIT";
 ```
 
@@ -6935,13 +6394,6 @@ ans:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
 
 ### Errors
 
@@ -7044,25 +6496,14 @@ const input_list2 = [ 1, 3, 4 ];
 
 // Live state
 
-
-HUD ON
 let list1 = 1 → 2 → 4 → null;
 
-
-
-HUD ON
 let list2 = 1 → 3 → 4 → null;
 
-
-
-HUD ON
 let tail = undefined;
-
 
 // Merged chain (dummy.next → ...)
 
-
-HUD OFF
 const result = pending;
 ```
 
@@ -7455,10 +6896,6 @@ node(4)
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD OFF
 
 ### Errors
 
@@ -7531,30 +6968,16 @@ const input_head = [ 1, 2, 3, 4, 5 ];
 
 // Live state
 
-
-HUD ON
 let head = 1 → 2 → 3 → 4 → 5 → null;
 
-
-
-HUD ON
 let prev = null;
 
-
-
-HUD ON
 let curr = 1 → 2 → 3 → 4 → 5 → null;
 
-
-
-HUD ON
 let next = undefined;
-
 
 // Return value
 
-
-HUD OFF
 const result = pending;
 ```
 
@@ -7997,11 +7420,6 @@ null
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD OFF
 
 ### Errors
 
@@ -8039,37 +7457,18 @@ const height = [1,8,6,2,5,4,8,3,7];
 
 // Live state
 
-
-HUD ON
 let left = 0;
 
-
-
-HUD ON
 let right = 8;
 
-
-
-HUD ON
 let width = undefined;
 
-
-
-HUD ON
 let currentHeight = undefined;
 
-
-
-HUD ON
 let area = undefined;
 
-
-
-HUD ON
 let ans = 0;
 
-
-INFO
 let state = "INIT";
 ```
 
@@ -8767,13 +8166,6 @@ ans:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
 
 ### Errors
 
@@ -8810,33 +8202,18 @@ const sorted = [-4,-1,-1,0,1,2];
 
 // Live state
 
-
-HUD ON
 let i = 0;
 
-
-
-HUD ON
 let left = 1;
 
-
-
-HUD ON
 let right = 5;
 
-
-
-HUD ON
 let sum = undefined;
 
-
-INFO
 let state = "INIT";
 
 // Output
 
-
-HUD ON
 return res = [];
 ```
 
@@ -9604,12 +8981,6 @@ res:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 
@@ -9646,33 +9017,18 @@ const cleaned = "amanaplanacanalpanama";
 
 // Live state
 
-
-HUD ON
 let left = 0;
 
-
-
-HUD ON
 let right = 29;
 
-
-
-HUD ON
 let charactersCompared = 0;
 
-
-
-HUD ON
 let charactersSkipped = 0;
 
-
-INFO
 let state = "INIT";
 
 // Output
 
-
-HUD ON
 return ans = undefined;
 ```
 
@@ -10808,12 +10164,6 @@ true
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): HUD ON
-- (no id): INFO
-- (no id): HUD ON
 
 ### Errors
 

@@ -8,6 +8,8 @@ const REPORTS_DIR = path.join(ROOT, "reports");
 const EXCLUDED_DIRS = new Set([".git", "node_modules", ".obsidian"]);
 const MAX_STEPS = 80;
 const TEXT_LIMIT = 12000;
+const UI_ONLY_LINES = new Set(["HUD ON", "HUD OFF", "INFO"]);
+const IGNORED_BUTTON_TEXT = new Set(["HUD ON", "HUD OFF", "INFO"]);
 
 function normalizeCapturedText(text) {
   if (!text) return "";
@@ -16,6 +18,47 @@ function normalizeCapturedText(text) {
     .map((line) => line.trimEnd())
     .join("\n")
     .trim();
+}
+
+function cleanCapturedPanelText(text) {
+  if (!text) return "";
+
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd());
+
+  const cleaned = [];
+  for (const line of lines) {
+    if (UI_ONLY_LINES.has(line.trim())) {
+      continue;
+    }
+    cleaned.push(line);
+  }
+
+  const collapsed = [];
+  let blankRun = 0;
+  for (const line of cleaned) {
+    if (line.trim() === "") {
+      blankRun += 1;
+      if (blankRun <= 1) {
+        collapsed.push("");
+      }
+      continue;
+    }
+    blankRun = 0;
+    collapsed.push(line);
+  }
+
+  return collapsed.join("\n").trim();
+}
+
+function filterVisibleButtons(buttons) {
+  if (!buttons) {
+    return [];
+  }
+  return buttons.filter((button) => !IGNORED_BUTTON_TEXT.has(button.text));
 }
 
 function limitText(text, max = TEXT_LIMIT) {
@@ -54,18 +97,28 @@ async function captureSnapshot(page) {
     }
 
     function resultText() {
-      const parts = [];
-      for (const selector of [".result-card", ".result-value"]) {
-        for (const element of document.querySelectorAll(selector)) {
-          const value = element.innerText.trim();
-          if (value) {
-            parts.push(value);
-          }
+      const resultValues = [];
+      for (const element of document.querySelectorAll(".result-value")) {
+        const value = element.innerText.trim();
+        if (value) {
+          resultValues.push(value);
         }
       }
-      return [...new Set(parts)].join("\n");
+      if (resultValues.length > 0) {
+        return [...new Set(resultValues)].join("\n");
+      }
+
+      const resultCards = [];
+      for (const element of document.querySelectorAll(".result-card")) {
+        const value = element.innerText.trim();
+        if (value) {
+          resultCards.push(value);
+        }
+      }
+      return [...new Set(resultCards)].join("\n");
     }
 
+    const ignoredButtonText = new Set(["HUD ON", "HUD OFF", "INFO"]);
     const visibleButtons = Array.from(document.querySelectorAll("button"))
       .filter((button) => {
         const style = window.getComputedStyle(button);
@@ -78,7 +131,8 @@ async function captureSnapshot(page) {
       .map((button) => ({
         id: button.id || null,
         text: button.innerText.trim(),
-      }));
+      }))
+      .filter((button) => !ignoredButtonText.has(button.text));
 
     return {
       title: document.title,
@@ -97,11 +151,30 @@ async function captureSnapshot(page) {
 function limitSnapshotFields(snapshot) {
   return {
     ...snapshot,
-    hudText: limitText(snapshot.hudText),
-    consoleText: limitText(snapshot.consoleText),
-    narrationText: limitText(snapshot.narrationText),
-    traceText: limitText(snapshot.traceText),
-    resultText: limitText(snapshot.resultText),
+    hudText: limitText(cleanCapturedPanelText(snapshot.hudText)),
+    consoleText: limitText(cleanCapturedPanelText(snapshot.consoleText)),
+    narrationText: limitText(cleanCapturedPanelText(snapshot.narrationText)),
+    traceText: limitText(cleanCapturedPanelText(snapshot.traceText)),
+    resultText: limitText(cleanCapturedPanelText(snapshot.resultText)),
+    visibleButtons: filterVisibleButtons(snapshot.visibleButtons),
+  };
+}
+
+function buildSummary(visualizers) {
+  const visualizersWithErrors = visualizers.filter((entry) => entry.errors.length > 0).length;
+  const maxStepsUsed = Math.max(0, ...visualizers.map((entry) => entry.steps.length));
+  const visualizersAtMaxStepLimit = visualizers
+    .filter((entry) => entry.steps.length >= MAX_STEPS)
+    .map((entry) => entry.file);
+  const totalStepSnapshots = visualizers.reduce((sum, entry) => sum + entry.steps.length, 0);
+
+  return {
+    visualizerCount: visualizers.length,
+    visualizersWithErrors,
+    maxStepLimit: MAX_STEPS,
+    maxStepsUsed,
+    visualizersAtMaxStepLimit,
+    totalStepSnapshots,
   };
 }
 
@@ -237,12 +310,22 @@ async function captureVisualizer(page, filePath) {
 }
 
 function buildMarkdownReport(report) {
+  const summary = report.summary;
   const lines = [
     "# Visualizer Output Report",
     "",
     `Generated: ${report.generatedAt}`,
     "",
     `Generated from ${report.visualizerCount} HTML visualizers.`,
+    "",
+    "## Summary",
+    "",
+    `- Visualizers captured: ${summary.visualizerCount}`,
+    `- Visualizers with errors: ${summary.visualizersWithErrors}`,
+    `- Max step limit: ${summary.maxStepLimit}`,
+    `- Highest steps used: ${summary.maxStepsUsed}`,
+    `- Visualizers at max step limit: ${summary.visualizersAtMaxStepLimit.length}`,
+    `- Total step snapshots: ${summary.totalStepSnapshots}`,
     "",
   ];
 
@@ -420,9 +503,11 @@ async function main() {
 
   await browser.close();
 
+  const summary = buildSummary(visualizers);
   const report = {
     generatedAt: new Date().toISOString(),
     visualizerCount: visualizers.length,
+    summary,
     visualizers,
   };
 
