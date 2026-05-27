@@ -9,9 +9,21 @@ const EXCLUDED_DIRS = new Set([".git", "node_modules", ".obsidian"]);
 const MAX_STEPS = 80;
 const TEXT_LIMIT = 12000;
 
-function limitText(text, max = TEXT_LIMIT) {
+function normalizeCapturedText(text) {
   if (!text) return "";
-  return text.length > max ? `${text.slice(0, max)}\n...[truncated]` : text;
+  return text
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+}
+
+function limitText(text, max = TEXT_LIMIT) {
+  const normalized = normalizeCapturedText(text);
+  if (!normalized) return "";
+  return normalized.length > max
+    ? `${normalized.slice(0, max)}\n...[truncated]`
+    : normalized;
 }
 
 function findHtmlFiles(dir, files = []) {

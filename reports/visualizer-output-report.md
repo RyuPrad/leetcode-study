@@ -1,6 +1,6 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T09:06:03.065Z
+Generated: 2026-05-27T09:14:14.907Z
 
 Generated from 19 HTML visualizers.
 
@@ -36,36 +36,36 @@ const nums = [ 1, 2, 1 ];
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 const n = 3;
 
-      
-        
+
+
 HUD ON
 let value = undefined;
 
-      
-        
+
+
 HUD ON
 let firstIndex = undefined;
 
-      
-        
+
+
 HUD ON
 let secondIndex = undefined;
 
-      
-        
+
+
 HUD ON
 const res = [ _, _, _, _, _, _ ];
 
-      
+
 // Output
 return res = [ _, _, _, _, _, _ ];
 ```
@@ -626,27 +626,27 @@ const nums = [ 1, 2, 3, 1 ];
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let num = undefined;
 
-      
-        
+
+
 HUD ON
 const seen = new Set();
 
-      
+
 INFO
 seen.has(num) = not checked;
 
 // Output
 
-        
+
 HUD ON
 return result = pending;
 ```
@@ -1150,66 +1150,543 @@ Step mode: btn-next
 ### Initial HUD
 
 ```text
-(empty)
+mode:
+encode
+index:
+0
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
+```
+
+### Initial Console
+
+```text
+// Input
+const strs = ["neet","code","love","you"];
+const encodedSource = "4#neet4#code4#love3#you";
+
+// Live state
+
+
+HUD ON
+let mode = "encode";
+
+
+
+HUD ON
+let index = 0;
+
+
+
+HUD ON
+let i = 0;
+
+
+INFO
+let j = 0;
+INFO
+let start = undefined;
+
+
+HUD ON
+let len = undefined;
+
+
+// Output
+
+
+HUD OFF
+return encoded = "4#neet4#code4#love3#you";
 ```
 
 ### Initial Narration
 
 ```text
-Press Step Over to begin.
+Start with an empty encoded string: result = "".
+```
+
+### Initial Trace
+
+```text
+No steps recorded yet. Step until the algorithm appends or slices a string.
 ```
 
 ### Step Snapshots (19)
 
 #### Step 0 (next: Step Over)
 
+HUD:
+```text
+mode:
+encode
+index:
+0
+i:
+0
+len:
+undefined
+result:
+""
+```
+
+Result:
+```text
+encoded output
+""
+""
+```
+
 #### Step 1 (next: Step Over)
-
-#### Step 2 (next: Step Over)
-
-#### Step 3 (next: Step Over)
-
-#### Step 4 (next: Step Over)
-
-#### Step 5 (next: Step Over)
-
-#### Step 6 (next: Step Over)
-
-#### Step 7 (next: Step Over)
-
-#### Step 8 (next: Step Over)
-
-#### Step 9 (next: Step Over)
-
-#### Step 10 (next: Step Over)
-
-#### Step 11 (next: Step Over)
-
-#### Step 12 (next: Step Over)
-
-#### Step 13 (next: Step Over)
-
-#### Step 14 (next: Step Over)
-
-#### Step 15 (next: Step Over)
-
-#### Step 16 (next: Step Over)
-
-#### Step 17 (next: Step Over)
-
-#### Step 18 (next: Finished!)
-
-### Final Snapshot
 
 HUD:
 ```text
-(empty)
+mode:
+encode
+index:
+0
+i:
+0
+len:
+4
+result:
+""
+```
+
+Result:
+```text
+encoded output
+""
+""
+```
+
+#### Step 2 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+0
+i:
+0
+len:
+4
+result:
+""
+```
+
+Result:
+```text
+encoded output
+""
+""
+```
+
+#### Step 3 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+0
+i:
+0
+len:
+4
+result:
+"4#neet"
+```
+
+Result:
+```text
+encoded output
+"4#neet"
+"4#neet"
+```
+
+#### Step 4 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+1
+i:
+0
+len:
+undefined
+result:
+"4#neet"
+```
+
+Result:
+```text
+encoded output
+"4#neet"
+"4#neet"
+```
+
+#### Step 5 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+1
+i:
+0
+len:
+4
+result:
+"4#neet"
+```
+
+Result:
+```text
+encoded output
+"4#neet"
+"4#neet"
+```
+
+#### Step 6 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+1
+i:
+0
+len:
+4
+result:
+"4#neet"
+```
+
+Result:
+```text
+encoded output
+"4#neet"
+"4#neet"
+```
+
+#### Step 7 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+1
+i:
+0
+len:
+4
+result:
+"4#neet4#code"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code"
+"4#neet4#code"
+```
+
+#### Step 8 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+2
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code"
+"4#neet4#code"
+```
+
+#### Step 9 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+2
+i:
+0
+len:
+4
+result:
+"4#neet4#code"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code"
+"4#neet4#code"
+```
+
+#### Step 10 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+2
+i:
+0
+len:
+4
+result:
+"4#neet4#code"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code"
+"4#neet4#code"
+```
+
+#### Step 11 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+2
+i:
+0
+len:
+4
+result:
+"4#neet4#code4#love"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love"
+"4#neet4#code4#love"
+```
+
+#### Step 12 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+3
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love"
+"4#neet4#code4#love"
+```
+
+#### Step 13 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+3
+i:
+0
+len:
+3
+result:
+"4#neet4#code4#love"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love"
+"4#neet4#code4#love"
+```
+
+#### Step 14 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+3
+i:
+0
+len:
+3
+result:
+"4#neet4#code4#love"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love"
+"4#neet4#code4#love"
+```
+
+#### Step 15 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+3
+i:
+0
+len:
+3
+result:
+"4#neet4#code4#love3#you"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love3#you"
+"4#neet4#code4#love3#you"
+```
+
+#### Step 16 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+4
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love3#you"
+"4#neet4#code4#love3#you"
+```
+
+#### Step 17 (next: Step Over)
+
+HUD:
+```text
+mode:
+encode
+index:
+4
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love3#you"
+"4#neet4#code4#love3#you"
+```
+
+#### Step 18 (next: Finished!)
+
+HUD:
+```text
+mode:
+encode
+index:
+4
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
+```
+
+Result:
+```text
+encoded output
+"4#neet4#code4#love3#you"
+"4#neet4#code4#love3#you"
+```
+
+### Final Snapshot
+
+return value: encoded output
+"4#neet4#code4#love3#you"
+"4#neet4#code4#love3#you"
+
+HUD:
+```text
+mode:
+encode
+index:
+4
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
 ```
 
 ### After Step Back
 
 ```text
-(empty)
+mode:
+encode
+index:
+4
+i:
+0
+len:
+undefined
+result:
+"4#neet4#code4#love3#you"
 ```
 
 ### Controls
@@ -1229,30 +1706,17 @@ HUD:
 - #btn-prev: Step Back
 - #btn-next: Step Over
 - #btn-reset: Reset
+- (no id): HUD ON
+- (no id): HUD ON
+- (no id): HUD ON
+- (no id): INFO
+- (no id): INFO
+- (no id): HUD ON
+- (no id): HUD OFF
 
 ### Errors
 
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
-- pageerror: Cannot access 'len' before initialization
+None
 
 ## Array & Hashing/group_anagrams_visualizer.html
 
@@ -1284,37 +1748,37 @@ const strs = ["eat", "tea", "tan", "ate", "nat", "bat"];
 
 // Live state
 
-        
+
 HUD ON
 let wordIndex = 0;
 
-      
-        
+
+
 HUD ON
 let str = undefined;
 
-      
+
 INFO
 let charIndex = 0;
 INFO
 let count = all zeros;
 
-        
+
 HUD ON
 const key = not built;
 
-      
-        
+
+
 HUD OFF
 const groups.size = 0;
 
-      
+
 // HashMap
 new Map()
 
 // Output
 
-        
+
 HUD ON
 return res = pending;
 ```
@@ -2699,29 +3163,29 @@ const strs = ["flower", "flow", "flight"];
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let j = 1;
 
-      
-        
+
+
 HUD ON
 const char = undefined;
 
-      
-        
+
+
 HUD ON
 let prefix = pending;
 
-      
+
 // Output
 
-        
+
 HUD ON
 return prefix = pending;
 ```
@@ -4774,32 +5238,32 @@ const target = 9;
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let num = undefined;
 
-      
-        
+
+
 HUD ON
 let need = undefined;
 
-      
-        
+
+
 HUD ON
 const seen = new Map();
 
-      
+
 INFO
 seen.has(need) = not checked;
 
 // Output
 
-        
+
 HUD ON
 return res = pending;
 ```
@@ -5186,32 +5650,32 @@ const target = 9;
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let num = undefined;
 
-      
-        
+
+
 HUD ON
 let need = undefined;
 
-      
-        
+
+
 HUD ON
 const seen = new Map();
 
-      
+
 INFO
 seen.has(need) = not checked;
 
 // Output
 
-        
+
 HUD ON
 return res = pending;
 ```
@@ -5595,21 +6059,21 @@ const t = "nagaram";
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let s[i] = undefined;
 
-      
-        
+
+
 HUD ON
 let t[i] = undefined;
 
-      
+
 INFO
 length check = pass;
 INFO
@@ -5619,7 +6083,7 @@ nonzero counts = all zero;
 
 // Output
 
-        
+
 HUD ON
 return result = pending;
 ```
@@ -7409,36 +7873,36 @@ const target = 9;
 
 // Live state
 
-        
+
 HUD ON
 let left = 0;
 
-      
-        
+
+
 HUD ON
 let right = 5;
 
-      
-        
+
+
 HUD ON
 let mid = undefined;
 
-      
-        
+
+
 HUD ON
 let nums[mid] = undefined;
 
-      
-        
+
+
 HUD ON
 let target = 9;
 
-      
-        
+
+
 HUD ON
 let ans = undefined;
 
-      
+
 INFO
 let state = "INIT";
 ```
@@ -7715,36 +8179,36 @@ const target = 5;
 
 // Live state
 
-        
+
 HUD ON
 let left = 0;
 
-      
-        
+
+
 HUD ON
 let right = 3;
 
-      
-        
+
+
 HUD ON
 let mid = undefined;
 
-      
-        
+
+
 HUD ON
 let nums[mid] = undefined;
 
-      
-        
+
+
 HUD ON
 let target = 5;
 
-      
-        
+
+
 HUD ON
 let ans = undefined;
 
-      
+
 INFO
 let state = "INIT";
 ```
@@ -8085,24 +8549,24 @@ const input_list2 = [ 1, 3, 4 ];
 
 // Live state
 
-                
+
 HUD ON
 let list1 = 1 → 2 → 4 → null;
 
-            
-                
+
+
 HUD ON
 let list2 = 1 → 3 → 4 → null;
 
-            
-                
+
+
 HUD ON
 let tail = undefined;
 
-            
+
 // Merged chain (dummy.next → ...)
 
-                
+
 HUD OFF
 const result = pending;
 ```
@@ -8572,29 +9036,29 @@ const input_head = [ 1, 2, 3, 4, 5 ];
 
 // Live state
 
-                
+
 HUD ON
 let head = 1 → 2 → 3 → 4 → 5 → null;
 
-            
-                
+
+
 HUD ON
 let prev = null;
 
-            
-                
+
+
 HUD ON
 let curr = 1 → 2 → 3 → 4 → 5 → null;
 
-            
-                
+
+
 HUD ON
 let next = undefined;
 
-            
+
 // Return value
 
-                
+
 HUD OFF
 const result = pending;
 ```
@@ -9080,36 +9544,36 @@ const height = [1,8,6,2,5,4,8,3,7];
 
 // Live state
 
-        
+
 HUD ON
 let left = 0;
 
-      
-        
+
+
 HUD ON
 let right = 8;
 
-      
-        
+
+
 HUD ON
 let width = undefined;
 
-      
-        
+
+
 HUD ON
 let currentHeight = undefined;
 
-      
-        
+
+
 HUD ON
 let area = undefined;
 
-      
-        
+
+
 HUD ON
 let ans = 0;
 
-      
+
 INFO
 let state = "INIT";
 ```
@@ -9851,32 +10315,32 @@ const sorted = [-4,-1,-1,0,1,2];
 
 // Live state
 
-        
+
 HUD ON
 let i = 0;
 
-      
-        
+
+
 HUD ON
 let left = 1;
 
-      
-        
+
+
 HUD ON
 let right = 5;
 
-      
-        
+
+
 HUD ON
 let sum = undefined;
 
-      
+
 INFO
 let state = "INIT";
 
 // Output
 
-        
+
 HUD ON
 return res = [];
 ```
@@ -10687,32 +11151,32 @@ const cleaned = "amanaplanacanalpanama";
 
 // Live state
 
-        
+
 HUD ON
 let left = 0;
 
-      
-        
+
+
 HUD ON
 let right = 29;
 
-      
-        
+
+
 HUD ON
 let charactersCompared = 0;
 
-      
-        
+
+
 HUD ON
 let charactersSkipped = 0;
 
-      
+
 INFO
 let state = "INIT";
 
 // Output
 
-        
+
 HUD ON
 return ans = undefined;
 ```
