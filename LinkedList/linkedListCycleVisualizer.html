@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeetCode 141 — Linked List Cycle Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --code: #1e1e1e;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    h1 { margin: 0 0 18px; font-size: 24px; color: #e5e5e5; }
+    h2 { margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: #e5e5e5; font-size: 18px; }
+    h3 { margin: 18px 0 10px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(560px, 1.35fr) minmax(380px, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+    .wide-panel { margin-top: 20px; }
+
+    /* Floating controls */
+    .floating-controls {
+      position: fixed;
+      top: 22px;
+      right: 22px;
+      z-index: 1000;
+      width: 292px;
+      background: rgba(30, 30, 30, 0.94);
+      backdrop-filter: blur(8px);
+      border: 1px solid #555;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+      user-select: none;
+    }
+    .drag-handle {
+      cursor: grab;
+      color: #aaa;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      text-align: center;
+      letter-spacing: 2px;
+      padding: 6px 0 8px;
+      border-bottom: 1px solid #555;
+      touch-action: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    button {
+      flex: 1;
+      border: 0;
+      border-radius: 4px;
+      padding: 8px 10px;
+      background: #0e639c;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #1177bb; }
+    button:disabled { background: #555; color: #999; cursor: not-allowed; }
+    .btn-ex { background: #4d4d4d; font-size: 12px; }
+    .btn-ex:hover { background: #666; }
+    .btn-ex.active { background: var(--green); color: #111; box-shadow: 0 0 10px rgba(106,153,85,0.45); }
+    .btn-toggle { background: #943b76; font-size: 12px; }
+    .btn-cycle-mode { background: #8b5a2b; font-size: 12px; }
+    .btn-dock { background: #555; font-size: 12px; }
+
+    .hud { margin-top: 8px; padding: 8px 0 2px; border-top: 1px dashed #555; font-family: Consolas, monospace; font-size: 13px; }
+    .hud-line { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; color: var(--cyan); }
+    .hud-val { color: #b5cea8; font-weight: 700; text-align: right; }
+    .hud-val.warn { color: var(--yellow); }
+    .hud-val.true { color: var(--green); }
+    .hud-val.false { color: var(--red); }
+
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-family: Consolas, monospace; font-size: 12px; }
+    .pill { border: 1px solid #444; border-radius: 999px; padding: 5px 10px; background: #1e1e1e; }
+    .pill.head { color: var(--blue); border-color: var(--blue); }
+    .pill.slow { color: var(--green); border-color: var(--green); }
+    .pill.fast { color: var(--purple); border-color: var(--purple); }
+    .pill.next { color: var(--yellow); border-color: var(--yellow); }
+    .pill.meet { color: var(--red); border-color: var(--red); }
+
+    .svg-wrap { width: 100%; min-height: 340px; overflow-x: auto; overflow-y: hidden; border: 1px solid #333; border-radius: 8px; background: #202020; }
+    svg { display: block; min-width: 760px; }
+    .node-circle { fill: #123145; stroke: #9cdcfe; stroke-width: 2; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.45)); }
+    .node-circle.head-node { stroke: var(--blue); stroke-width: 3; }
+    .node-circle.slow { stroke: var(--green); stroke-width: 4; }
+    .node-circle.fast { stroke: var(--purple); stroke-width: 4; }
+    .node-circle.meet { stroke: var(--red); stroke-width: 5; }
+    .node-circle.active-read { filter: drop-shadow(0 0 8px rgba(215,186,125,0.75)); }
+    .node-text { fill: var(--text); font-size: 18px; font-weight: 700; text-anchor: middle; dominant-baseline: central; font-family: Consolas, monospace; }
+    .idx-text { fill: #777; font-size: 11px; text-anchor: middle; font-family: Consolas, monospace; }
+    .edge-line { stroke: #888; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .edge-line.cycle { stroke: var(--yellow); stroke-width: 2.5; stroke-dasharray: 6 4; marker-end: url(#arrowYellow); }
+    .edge-line.hop { stroke: var(--yellow); stroke-width: 4; marker-end: url(#arrowYellow); filter: drop-shadow(0 0 4px rgba(215,186,125,0.7)); }
+    .edge-line.slow-hop { stroke: var(--green); stroke-width: 4; marker-end: url(#arrowGreen); }
+    .edge-line.fast-hop { stroke: var(--purple); stroke-width: 4; marker-end: url(#arrowPurple); }
+    .edge-label { font-family: Consolas, monospace; font-size: 12px; font-weight: 700; text-anchor: middle; }
+    .edge-label.slow { fill: var(--green); }
+    .edge-label.fast { fill: var(--purple); }
+    .edge-label.next { fill: var(--yellow); }
+
+    .badge { font-family: Consolas, monospace; font-size: 12px; font-weight: 700; text-anchor: middle; }
+    .badge-bg.head { fill: var(--blue); }
+    .badge-bg.slow { fill: var(--green); }
+    .badge-bg.fast { fill: var(--purple); }
+    .badge-bg.meet { fill: var(--red); }
+    .badge-text { fill: white; }
+    .badge-text.dark { fill: #111; }
+
+    .narration { margin-top: 14px; border-left: 4px solid var(--blue); background: var(--panel2); border-radius: 4px; padding: 12px 16px; line-height: 1.55; font-size: 14px; }
+    code { font-family: Consolas, monospace; color: var(--cyan); }
+
+    /* Code panel */
+    .code-panel { background: var(--code); border: 1px solid var(--border); border-radius: 6px; padding: 10px 0; overflow-x: auto; font-family: Consolas, monospace; font-size: 14px; line-height: 1.55; }
+    .code-line { white-space: pre; padding: 2px 14px; border-left: 4px solid transparent; }
+    .code-line.active { background: #062f4a; border-left-color: var(--blue); }
+    .code-line.future { opacity: 0.75; }
+    .kw { color: var(--purple); } .fn { color: #dcdcaa; } .vr { color: var(--cyan); } .cm { color: var(--green); } .op { color: var(--text); } .bool { color: #569cd6; }
+
+    .console { background: var(--code); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.65; overflow-x: auto; }
+    .console-grid { display: grid; grid-template-columns: 108px 1fr; gap: 4px 14px; }
+    .console-key { color: var(--cyan); font-weight: 700; }
+    .console-val { color: #b5cea8; }
+    .console-val.warn { color: var(--yellow); }
+    .console-val.true { color: var(--green); }
+    .console-val.false { color: var(--red); }
+
+    /* Object view */
+    .obj-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-family: Consolas, monospace; font-size: 12px; color: #aaa; }
+    .obj-mode-label { padding: 5px 10px; background: #1e1e1e; border: 1px solid #444; border-radius: 999px; }
+    .obj-mode-label.reference { color: var(--yellow); border-color: var(--yellow); }
+    .obj-mode-label.unroll { color: var(--orange); border-color: var(--orange); }
+    .object-grid { display: grid; grid-template-columns: minmax(420px, 1.1fr) minmax(260px, 0.65fr); gap: 16px; }
+    @media (max-width: 980px) { .object-grid { grid-template-columns: 1fr; } }
+    .obj-box { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow: auto; min-height: 250px; max-height: 560px; }
+    .obj-body { font-family: Consolas, Monaco, monospace; font-size: 13px; line-height: 1.55; white-space: pre; color: var(--text); }
+    .obj-node { border-radius: 3px; }
+    /* Highlight only the node header / touched line, not the entire nested subtree.
+       This prevents deep cycle views from turning into a giant wall of outlined boxes. */
+    .obj-node-head { display: inline-block; border-radius: 3px; padding: 0 3px; }
+    .obj-node-head.active-node { background: rgba(156, 220, 254, 0.10); outline: 1px solid var(--cyan); box-shadow: 0 0 7px rgba(156,220,254,0.25); }
+    .obj-node-head.assignment-node { background: rgba(86, 156, 214, 0.10); outline: 1px solid var(--blue); }
+    .obj-node-head.meet-node { background: rgba(226, 75, 74, 0.16); outline: 2px solid var(--red); box-shadow: 0 0 14px rgba(226,75,74,0.45); }
+    .obj-node.muted-repeat { opacity: 0.46; }
+    .obj-key { color: var(--cyan); }
+    .obj-key.hl-next { background: var(--yellow); color: #111; border-radius: 3px; padding: 1px 4px; font-weight: 700; }
+    .obj-val { color: #b5cea8; }
+    .obj-null { color: var(--purple); font-style: italic; }
+    .obj-comment { color: var(--green); font-style: italic; }
+    .obj-cycle { color: var(--red); font-style: italic; font-weight: 700; }
+    .obj-cap { color: var(--yellow); font-style: italic; font-weight: 700; }
+    .obj-repeat-cutoff { color: var(--orange); font-style: italic; font-weight: 700; background: rgba(206,145,120,0.08); border: 1px dashed var(--orange); border-radius: 4px; padding: 1px 6px; }
+    .obj-badge { display: inline-block; padding: 1px 6px; margin-left: 6px; border-radius: 3px; font-size: 11px; font-weight: 700; color: #111; }
+    .obj-badge.head { background: var(--blue); color: white; }
+    .obj-badge.slow { background: var(--green); color: #111; }
+    .obj-badge.fast { background: var(--purple); color: white; }
+    .obj-badge.meet { background: var(--red); color: white; }
+    .obj-badge.hop { background: var(--yellow); color: #111; }
+    .obj-label { color: var(--cyan); font-weight: 700; display: inline-block; border-left: 3px solid var(--blue); padding: 5px 10px; background: var(--panel2); border-radius: 4px; margin-bottom: 8px; }
+    .action-card { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.55; }
+    .action-title { color: var(--yellow); font-weight: 700; margin-bottom: 8px; }
+    .action-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin-bottom: 5px; }
+    .action-key { color: var(--cyan); }
+    .action-val { color: #b5cea8; }
+    .action-val.warn { color: var(--yellow); }
+    .action-val.true { color: var(--green); }
+    .action-val.false { color: var(--red); }
+
+    .small-note { margin-top: 10px; color: #aaa; font-size: 12px; font-family: Consolas, monospace; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <h1>LeetCode 141 — Linked List Cycle</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">:: DRAG THIS BAR ::</div>
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockLeft()">Dock Left</button>
+      <button class="btn-dock" onclick="dockRight()">Dock Right</button>
+    </div>
+    <div id="hud" class="hud"></div>
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">[3,2,0,-4], pos=1</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">[1,2], pos=0</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">[1], no cycle</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">[], no cycle</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-5" class="btn-ex" onclick="loadExample(5)">[1,2,3,4,5], pos=2</button>
+    </div>
+    <div class="btn-row">
+      <button id="memory-toggle" class="btn-toggle" onclick="toggleMemoryLabels()">Memory labels: ON</button>
+    </div>
+    <div class="btn-row">
+      <button id="cycle-toggle" class="btn-cycle-mode" onclick="toggleCycleNesting()">Object view: Nested refs</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button onclick="reset()">Reset</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Linked List View</h2>
+      <div class="legend">
+        <span class="pill head">head = entry pointer</span>
+        <span class="pill slow">slow = 1 step</span>
+        <span class="pill fast">fast = 2 steps</span>
+        <span class="pill next">yellow = .next being read</span>
+        <span class="pill meet">red = same object reference</span>
+      </div>
+      <div class="svg-wrap"><svg id="svg" width="920" height="340"></svg></div>
+      <div id="narration" class="narration">Press <b>Step Over</b> to start. No algorithm pointer has been assigned yet.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+        <div id="line-1" class="code-line"><span class="kw">var</span> hasCycle = <span class="kw">function</span>(<span class="vr">head</span>) {</div>
+        <div id="line-2" class="code-line">  <span class="kw">let</span> slow = head;</div>
+        <div id="line-3" class="code-line">  <span class="kw">let</span> fast = head;</div>
+        <div id="line-4" class="code-line"></div>
+        <div id="line-5" class="code-line">  <span class="kw">while</span> (fast !== <span class="kw">null</span> &amp;&amp; fast.next !== <span class="kw">null</span>) {</div>
+        <div id="line-6" class="code-line">    slow = slow.next;</div>
+        <div id="line-7" class="code-line">    fast = fast.next.next;</div>
+        <div id="line-8" class="code-line"></div>
+        <div id="line-9" class="code-line">    <span class="kw">if</span> (slow === fast) {</div>
+        <div id="line-10" class="code-line">      <span class="kw">return</span> <span class="bool">true</span>;</div>
+        <div id="line-11" class="code-line">    }</div>
+        <div id="line-12" class="code-line">  }</div>
+        <div id="line-13" class="code-line"></div>
+        <div id="line-14" class="code-line">  <span class="kw">return</span> <span class="bool">false</span>;</div>
+        <div id="line-15" class="code-line">};</div>
+      </div>
+
+      <h3>Variables</h3>
+      <div id="console" class="console"></div>
+    </div>
+  </div>
+
+  <div class="panel wide-panel">
+    <h2>Object View <span style="font-size:12px;color:#888;font-weight:400">— nested JS object format</span></h2>
+    <div class="obj-toolbar">
+      <span id="obj-mode-label" class="obj-mode-label reference">Nested refs mode</span>
+      <span>Highlights now follow the current code line, not every known fact.</span>
+    </div>
+    <div class="object-grid">
+      <div class="obj-box">
+        <div class="obj-label">head =</div>
+        <div id="object-view" class="obj-body"></div>
+      </div>
+      <div id="action-card" class="action-card"></div>
+    </div>
+  </div>
+
+  <script>
+    const EXAMPLES = {
+      1: { values: [3, 2, 0, -4], pos: 1 },
+      2: { values: [1, 2], pos: 0 },
+      3: { values: [1], pos: -1 },
+      4: { values: [], pos: -1 },
+      5: { values: [1, 2, 3, 4, 5], pos: 2 }
+    };
+
+    // Algorithm states are the states AFTER a Step Over has executed.
+    const State = {
+      INIT: 'INIT',
+      ASSIGN: 'ASSIGN',
+      CHECK: 'CHECK',
+      MOVE_SLOW: 'MOVE_SLOW',
+      MOVE_FAST: 'MOVE_FAST',
+      COMPARE: 'COMPARE',
+      RETURN_TRUE: 'RETURN_TRUE',
+      RETURN_FALSE: 'RETURN_FALSE'
+    };
+
+    let activeExample = 1;
+    let nodes = [];
+    let headId = null;
+    let state = State.INIT;
+    let slowId = null;
+    let fastId = null;
+    let answer = 'pending';
+    let condition = 'not checked';
+    let cycleNesting = 'reference'; // 'reference' = nested refs, 'memory' = declarations
+    let memoryLabels = true;
+    let history = [];
+    let lastAction = {};
+
+    // ---------- Drag logic with Pointer Events ----------
+    const dragContainer = document.getElementById('drag-container');
+    const dragHandle = document.getElementById('drag-handle');
+    let dragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    dragHandle.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      dragHandle.setPointerCapture(e.pointerId);
+      const rect = dragContainer.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+    });
+    dragHandle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      dragContainer.style.left = `${Math.max(0, e.clientX - offsetX)}px`;
+      dragContainer.style.top = `${Math.max(0, e.clientY - offsetY)}px`;
+      dragContainer.style.right = 'auto';
+    });
+    dragHandle.addEventListener('pointerup', (e) => {
+      dragging = false;
+      try { dragHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    function dockLeft() {
+      dragContainer.style.left = '22px';
+      dragContainer.style.right = 'auto';
+      dragContainer.style.top = '22px';
+    }
+    function dockRight() {
+      dragContainer.style.right = '22px';
+      dragContainer.style.left = 'auto';
+      dragContainer.style.top = '22px';
+    }
+
+    // ---------- Model ----------
+    function buildNodes(values, pos) {
+      nodes = values.map((value, i) => ({ id: `node${i}`, value, index: i, nextId: null }));
+      for (let i = 0; i < nodes.length; i++) {
+        if (i < nodes.length - 1) nodes[i].nextId = nodes[i + 1].id;
+        else nodes[i].nextId = pos >= 0 ? nodes[pos].id : null;
+      }
+      headId = nodes.length ? nodes[0].id : null;
+    }
+
+    function getNode(id) { return nodes.find(n => n.id === id) || null; }
+    function nextOf(id) { const n = getNode(id); return n ? n.nextId : null; }
+    function nodeLabel(id) {
+      if (id === null) return 'null';
+      const n = getNode(id);
+      return n ? `${n.id}(${n.value})` : 'undefined';
+    }
+    function shortNodeLabel(id) {
+      if (id === null) return 'null';
+      const n = getNode(id);
+      return n ? `${n.id}` : 'undefined';
+    }
+
+    function loadExample(num) {
+      activeExample = num;
+      const ex = EXAMPLES[num];
+      buildNodes(ex.values, ex.pos);
+      resetAlgorithmOnly();
+    }
+
+    function reset() { loadExample(activeExample); }
+
+    function resetAlgorithmOnly() {
+      state = State.INIT;
+      slowId = null;
+      fastId = null;
+      answer = 'pending';
+      condition = 'not checked';
+      history = [];
+      lastAction = {};
+      render();
+    }
+
+    function saveState() {
+      history.push({
+        state, slowId, fastId, answer, condition,
+        lastAction: JSON.parse(JSON.stringify(lastAction || {}))
+      });
+    }
+
+    function restoreState(s) {
+      state = s.state;
+      slowId = s.slowId;
+      fastId = s.fastId;
+      answer = s.answer;
+      condition = s.condition;
+      lastAction = s.lastAction || {};
+    }
+
+    function prevStep() {
+      if (!history.length) return;
+      restoreState(history.pop());
+      render();
+    }
+
+    function nextStep() {
+      if (state === State.RETURN_TRUE || state === State.RETURN_FALSE) return;
+      saveState();
+
+      if (state === State.INIT) {
+        slowId = headId;
+        fastId = headId;
+        answer = 'pending';
+        condition = 'not checked';
+        lastAction = { type: 'assign', nodeId: headId };
+        state = State.ASSIGN;
+      } else if (state === State.ASSIGN || state === State.COMPARE) {
+        const fastExists = fastId !== null;
+        const fastNext = nextOf(fastId);
+        const canContinue = fastExists && fastNext !== null;
+        condition = canContinue ? 'true: fast and fast.next exist' : 'false: fast cannot move 2 steps';
+        lastAction = { type: 'check', fastId, fastNextId: fastNext, result: canContinue };
+        state = State.CHECK;
+        if (!canContinue) {
+          answer = 'false';
+          state = State.RETURN_FALSE;
+          lastAction = { type: 'returnFalse', fastId, fastNextId: fastNext };
+        }
+      } else if (state === State.CHECK) {
+        const oldSlow = slowId;
+        const newSlow = nextOf(slowId);
+        slowId = newSlow;
+        lastAction = { type: 'moveSlow', fromId: oldSlow, toId: newSlow };
+        state = State.MOVE_SLOW;
+      } else if (state === State.MOVE_SLOW) {
+        const oldFast = fastId;
+        const hop1 = nextOf(fastId);
+        const hop2 = nextOf(hop1);
+        fastId = hop2;
+        lastAction = { type: 'moveFast', fromId: oldFast, hop1Id: hop1, toId: hop2 };
+        state = State.MOVE_FAST;
+      } else if (state === State.MOVE_FAST) {
+        const same = slowId !== null && slowId === fastId;
+        lastAction = { type: 'compare', slowId, fastId, same };
+        condition = 'checked slow === fast';
+        state = State.COMPARE;
+        if (same) {
+          answer = 'true';
+          state = State.RETURN_TRUE;
+          lastAction = { type: 'returnTrue', meetingId: slowId };
+        }
+      }
+
+      render();
+    }
+
+    function toggleMemoryLabels() {
+      memoryLabels = !memoryLabels;
+      document.getElementById('memory-toggle').textContent = `Memory labels: ${memoryLabels ? 'ON' : 'OFF'}`;
+      render();
+    }
+
+    function toggleCycleNesting() {
+      cycleNesting = cycleNesting === 'reference' ? 'memory' : 'reference';
+      document.getElementById('cycle-toggle').textContent = cycleNesting === 'reference'
+        ? 'Object view: Nested refs'
+        : 'Object view: Memory graph';
+      render();
+    }
+
+    // ---------- Semantic highlights ----------
+    function getSemanticHighlights() {
+      const h = {
+        activeNodeIds: new Set(),
+        assignmentNodeIds: new Set(),
+        meetNodeIds: new Set(),
+        nextFieldNodeIds: new Set(),
+        badgesByNodeId: new Map(),
+        slowHop: null,
+        fastHop1: null,
+        fastHop2: null,
+        messageTitle: 'Not started',
+        messageBody: 'The linked list exists, but the algorithm has not assigned slow or fast yet.'
+      };
+
+      const addBadge = (nodeId, badge) => {
+        if (nodeId === null) return;
+        if (!h.badgesByNodeId.has(nodeId)) h.badgesByNodeId.set(nodeId, []);
+        h.badgesByNodeId.get(nodeId).push(badge);
+      };
+
+      if (state === State.INIT) {
+        return h;
+      }
+
+      // head badge appears only after the algorithm has started.
+      addBadge(headId, { label: 'head', kind: 'head' });
+      addBadge(slowId, { label: 'slow', kind: 'slow' });
+      addBadge(fastId, { label: 'fast', kind: 'fast' });
+
+      switch (lastAction.type) {
+        case 'assign':
+          if (lastAction.nodeId !== null) h.assignmentNodeIds.add(lastAction.nodeId);
+          h.messageTitle = 'Assignment step';
+          h.messageBody = 'slow and fast are both assigned to head. This is the first real algorithm step.';
+          break;
+        case 'check':
+          if (lastAction.fastId !== null) {
+            h.activeNodeIds.add(lastAction.fastId);
+            h.nextFieldNodeIds.add(lastAction.fastId);
+          }
+          h.messageTitle = 'While-condition check';
+          h.messageBody = 'The code checks fast and fast.next so fast can safely move two steps.';
+          break;
+        case 'moveSlow':
+          h.activeNodeIds.add(lastAction.fromId);
+          h.nextFieldNodeIds.add(lastAction.fromId);
+          h.slowHop = { fromId: lastAction.fromId, toId: lastAction.toId };
+          addBadge(lastAction.fromId, { label: 'old slow', kind: 'slow' });
+          addBadge(lastAction.toId, { label: 'new slow', kind: 'slow' });
+          h.messageTitle = 'Move slow one step';
+          h.messageBody = 'The old slow node reads its .next field, then slow moves to that next node.';
+          break;
+        case 'moveFast':
+          h.activeNodeIds.add(lastAction.fromId);
+          if (lastAction.hop1Id !== null) h.activeNodeIds.add(lastAction.hop1Id);
+          h.nextFieldNodeIds.add(lastAction.fromId);
+          h.nextFieldNodeIds.add(lastAction.hop1Id);
+          h.fastHop1 = { fromId: lastAction.fromId, toId: lastAction.hop1Id };
+          h.fastHop2 = { fromId: lastAction.hop1Id, toId: lastAction.toId };
+          addBadge(lastAction.fromId, { label: 'fast start', kind: 'fast' });
+          addBadge(lastAction.hop1Id, { label: '1st hop', kind: 'hop' });
+          addBadge(lastAction.toId, { label: '2nd hop', kind: 'fast' });
+          h.messageTitle = 'Move fast two steps';
+          h.messageBody = 'fast follows .next once, then follows .next again. That is why fast may catch slow inside a cycle.';
+          break;
+        case 'compare':
+          if (lastAction.same) {
+            h.meetNodeIds.add(lastAction.slowId);
+            addBadge(lastAction.slowId, { label: 'same reference?', kind: 'meet' });
+          } else {
+            h.activeNodeIds.add(lastAction.slowId);
+            h.activeNodeIds.add(lastAction.fastId);
+            addBadge(lastAction.slowId, { label: 'compare', kind: 'slow' });
+            addBadge(lastAction.fastId, { label: 'compare', kind: 'fast' });
+          }
+          h.messageTitle = 'Compare references';
+          h.messageBody = 'slow === fast checks whether both variables point to the exact same node object, not just the same value.';
+          break;
+        case 'returnTrue':
+          h.meetNodeIds.add(lastAction.meetingId);
+          addBadge(lastAction.meetingId, { label: 'slow === fast', kind: 'meet' });
+          h.messageTitle = 'Return true';
+          h.messageBody = 'The two pointers met at the same object reference, so the list has a cycle.';
+          break;
+        case 'returnFalse':
+          if (lastAction.fastId !== null) {
+            h.activeNodeIds.add(lastAction.fastId);
+            h.nextFieldNodeIds.add(lastAction.fastId);
+          }
+          h.messageTitle = 'Return false';
+          h.messageBody = 'fast reached null, or fast.next reached null, so there is an actual end and no cycle.';
+          break;
+      }
+      return h;
+    }
+
+    // ---------- Rendering ----------
+    function render() {
+      const highlights = getSemanticHighlights();
+      renderButtons();
+      renderHud();
+      renderCode();
+      renderConsole();
+      renderNarration(highlights);
+      renderSvg(highlights);
+      renderObjectView(highlights);
+      renderActionCard(highlights);
+    }
+
+    function renderButtons() {
+      document.getElementById('btn-prev').disabled = history.length === 0;
+      const done = state === State.RETURN_TRUE || state === State.RETURN_FALSE;
+      document.getElementById('btn-next').disabled = done;
+      document.getElementById('btn-next').textContent = done ? 'Finished!' : 'Step Over';
+      document.querySelectorAll('.btn-ex').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`btn-ex-${activeExample}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      document.getElementById('memory-toggle').textContent = `Memory labels: ${memoryLabels ? 'ON' : 'OFF'}`;
+      document.getElementById('cycle-toggle').textContent = cycleNesting === 'reference'
+        ? 'Object view: Nested refs'
+        : 'Object view: Memory graph';
+    }
+
+    function renderHud() {
+      const cls = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
+      document.getElementById('hud').innerHTML = `
+        <div class="hud-line"><span>head:</span><span class="hud-val">${nodeLabel(headId)}</span></div>
+        <div class="hud-line"><span>slow:</span><span class="hud-val">${state === State.INIT ? 'unassigned' : nodeLabel(slowId)}</span></div>
+        <div class="hud-line"><span>fast:</span><span class="hud-val">${state === State.INIT ? 'unassigned' : nodeLabel(fastId)}</span></div>
+        <div class="hud-line"><span>condition:</span><span class="hud-val warn">${condition}</span></div>
+        <div class="hud-line"><span>answer:</span><span class="hud-val ${cls}">${answer}</span></div>
+      `;
+    }
+
+    function clearCodeHighlights() {
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+    }
+    function highlightLines(lines) {
+      clearCodeHighlights();
+      lines.forEach(n => {
+        const el = document.getElementById(`line-${n}`);
+        if (el) el.classList.add('active');
+      });
+    }
+    function renderCode() {
+      if (state === State.INIT) highlightLines([]);
+      else if (state === State.ASSIGN) highlightLines([2,3]);
+      else if (state === State.CHECK) highlightLines([5]);
+      else if (state === State.MOVE_SLOW) highlightLines([6]);
+      else if (state === State.MOVE_FAST) highlightLines([7]);
+      else if (state === State.COMPARE) highlightLines([9]);
+      else if (state === State.RETURN_TRUE) highlightLines([10]);
+      else if (state === State.RETURN_FALSE) highlightLines([14]);
+    }
+
+    function renderConsole() {
+      const answerClass = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
+      const started = state !== State.INIT;
+      document.getElementById('console').innerHTML = `
+        <div class="console-grid">
+          <div class="console-key">input</div><div class="console-val">[${nodes.map(n => n.value).join(', ')}], pos=${EXAMPLES[activeExample].pos}</div>
+          <div class="console-key">head</div><div class="console-val">${nodeLabel(headId)}</div>
+          <div class="console-key">slow</div><div class="console-val">${started ? nodeLabel(slowId) : 'unassigned'}</div>
+          <div class="console-key">fast</div><div class="console-val">${started ? nodeLabel(fastId) : 'unassigned'}</div>
+          <div class="console-key">condition</div><div class="console-val warn">${condition}</div>
+          <div class="console-key">answer</div><div class="console-val ${answerClass}">${answer}</div>
+          <div class="console-key">last action</div><div class="console-val">${describeLastAction()}</div>
+        </div>
+      `;
+    }
+
+    function describeLastAction() {
+      switch (lastAction.type) {
+        case 'assign': return 'slow = head; fast = head';
+        case 'check': return `check ${nodeLabel(lastAction.fastId)} and ${shortNodeLabel(lastAction.fastId)}.next`;
+        case 'moveSlow': return `slow: ${nodeLabel(lastAction.fromId)} → ${nodeLabel(lastAction.toId)}`;
+        case 'moveFast': return `fast: ${nodeLabel(lastAction.fromId)} → ${nodeLabel(lastAction.hop1Id)} → ${nodeLabel(lastAction.toId)}`;
+        case 'compare': return `slow === fast is ${lastAction.same}`;
+        case 'returnTrue': return 'return true';
+        case 'returnFalse': return 'return false';
+        default: return 'none yet';
+      }
+    }
+
+    function renderNarration(highlights) {
+      document.getElementById('narration').innerHTML = `<b>${escapeHtml(highlights.messageTitle)}:</b> ${escapeHtml(highlights.messageBody)}`;
+    }
+
+    function getNodePositions() {
+      const positions = new Map();
+      if (!nodes.length) return positions;
+      const startX = 90;
+      const gap = 130;
+      nodes.forEach((node, i) => {
+        positions.set(node.id, { x: startX + i * gap, y: 135 });
+      });
+      return positions;
+    }
+
+    function renderSvg(h) {
+      const svg = document.getElementById('svg');
+      const width = Math.max(760, nodes.length * 130 + 180);
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', 340);
+
+      if (!nodes.length) {
+        svg.innerHTML = `
+          ${svgDefs()}
+          <text x="80" y="150" fill="#9cdcfe" font-family="Consolas" font-size="16">head</text>
+          <rect x="130" y="126" width="80" height="36" rx="6" fill="#1e1e1e" stroke="#555" stroke-dasharray="5 4" />
+          <text x="170" y="145" fill="#c586c0" font-family="Consolas" font-size="16" text-anchor="middle">null</text>
+        `;
+        return;
+      }
+
+      const pos = getNodePositions();
+      const elements = [svgDefs()];
+
+      // Normal next edges and cycle edge.
+      nodes.forEach((node) => {
+        if (!node.nextId) return;
+        const a = pos.get(node.id);
+        const b = pos.get(node.nextId);
+        if (!a || !b) return;
+        const isCycleBack = nodes.findIndex(n => n.id === node.nextId) <= nodes.findIndex(n => n.id === node.id);
+        const isHop = isHighlightedEdge(h, node.id, node.nextId);
+        if (isCycleBack) {
+          const midY = 245 + Math.abs(nodes.findIndex(n => n.id === node.id) - nodes.findIndex(n => n.id === node.nextId)) * 8;
+          const d = `M ${a.x} ${a.y + 42} C ${a.x} ${midY}, ${b.x} ${midY}, ${b.x} ${b.y + 42}`;
+          const cls = isHop ? 'edge-line cycle hop' : 'edge-line cycle';
+          elements.push(`<path d="${d}" class="${cls}" />`);
+          elements.push(`<text x="${(a.x + b.x)/2}" y="${midY + 18}" class="edge-label next">cycle link</text>`);
+        } else {
+          const cls = isHop ? 'edge-line hop' : 'edge-line';
+          elements.push(`<line x1="${a.x + 38}" y1="${a.y}" x2="${b.x - 38}" y2="${b.y}" class="${cls}" />`);
+        }
+      });
+
+      // Null edge if no cycle.
+      const last = nodes[nodes.length - 1];
+      if (last && last.nextId === null) {
+        const a = pos.get(last.id);
+        elements.push(`<line x1="${a.x + 38}" y1="${a.y}" x2="${a.x + 92}" y2="${a.y}" class="edge-line" />`);
+        elements.push(`<rect x="${a.x + 98}" y="${a.y - 18}" width="62" height="36" rx="6" fill="#1e1e1e" stroke="#555" stroke-dasharray="5 4" />`);
+        elements.push(`<text x="${a.x + 129}" y="${a.y + 1}" fill="#c586c0" font-family="Consolas" font-size="14" text-anchor="middle">null</text>`);
+      }
+
+      // Movement ghost arrows.
+      if (h.slowHop && h.slowHop.fromId && h.slowHop.toId) drawGhostHop(elements, pos, h.slowHop.fromId, h.slowHop.toId, 'slow');
+      if (h.fastHop1 && h.fastHop1.fromId && h.fastHop1.toId) drawGhostHop(elements, pos, h.fastHop1.fromId, h.fastHop1.toId, 'fast', '1st hop');
+      if (h.fastHop2 && h.fastHop2.fromId && h.fastHop2.toId) drawGhostHop(elements, pos, h.fastHop2.fromId, h.fastHop2.toId, 'fast', '2nd hop');
+
+      nodes.forEach((node) => {
+        const p = pos.get(node.id);
+        let cls = 'node-circle';
+        if (state !== State.INIT && node.id === headId) cls += ' head-node';
+        if (state !== State.INIT && node.id === slowId) cls += ' slow';
+        if (state !== State.INIT && node.id === fastId) cls += ' fast';
+        if (h.meetNodeIds.has(node.id)) cls += ' meet';
+        if (h.activeNodeIds.has(node.id) || h.nextFieldNodeIds.has(node.id)) cls += ' active-read';
+
+        elements.push(`<circle cx="${p.x}" cy="${p.y}" r="34" class="${cls}" />`);
+        elements.push(`<text x="${p.x}" y="${p.y}" class="node-text">${escapeHtml(String(node.value))}</text>`);
+        elements.push(`<text x="${p.x}" y="${p.y + 56}" class="idx-text">${memoryLabels ? node.id : `index ${node.index}`}</text>`);
+
+        if (state !== State.INIT) {
+          const badges = [];
+          if (node.id === headId) badges.push({ label: 'head', kind: 'head' });
+          if (node.id === slowId) badges.push({ label: 'slow', kind: 'slow' });
+          if (node.id === fastId) badges.push({ label: 'fast', kind: 'fast' });
+          if (h.meetNodeIds.has(node.id)) badges.push({ label: 'same ref', kind: 'meet' });
+          drawSvgBadges(elements, p.x, p.y - 56, badges);
+        }
+      });
+
+      svg.innerHTML = elements.join('\n');
+    }
+
+    function isHighlightedEdge(h, fromId, toId) {
+      const check = (edge) => edge && edge.fromId === fromId && edge.toId === toId;
+      return check(h.slowHop) || check(h.fastHop1) || check(h.fastHop2);
+    }
+
+    function drawGhostHop(elements, pos, fromId, toId, kind, label = '') {
+      const a = pos.get(fromId); const b = pos.get(toId);
+      if (!a || !b) return;
+      const cls = kind === 'slow' ? 'slow-hop' : 'fast-hop';
+      if (Math.abs(a.x - b.x) < 3 && Math.abs(a.y - b.y) < 3) return;
+      const isBack = b.x <= a.x;
+      if (isBack) {
+        const midY = 75;
+        const d = `M ${a.x} ${a.y - 42} C ${a.x} ${midY}, ${b.x} ${midY}, ${b.x} ${b.y - 42}`;
+        elements.push(`<path d="${d}" class="edge-line ${cls}" />`);
+        elements.push(`<text x="${(a.x + b.x)/2}" y="${midY - 8}" class="edge-label ${kind}">${label || kind}</text>`);
+      } else {
+        elements.push(`<line x1="${a.x + 38}" y1="${a.y - 22}" x2="${b.x - 38}" y2="${b.y - 22}" class="edge-line ${cls}" />`);
+        elements.push(`<text x="${(a.x + b.x)/2}" y="${a.y - 34}" class="edge-label ${kind}">${label || kind}</text>`);
+      }
+    }
+
+    function drawSvgBadges(elements, x, y, badges) {
+      badges.slice(0, 4).forEach((badge, i) => {
+        const w = Math.max(48, badge.label.length * 8 + 14);
+        const bx = x - w / 2;
+        const by = y - i * 24;
+        const darkText = badge.kind === 'slow' || badge.kind === 'hop';
+        elements.push(`<rect x="${bx}" y="${by}" width="${w}" height="18" rx="4" class="badge-bg ${badge.kind}" />`);
+        elements.push(`<text x="${x}" y="${by + 9}" class="badge-text ${darkText ? 'dark' : ''} badge" dominant-baseline="central">${escapeHtml(badge.label)}</text>`);
+      });
+    }
+
+    function svgDefs() {
+      return `
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#888" /></marker>
+          <marker id="arrowYellow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#d7ba7d" /></marker>
+          <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#6a9955" /></marker>
+          <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#c586c0" /></marker>
+        </defs>
+      `;
+    }
+
+    function renderObjectView(h) {
+      const label = document.getElementById('obj-mode-label');
+      label.className = `obj-mode-label ${cycleNesting === 'reference' ? 'reference' : 'unroll'}`;
+      label.textContent = cycleNesting === 'reference' ? 'Nested refs mode' : 'Full JS memory graph mode';
+
+      const target = document.getElementById('object-view');
+      if (headId === null) {
+        target.innerHTML = `<span class="obj-null">null</span>`;
+        return;
+      }
+
+      if (cycleNesting === 'memory') {
+        target.innerHTML = renderMemoryGraphView(h);
+        return;
+      }
+
+      // Accurate nested view: acyclic lists are fully nested to null.
+      // Cyclic lists stop only at the repeated object reference, because that is the actual data shape.
+      target.innerHTML = renderObjectNode(headId, h, new Set(), 0);
+    }
+
+    function renderObjectNode(nodeId, h, seen, depth) {
+      const indent = '  '.repeat(depth);
+      const inner = '  '.repeat(depth + 1);
+
+      if (nodeId === null) return `<span class="obj-null">null</span>`;
+      const node = getNode(nodeId);
+      if (!node) return `<span class="obj-null">undefined</span>`;
+
+      const alreadySeen = seen.has(nodeId);
+      if (alreadySeen) {
+        const n = getNode(nodeId);
+        const refName = memoryLabels ? nodeId : `index ${n.index}`;
+        return `<span class="obj-cycle">/* CYCLE REFERENCE → ${refName} (val ${escapeHtml(String(n.value))}) */</span>`;
+      }
+
+      const nextSeen = new Set(seen);
+      nextSeen.add(nodeId);
+
+      let wrapperCls = ['obj-node'];
+      let headCls = ['obj-node-head'];
+      if (h.meetNodeIds.has(nodeId)) headCls.push('meet-node');
+      else if (h.assignmentNodeIds.has(nodeId)) headCls.push('assignment-node');
+      else if (h.activeNodeIds.has(nodeId)) headCls.push('active-node');
+
+      const badges = renderObjectBadges(nodeId, h, false);
+      const nextKeyClass = h.nextFieldNodeIds.has(nodeId) ? 'obj-key hl-next' : 'obj-key';
+      const nextHtml = renderObjectNode(node.nextId, h, nextSeen, depth + 1);
+
+      return `<span class="${wrapperCls.join(' ')}"><span class="${headCls.join(' ')}">{${badges}</span>
+${inner}<span class="obj-key">val</span>: <span class="obj-val">${escapeHtml(String(node.value))}</span>,
+${inner}<span class="${nextKeyClass}">next</span>: ${nextHtml}
+${indent}}</span>`;
+    }
+
+    function renderMemoryGraphView(h) {
+      // This is the most accurate finite representation of a cyclic linked list in JavaScript:
+      // each node object appears once, and .next stores a reference to another node object.
+      const lines = [];
+      const idFor = (id) => {
+        if (id === null) return '<span class="obj-null">null</span>';
+        const n = getNode(id);
+        if (!n) return '<span class="obj-null">undefined</span>';
+        return `<span class="obj-val">${escapeHtml(memoryLabels ? id : `index${n.index}`)}</span>`;
+      };
+
+      nodes.forEach((node) => {
+        let headCls = ['obj-node-head'];
+        if (h.meetNodeIds.has(node.id)) headCls.push('meet-node');
+        else if (h.assignmentNodeIds.has(node.id)) headCls.push('assignment-node');
+        else if (h.activeNodeIds.has(node.id)) headCls.push('active-node');
+
+        const badges = renderObjectBadges(node.id, h, false);
+        const nextKeyClass = h.nextFieldNodeIds.has(node.id) ? 'obj-key hl-next' : 'obj-key';
+        const nextNode = getNode(node.nextId);
+        const isBackReference = node.nextId !== null && nextNode && nextNode.index <= node.index;
+        const nextComment = isBackReference
+          ? ` <span class="obj-cycle">// cycle link: same object reference, not a copy</span>`
+          : '';
+
+        lines.push(`<span class="${headCls.join(' ')}"><span class="kw">const</span> ${escapeHtml(memoryLabels ? node.id : `index${node.index}`)} = {${badges}</span>\n  <span class="obj-key">val</span>: <span class="obj-val">${escapeHtml(String(node.value))}</span>,\n  <span class="${nextKeyClass}">next</span>: ${idFor(node.nextId)}${nextComment}\n};`);
+      });
+
+      lines.push(`\n<span class="kw">const</span> <span class="obj-key">head</span> = ${idFor(headId)};`);
+      return lines.join('\n\n');
+    }
+
+    function renderObjectBadges(nodeId, h, alreadySeen) {
+      if (state === State.INIT) return '';
+      const badges = [];
+      if (nodeId === headId) badges.push({ label: 'head', kind: 'head' });
+      if (nodeId === slowId) badges.push({ label: 'slow', kind: 'slow' });
+      if (nodeId === fastId) badges.push({ label: 'fast', kind: 'fast' });
+      const semantic = h.badgesByNodeId.get(nodeId) || [];
+      semantic.forEach(b => {
+        if (!badges.some(existing => existing.label === b.label && existing.kind === b.kind)) badges.push(b);
+      });
+      return badges.map(b => `<span class="obj-badge ${b.kind}">${escapeHtml(b.label)}</span>`).join('');
+    }
+
+    function renderActionCard(h) {
+      const answerClass = answer === 'true' ? 'true' : answer === 'false' ? 'false' : 'warn';
+      let modeNote = cycleNesting === 'reference'
+        ? 'Nested refs mode shows acyclic lists fully nested, and cyclic lists end exactly where the next field points back to an existing object.'
+        : 'Memory graph mode shows every node object once with next references, which is the most accurate finite view of cyclic JavaScript data.';
+
+      document.getElementById('action-card').innerHTML = `
+        <div class="action-title">${escapeHtml(h.messageTitle)}</div>
+        <div class="action-row"><div class="action-key">touching</div><div class="action-val">${describeTouchedObject()}</div></div>
+        <div class="action-row"><div class="action-key">meaning</div><div class="action-val">${escapeHtml(h.messageBody)}</div></div>
+        <div class="action-row"><div class="action-key">answer</div><div class="action-val ${answerClass}">${escapeHtml(answer)}</div></div>
+        <div class="small-note">${escapeHtml(modeNote)}</div>
+      `;
+    }
+
+    function describeTouchedObject() {
+      switch (lastAction.type) {
+        case 'assign': return `${nodeLabel(headId)} object itself`;
+        case 'check': return `${nodeLabel(lastAction.fastId)} and its next field`;
+        case 'moveSlow': return `${nodeLabel(lastAction.fromId)}.next`;
+        case 'moveFast': return `${nodeLabel(lastAction.fromId)}.next, then ${nodeLabel(lastAction.hop1Id)}.next`;
+        case 'compare': return `compare ${nodeLabel(lastAction.slowId)} with ${nodeLabel(lastAction.fastId)}`;
+        case 'returnTrue': return `${nodeLabel(lastAction.meetingId)} where slow === fast`;
+        case 'returnFalse': return `the null-ending fast path`;
+        default: return 'nothing yet';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    // Boot
+    loadExample(1);
+  </script>
+</body>
+</html>

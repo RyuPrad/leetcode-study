@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merge Two Sorted Lists Visualizer</title>
+    <style>
+        /* Dark Theme matching Obsidian & VS Code */
+        body {
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box;
+        }
+
+        /* FLOATING DRAGGABLE CONTROLS & HUD */
+        .floating-controls {
+            position: fixed; top: 20px; right: 20px;
+            background-color: rgba(30, 30, 30, 0.85); backdrop-filter: blur(8px);
+            padding: 10px; border-radius: 8px; z-index: 1000; border: 1px solid #444;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 8px; min-width: 260px;
+        }
+        .drag-handle { cursor: grab; color: #888; font-size: 12px; text-align: center; user-select: none; padding-bottom: 5px; border-bottom: 1px solid #444; letter-spacing: 2px; }
+        .drag-handle:active { cursor: grabbing; }
+
+        .hud-container { display: flex; flex-direction: column; gap: 4px; font-family: 'Consolas', monospace; font-size: 13px; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px dashed #555; word-break: break-all; }
+        .hud-container:empty { display: none; border: none; padding: 0; margin: 0; }
+        .hud-item { display: flex; justify-content: space-between; color: #9cdcfe; gap: 10px; }
+        .hud-val { color: #b5cea8; font-weight: bold; text-align: right;}
+
+        .btn-row { display: flex; gap: 8px; justify-content: space-between; }
+        button { background: #0e639c; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 14px; font-weight: bold; flex: 1; text-align: center; }
+        button:hover { background: #1177bb; }
+        button:disabled { background: #555; cursor: not-allowed; color: #888; }
+
+        .btn-ex { background: #4d4d4d; font-size: 12px; }
+        .btn-ex:hover { background: #666; }
+        .btn-ex.active { background: #6a9955; color: #1e1e1e; box-shadow: 0 0 10px rgba(106, 153, 85, 0.6); }
+
+        .container { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;}
+        .panel { background: #252526; border: 1px solid #3c3c3c; border-radius: 8px; padding: 20px; flex: 1; min-width: 300px; }
+        h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid #3c3c3c; padding-bottom: 10px; color: #cccccc;}
+        h3 { font-size: 14px; color: #888; margin: 20px 0 10px 0; text-transform: uppercase; letter-spacing: 1px;}
+
+        /* LINKED LIST VISUALIZATION */
+        .lists-stage {
+            display: flex; flex-direction: column; gap: 50px;
+            padding: 30px 20px 20px 20px; min-height: 380px;
+            position: relative;
+        }
+        .list-row {
+            display: flex; align-items: center; gap: 8px;
+            min-height: 90px; position: relative;
+        }
+        .list-label {
+            font-family: 'Consolas', monospace; font-size: 14px; font-weight: bold;
+            color: #9cdcfe; min-width: 80px;
+            padding: 6px 10px; background: #2d2d30; border-radius: 4px;
+            border: 1px solid #444;
+        }
+        .list-label.l1 { color: #569cd6; border-color: #569cd6; }
+        .list-label.l2 { color: #c586c0; border-color: #c586c0; }
+        .list-label.merged { color: #6a9955; border-color: #6a9955; }
+
+        .node {
+            width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+            border: 2px solid #555; border-radius: 50%;
+            font-size: 20px; font-weight: bold;
+            background: #2d2d30; color: #d4d4d4;
+            position: relative; transition: all 0.3s ease;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .node.l1 { border-color: #569cd6; background: #1e3a5c; color: #9cdcfe; }
+        .node.l2 { border-color: #c586c0; background: #4a2c48; color: #e8b8e4; }
+        .node.dummy { border-color: #d7ba7d; background: #3a3220; color: #d7ba7d; border-style: dashed; }
+        .node.merged-l1 { border-color: #6a9955; background: #1e3a5c; color: #9cdcfe; border-width: 3px; }
+        .node.merged-l2 { border-color: #6a9955; background: #4a2c48; color: #e8b8e4; border-width: 3px; }
+
+        /* Node states */
+        .node.picked {
+            transform: translateY(-8px) scale(1.1);
+            box-shadow: 0 8px 20px rgba(106, 153, 85, 0.6);
+            border-color: #6a9955 !important; border-width: 3px;
+        }
+        .node.not-picked {
+            opacity: 0.35; filter: grayscale(60%);
+        }
+        .node.consumed {
+            opacity: 0.25; filter: grayscale(100%);
+        }
+        .node.tail-target {
+            box-shadow: 0 0 0 3px #d7ba7d, 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        /* Arrows between nodes */
+        .arrow {
+            color: #888; font-size: 20px; font-weight: bold;
+            flex-shrink: 0; transition: color 0.3s ease;
+        }
+        .arrow.active { color: #6a9955; }
+        .arrow.new-link {
+            color: #d7ba7d;
+            animation: pulse 0.8s ease-in-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+        }
+
+        /* Pointers */
+        .pointer {
+            position: absolute; font-size: 12px; font-weight: bold;
+            padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+            left: 50%; transform: translateX(-50%); z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .ptr-l1 { background: #569cd6; color: white; top: -32px; }
+        .ptr-l2 { background: #c586c0; color: white; top: -32px; }
+        .ptr-tail { background: #d7ba7d; color: #1e1e1e; bottom: -32px; }
+
+        .null-marker {
+            font-family: 'Consolas', monospace; font-size: 14px;
+            color: #666; padding: 6px 12px;
+            border: 1px dashed #555; border-radius: 4px;
+            background: #1e1e1e;
+        }
+
+        /* CODE PANEL */
+        .code-panel { background: #1e1e1e; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; border-radius: 6px; border: 1px solid #3c3c3c; padding: 10px 0; overflow-x: auto; }
+        .code-line { padding: 2px 15px; border-left: 4px solid transparent; white-space: pre; }
+        .code-line.active { background-color: #062f4a; border-left-color: #569cd6; }
+        .kw { color: #c586c0; } .fn { color: #dcdcaa; } .cm { color: #6a9955; } .nm { color: #b5cea8; } .vr { color: #9cdcfe; } .op { color: #d4d4d4; } .str { color: #ce9178; }
+
+        /* CONSOLE */
+        .console { background: #1e1e1e; padding: 20px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 15px; border: 1px solid #3c3c3c; line-height: 1.6; color: #9cdcfe; white-space: pre-wrap; word-break: break-all; margin-top: 20px;}
+        .console-line { display: flex; align-items: center; margin-bottom: 6px; }
+        .pin-btn { background: transparent; color: #aaa; border: 1px solid #555; border-radius: 4px; cursor: pointer; padding: 4px 8px; font-size: 11px; margin-right: 15px; flex-shrink: 0; width: 75px; transition: 0.2s;}
+        .pin-btn:hover { background: #333; }
+        .pin-btn.active { background: #0e639c; color: white; border-color: #0e639c; font-weight: bold; }
+
+        .narration {
+            background: #2d2d30; border-left: 4px solid #569cd6;
+            padding: 12px 16px; border-radius: 4px;
+            font-size: 14px; color: #d4d4d4; line-height: 1.6;
+            margin-top: 15px; min-height: 20px;
+        }
+
+        /* OBJECT VIEW (nested JS object format) */
+        .obj-view-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr;
+            gap: 16px;
+        }
+        .obj-col {
+            background: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            padding: 14px;
+            min-height: 80px;
+            overflow-x: auto;
+        }
+        .obj-label {
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 10px;
+            padding: 4px 10px;
+            background: #252526;
+            border-radius: 4px;
+            display: inline-block;
+            letter-spacing: 0.5px;
+        }
+        .obj-label.l1     { color: #569cd6; border-left: 3px solid #569cd6; }
+        .obj-label.l2     { color: #c586c0; border-left: 3px solid #c586c0; }
+        .obj-label.merged { color: #6a9955; border-left: 3px solid #6a9955; }
+
+        .obj-body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            white-space: pre;
+            line-height: 1.55;
+            color: #d4d4d4;
+        }
+        .obj-key      { color: #9cdcfe; }
+        .obj-val      { color: #b5cea8; }
+        .obj-null     { color: #c586c0; font-style: italic; }
+        .obj-comment  { color: #6a9955; font-style: italic; font-size: 11px; }
+
+        /* Object view highlights */
+        .obj-node.hl-node {
+            background: rgba(215, 186, 125, 0.12);
+            outline: 1px solid #d7ba7d;
+            border-radius: 3px;
+            box-shadow: 0 0 8px rgba(215, 186, 125, 0.25);
+        }
+        .obj-val.hl {
+            background: #6a9955;
+            color: #1e1e1e;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            animation: objPulse 1.2s ease-in-out infinite;
+        }
+        .obj-key.hl {
+            background: #d7ba7d;
+            color: #1e1e1e;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            animation: objPulse 1.2s ease-in-out infinite;
+        }
+        .obj-node.dummy-node { opacity: 0.75; }
+        .tail-marker {
+            color: #d7ba7d;
+            font-weight: bold;
+            font-size: 11px;
+            background: rgba(215, 186, 125, 0.12);
+            padding: 1px 7px;
+            border-radius: 3px;
+            border: 1px solid #d7ba7d;
+            margin-left: 8px;
+        }
+
+        /* Raw memory view: "extra" nodes still linked but not yet cut */
+        .obj-node.extra-node {
+            opacity: 0.55;
+            outline: 1px dashed #888;
+            border-radius: 3px;
+        }
+        .obj-node.extra-node.about-to-cut {
+            opacity: 0.8;
+            outline: 1px dashed #e24b4a;
+            background: rgba(226, 75, 74, 0.08);
+            animation: cutPulse 1.2s ease-in-out infinite;
+        }
+        .extra-marker {
+            color: #888;
+            font-size: 10px;
+            font-style: italic;
+            margin-left: 8px;
+            font-family: 'Consolas', monospace;
+        }
+        .cut-marker {
+            color: #e24b4a;
+            font-weight: bold;
+            font-size: 10px;
+            background: rgba(226, 75, 74, 0.15);
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid #e24b4a;
+            margin-left: 8px;
+            font-family: 'Consolas', monospace;
+        }
+        @keyframes cutPulse {
+            0%, 100% { opacity: 0.8; }
+            50%      { opacity: 0.4; }
+        }
+
+        /* Raw memory toggle button */
+        .btn-raw {
+            background: #3a3a3a;
+            color: #d4d4d4;
+            font-size: 12px;
+        }
+        .btn-raw:hover { background: #4a4a4a; }
+        .btn-raw.raw-on {
+            background: #8b3a62;
+            color: white;
+            box-shadow: 0 0 10px rgba(139, 58, 98, 0.4);
+        }
+
+        @keyframes objPulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.65; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="floating-controls" id="drag-container">
+        <div class="drag-handle" id="drag-handle">⋮⋮ DRAG ⋮⋮</div>
+        <div id="hud-ui" class="hud-container"></div>
+        <div class="btn-row">
+            <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">[1,2,4] + [1,3,4]</button>
+            <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">[] + [0]</button>
+        </div>
+        <div class="btn-row" style="margin-top: 4px;">
+            <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">[5] + [1,2,3]</button>
+            <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">[] + []</button>
+        </div>
+        <div class="btn-row" style="margin-top: 4px;">
+            <button id="btn-raw-toggle" class="btn-raw" onclick="toggleRawView()">Object view: Committed</button>
+        </div>
+        <div class="btn-row" style="margin-top: 4px;">
+            <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+            <button id="btn-next" onclick="nextStep()">Step Over</button>
+            <button id="btn-reset" onclick="init()">Reset</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+            <h2>Linked List View</h2>
+            <div id="lists-ui" class="lists-stage"></div>
+            <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+        </div>
+
+        <div class="panel" style="flex: 1.5;">
+            <h2>Live Debugger</h2>
+            <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">var</span> mergeTwoLists = <span class="kw">function</span>(list1, list2) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> dummy = <span class="kw">new</span> <span class="fn">ListNode</span>();</div>
+<div id="line-3" class="code-line">  <span class="kw">let</span> tail = dummy;</div>
+<div id="line-4" class="code-line"></div>
+<div id="line-5" class="code-line">  <span class="kw">while</span> (list1 !== <span class="kw">null</span> && list2 !== <span class="kw">null</span>) {</div>
+<div id="line-6" class="code-line">    <span class="kw">if</span> (list1.val <= list2.val) {</div>
+<div id="line-7" class="code-line">      tail.next = list1;</div>
+<div id="line-8" class="code-line">      list1 = list1.next;</div>
+<div id="line-9" class="code-line">    } <span class="kw">else</span> {</div>
+<div id="line-10" class="code-line">      tail.next = list2;</div>
+<div id="line-11" class="code-line">      list2 = list2.next;</div>
+<div id="line-12" class="code-line">    }</div>
+<div id="line-13" class="code-line">    tail = tail.next;</div>
+<div id="line-14" class="code-line">  }</div>
+<div id="line-15" class="code-line"></div>
+<div id="line-16" class="code-line">  <span class="cm">// One is null; attach what's left</span></div>
+<div id="line-17" class="code-line">  tail.next = list1 !== <span class="kw">null</span> ? list1 : list2;</div>
+<div id="line-18" class="code-line"></div>
+<div id="line-19" class="code-line">  <span class="kw">return</span> dummy.next;</div>
+<div id="line-20" class="code-line">};</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h2>Object View <span style="font-size: 12px; color: #888; font-weight: normal;">— nested JS object format (debugger-style)</span></h2>
+        <div class="obj-view-grid">
+            <div class="obj-col" id="obj-col-l1"></div>
+            <div class="obj-col" id="obj-col-l2"></div>
+            <div class="obj-col" id="obj-col-merged"></div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h2>Variables & Outputs</h2>
+        <div class="console" id="console-ui"></div>
+    </div>
+
+    <script>
+        // DRAG LOGIC
+        const dragContainer = document.getElementById("drag-container");
+        const dragHandle = document.getElementById("drag-handle");
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        dragHandle.onmousedown = dragMouseDown;
+        function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; }
+        function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; dragContainer.style.top = (dragContainer.offsetTop - pos2) + "px"; dragContainer.style.left = (dragContainer.offsetLeft - pos1) + "px"; dragContainer.style.right = "auto"; }
+        function closeDragElement() { document.onmouseup = null; document.onmousemove = null; }
+
+        // HUD STATE
+        let pinned = { list1: true, list2: true, tail: true, result: false };
+        function togglePin(vName) { pinned[vName] = !pinned[vName]; render(); }
+
+        // Raw memory view toggle (affects only the merged column)
+        let rawMemoryView = false;
+        function toggleRawView() {
+            rawMemoryView = !rawMemoryView;
+            const btn = document.getElementById('btn-raw-toggle');
+            btn.textContent = 'Object view: ' + (rawMemoryView ? 'Raw memory' : 'Committed');
+            btn.classList.toggle('raw-on', rawMemoryView);
+            render();
+        }
+
+        // EXAMPLES
+        const examples = {
+            1: { l1: [1, 2, 4], l2: [1, 3, 4] },
+            2: { l1: [],        l2: [0]       },
+            3: { l1: [5],       l2: [1, 2, 3] },
+            4: { l1: [],        l2: []        }
+        };
+
+        // STATE
+        // We represent each list as an array of node objects with stable ids.
+        // "pointers" track indices into the original arrays (null means null pointer).
+        let origL1 = [], origL2 = [];
+        let l1Idx = null, l2Idx = null;        // current list1, list2 pointers
+        let tailOwner = null, tailIdx = null;   // tailOwner: "dummy" | "l1" | "l2"
+        let mergedChain = [];                   // [{owner, idx}] attached after dummy, in order
+        let pickedSide = null;                  // "l1" | "l2" for highlight on current step
+        let lastLinkMade = null;                // { from: "tail-or-prev", to: {owner,idx} } for arrow pulse
+        let activeExample = 1;
+        let execState = "INIT";
+        let historyStack = [];
+
+        function loadExample(exNum) {
+            activeExample = exNum;
+            origL1 = [...examples[exNum].l1];
+            origL2 = [...examples[exNum].l2];
+            init();
+        }
+
+        function init() {
+            l1Idx = origL1.length > 0 ? 0 : null;
+            l2Idx = origL2.length > 0 ? 0 : null;
+            tailOwner = null; tailIdx = null;
+            mergedChain = [];
+            pickedSide = null;
+            lastLinkMade = null;
+            execState = "INIT";
+            historyStack = [];
+            document.getElementById('btn-next').disabled = false;
+            document.getElementById('btn-next').textContent = "Step Over";
+            render();
+        }
+
+        function saveState() {
+            historyStack.push({
+                execState, l1Idx, l2Idx,
+                tailOwner, tailIdx,
+                mergedChain: mergedChain.map(n => ({...n})),
+                pickedSide, lastLinkMade
+            });
+        }
+
+        function prevStep() {
+            if (historyStack.length === 0) return;
+            const s = historyStack.pop();
+            execState = s.execState;
+            l1Idx = s.l1Idx; l2Idx = s.l2Idx;
+            tailOwner = s.tailOwner; tailIdx = s.tailIdx;
+            mergedChain = s.mergedChain;
+            pickedSide = s.pickedSide;
+            lastLinkMade = s.lastLinkMade;
+            document.getElementById('btn-next').disabled = false;
+            document.getElementById('btn-next').textContent = "Step Over";
+            render();
+        }
+
+        function nextStep() {
+            if (execState === "END") return;
+            saveState();
+
+            switch(execState) {
+                case "INIT":
+                    // dummy created, tail -> dummy
+                    tailOwner = "dummy"; tailIdx = 0;
+                    lastLinkMade = null;
+                    pickedSide = null;
+                    execState = "WHILE_CHECK";
+                    break;
+
+                case "WHILE_CHECK":
+                    pickedSide = null;
+                    lastLinkMade = null;
+                    if (l1Idx !== null && l2Idx !== null) {
+                        execState = "IF_COMPARE";
+                    } else {
+                        execState = "AFTER_LOOP";
+                    }
+                    break;
+
+                case "IF_COMPARE": {
+                    const v1 = origL1[l1Idx];
+                    const v2 = origL2[l2Idx];
+                    if (v1 <= v2) {
+                        pickedSide = "l1";
+                        execState = "ATTACH_L1";
+                    } else {
+                        pickedSide = "l2";
+                        execState = "ATTACH_L2";
+                    }
+                    break;
+                }
+
+                case "ATTACH_L1":
+                    // tail.next = list1  -->  push l1 node onto mergedChain
+                    mergedChain.push({ owner: "l1", idx: l1Idx });
+                    lastLinkMade = { to: { owner: "l1", idx: l1Idx } };
+                    execState = "ADVANCE_L1";
+                    break;
+
+                case "ADVANCE_L1":
+                    // list1 = list1.next
+                    l1Idx = (l1Idx + 1 < origL1.length) ? l1Idx + 1 : null;
+                    execState = "MOVE_TAIL";
+                    break;
+
+                case "ATTACH_L2":
+                    mergedChain.push({ owner: "l2", idx: l2Idx });
+                    lastLinkMade = { to: { owner: "l2", idx: l2Idx } };
+                    execState = "ADVANCE_L2";
+                    break;
+
+                case "ADVANCE_L2":
+                    l2Idx = (l2Idx + 1 < origL2.length) ? l2Idx + 1 : null;
+                    execState = "MOVE_TAIL";
+                    break;
+
+                case "MOVE_TAIL": {
+                    // tail = tail.next  -->  last node of mergedChain
+                    const last = mergedChain[mergedChain.length - 1];
+                    tailOwner = last.owner; tailIdx = last.idx;
+                    pickedSide = null;
+                    lastLinkMade = null;
+                    execState = "WHILE_CHECK";
+                    break;
+                }
+
+                case "AFTER_LOOP":
+                    // tail.next = list1 !== null ? list1 : list2
+                    // Attach entire remaining tail (if any) to mergedChain as a run.
+                    if (l1Idx !== null) {
+                        for (let k = l1Idx; k < origL1.length; k++) {
+                            mergedChain.push({ owner: "l1", idx: k });
+                        }
+                        if (mergedChain.length > 0) {
+                            lastLinkMade = { to: { owner: "l1", idx: l1Idx } };
+                        }
+                        l1Idx = null;
+                    } else if (l2Idx !== null) {
+                        for (let k = l2Idx; k < origL2.length; k++) {
+                            mergedChain.push({ owner: "l2", idx: k });
+                        }
+                        if (mergedChain.length > 0) {
+                            lastLinkMade = { to: { owner: "l2", idx: l2Idx } };
+                        }
+                        l2Idx = null;
+                    }
+                    execState = "RETURN";
+                    break;
+
+                case "RETURN":
+                    execState = "END";
+                    break;
+            }
+            render();
+        }
+
+        function highlightLines(linesArray) {
+            document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+            linesArray.forEach(lineNum => {
+                const el = document.getElementById(`line-${lineNum}`);
+                if (el) el.classList.add('active');
+            });
+        }
+
+        function narrate(text) {
+            document.getElementById('narration-ui').innerHTML = text;
+        }
+
+        // Helpers: is a specific (owner, idx) node already consumed into the merged chain?
+        function isConsumed(owner, idx) {
+            return mergedChain.some(n => n.owner === owner && n.idx === idx);
+        }
+
+        function createConsoleLine(varKey, keyword, varName, varValue) {
+            const isActive = pinned[varKey];
+            const btnClass = isActive ? 'pin-btn active' : 'pin-btn';
+            const btnText = isActive ? 'HUD ON' : 'HUD OFF';
+            return `
+                <div class="console-line">
+                    <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+                    <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+                </div>
+            `;
+        }
+
+        // ---------- OBJECT VIEW ----------
+        // Maps the current execution state to which fields in the object tree
+        // should be highlighted. Mirrors the line highlighted in the Live Debugger.
+        function mergedIdxForTail() {
+            // Position of `tail` within the merged object tree.
+            // Returns -1 if tail is not pointing anywhere yet (INIT).
+            if (tailOwner === null)   return -1;
+            if (tailOwner === 'dummy') return 0;
+            for (let i = 0; i < mergedChain.length; i++) {
+                if (mergedChain[i].owner === tailOwner && mergedChain[i].idx === tailIdx) {
+                    return i + 1; // +1 because dummy occupies index 0
+                }
+            }
+            return -1;
+        }
+
+        function computeObjectHighlights() {
+            // { list1: {idx: {value, next, whole}}, list2: {...}, merged: {...} }
+            const h = { list1: {}, list2: {}, merged: {} };
+            const mark = (which, idx, type) => {
+                if (!h[which][idx]) h[which][idx] = {};
+                h[which][idx][type] = true;
+            };
+
+            switch (execState) {
+                case "INIT":
+                    // const dummy = new ListNode(); let tail = dummy;
+                    mark('merged', 0, 'whole');
+                    break;
+                case "WHILE_CHECK":
+                    // list1 !== null && list2 !== null
+                    if (l1Idx !== null) mark('list1', 0, 'whole');
+                    if (l2Idx !== null) mark('list2', 0, 'whole');
+                    break;
+                case "IF_COMPARE":
+                    // list1.val <= list2.val  -> highlight both val fields
+                    mark('list1', 0, 'value');
+                    mark('list2', 0, 'value');
+                    break;
+                case "ATTACH_L1":
+                    // tail.next = list1  -> the tail's next field and the list1 head
+                    mark('merged', mergedIdxForTail(), 'next');
+                    mark('list1', 0, 'whole');
+                    break;
+                case "ADVANCE_L1":
+                    // list1 = list1.next  -> the next pointer being followed
+                    mark('list1', 0, 'next');
+                    break;
+                case "ATTACH_L2":
+                    mark('merged', mergedIdxForTail(), 'next');
+                    mark('list2', 0, 'whole');
+                    break;
+                case "ADVANCE_L2":
+                    mark('list2', 0, 'next');
+                    break;
+                case "MOVE_TAIL":
+                    // tail = tail.next  -> the newly-added last node becomes the new tail
+                    mark('merged', mergedChain.length, 'whole');
+                    break;
+                case "AFTER_LOOP":
+                    // tail.next = list1 !== null ? list1 : list2
+                    mark('merged', mergedIdxForTail(), 'next');
+                    if      (l1Idx !== null) mark('list1', 0, 'whole');
+                    else if (l2Idx !== null) mark('list2', 0, 'whole');
+                    break;
+                case "RETURN":
+                case "END":
+                    // return dummy.next  -> the next pointer of the dummy
+                    mark('merged', 0, 'next');
+                    break;
+            }
+            return h;
+        }
+
+        // Would the next attach overwrite the last-committed node's .next and cut off extras?
+        // True only when we're about to attach from a DIFFERENT source than the last commit.
+        function wouldCutExtras() {
+            if (!rawMemoryView) return false;
+            if (mergedChain.length === 0) return false;
+            const last = mergedChain[mergedChain.length - 1];
+            if (execState === "ATTACH_L1" && last.owner !== "l1") return true;
+            if (execState === "ATTACH_L2" && last.owner !== "l2") return true;
+            return false;
+        }
+
+        // Build the merged object tree as {value, isDummy?, isExtra?}[].
+        // In raw memory mode, appends the "still-linked" tail of the last commit's source list.
+        function buildMergedNodes() {
+            const result = [{ value: 0, isDummy: true }];
+            for (const n of mergedChain) {
+                const v = n.owner === 'l1' ? origL1[n.idx] : origL2[n.idx];
+                result.push({ value: v });
+            }
+            if (rawMemoryView && mergedChain.length > 0) {
+                const last = mergedChain[mergedChain.length - 1];
+                const srcArr = last.owner === 'l1' ? origL1 : origL2;
+                for (let k = last.idx + 1; k < srcArr.length; k++) {
+                    result.push({ value: srcArr[k], isExtra: true });
+                }
+            }
+            return result;
+        }
+
+        function renderObjectNode(nodes, offset, highlights, depth, tailOffset, aboutToCut) {
+            if (offset >= nodes.length) {
+                return '<span class="obj-null">null</span>';
+            }
+            const node = nodes[offset];
+            const h = highlights[offset] || {};
+            const isTail = tailOffset >= 0 && offset === tailOffset;
+
+            const cls = ['obj-node'];
+            if (h.whole)      cls.push('hl-node');
+            if (node.isDummy) cls.push('dummy-node');
+            if (node.isExtra) {
+                cls.push('extra-node');
+                if (aboutToCut) cls.push('about-to-cut');
+            }
+
+            const valCls  = 'obj-val' + (h.value ? ' hl' : '');
+            const nextCls = 'obj-key' + (h.next  ? ' hl' : '');
+
+            const indent      = '  '.repeat(depth);
+            const innerIndent = '  '.repeat(depth + 1);
+            const inner = renderObjectNode(nodes, offset + 1, highlights, depth + 1, tailOffset, aboutToCut);
+
+            const valDisplay = node.isDummy
+                ? `<span class="${valCls}">0</span> <span class="obj-comment">// placeholder</span>`
+                : `<span class="${valCls}">${node.value}</span>`;
+
+            // Markers appended after the opening brace
+            let marker = '';
+            if (isTail) {
+                marker += '<span class="tail-marker">← tail</span>';
+            }
+            // Annotate only the FIRST extra node in the chain so we don't spam.
+            const isFirstExtra = node.isExtra && (offset === 0 || !nodes[offset - 1].isExtra);
+            if (isFirstExtra) {
+                marker += aboutToCut
+                    ? '<span class="cut-marker">← about to be cut!</span>'
+                    : '<span class="extra-marker">// still linked in memory (not yet cut)</span>';
+            }
+
+            return `<span class="${cls.join(' ')}">{${marker}\n${innerIndent}<span class="obj-key">value</span>: ${valDisplay},\n${innerIndent}<span class="${nextCls}">next</span>: ${inner}\n${indent}}</span>`;
+        }
+
+        function renderObjectView() {
+            const highlights = computeObjectHighlights();
+            const aboutToCut = wouldCutExtras();
+
+            // list1 column (always shows what the list1 variable points at — unaffected by raw toggle)
+            const l1Nodes = l1Idx !== null ? origL1.slice(l1Idx).map(v => ({ value: v })) : [];
+            const l1Inner = l1Nodes.length === 0
+                ? '<span class="obj-null">null</span>'
+                : renderObjectNode(l1Nodes, 0, highlights.list1, 0, -1, false);
+            document.getElementById('obj-col-l1').innerHTML =
+                `<div class="obj-label l1">list1 =</div><div class="obj-body">${l1Inner}</div>`;
+
+            // list2 column
+            const l2Nodes = l2Idx !== null ? origL2.slice(l2Idx).map(v => ({ value: v })) : [];
+            const l2Inner = l2Nodes.length === 0
+                ? '<span class="obj-null">null</span>'
+                : renderObjectNode(l2Nodes, 0, highlights.list2, 0, -1, false);
+            document.getElementById('obj-col-l2').innerHTML =
+                `<div class="obj-label l2">list2 =</div><div class="obj-body">${l2Inner}</div>`;
+
+            // merged column — toggle swaps between committed and raw memory projections
+            const mergedNodes = buildMergedNodes();
+            const tailOffset = (execState === "INIT") ? -1 : mergedIdxForTail();
+            const mergedInner = renderObjectNode(mergedNodes, 0, highlights.merged, 0, tailOffset, aboutToCut);
+            const labelSuffix = rawMemoryView
+                ? ' <span class="obj-comment">(raw memory)</span>'
+                : '';
+            document.getElementById('obj-col-merged').innerHTML =
+                `<div class="obj-label merged">dummy =${labelSuffix}</div><div class="obj-body">${mergedInner}</div>`;
+        }
+
+        function buildListRow(label, labelClass, origArr, ptrIdx, ownerTag) {
+            // Returns an element: [label] node -> node -> node -> null
+            // Dims nodes that have already been consumed into mergedChain.
+            // Shows pointer above the node at ptrIdx.
+            const row = document.createElement('div');
+            row.className = 'list-row';
+
+            const lab = document.createElement('div');
+            lab.className = 'list-label ' + labelClass;
+            lab.textContent = label;
+            row.appendChild(lab);
+
+            if (origArr.length === 0) {
+                const nullEl = document.createElement('div');
+                nullEl.className = 'null-marker';
+                nullEl.textContent = 'null';
+                row.appendChild(nullEl);
+                return row;
+            }
+
+            origArr.forEach((val, idx) => {
+                const node = document.createElement('div');
+                node.className = 'node ' + ownerTag;
+                node.textContent = val;
+
+                const consumed = isConsumed(ownerTag, idx);
+                if (consumed) node.classList.add('consumed');
+
+                // Highlight the node that's currently pointed at by list1 or list2
+                if (ptrIdx === idx) {
+                    const ptr = document.createElement('div');
+                    ptr.className = 'pointer ' + (ownerTag === 'l1' ? 'ptr-l1' : 'ptr-l2');
+                    ptr.textContent = ownerTag === 'l1' ? 'list1' : 'list2';
+                    node.appendChild(ptr);
+
+                    // During IF_COMPARE: show pick vs non-pick
+                    if (execState === "IF_COMPARE" || execState === "ATTACH_L1" || execState === "ATTACH_L2") {
+                        if (pickedSide === ownerTag) {
+                            node.classList.add('picked');
+                        } else if (pickedSide && pickedSide !== ownerTag) {
+                            node.classList.add('not-picked');
+                        }
+                    }
+                }
+
+                row.appendChild(node);
+
+                if (idx < origArr.length - 1) {
+                    const arr = document.createElement('div');
+                    arr.className = 'arrow';
+                    arr.textContent = '→';
+                    row.appendChild(arr);
+                }
+            });
+
+            // trailing -> null
+            const arr = document.createElement('div');
+            arr.className = 'arrow';
+            arr.textContent = '→';
+            row.appendChild(arr);
+            const nullEl = document.createElement('div');
+            nullEl.className = 'null-marker';
+            nullEl.textContent = 'null';
+            row.appendChild(nullEl);
+
+            return row;
+        }
+
+        function buildMergedRow() {
+            const row = document.createElement('div');
+            row.className = 'list-row';
+
+            const lab = document.createElement('div');
+            lab.className = 'list-label merged';
+            lab.textContent = 'merged';
+            row.appendChild(lab);
+
+            // Dummy node
+            const dummy = document.createElement('div');
+            dummy.className = 'node dummy';
+            dummy.textContent = 'D';
+            if (tailOwner === 'dummy') {
+                const tptr = document.createElement('div');
+                tptr.className = 'pointer ptr-tail';
+                tptr.textContent = 'tail';
+                dummy.appendChild(tptr);
+                dummy.classList.add('tail-target');
+            }
+            row.appendChild(dummy);
+
+            if (mergedChain.length === 0) {
+                const arr = document.createElement('div');
+                arr.className = 'arrow';
+                arr.textContent = '→';
+                row.appendChild(arr);
+                const nullEl = document.createElement('div');
+                nullEl.className = 'null-marker';
+                nullEl.textContent = 'null';
+                row.appendChild(nullEl);
+                return row;
+            }
+
+            mergedChain.forEach((n, chainIdx) => {
+                const isNewlyAdded = lastLinkMade &&
+                                     lastLinkMade.to.owner === n.owner &&
+                                     lastLinkMade.to.idx === n.idx;
+
+                const arr = document.createElement('div');
+                arr.className = 'arrow active' + (isNewlyAdded ? ' new-link' : '');
+                arr.textContent = '→';
+                row.appendChild(arr);
+
+                const val = n.owner === 'l1' ? origL1[n.idx] : origL2[n.idx];
+                const node = document.createElement('div');
+                node.className = 'node ' + (n.owner === 'l1' ? 'merged-l1' : 'merged-l2');
+                node.textContent = val;
+
+                // tail pointer lands on the last node in the chain, if tail is not dummy
+                if (tailOwner === n.owner && tailIdx === n.idx && chainIdx === mergedChain.length - 1) {
+                    const tptr = document.createElement('div');
+                    tptr.className = 'pointer ptr-tail';
+                    tptr.textContent = 'tail';
+                    node.appendChild(tptr);
+                    node.classList.add('tail-target');
+                }
+
+                row.appendChild(node);
+            });
+
+            // trailing arrow to null (unless we're done and have everything)
+            const arr = document.createElement('div');
+            arr.className = 'arrow';
+            arr.textContent = '→';
+            row.appendChild(arr);
+            const nullEl = document.createElement('div');
+            nullEl.className = 'null-marker';
+            nullEl.textContent = 'null';
+            row.appendChild(nullEl);
+
+            return row;
+        }
+
+        // Build pretty representation of current list1 / list2 / merged for console
+        function formatList(origArr, ptrIdx) {
+            if (origArr.length === 0 || ptrIdx === null) return '<span class="kw">null</span>';
+            const vals = [];
+            for (let k = ptrIdx; k < origArr.length; k++) {
+                // Only include nodes not yet consumed
+                // (When iterating forward from ptrIdx, we assume no gaps.)
+                vals.push(origArr[k]);
+            }
+            if (vals.length === 0) return '<span class="kw">null</span>';
+            return vals.map(v => `<span class="nm">${v}</span>`).join(' → ') + ' → <span class="kw">null</span>';
+        }
+
+        function formatMerged() {
+            if (mergedChain.length === 0) return '<span class="str">dummy</span> → <span class="kw">null</span>';
+            const parts = mergedChain.map(n => {
+                const v = n.owner === 'l1' ? origL1[n.idx] : origL2[n.idx];
+                return `<span class="nm">${v}</span>`;
+            });
+            return '<span class="str">dummy</span> → ' + parts.join(' → ') + ' → <span class="kw">null</span>';
+        }
+
+        function formatTail() {
+            if (tailOwner === null) return 'undefined';
+            if (tailOwner === 'dummy') return '<span class="str">dummy</span>';
+            const v = tailOwner === 'l1' ? origL1[tailIdx] : origL2[tailIdx];
+            return `<span class="str">node(</span><span class="nm">${v}</span><span class="str">)</span>`;
+        }
+
+        function render() {
+            document.getElementById('btn-prev').disabled = (historyStack.length === 0);
+
+            // Active example button
+            document.querySelectorAll('.btn-ex').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-ex-${activeExample}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Button state at end
+            if (execState === "END") {
+                document.getElementById('btn-next').disabled = true;
+                document.getElementById('btn-next').textContent = "Finished!";
+            } else {
+                document.getElementById('btn-next').disabled = false;
+                document.getElementById('btn-next').textContent = "Step Over";
+            }
+
+            // 1. Line highlights + narration
+            const v1 = l1Idx !== null ? origL1[l1Idx] : 'null';
+            const v2 = l2Idx !== null ? origL2[l2Idx] : 'null';
+
+            switch(execState) {
+                case "INIT":
+                    highlightLines([2, 3]);
+                    narrate("Create a <b>dummy</b> node to simplify the merge. <b>tail</b> will track the last node of the growing merged list; it starts at dummy.");
+                    break;
+                case "WHILE_CHECK":
+                    highlightLines([5]);
+                    if (l1Idx !== null && l2Idx !== null) {
+                        narrate(`Both lists still have nodes (<b>list1</b> = ${v1}, <b>list2</b> = ${v2}). Enter the loop.`);
+                    } else {
+                        narrate(`One list is exhausted — <b>list1</b> = ${v1}, <b>list2</b> = ${v2}. Exit the loop.`);
+                    }
+                    break;
+                case "IF_COMPARE":
+                    highlightLines([6]);
+                    if (v1 <= v2) {
+                        narrate(`Compare: ${v1} ≤ ${v2} → pick from <b style="color:#569cd6">list1</b>.`);
+                    } else {
+                        narrate(`Compare: ${v1} &gt; ${v2} → pick from <b style="color:#c586c0">list2</b>.`);
+                    }
+                    break;
+                case "ATTACH_L1":
+                    highlightLines([7]);
+                    narrate(`<code>tail.next = list1</code> — splice the list1 node (value ${origL1[l1Idx]}) onto the merged list.`);
+                    break;
+                case "ADVANCE_L1":
+                    highlightLines([8]);
+                    narrate(`<code>list1 = list1.next</code> — advance the list1 pointer.`);
+                    break;
+                case "ATTACH_L2":
+                    highlightLines([10]);
+                    narrate(`<code>tail.next = list2</code> — splice the list2 node (value ${origL2[l2Idx]}) onto the merged list.`);
+                    break;
+                case "ADVANCE_L2":
+                    highlightLines([11]);
+                    narrate(`<code>list2 = list2.next</code> — advance the list2 pointer.`);
+                    break;
+                case "MOVE_TAIL":
+                    highlightLines([13]);
+                    narrate(`<code>tail = tail.next</code> — tail now points to the node we just attached.`);
+                    break;
+                case "AFTER_LOOP":
+                    highlightLines([17]);
+                    if (mergedChain.length === 0 && origL1.length === 0 && origL2.length === 0) {
+                        narrate(`Both lists were empty. <b>tail.next</b> stays null.`);
+                    } else {
+                        const which = origL1.some((_,k)=>!mergedChain.some(m=>m.owner==='l1'&&m.idx===k))
+                                      ? 'list1' : 'list2';
+                        narrate(`One list is null. Attach the remaining tail of <b>${which}</b> — no more comparisons needed since it's already sorted.`);
+                    }
+                    break;
+                case "RETURN":
+                    highlightLines([19]);
+                    narrate(`Return <code>dummy.next</code> — skipping past the placeholder to the real head of the merged list.`);
+                    break;
+                case "END":
+                    highlightLines([19]);
+                    narrate(`✓ Done. Merged list has ${mergedChain.length} node${mergedChain.length === 1 ? '' : 's'}.`);
+                    break;
+            }
+
+            // 2. Build the list visuals
+            const stage = document.getElementById('lists-ui');
+            stage.innerHTML = '';
+            stage.appendChild(buildListRow('list1', 'l1', origL1, l1Idx, 'l1'));
+            stage.appendChild(buildListRow('list2', 'l2', origL2, l2Idx, 'l2'));
+            stage.appendChild(buildMergedRow());
+
+            // 2b. Build the object view (nested JS object format)
+            renderObjectView();
+
+            // 3. Console
+            const vMap = {
+                list1: formatList(origL1, l1Idx),
+                list2: formatList(origL2, l2Idx),
+                tail:  formatTail(),
+                result: execState === "END" || execState === "RETURN" ? formatMerged() : '<span class="kw">pending</span>'
+            };
+
+            document.getElementById('console-ui').innerHTML =
+                `<span class="cm">// Original inputs</span><br>` +
+                `<span class="kw">const</span> input_list1 = [ ${origL1.join(', ')} ];<br>` +
+                `<span class="kw">const</span> input_list2 = [ ${origL2.join(', ')} ];<br><br>` +
+                `<span class="cm">// Live state</span><br>` +
+                createConsoleLine('list1', 'let', 'list1', vMap.list1) +
+                createConsoleLine('list2', 'let', 'list2', vMap.list2) +
+                createConsoleLine('tail', 'let', 'tail', vMap.tail) +
+                `<br><span class="cm">// Merged chain (dummy.next → ...)</span><br>` +
+                createConsoleLine('result', 'const', 'result', vMap.result);
+
+            // 4. HUD
+            const hudUi = document.getElementById('hud-ui');
+            hudUi.innerHTML = '';
+            for (const [key, isPinned] of Object.entries(pinned)) {
+                if (isPinned) {
+                    const div = document.createElement('div');
+                    div.className = 'hud-item';
+                    div.innerHTML = `<span>${key}:</span> <span class="hud-val">${vMap[key]}</span>`;
+                    hudUi.appendChild(div);
+                }
+            }
+        }
+
+        // Boot
+        origL1 = [...examples[1].l1];
+        origL2 = [...examples[1].l2];
+        init();
+    </script>
+</body>
+</html>
