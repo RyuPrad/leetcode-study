@@ -1,6 +1,6 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T22:26:47.753Z
+Generated: 2026-05-27T22:40:34.529Z
 
 Generated from 18 HTML visualizers.
 
@@ -27,12 +27,6 @@ i:
 0
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ _, _, _, _, _, _ ]
 ```
@@ -83,12 +77,6 @@ i:
 0
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ _, _, _, _, _, _ ]
 ```
@@ -106,12 +94,6 @@ i:
 0
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ _, _, _, _, _, _ ]
 ```
@@ -128,12 +110,6 @@ HUD:
 i:
 0
 n:
-3
-value:
-1
-firstIndex:
-0
-secondIndex:
 3
 res:
 [ _, _, _, _, _, _ ]
@@ -152,12 +128,6 @@ i:
 0
 n:
 3
-value:
-1
-firstIndex:
-0
-secondIndex:
-3
 res:
 [ 1, _, _, _, _, _ ]
 ```
@@ -174,12 +144,6 @@ HUD:
 i:
 0
 n:
-3
-value:
-1
-firstIndex:
-0
-secondIndex:
 3
 res:
 [ 1, _, _, 1, _, _ ]
@@ -198,12 +162,6 @@ i:
 1
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, _, _, 1, _, _ ]
 ```
@@ -221,12 +179,6 @@ i:
 1
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, _, _, 1, _, _ ]
 ```
@@ -244,12 +196,6 @@ i:
 1
 n:
 3
-value:
-2
-firstIndex:
-1
-secondIndex:
-4
 res:
 [ 1, _, _, 1, _, _ ]
 ```
@@ -267,12 +213,6 @@ i:
 1
 n:
 3
-value:
-2
-firstIndex:
-1
-secondIndex:
-4
 res:
 [ 1, 2, _, 1, _, _ ]
 ```
@@ -290,12 +230,6 @@ i:
 1
 n:
 3
-value:
-2
-firstIndex:
-1
-secondIndex:
-4
 res:
 [ 1, 2, _, 1, 2, _ ]
 ```
@@ -313,12 +247,6 @@ i:
 2
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, _, 1, 2, _ ]
 ```
@@ -336,12 +264,6 @@ i:
 2
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, _, 1, 2, _ ]
 ```
@@ -359,12 +281,6 @@ i:
 2
 n:
 3
-value:
-1
-firstIndex:
-2
-secondIndex:
-5
 res:
 [ 1, 2, _, 1, 2, _ ]
 ```
@@ -382,12 +298,6 @@ i:
 2
 n:
 3
-value:
-1
-firstIndex:
-2
-secondIndex:
-5
 res:
 [ 1, 2, 1, 1, 2, _ ]
 ```
@@ -405,12 +315,6 @@ i:
 2
 n:
 3
-value:
-1
-firstIndex:
-2
-secondIndex:
-5
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -428,12 +332,6 @@ i:
 done
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -451,12 +349,6 @@ i:
 done
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -474,12 +366,6 @@ i:
 done
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -499,12 +385,6 @@ i:
 done
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -516,12 +396,6 @@ i:
 done
 n:
 3
-value:
-undefined
-firstIndex:
-undefined
-secondIndex:
-undefined
 res:
 [ 1, 2, 1, 1, 2, 1 ]
 ```
@@ -1559,7 +1433,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 0
 res:
 pending
@@ -1616,7 +1490,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 0
 res:
 pending
@@ -1632,7 +1506,7 @@ str:
 "eat"
 key:
 not built
-mapSize:
+groups:
 0
 res:
 pending
@@ -1648,7 +1522,7 @@ str:
 "eat"
 key:
 not built
-mapSize:
+groups:
 0
 res:
 pending
@@ -1664,7 +1538,7 @@ str:
 "eat"
 key:
 not built
-mapSize:
+groups:
 0
 res:
 pending
@@ -1680,7 +1554,7 @@ str:
 "eat"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 0
 res:
 pending
@@ -1696,7 +1570,7 @@ str:
 "eat"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1712,7 +1586,7 @@ str:
 "eat"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1728,7 +1602,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1744,7 +1618,7 @@ str:
 "tea"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1760,7 +1634,7 @@ str:
 "tea"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1776,7 +1650,7 @@ str:
 "tea"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1792,7 +1666,7 @@ str:
 "tea"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1808,7 +1682,7 @@ str:
 "tea"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1824,7 +1698,7 @@ str:
 "tea"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1840,7 +1714,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1856,7 +1730,7 @@ str:
 "tan"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1872,7 +1746,7 @@ str:
 "tan"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1888,7 +1762,7 @@ str:
 "tan"
 key:
 not built
-mapSize:
+groups:
 1
 res:
 pending
@@ -1904,7 +1778,7 @@ str:
 "tan"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 1
 res:
 pending
@@ -1920,7 +1794,7 @@ str:
 "tan"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -1936,7 +1810,7 @@ str:
 "tan"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -1952,7 +1826,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -1968,7 +1842,7 @@ str:
 "ate"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -1984,7 +1858,7 @@ str:
 "ate"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2000,7 +1874,7 @@ str:
 "ate"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2016,7 +1890,7 @@ str:
 "ate"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2032,7 +1906,7 @@ str:
 "ate"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2048,7 +1922,7 @@ str:
 "ate"
 key:
 a:1 | e:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2064,7 +1938,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2080,7 +1954,7 @@ str:
 "nat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2096,7 +1970,7 @@ str:
 "nat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2112,7 +1986,7 @@ str:
 "nat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2128,7 +2002,7 @@ str:
 "nat"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2144,7 +2018,7 @@ str:
 "nat"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2160,7 +2034,7 @@ str:
 "nat"
 key:
 a:1 | n:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2176,7 +2050,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2192,7 +2066,7 @@ str:
 "bat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2208,7 +2082,7 @@ str:
 "bat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2224,7 +2098,7 @@ str:
 "bat"
 key:
 not built
-mapSize:
+groups:
 2
 res:
 pending
@@ -2240,7 +2114,7 @@ str:
 "bat"
 key:
 a:1 | b:1 | t:1
-mapSize:
+groups:
 2
 res:
 pending
@@ -2256,7 +2130,7 @@ str:
 "bat"
 key:
 a:1 | b:1 | t:1
-mapSize:
+groups:
 3
 res:
 pending
@@ -2272,7 +2146,7 @@ str:
 "bat"
 key:
 a:1 | b:1 | t:1
-mapSize:
+groups:
 3
 res:
 pending
@@ -2288,7 +2162,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 3
 res:
 pending
@@ -2304,7 +2178,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 3
 res:
 pending
@@ -2320,7 +2194,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 3
 res:
 [["eat","tea","ate"],["tan","nat"],["bat"]]
@@ -2336,7 +2210,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 3
 res:
 [["eat","tea","ate"],["tan","nat"],["bat"]]
@@ -2351,7 +2225,7 @@ str:
 undefined
 key:
 not built
-mapSize:
+groups:
 3
 res:
 pending
@@ -2894,11 +2768,9 @@ Step mode: btn-next
 ### Initial HUD
 
 ```text
-phase:
-INIT
 i:
 -
-numsI:
+num:
 undefined
 prefix:
 1
@@ -2946,11 +2818,9 @@ No operations yet. Step forward to start tracing the algorithm.
 
 HUD:
 ```text
-phase:
-PREFIX_START
 i:
 -
-numsI:
+num:
 undefined
 prefix:
 1
@@ -2964,11 +2834,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_READ
 i:
 0
-numsI:
+num:
 1
 prefix:
 1
@@ -2982,11 +2850,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_WRITE
 i:
 0
-numsI:
+num:
 1
 prefix:
 1
@@ -3000,11 +2866,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_UPDATE
 i:
 0
-numsI:
+num:
 1
 prefix:
 1
@@ -3018,11 +2882,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_READ
 i:
 1
-numsI:
+num:
 2
 prefix:
 1
@@ -3036,11 +2898,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_WRITE
 i:
 1
-numsI:
+num:
 2
 prefix:
 1
@@ -3054,11 +2914,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_UPDATE
 i:
 1
-numsI:
+num:
 2
 prefix:
 2
@@ -3072,11 +2930,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_READ
 i:
 2
-numsI:
+num:
 3
 prefix:
 2
@@ -3090,11 +2946,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_WRITE
 i:
 2
-numsI:
+num:
 3
 prefix:
 2
@@ -3108,11 +2962,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_UPDATE
 i:
 2
-numsI:
+num:
 3
 prefix:
 6
@@ -3126,11 +2978,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_READ
 i:
 3
-numsI:
+num:
 4
 prefix:
 6
@@ -3144,11 +2994,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_WRITE
 i:
 3
-numsI:
+num:
 4
 prefix:
 6
@@ -3162,11 +3010,9 @@ res:
 
 HUD:
 ```text
-phase:
-PREFIX_UPDATE
 i:
 3
-numsI:
+num:
 4
 prefix:
 24
@@ -3180,11 +3026,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_START
 i:
 -
-numsI:
+num:
 undefined
 prefix:
 24
@@ -3198,11 +3042,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_READ
 i:
 3
-numsI:
+num:
 4
 prefix:
 24
@@ -3216,11 +3058,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_WRITE
 i:
 3
-numsI:
+num:
 4
 prefix:
 24
@@ -3234,11 +3074,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_UPDATE
 i:
 3
-numsI:
+num:
 4
 prefix:
 24
@@ -3252,11 +3090,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_READ
 i:
 2
-numsI:
+num:
 3
 prefix:
 24
@@ -3270,11 +3106,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_WRITE
 i:
 2
-numsI:
+num:
 3
 prefix:
 24
@@ -3288,11 +3122,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_UPDATE
 i:
 2
-numsI:
+num:
 3
 prefix:
 24
@@ -3306,11 +3138,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_READ
 i:
 1
-numsI:
+num:
 2
 prefix:
 24
@@ -3324,11 +3154,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_WRITE
 i:
 1
-numsI:
+num:
 2
 prefix:
 24
@@ -3342,11 +3170,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_UPDATE
 i:
 1
-numsI:
+num:
 2
 prefix:
 24
@@ -3360,11 +3186,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_READ
 i:
 0
-numsI:
+num:
 1
 prefix:
 24
@@ -3378,11 +3202,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_WRITE
 i:
 0
-numsI:
+num:
 1
 prefix:
 24
@@ -3396,11 +3218,9 @@ res:
 
 HUD:
 ```text
-phase:
-SUFFIX_UPDATE
 i:
 0
-numsI:
+num:
 1
 prefix:
 24
@@ -3414,11 +3234,9 @@ res:
 
 HUD:
 ```text
-phase:
-DONE
 i:
 -
-numsI:
+num:
 undefined
 prefix:
 24
@@ -3432,11 +3250,9 @@ res:
 
 HUD:
 ```text
-phase:
-DONE
 i:
 -
-numsI:
+num:
 undefined
 prefix:
 24
@@ -3449,11 +3265,9 @@ res:
 ### After Step Back
 
 ```text
-phase:
-SUFFIX_UPDATE
 i:
 0
-numsI:
+num:
 1
 prefix:
 24
@@ -3494,15 +3308,13 @@ Step mode: btn-next
 ### Initial HUD
 
 ```text
-phase:
-INIT
 i:
 -
 num:
 undefined
 freq:
 Map size 0
-bucket:
+buckets:
 -
 res:
 []
@@ -3547,15 +3359,13 @@ No operations yet. Step forward to start tracing the algorithm.
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 0
 num:
 1
 freq:
-Map size 0
-bucket:
+0
+buckets:
 -
 res:
 []
@@ -3570,15 +3380,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 0
 num:
 1
 freq:
-Map size 1
-bucket:
+1
+buckets:
 -
 res:
 []
@@ -3593,15 +3401,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 1
 num:
 1
 freq:
-Map size 1
-bucket:
+1
+buckets:
 -
 res:
 []
@@ -3616,15 +3422,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 1
 num:
 1
 freq:
-Map size 1
-bucket:
+2
+buckets:
 -
 res:
 []
@@ -3639,15 +3443,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 2
 num:
 1
 freq:
-Map size 1
-bucket:
+2
+buckets:
 -
 res:
 []
@@ -3662,15 +3464,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 2
 num:
 1
 freq:
-Map size 1
-bucket:
+3
+buckets:
 -
 res:
 []
@@ -3685,15 +3485,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 3
 num:
 2
 freq:
-Map size 1
-bucket:
+0
+buckets:
 -
 res:
 []
@@ -3708,15 +3506,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 3
 num:
 2
 freq:
-Map size 2
-bucket:
+1
+buckets:
 -
 res:
 []
@@ -3731,15 +3527,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 4
 num:
 2
 freq:
-Map size 2
-bucket:
+1
+buckets:
 -
 res:
 []
@@ -3754,15 +3548,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 4
 num:
 2
 freq:
-Map size 2
-bucket:
+2
+buckets:
 -
 res:
 []
@@ -3777,15 +3569,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_READ
 i:
 5
 num:
 3
 freq:
-Map size 2
-bucket:
+0
+buckets:
 -
 res:
 []
@@ -3800,15 +3590,13 @@ Result:
 
 HUD:
 ```text
-phase:
-COUNT_WRITE
 i:
 5
 num:
 3
 freq:
-Map size 3
-bucket:
+1
+buckets:
 -
 res:
 []
@@ -3823,15 +3611,13 @@ Result:
 
 HUD:
 ```text
-phase:
-MAKE_BUCKETS
 i:
 -
 num:
 undefined
 freq:
 Map size 3
-bucket:
+buckets:
 -
 res:
 []
@@ -3846,16 +3632,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_READ
 i:
 -
 num:
 1
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 []
 ```
@@ -3869,16 +3653,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_WRITE
 i:
 -
 num:
 1
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 []
 ```
@@ -3892,16 +3674,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_READ
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 []
 ```
@@ -3915,16 +3695,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_WRITE
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 []
 ```
@@ -3938,16 +3716,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_READ
 i:
 -
 num:
 3
 freq:
-Map size 3
-bucket:
-bucket[1]
+1
+buckets:
+buckets[1]
 res:
 []
 ```
@@ -3961,16 +3737,14 @@ Result:
 
 HUD:
 ```text
-phase:
-BUCKET_WRITE
 i:
 -
 num:
 3
 freq:
-Map size 3
-bucket:
-bucket[1]
+1
+buckets:
+buckets[1]
 res:
 []
 ```
@@ -3984,15 +3758,13 @@ Result:
 
 HUD:
 ```text
-phase:
-RESULT_INIT
 i:
 -
 num:
 undefined
 freq:
 Map size 3
-bucket:
+buckets:
 -
 res:
 []
@@ -4007,16 +3779,14 @@ Result:
 
 HUD:
 ```text
-phase:
-SCAN_BUCKET
 i:
 -
 num:
 undefined
 freq:
-Map size 3
-bucket:
-bucket[6]
+6
+buckets:
+buckets[6]
 res:
 []
 ```
@@ -4030,16 +3800,14 @@ Result:
 
 HUD:
 ```text
-phase:
-SCAN_BUCKET
 i:
 -
 num:
 undefined
 freq:
-Map size 3
-bucket:
-bucket[5]
+5
+buckets:
+buckets[5]
 res:
 []
 ```
@@ -4053,16 +3821,14 @@ Result:
 
 HUD:
 ```text
-phase:
-SCAN_BUCKET
 i:
 -
 num:
 undefined
 freq:
-Map size 3
-bucket:
-bucket[4]
+4
+buckets:
+buckets[4]
 res:
 []
 ```
@@ -4076,16 +3842,14 @@ Result:
 
 HUD:
 ```text
-phase:
-SCAN_BUCKET
 i:
 -
 num:
 undefined
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 []
 ```
@@ -4099,16 +3863,14 @@ Result:
 
 HUD:
 ```text
-phase:
-INNER_LOOP
 i:
 -
 num:
 1
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 []
 ```
@@ -4122,16 +3884,14 @@ Result:
 
 HUD:
 ```text
-phase:
-PUSH_RESULT
 i:
 -
 num:
 1
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 [1]
 ```
@@ -4145,16 +3905,14 @@ Result:
 
 HUD:
 ```text
-phase:
-CHECK_K
 i:
 -
 num:
 1
 freq:
-Map size 3
-bucket:
-bucket[3]
+3
+buckets:
+buckets[3]
 res:
 [1]
 ```
@@ -4168,16 +3926,14 @@ Result:
 
 HUD:
 ```text
-phase:
-SCAN_BUCKET
 i:
 -
 num:
 undefined
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1]
 ```
@@ -4191,16 +3947,14 @@ Result:
 
 HUD:
 ```text
-phase:
-INNER_LOOP
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1]
 ```
@@ -4214,16 +3968,14 @@ Result:
 
 HUD:
 ```text
-phase:
-PUSH_RESULT
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1, 2]
 ```
@@ -4237,16 +3989,14 @@ Result:
 
 HUD:
 ```text
-phase:
-CHECK_K
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1, 2]
 ```
@@ -4260,16 +4010,14 @@ Result:
 
 HUD:
 ```text
-phase:
-DONE
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1, 2]
 ```
@@ -4285,16 +4033,14 @@ return value: [ 1, 2 ]
 
 HUD:
 ```text
-phase:
-DONE
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1, 2]
 ```
@@ -4302,16 +4048,14 @@ res:
 ### After Step Back
 
 ```text
-phase:
-CHECK_K
 i:
 -
 num:
 2
 freq:
-Map size 3
-bucket:
-bucket[2]
+2
+buckets:
+buckets[2]
 res:
 [1, 2]
 ```
@@ -5490,7 +5234,7 @@ right:
 5
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 9
@@ -5546,7 +5290,7 @@ right:
 5
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 9
@@ -5564,7 +5308,7 @@ right:
 5
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 9
@@ -5582,7 +5326,7 @@ right:
 5
 mid:
 2
-currentValue:
+nums[mid]:
 3
 target:
 9
@@ -5600,7 +5344,7 @@ right:
 5
 mid:
 2
-currentValue:
+nums[mid]:
 3
 target:
 9
@@ -5618,7 +5362,7 @@ right:
 5
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 9
@@ -5636,7 +5380,7 @@ right:
 5
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 9
@@ -5654,7 +5398,7 @@ right:
 5
 mid:
 4
-currentValue:
+nums[mid]:
 9
 target:
 9
@@ -5672,7 +5416,7 @@ right:
 5
 mid:
 4
-currentValue:
+nums[mid]:
 9
 target:
 9
@@ -5690,7 +5434,7 @@ right:
 5
 mid:
 4
-currentValue:
+nums[mid]:
 9
 target:
 9
@@ -5708,7 +5452,7 @@ right:
 5
 mid:
 4
-currentValue:
+nums[mid]:
 9
 target:
 9
@@ -5725,7 +5469,7 @@ right:
 5
 mid:
 4
-currentValue:
+nums[mid]:
 9
 target:
 9
@@ -5770,7 +5514,7 @@ right:
 3
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 5
@@ -5826,7 +5570,7 @@ right:
 3
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 5
@@ -5844,7 +5588,7 @@ right:
 3
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 5
@@ -5862,7 +5606,7 @@ right:
 3
 mid:
 1
-currentValue:
+nums[mid]:
 3
 target:
 5
@@ -5880,7 +5624,7 @@ right:
 3
 mid:
 1
-currentValue:
+nums[mid]:
 3
 target:
 5
@@ -5898,7 +5642,7 @@ right:
 3
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 5
@@ -5916,7 +5660,7 @@ right:
 3
 mid:
 undefined
-currentValue:
+nums[mid]:
 undefined
 target:
 5
@@ -5934,7 +5678,7 @@ right:
 3
 mid:
 2
-currentValue:
+nums[mid]:
 5
 target:
 5
@@ -5952,7 +5696,7 @@ right:
 3
 mid:
 2
-currentValue:
+nums[mid]:
 5
 target:
 5
@@ -5970,7 +5714,7 @@ right:
 3
 mid:
 2
-currentValue:
+nums[mid]:
 5
 target:
 5
@@ -5988,7 +5732,7 @@ right:
 3
 mid:
 2
-currentValue:
+nums[mid]:
 5
 target:
 5
@@ -6005,7 +5749,7 @@ right:
 3
 mid:
 2
-currentValue:
+nums[mid]:
 5
 target:
 5
@@ -8167,10 +7911,6 @@ left:
 0
 right:
 8
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8222,10 +7962,6 @@ left:
 0
 right:
 8
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8240,10 +7976,6 @@ left:
 0
 right:
 8
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8258,10 +7990,6 @@ left:
 0
 right:
 8
-width:
-8
-currentHeight:
-1
 area:
 8
 ans:
@@ -8276,10 +8004,6 @@ left:
 0
 right:
 8
-width:
-8
-currentHeight:
-1
 area:
 8
 ans:
@@ -8294,10 +8018,6 @@ left:
 1
 right:
 8
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8312,10 +8032,6 @@ left:
 1
 right:
 8
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8330,10 +8046,6 @@ left:
 1
 right:
 8
-width:
-7
-currentHeight:
-7
 area:
 49
 ans:
@@ -8348,10 +8060,6 @@ left:
 1
 right:
 8
-width:
-7
-currentHeight:
-7
 area:
 49
 ans:
@@ -8366,10 +8074,6 @@ left:
 1
 right:
 7
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8384,10 +8088,6 @@ left:
 1
 right:
 7
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8402,10 +8102,6 @@ left:
 1
 right:
 7
-width:
-6
-currentHeight:
-3
 area:
 18
 ans:
@@ -8420,10 +8116,6 @@ left:
 1
 right:
 7
-width:
-6
-currentHeight:
-3
 area:
 18
 ans:
@@ -8438,10 +8130,6 @@ left:
 1
 right:
 6
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8456,10 +8144,6 @@ left:
 1
 right:
 6
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8474,10 +8158,6 @@ left:
 1
 right:
 6
-width:
-5
-currentHeight:
-8
 area:
 40
 ans:
@@ -8492,10 +8172,6 @@ left:
 1
 right:
 6
-width:
-5
-currentHeight:
-8
 area:
 40
 ans:
@@ -8510,10 +8186,6 @@ left:
 1
 right:
 5
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8528,10 +8200,6 @@ left:
 1
 right:
 5
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8546,10 +8214,6 @@ left:
 1
 right:
 5
-width:
-4
-currentHeight:
-4
 area:
 16
 ans:
@@ -8564,10 +8228,6 @@ left:
 1
 right:
 5
-width:
-4
-currentHeight:
-4
 area:
 16
 ans:
@@ -8582,10 +8242,6 @@ left:
 1
 right:
 4
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8600,10 +8256,6 @@ left:
 1
 right:
 4
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8618,10 +8270,6 @@ left:
 1
 right:
 4
-width:
-3
-currentHeight:
-5
 area:
 15
 ans:
@@ -8636,10 +8284,6 @@ left:
 1
 right:
 4
-width:
-3
-currentHeight:
-5
 area:
 15
 ans:
@@ -8654,10 +8298,6 @@ left:
 1
 right:
 3
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8672,10 +8312,6 @@ left:
 1
 right:
 3
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8690,10 +8326,6 @@ left:
 1
 right:
 3
-width:
-2
-currentHeight:
-2
 area:
 4
 ans:
@@ -8708,10 +8340,6 @@ left:
 1
 right:
 3
-width:
-2
-currentHeight:
-2
 area:
 4
 ans:
@@ -8726,10 +8354,6 @@ left:
 1
 right:
 2
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8744,10 +8368,6 @@ left:
 1
 right:
 2
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8762,10 +8382,6 @@ left:
 1
 right:
 2
-width:
-1
-currentHeight:
-6
 area:
 6
 ans:
@@ -8780,10 +8396,6 @@ left:
 1
 right:
 2
-width:
-1
-currentHeight:
-6
 area:
 6
 ans:
@@ -8798,10 +8410,6 @@ left:
 1
 right:
 1
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8816,10 +8424,6 @@ left:
 1
 right:
 1
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8834,10 +8438,6 @@ left:
 1
 right:
 1
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8852,10 +8452,6 @@ left:
 1
 right:
 1
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -8869,10 +8465,6 @@ left:
 1
 right:
 1
-width:
-undefined
-currentHeight:
-undefined
 area:
 undefined
 ans:
@@ -9728,10 +9320,6 @@ left:
 0
 right:
 29
-compared:
-0
-skipped:
-0
 ans:
 undefined
 ```
@@ -9782,10 +9370,6 @@ left:
 0
 right:
 29
-compared:
-0
-skipped:
-0
 ans:
 undefined
 ```
@@ -9798,10 +9382,6 @@ left:
 0
 right:
 29
-compared:
-0
-skipped:
-0
 ans:
 undefined
 ```
@@ -9814,10 +9394,6 @@ left:
 0
 right:
 29
-compared:
-0
-skipped:
-0
 ans:
 undefined
 ```
@@ -9830,10 +9406,6 @@ left:
 0
 right:
 29
-compared:
-0
-skipped:
-0
 ans:
 undefined
 ```
@@ -9846,10 +9418,6 @@ left:
 0
 right:
 29
-compared:
-1
-skipped:
-0
 ans:
 undefined
 ```
@@ -9862,10 +9430,6 @@ left:
 1
 right:
 28
-compared:
-1
-skipped:
-0
 ans:
 undefined
 ```
@@ -9878,10 +9442,6 @@ left:
 1
 right:
 28
-compared:
-1
-skipped:
-0
 ans:
 undefined
 ```
@@ -9894,10 +9454,6 @@ left:
 2
 right:
 28
-compared:
-1
-skipped:
-1
 ans:
 undefined
 ```
@@ -9910,10 +9466,6 @@ left:
 2
 right:
 28
-compared:
-1
-skipped:
-1
 ans:
 undefined
 ```
@@ -9926,10 +9478,6 @@ left:
 2
 right:
 28
-compared:
-1
-skipped:
-1
 ans:
 undefined
 ```
@@ -9942,10 +9490,6 @@ left:
 2
 right:
 28
-compared:
-2
-skipped:
-1
 ans:
 undefined
 ```
@@ -9958,10 +9502,6 @@ left:
 3
 right:
 27
-compared:
-2
-skipped:
-1
 ans:
 undefined
 ```
@@ -9974,10 +9514,6 @@ left:
 3
 right:
 27
-compared:
-2
-skipped:
-1
 ans:
 undefined
 ```
@@ -9990,10 +9526,6 @@ left:
 3
 right:
 27
-compared:
-2
-skipped:
-1
 ans:
 undefined
 ```
@@ -10006,10 +9538,6 @@ left:
 3
 right:
 27
-compared:
-2
-skipped:
-1
 ans:
 undefined
 ```
@@ -10022,10 +9550,6 @@ left:
 3
 right:
 27
-compared:
-3
-skipped:
-1
 ans:
 undefined
 ```
@@ -10038,10 +9562,6 @@ left:
 4
 right:
 26
-compared:
-3
-skipped:
-1
 ans:
 undefined
 ```
@@ -10054,10 +9574,6 @@ left:
 4
 right:
 26
-compared:
-3
-skipped:
-1
 ans:
 undefined
 ```
@@ -10070,10 +9586,6 @@ left:
 4
 right:
 26
-compared:
-3
-skipped:
-1
 ans:
 undefined
 ```
@@ -10086,10 +9598,6 @@ left:
 4
 right:
 26
-compared:
-3
-skipped:
-1
 ans:
 undefined
 ```
@@ -10102,10 +9610,6 @@ left:
 4
 right:
 26
-compared:
-4
-skipped:
-1
 ans:
 undefined
 ```
@@ -10118,10 +9622,6 @@ left:
 5
 right:
 25
-compared:
-4
-skipped:
-1
 ans:
 undefined
 ```
@@ -10134,10 +9634,6 @@ left:
 5
 right:
 25
-compared:
-4
-skipped:
-1
 ans:
 undefined
 ```
@@ -10150,10 +9646,6 @@ left:
 6
 right:
 25
-compared:
-4
-skipped:
-2
 ans:
 undefined
 ```
@@ -10166,10 +9658,6 @@ left:
 7
 right:
 25
-compared:
-4
-skipped:
-3
 ans:
 undefined
 ```
@@ -10182,10 +9670,6 @@ left:
 7
 right:
 25
-compared:
-4
-skipped:
-3
 ans:
 undefined
 ```
@@ -10198,10 +9682,6 @@ left:
 7
 right:
 25
-compared:
-4
-skipped:
-3
 ans:
 undefined
 ```
@@ -10214,10 +9694,6 @@ left:
 7
 right:
 25
-compared:
-5
-skipped:
-3
 ans:
 undefined
 ```
@@ -10230,10 +9706,6 @@ left:
 8
 right:
 24
-compared:
-5
-skipped:
-3
 ans:
 undefined
 ```
@@ -10246,10 +9718,6 @@ left:
 8
 right:
 24
-compared:
-5
-skipped:
-3
 ans:
 undefined
 ```
@@ -10262,10 +9730,6 @@ left:
 9
 right:
 24
-compared:
-5
-skipped:
-4
 ans:
 undefined
 ```
@@ -10278,10 +9742,6 @@ left:
 9
 right:
 24
-compared:
-5
-skipped:
-4
 ans:
 undefined
 ```
@@ -10294,10 +9754,6 @@ left:
 9
 right:
 24
-compared:
-5
-skipped:
-4
 ans:
 undefined
 ```
@@ -10310,10 +9766,6 @@ left:
 9
 right:
 24
-compared:
-6
-skipped:
-4
 ans:
 undefined
 ```
@@ -10326,10 +9778,6 @@ left:
 10
 right:
 23
-compared:
-6
-skipped:
-4
 ans:
 undefined
 ```
@@ -10342,10 +9790,6 @@ left:
 10
 right:
 23
-compared:
-6
-skipped:
-4
 ans:
 undefined
 ```
@@ -10358,10 +9802,6 @@ left:
 10
 right:
 23
-compared:
-6
-skipped:
-4
 ans:
 undefined
 ```
@@ -10374,10 +9814,6 @@ left:
 10
 right:
 22
-compared:
-6
-skipped:
-5
 ans:
 undefined
 ```
@@ -10390,10 +9826,6 @@ left:
 10
 right:
 21
-compared:
-6
-skipped:
-6
 ans:
 undefined
 ```
@@ -10406,10 +9838,6 @@ left:
 10
 right:
 21
-compared:
-6
-skipped:
-6
 ans:
 undefined
 ```
@@ -10422,10 +9850,6 @@ left:
 10
 right:
 21
-compared:
-7
-skipped:
-6
 ans:
 undefined
 ```
@@ -10438,10 +9862,6 @@ left:
 11
 right:
 20
-compared:
-7
-skipped:
-6
 ans:
 undefined
 ```
@@ -10454,10 +9874,6 @@ left:
 11
 right:
 20
-compared:
-7
-skipped:
-6
 ans:
 undefined
 ```
@@ -10470,10 +9886,6 @@ left:
 11
 right:
 20
-compared:
-7
-skipped:
-6
 ans:
 undefined
 ```
@@ -10486,10 +9898,6 @@ left:
 11
 right:
 20
-compared:
-7
-skipped:
-6
 ans:
 undefined
 ```
@@ -10502,10 +9910,6 @@ left:
 11
 right:
 20
-compared:
-8
-skipped:
-6
 ans:
 undefined
 ```
@@ -10518,10 +9922,6 @@ left:
 12
 right:
 19
-compared:
-8
-skipped:
-6
 ans:
 undefined
 ```
@@ -10534,10 +9934,6 @@ left:
 12
 right:
 19
-compared:
-8
-skipped:
-6
 ans:
 undefined
 ```
@@ -10550,10 +9946,6 @@ left:
 12
 right:
 19
-compared:
-8
-skipped:
-6
 ans:
 undefined
 ```
@@ -10566,10 +9958,6 @@ left:
 12
 right:
 19
-compared:
-8
-skipped:
-6
 ans:
 undefined
 ```
@@ -10582,10 +9970,6 @@ left:
 12
 right:
 19
-compared:
-9
-skipped:
-6
 ans:
 undefined
 ```
@@ -10598,10 +9982,6 @@ left:
 13
 right:
 18
-compared:
-9
-skipped:
-6
 ans:
 undefined
 ```
@@ -10614,10 +9994,6 @@ left:
 13
 right:
 18
-compared:
-9
-skipped:
-6
 ans:
 undefined
 ```
@@ -10630,10 +10006,6 @@ left:
 14
 right:
 18
-compared:
-9
-skipped:
-7
 ans:
 undefined
 ```
@@ -10646,10 +10018,6 @@ left:
 15
 right:
 18
-compared:
-9
-skipped:
-8
 ans:
 undefined
 ```
@@ -10662,10 +10030,6 @@ left:
 15
 right:
 18
-compared:
-9
-skipped:
-8
 ans:
 undefined
 ```
@@ -10678,10 +10042,6 @@ left:
 15
 right:
 18
-compared:
-9
-skipped:
-8
 ans:
 undefined
 ```
@@ -10694,10 +10054,6 @@ left:
 15
 right:
 18
-compared:
-10
-skipped:
-8
 ans:
 undefined
 ```
@@ -10710,10 +10066,6 @@ left:
 16
 right:
 17
-compared:
-10
-skipped:
-8
 ans:
 undefined
 ```
@@ -10726,10 +10078,6 @@ left:
 16
 right:
 17
-compared:
-10
-skipped:
-8
 ans:
 undefined
 ```
@@ -10742,10 +10090,6 @@ left:
 17
 right:
 17
-compared:
-10
-skipped:
-9
 ans:
 undefined
 ```
@@ -10758,10 +10102,6 @@ left:
 17
 right:
 17
-compared:
-10
-skipped:
-9
 ans:
 undefined
 ```
@@ -10774,10 +10114,6 @@ left:
 17
 right:
 17
-compared:
-10
-skipped:
-9
 ans:
 undefined
 ```
@@ -10790,10 +10126,6 @@ left:
 17
 right:
 17
-compared:
-11
-skipped:
-9
 ans:
 undefined
 ```
@@ -10806,10 +10138,6 @@ left:
 18
 right:
 16
-compared:
-11
-skipped:
-9
 ans:
 undefined
 ```
@@ -10822,10 +10150,6 @@ left:
 18
 right:
 16
-compared:
-11
-skipped:
-9
 ans:
 true
 ```
@@ -10838,10 +10162,6 @@ left:
 18
 right:
 16
-compared:
-11
-skipped:
-9
 ans:
 true
 ```
@@ -10854,10 +10174,6 @@ left:
 18
 right:
 16
-compared:
-11
-skipped:
-9
 ans:
 true
 ```
@@ -10869,10 +10185,6 @@ left:
 18
 right:
 16
-compared:
-11
-skipped:
-9
 ans:
 true
 ```
