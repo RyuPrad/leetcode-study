@@ -3,7 +3,8 @@ import path from "path";
 import { pathToFileURL } from "url";
 
 const EXCLUDED_DIRS = new Set([".git", "node_modules", ".obsidian"]);
-const IFRAME_SRC_RE = /\bsrc\s*=\s*(["'])([\s\S]*?)\1/gi;
+const IFRAME_OPEN_TAG_RE = /<iframe\b[\s\S]*?(?:\/\s*>|>)/gi;
+const IFRAME_SRC_IN_TAG_RE = /\bsrc\s*=\s*(["'])([\s\S]*?)\1/i;
 const WINDOWS_ROOT_RE = /^[A-Za-z]:[\\/]/;
 
 function parseArgs(argv) {
@@ -128,13 +129,16 @@ function toWindowsFileUrl(urlRoot, relativeVisualizerPath) {
 }
 
 function replaceIframeSrcValues(content, replacements) {
-  return content.replace(IFRAME_SRC_RE, (match, quote, _srcValue, offset) => {
-    const pending = replacements.find((entry) => entry.offset === offset);
+  return content.replace(IFRAME_OPEN_TAG_RE, (tag, offset) => {
+    const pending = replacements.find((entry) => entry.tagOffset === offset);
     if (!pending) {
-      return match;
+      return tag;
     }
 
-    return `src=${quote}${pending.newSrc}${quote}`;
+    return tag.replace(
+      IFRAME_SRC_IN_TAG_RE,
+      (_match, quote) => `src=${quote}${pending.newSrc}${quote}`
+    );
   });
 }
 
@@ -144,9 +148,22 @@ function processMarkdownFile(mdPath, walkRoot, urlRoot) {
   const results = [];
 
   let match;
-  IFRAME_SRC_RE.lastIndex = 0;
-  while ((match = IFRAME_SRC_RE.exec(content)) !== null) {
-    const srcValue = match[2];
+  IFRAME_OPEN_TAG_RE.lastIndex = 0;
+  while ((match = IFRAME_OPEN_TAG_RE.exec(content)) !== null) {
+    const tag = match[0];
+    const tagOffset = match.index;
+    const srcMatch = tag.match(IFRAME_SRC_IN_TAG_RE);
+
+    if (!srcMatch) {
+      results.push({
+        type: "invalid",
+        mdPath,
+        srcValue: "(iframe missing src attribute)",
+      });
+      continue;
+    }
+
+    const srcValue = srcMatch[2];
     const htmlFilename = extractHtmlFilename(srcValue);
 
     if (!htmlFilename) {
@@ -191,7 +208,7 @@ function processMarkdownFile(mdPath, walkRoot, urlRoot) {
       htmlFilename,
       srcValue,
       expectedSrc,
-      offset: match.index,
+      tagOffset,
     });
   }
 
