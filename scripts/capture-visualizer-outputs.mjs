@@ -69,6 +69,16 @@ function limitText(text, max = TEXT_LIMIT) {
     : normalized;
 }
 
+function isDuplicateVisualizerCopy(filename) {
+  const lower = filename.toLowerCase();
+  return (
+    / - copy\.html$/i.test(filename) ||
+    /_copy\.html$/i.test(lower) ||
+    / copy\.html$/i.test(lower) ||
+    /\(\d+\)\.html$/i.test(filename)
+  );
+}
+
 function findHtmlFiles(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (EXCLUDED_DIRS.has(entry.name)) {
@@ -78,7 +88,7 @@ function findHtmlFiles(dir, files = []) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       findHtmlFiles(fullPath, files);
-    } else if (entry.isFile() && entry.name.endsWith(".html")) {
+    } else if (entry.isFile() && entry.name.endsWith(".html") && !isDuplicateVisualizerCopy(entry.name)) {
       files.push(fullPath);
     }
   }
