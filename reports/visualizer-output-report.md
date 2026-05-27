@@ -1,6 +1,6 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T20:45:47.835Z
+Generated: 2026-05-27T20:58:32.732Z
 
 Generated from 19 HTML visualizers.
 
@@ -561,7 +561,7 @@ num:
 undefined
 seen:
 { }
-result:
+ans:
 pending
 ```
 
@@ -583,7 +583,7 @@ seen.has(num) = not checked;
 
 // Output
 
-return result = pending;
+return ans = pending;
 ```
 
 ### Initial Narration
@@ -610,7 +610,7 @@ num:
 undefined
 seen:
 { }
-result:
+ans:
 pending
 ```
 
@@ -629,7 +629,7 @@ num:
 1
 seen:
 { }
-result:
+ans:
 pending
 ```
 
@@ -648,7 +648,7 @@ num:
 1
 seen:
 { }
-result:
+ans:
 pending
 ```
 
@@ -667,7 +667,7 @@ num:
 1
 seen:
 { }
-result:
+ans:
 pending
 ```
 
@@ -686,7 +686,7 @@ num:
 1
 seen:
 { 1 }
-result:
+ans:
 pending
 ```
 
@@ -705,7 +705,7 @@ num:
 undefined
 seen:
 { 1 }
-result:
+ans:
 pending
 ```
 
@@ -724,7 +724,7 @@ num:
 2
 seen:
 { 1 }
-result:
+ans:
 pending
 ```
 
@@ -743,7 +743,7 @@ num:
 2
 seen:
 { 1 }
-result:
+ans:
 pending
 ```
 
@@ -762,7 +762,7 @@ num:
 2
 seen:
 { 1 }
-result:
+ans:
 pending
 ```
 
@@ -781,7 +781,7 @@ num:
 2
 seen:
 { 1, 2 }
-result:
+ans:
 pending
 ```
 
@@ -800,7 +800,7 @@ num:
 undefined
 seen:
 { 1, 2 }
-result:
+ans:
 pending
 ```
 
@@ -819,7 +819,7 @@ num:
 3
 seen:
 { 1, 2 }
-result:
+ans:
 pending
 ```
 
@@ -838,7 +838,7 @@ num:
 3
 seen:
 { 1, 2 }
-result:
+ans:
 pending
 ```
 
@@ -857,7 +857,7 @@ num:
 3
 seen:
 { 1, 2 }
-result:
+ans:
 pending
 ```
 
@@ -876,7 +876,7 @@ num:
 3
 seen:
 { 1, 2, 3 }
-result:
+ans:
 pending
 ```
 
@@ -895,7 +895,7 @@ num:
 undefined
 seen:
 { 1, 2, 3 }
-result:
+ans:
 pending
 ```
 
@@ -914,7 +914,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 pending
 ```
 
@@ -933,7 +933,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 pending
 ```
 
@@ -952,7 +952,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 true
 ```
 
@@ -971,7 +971,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 true
 ```
 
@@ -992,7 +992,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 true
 ```
 
@@ -1005,7 +1005,7 @@ num:
 1
 seen:
 { 1, 2, 3 }
-result:
+ans:
 true
 ```
 
@@ -1046,7 +1046,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1078,7 +1078,7 @@ return encoded = "4#neet4#code4#love3#you";
 ### Initial Narration
 
 ```text
-Start with an empty encoded string: result = "".
+Start with an empty encoded string: encoded = "".
 ```
 
 ### Initial Trace
@@ -1101,7 +1101,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 ""
 ```
 
@@ -1122,7 +1122,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 ""
 ```
 
@@ -1143,7 +1143,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 ""
 ```
 
@@ -1164,7 +1164,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet"
 ```
 
@@ -1185,7 +1185,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet"
 ```
 
@@ -1206,7 +1206,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet"
 ```
 
@@ -1227,7 +1227,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet"
 ```
 
@@ -1248,7 +1248,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet4#code"
 ```
 
@@ -1269,7 +1269,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code"
 ```
 
@@ -1290,7 +1290,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet4#code"
 ```
 
@@ -1311,7 +1311,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet4#code"
 ```
 
@@ -1332,7 +1332,7 @@ i:
 0
 len:
 4
-result:
+encoded:
 "4#neet4#code4#love"
 ```
 
@@ -1353,7 +1353,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love"
 ```
 
@@ -1374,7 +1374,7 @@ i:
 0
 len:
 3
-result:
+encoded:
 "4#neet4#code4#love"
 ```
 
@@ -1395,7 +1395,7 @@ i:
 0
 len:
 3
-result:
+encoded:
 "4#neet4#code4#love"
 ```
 
@@ -1416,7 +1416,7 @@ i:
 0
 len:
 3
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1437,7 +1437,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1458,7 +1458,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1479,7 +1479,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1502,7 +1502,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
@@ -1517,7 +1517,7 @@ i:
 0
 len:
 undefined
-result:
+encoded:
 "4#neet4#code4#love3#you"
 ```
 
