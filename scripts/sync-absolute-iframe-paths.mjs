@@ -128,6 +128,37 @@ function toWindowsFileUrl(urlRoot, relativeVisualizerPath) {
   return buildWindowsFileUrlFromRoot(urlRoot, relativeVisualizerPath);
 }
 
+function normalizePathSegment(segment) {
+  try {
+    return decodeURIComponent(segment.replace(/\+/g, " "));
+  } catch {
+    return segment
+      .replace(/%26/gi, "&")
+      .replace(/%20/gi, " ")
+      .replace(/%27/gi, "'");
+  }
+}
+
+function normalizeFileUrlForCompare(url) {
+  const trimmed = url.trim().replace(/\\/g, "/");
+  const match = trimmed.match(/^file:\/\/\/(.+)$/i);
+  if (!match) {
+    return trimmed.toLowerCase();
+  }
+
+  const normalizedPath = match[1]
+    .split("/")
+    .map(normalizePathSegment)
+    .join("/")
+    .toLowerCase();
+
+  return `file:///${normalizedPath}`;
+}
+
+function fileUrlsEquivalent(actual, expected) {
+  return normalizeFileUrlForCompare(actual) === normalizeFileUrlForCompare(expected);
+}
+
 function replaceIframeSrcValues(content, replacements) {
   return content.replace(IFRAME_OPEN_TAG_RE, (tag, offset) => {
     const pending = replacements.find((entry) => entry.tagOffset === offset);
@@ -191,7 +222,7 @@ function processMarkdownFile(mdPath, walkRoot, urlRoot) {
 
     const expectedSrc = toWindowsFileUrl(urlRoot, visualizerRelativePath);
 
-    if (srcValue.trim() === expectedSrc) {
+    if (fileUrlsEquivalent(srcValue, expectedSrc)) {
       results.push({
         type: "correct",
         mdPath,
