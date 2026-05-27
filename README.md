@@ -18,6 +18,8 @@ Check without writing:
 npm run check:iframes
 ```
 
+The check normalizes equivalent `file:///` path encodings before comparing (for example `%26` and literal `&` in folder names like `Array & Hashing`).
+
 Explicit root example:
 
 ```bash
