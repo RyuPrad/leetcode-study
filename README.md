@@ -23,3 +23,18 @@ Explicit root example:
 ```bash
 node scripts/sync-absolute-iframe-paths.mjs --root "C:\Users\ryupr\Documents\Obsidian Vault\Leetcode"
 ```
+
+## Capturing visualizer outputs
+
+Capture HUD, console, narration, trace, and step snapshots from every HTML visualizer:
+
+```bash
+npm run capture:outputs
+```
+
+This generates:
+
+- `reports/visualizer-output-report.json`
+- `reports/visualizer-output-report.md`
+
+These files are committed so the visualizer output state can be reviewed from GitHub.
