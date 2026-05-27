@@ -1,6 +1,6 @@
 # Visualizer Output Report
 
-Generated: 2026-05-27T20:35:57.821Z
+Generated: 2026-05-27T20:45:47.835Z
 
 Generated from 19 HTML visualizers.
 
@@ -11,7 +11,7 @@ Generated from 19 HTML visualizers.
 - Max step limit: 80
 - Highest steps used: 67
 - Visualizers at max step limit: 0
-- Total step snapshots: 483
+- Total step snapshots: 520
 
 ## Array & Hashing/concatenation_of_array_visualizer.html
 
@@ -6408,48 +6408,225 @@ Step mode: btn-next
 ### Initial HUD
 
 ```text
-(empty)
+head:
+node0(3)
+slow:
+unassigned
+fast:
+unassigned
+ans:
+pending
 ```
 
 ### Step Snapshots (13)
 
 #### Step 0 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node0(3)
+fast:
+node0(3)
+ans:
+pending
+```
+
 #### Step 1 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node0(3)
+fast:
+node0(3)
+ans:
+pending
+```
 
 #### Step 2 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node1(2)
+fast:
+node0(3)
+ans:
+pending
+```
+
 #### Step 3 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node1(2)
+fast:
+node2(0)
+ans:
+pending
+```
 
 #### Step 4 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node1(2)
+fast:
+node2(0)
+ans:
+pending
+```
+
 #### Step 5 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node1(2)
+fast:
+node2(0)
+ans:
+pending
+```
 
 #### Step 6 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node2(0)
+fast:
+node2(0)
+ans:
+pending
+```
+
 #### Step 7 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node2(0)
+fast:
+node1(2)
+ans:
+pending
+```
 
 #### Step 8 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node2(0)
+fast:
+node1(2)
+ans:
+pending
+```
+
 #### Step 9 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node2(0)
+fast:
+node1(2)
+ans:
+pending
+```
 
 #### Step 10 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node3(-4)
+fast:
+node1(2)
+ans:
+pending
+```
+
 #### Step 11 (next: Step Over)
 
+HUD:
+```text
+head:
+node0(3)
+slow:
+node3(-4)
+fast:
+node3(-4)
+ans:
+pending
+```
+
 #### Step 12 (next: Finished!)
+
+HUD:
+```text
+head:
+node0(3)
+slow:
+node3(-4)
+fast:
+node3(-4)
+ans:
+true
+```
 
 ### Final Snapshot
 
 HUD:
 ```text
-(empty)
+head:
+node0(3)
+slow:
+node3(-4)
+fast:
+node3(-4)
+ans:
+true
 ```
 
 ### After Step Back
 
 ```text
-(empty)
+head:
+node0(3)
+slow:
+node3(-4)
+fast:
+node3(-4)
+ans:
+pending
 ```
 
 ### Controls
@@ -6465,7 +6642,7 @@ HUD:
 - #cycle-toggle: Object view: Nested refs
 - #btn-prev: Step Back
 - #btn-next: Step Over
-- (no id): Reset
+- #btn-reset: Reset
 
 ### Errors
 
@@ -6483,8 +6660,12 @@ list1:
 1 → 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 undefined
+merged:
+pending
 ```
 
 ### Initial Console
@@ -6500,11 +6681,13 @@ let list1 = 1 → 2 → 4 → null;
 
 let list2 = 1 → 3 → 4 → null;
 
+const dummy = dummy;
+
 let tail = undefined;
 
-// Merged chain (dummy.next → ...)
+// Return value (dummy.next → merged list)
 
-const result = pending;
+return dummy.next = pending;
 ```
 
 ### Initial Narration
@@ -6523,8 +6706,12 @@ list1:
 1 → 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 dummy
+merged:
+pending
 ```
 
 #### Step 1 (next: Step Over)
@@ -6535,8 +6722,12 @@ list1:
 1 → 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 dummy
+merged:
+pending
 ```
 
 #### Step 2 (next: Step Over)
@@ -6547,8 +6738,12 @@ list1:
 1 → 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 dummy
+merged:
+pending
 ```
 
 #### Step 3 (next: Step Over)
@@ -6559,8 +6754,12 @@ list1:
 1 → 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 dummy
+merged:
+pending
 ```
 
 #### Step 4 (next: Step Over)
@@ -6571,8 +6770,12 @@ list1:
 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 dummy
+merged:
+pending
 ```
 
 #### Step 5 (next: Step Over)
@@ -6583,8 +6786,12 @@ list1:
 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 6 (next: Step Over)
@@ -6595,8 +6802,12 @@ list1:
 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 7 (next: Step Over)
@@ -6607,8 +6818,12 @@ list1:
 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 8 (next: Step Over)
@@ -6619,8 +6834,12 @@ list1:
 2 → 4 → null
 list2:
 1 → 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 9 (next: Step Over)
@@ -6631,8 +6850,12 @@ list1:
 2 → 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 10 (next: Step Over)
@@ -6643,8 +6866,12 @@ list1:
 2 → 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 11 (next: Step Over)
@@ -6655,8 +6882,12 @@ list1:
 2 → 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 12 (next: Step Over)
@@ -6667,8 +6898,12 @@ list1:
 2 → 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 13 (next: Step Over)
@@ -6679,8 +6914,12 @@ list1:
 2 → 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 14 (next: Step Over)
@@ -6691,8 +6930,12 @@ list1:
 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(1)
+merged:
+pending
 ```
 
 #### Step 15 (next: Step Over)
@@ -6703,8 +6946,12 @@ list1:
 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(2)
+merged:
+pending
 ```
 
 #### Step 16 (next: Step Over)
@@ -6715,8 +6962,12 @@ list1:
 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(2)
+merged:
+pending
 ```
 
 #### Step 17 (next: Step Over)
@@ -6727,8 +6978,12 @@ list1:
 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(2)
+merged:
+pending
 ```
 
 #### Step 18 (next: Step Over)
@@ -6739,8 +6994,12 @@ list1:
 4 → null
 list2:
 3 → 4 → null
+dummy:
+dummy
 tail:
 node(2)
+merged:
+pending
 ```
 
 #### Step 19 (next: Step Over)
@@ -6751,8 +7010,12 @@ list1:
 4 → null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(2)
+merged:
+pending
 ```
 
 #### Step 20 (next: Step Over)
@@ -6763,8 +7026,12 @@ list1:
 4 → null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(3)
+merged:
+pending
 ```
 
 #### Step 21 (next: Step Over)
@@ -6775,8 +7042,12 @@ list1:
 4 → null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(3)
+merged:
+pending
 ```
 
 #### Step 22 (next: Step Over)
@@ -6787,8 +7058,12 @@ list1:
 4 → null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(3)
+merged:
+pending
 ```
 
 #### Step 23 (next: Step Over)
@@ -6799,8 +7074,12 @@ list1:
 4 → null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(3)
+merged:
+pending
 ```
 
 #### Step 24 (next: Step Over)
@@ -6811,8 +7090,12 @@ list1:
 null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(3)
+merged:
+pending
 ```
 
 #### Step 25 (next: Step Over)
@@ -6823,8 +7106,12 @@ list1:
 null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+pending
 ```
 
 #### Step 26 (next: Step Over)
@@ -6835,8 +7122,12 @@ list1:
 null
 list2:
 4 → null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+pending
 ```
 
 #### Step 27 (next: Step Over)
@@ -6847,8 +7138,12 @@ list1:
 null
 list2:
 null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+dummy → 1 → 1 → 2 → 3 → 4 → 4 → null
 ```
 
 #### Step 28 (next: Finished!)
@@ -6859,8 +7154,12 @@ list1:
 null
 list2:
 null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+dummy → 1 → 1 → 2 → 3 → 4 → 4 → null
 ```
 
 ### Final Snapshot
@@ -6871,8 +7170,12 @@ list1:
 null
 list2:
 null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+dummy → 1 → 1 → 2 → 3 → 4 → 4 → null
 ```
 
 ### After Step Back
@@ -6882,8 +7185,12 @@ list1:
 null
 list2:
 null
+dummy:
+dummy
 tail:
 node(4)
+merged:
+dummy → 1 → 1 → 2 → 3 → 4 → 4 → null
 ```
 
 ### Controls
@@ -6905,19 +7212,806 @@ None
 
 Title: LeetCode 143 Reorder List Visualizer
 Heading: LeetCode 143 — Reorder List
-Step mode: no btn-next found
+Step mode: btn-next
 
 ### Initial HUD
 
 ```text
-(empty)
+head:
+node0(1)
+slow:
+null
+fast:
+null
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+### Step Snapshots (37)
+
+#### Step 0 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+null
+fast:
+null
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 1 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+null
+fast:
+null
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 2 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node0(1)
+fast:
+node0(1)
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 3 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node0(1)
+fast:
+node0(1)
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 4 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node0(1)
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 5 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 6 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 7 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 8 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+null
+next:
+null
+```
+
+#### Step 9 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+node2(3)
+next:
+null
+```
+
+#### Step 10 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+node2(3)
+next:
+null
+```
+
+#### Step 11 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+node2(3)
+next:
+node3(4)
+```
+
+#### Step 12 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+null
+curr:
+node2(3)
+next:
+node3(4)
+```
+
+#### Step 13 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node2(3)
+curr:
+node2(3)
+next:
+node3(4)
+```
+
+#### Step 14 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node2(3)
+curr:
+node3(4)
+next:
+node3(4)
+```
+
+#### Step 15 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node2(3)
+curr:
+node3(4)
+next:
+node3(4)
+```
+
+#### Step 16 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node2(3)
+curr:
+node3(4)
+next:
+null
+```
+
+#### Step 17 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node2(3)
+curr:
+node3(4)
+next:
+null
+```
+
+#### Step 18 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+node3(4)
+next:
+null
+```
+
+#### Step 19 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 20 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 21 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 22 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 23 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 24 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 25 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 26 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 27 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node3(4)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 28 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 29 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 30 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 31 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 32 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 33 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 34 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+node2(3)
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 35 (next: Step Over)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+#### Step 36 (next: Finished!)
+
+HUD:
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+node3(4)
+curr:
+null
+next:
+null
 ```
 
 ### Final Snapshot
 
 HUD:
 ```text
-(empty)
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+node3(4)
+curr:
+null
+next:
+null
+```
+
+### After Step Back
+
+```text
+head:
+node0(1)
+slow:
+node1(2)
+fast:
+node2(3)
+second:
+null
+prev:
+node3(4)
+curr:
+null
+next:
+null
 ```
 
 ### Controls
@@ -6932,9 +8026,9 @@ HUD:
 - #labBtn: Labels: Learning
 - #layoutBtn: Layout: Phase
 - #objBtn: Object: Memory
-- #prevBtn: Step Back
-- #nextBtn: Step Over
-- (no id): Reset
+- #btn-prev: Step Back
+- #btn-next: Step Over
+- #btn-reset: Reset
 
 ### Errors
 
@@ -6977,8 +8071,7 @@ let curr = 1 → 2 → 3 → 4 → 5 → null;
 let next = undefined;
 
 // Return value
-
-const result = pending;
+return prev = pending;
 ```
 
 ### Initial Narration
