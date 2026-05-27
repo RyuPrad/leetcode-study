@@ -7,3 +7,12 @@
   allow="fullscreen"
   allowfullscreen>
 </iframe>
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| strs | input strings |
+| prefix | longest shared prefix so far |
+| i | column index |
+| j | string index |

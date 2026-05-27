@@ -6,3 +6,13 @@
   allow="fullscreen"
   allowfullscreen>
 </iframe>
+
+## Variable Pattern
+
+| Name | Meaning |
+|---|---|
+| nums | input array |
+| res | output array |
+| prefix | running product from the left |
+| suffix | running product from the right |
+| i | current index |

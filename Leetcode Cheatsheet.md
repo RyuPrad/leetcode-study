@@ -7,6 +7,26 @@ Intervew Prep
 
 ](https://www.reddit.com/r/leetcode/?f=flair_name%3A%22Intervew%20Prep%22)
 
+# Standard Leetcode Variable Names
+
+Use the same names in every note and visualizer. Full reference: [[Variable Naming Guide]].
+
+| Category | Common names |
+|---|---|
+| Arrays | `nums`, `target`, `i`, `j`, `res`, `ans` |
+| Strings | `s`, `t`, `strs`, `prefix` |
+| Hash maps | `seen`, `freq`, `need`, `key`, `groups` |
+| Two pointers | `left`, `right`, `slow`, `fast`, `sum`, `area` |
+| Binary search | `left`, `right`, `mid`, `ans` |
+| Linked lists | `head`, `prev`, `curr`, `next`, `dummy`, `tail` |
+
+Problem-specific patterns (examples):
+
+- **Two Sum:** `nums`, `target`, `i`, `num`, `need`, `seen`, `res`
+- **3Sum:** `nums`, `res`, `i`, `left`, `right`, `sum`
+- **Binary Search:** `nums`, `target`, `left`, `right`, `mid`, `ans`
+- **Reverse Linked List:** `head`, `prev`, `curr`, `next`
+
 # Coding question patterns for all relevant DSA types:
 
 **Arrays and Strings**
