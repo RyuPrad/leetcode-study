@@ -217,6 +217,26 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Reorder List:** `head`, `slow`, `fast`, `prev`, `curr`, `next`, `second`
 
+**Remove Nth Node From End of List:** `head`, `dummy`, `fast`, `slow`, `n`
+
+**Copy List with Random Pointer:** `head`, `map`, `curr`
+
+**Add Two Numbers:** `l1`, `l2`, `dummy`, `curr`, `carry`, `sum`
+
+**Find the Duplicate Number:** `nums`, `slow`, `fast`
+
+**Reverse Linked List II:** `head`, `dummy`, `prev`, `curr`, `next`, `left`, `right`
+
+**Design Circular Queue:** `queue`, `head`, `count`, `capacity`, `value`
+
+**LRU Cache:** `capacity`, `cache`, `key`, `value`
+
+**LFU Cache:** `capacity`, `keyToVal`, `keyToFreq`, `freqToKeys`, `minFreq`, `key`, `value`
+
+**Merge k Sorted Lists:** `lists`, `l1`, `l2`, `dummy`, `curr`, `merged`
+
+**Reverse Nodes in k-Group:** `head`, `dummy`, `groupPrev`, `groupNext`, `kth`, `prev`, `curr`, `next`, `k`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
