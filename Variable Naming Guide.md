@@ -491,6 +491,36 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Regular Expression Matching:** `s`, `p`, `m`, `n`, `dp`, `i`, `j`
 
+### Greedy
+
+**Lemonade Change:** `bills`, `five`, `ten`, `bill`, `ans`
+
+**Maximum Subarray:** `nums`, `curSum`, `maxSum`, `i`, `ans`
+
+**Maximum Sum Circular Subarray:** `nums`, `total`, `curMax`, `maxSum`, `curMin`, `minSum`, `num`, `ans`
+
+**Longest Turbulent Subarray:** `arr`, `inc`, `dec`, `i`, `ans`
+
+**Jump Game:** `nums`, `goal`, `i`, `ans`
+
+**Jump Game II:** `nums`, `jumps`, `curEnd`, `farthest`, `i`
+
+**Jump Game VII:** `s`, `minJump`, `maxJump`, `n`, `dp`, `windowCount`, `i`, `ans`
+
+**Gas Station:** `gas`, `cost`, `total`, `tank`, `start`, `diff`, `i`, `ans`
+
+**Hand of Straights:** `hand`, `groupSize`, `count`, `keys`, `start`, `need`, `card`, `ans`
+
+**Dota2 Senate:** `senate`, `n`, `radiant`, `dire`, `i`, `r`, `d`, `ans`
+
+**Merge Triplets to Form Target Triplet:** `triplets`, `target`, `a`, `b`, `c`, `x`, `y`, `z`, `ans`
+
+**Partition Labels:** `s`, `last`, `res`, `start`, `end`, `i`
+
+**Valid Parenthesis String:** `s`, `low`, `high`, `ch`, `ans`
+
+**Candy:** `ratings`, `n`, `candies`, `i`, `ans`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
