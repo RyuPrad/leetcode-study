@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 853. Car Fleet Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* VISUAL STAGE */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding: 20px 10px;
+      min-height: 360px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .stage-label {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    /* ROAD */
+    .road-wrap { position: relative; }
+
+    .road {
+      position: relative;
+      height: 120px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: repeating-linear-gradient(90deg, #232323, #232323 38px, #262626 38px, #262626 40px);
+      margin-top: 26px;
+    }
+
+    .finish {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 10px;
+      background: repeating-linear-gradient(45deg, #ddd, #ddd 5px, #333 5px, #333 10px);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .start-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 3px;
+      background: #555;
+    }
+
+    .target-tag {
+      position: absolute;
+      top: -24px;
+      right: 0;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      color: var(--yellow);
+      font-weight: bold;
+    }
+
+    .car {
+      position: absolute;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      transition: left 0.4s ease, top 0.3s ease;
+    }
+
+    .car-body {
+      min-width: 52px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--panel2);
+      border: 2px solid var(--blue);
+      color: var(--cyan);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.35);
+      transition: all 0.25s ease;
+    }
+
+    .car.current .car-body {
+      border-color: var(--yellow);
+      color: var(--yellow);
+      box-shadow: 0 0 0 3px rgba(215, 186, 125, 0.25), 0 8px 18px rgba(215, 186, 125, 0.3);
+      transform: scale(1.06);
+    }
+
+    .car.lead .car-body {
+      border-color: var(--green);
+      color: var(--greenText);
+    }
+
+    .car.absorbed .car-body {
+      border-color: var(--red);
+      color: #ffb3b3;
+      background: #3a2222;
+      animation: pulseRed 0.8s ease-in-out infinite;
+    }
+
+    .car-pos {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: Consolas, monospace;
+    }
+
+    @keyframes pulseRed {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    @keyframes pushIn {
+      0% { transform: translateY(-26px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes popOut {
+      0% { transform: translateY(0); opacity: 1; }
+      100% { transform: translateY(-26px); opacity: 0; }
+    }
+
+    /* STACK */
+    .stack-zone {
+      display: grid;
+      grid-template-columns: 120px minmax(220px, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stack-label {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-weight: bold;
+      padding: 8px 10px;
+      background: var(--panel2);
+      border-radius: 4px;
+      border: 1px solid #444;
+      text-align: center;
+    }
+
+    .stack-box {
+      min-height: 96px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 12px;
+      display: flex;
+      flex-direction: row-reverse;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.25s ease;
+    }
+
+    .stack-box.popping {
+      border-color: var(--red);
+      box-shadow: 0 0 16px rgba(226, 75, 74, 0.25);
+    }
+
+    .stack-box.pushing {
+      border-color: var(--green);
+      box-shadow: 0 0 16px rgba(106, 153, 85, 0.25);
+    }
+
+    .stack-item-wrap { position: relative; display: flex; }
+
+    .stack-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 62px;
+      height: 56px;
+      padding: 0 8px;
+      border-radius: 8px;
+      background: var(--panel2);
+      border: 2px solid var(--green);
+      color: var(--greenText);
+      font-family: Consolas, monospace;
+      font-weight: bold;
+      font-size: 16px;
+      transition: all 0.25s ease;
+    }
+
+    .stack-item.top {
+      border-color: var(--yellow);
+      box-shadow: 0 0 12px rgba(215, 186, 125, 0.45);
+    }
+
+    .stack-item.pushing {
+      animation: pushIn 0.45s ease;
+      border-color: var(--green);
+      background: #26472d;
+    }
+
+    .stack-item.popping {
+      animation: popOut 0.45s ease forwards;
+      border-color: var(--red);
+      background: #4a2525;
+      color: #ffb3b3;
+    }
+
+    .top-tag {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--yellow);
+      color: #1e1e1e;
+      white-space: nowrap;
+    }
+
+    .stack-empty {
+      color: #666;
+      font-family: Consolas, monospace;
+      align-self: center;
+    }
+
+    .result-card {
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: var(--greenText);
+      background: var(--panel2);
+      border: 1px solid var(--green);
+    }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace {
+      background: #062f4a;
+    }
+
+    .trace-table tr.merge-trace {
+      background: rgba(226, 75, 74, 0.14);
+    }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+      .stack-zone {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 853. Car Fleet</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">DRAG CONTROLS</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">12 | 5 cars</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">10 | [3]</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">100 | 3 cars</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">10 | 2 cars</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="12 | 10,8,0,5,3 | 2,4,1,1,3" placeholder="target | position | speed" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>Road + Arrival-Time Stack</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">var</span> <span class="fn">carFleet</span> = <span class="kw">function</span>(target, position, speed) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> cars = position.<span class="fn">map</span>((p, i) =&gt; [p, speed[i]]);</div>
+<div id="line-3" class="code-line">  cars.<span class="fn">sort</span>((a, b) =&gt; b[<span class="nm">0</span>] - a[<span class="nm">0</span>]);</div>
+<div id="line-4" class="code-line">  <span class="kw">const</span> stack = [];</div>
+<div id="line-5" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [p, s] <span class="kw">of</span> cars) {</div>
+<div id="line-6" class="code-line">    <span class="kw">const</span> time = (target - p) / s;</div>
+<div id="line-7" class="code-line">    stack.<span class="fn">push</span>(time);</div>
+<div id="line-8" class="code-line">    <span class="kw">if</span> (stack.length &gt;= <span class="nm">2</span> && stack[stack.length - <span class="nm">1</span>] &lt;= stack[stack.length - <span class="nm">2</span>]) {</div>
+<div id="line-9" class="code-line">      stack.<span class="fn">pop</span>();</div>
+<div id="line-10" class="code-line">    }</div>
+<div id="line-11" class="code-line">  }</div>
+<div id="line-12" class="code-line">  <span class="kw">return</span> stack.length;</div>
+<div id="line-13" class="code-line">};</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>Iteration Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables & Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // DRAG LOGIC — works inside normal browsers and Obsidian iframes.
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        // Some iframe hosts block fullscreen unless the iframe has allowfullscreen.
+        // Since this runs from a user click, opening the visualizer directly is a useful fallback.
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // HUD STATE
+    let pinned = {
+      position: true,
+      speed: true,
+      stack: true,
+      ans: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render();
+    }
+
+    // EXAMPLES: { target, position, speed }
+    const examples = {
+      1: { target: 12, position: [10, 8, 0, 5, 3], speed: [2, 4, 1, 1, 3] },
+      2: { target: 10, position: [3], speed: [3] },
+      3: { target: 100, position: [0, 2, 4], speed: [4, 2, 1] },
+      4: { target: 10, position: [6, 8], speed: [3, 2] }
+    };
+
+    // STATE
+    let target = 0;
+    let position = [];
+    let speed = [];
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      const ex = examples[exNum];
+      target = ex.target;
+      position = [...ex.position];
+      speed = [...ex.speed];
+      document.getElementById("custom-input").value = target + " | " + position.join(",") + " | " + speed.join(",");
+      init();
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      const parts = raw.split("|").map(p => p.trim());
+      if (parts.length !== 3) {
+        alert("Format: target | position list | speed list. Example: 12 | 10,8,0,5,3 | 2,4,1,1,3");
+        return;
+      }
+      const t = Number(parts[0]);
+      const pos = parts[1] === "" ? [] : parts[1].split(",").map(x => Number(x.trim()));
+      const sp = parts[2] === "" ? [] : parts[2].split(",").map(x => Number(x.trim()));
+
+      if (Number.isNaN(t) || pos.some(Number.isNaN) || sp.some(Number.isNaN)) {
+        alert("Please use only numbers. Example: 12 | 10,8,0,5,3 | 2,4,1,1,3");
+        return;
+      }
+      if (pos.length !== sp.length) {
+        alert("position and speed must have the same length.");
+        return;
+      }
+      if (sp.some(v => v <= 0)) {
+        alert("Each speed must be a positive number.");
+        return;
+      }
+
+      target = t;
+      position = pos;
+      speed = sp;
+      activeExample = 0;
+      init();
+    }
+
+    function fmtTime(t) {
+      // Show as fraction-friendly rounded value; keep up to 2 decimals, trim zeros.
+      const r = Math.round(t * 100) / 100;
+      return String(r);
+    }
+
+    // Build precomputed, index-reversible steps[].
+    function buildSteps() {
+      const out = [];
+      // cars before/after sort for narration
+      const carsUnsorted = position.map((p, i) => [p, speed[i]]);
+      const cars = position.map((p, i) => [p, speed[i]]);
+      cars.sort((a, b) => b[0] - a[0]);
+
+      const stack = [];   // arrival times of fleet leads
+      const trace = [];
+
+      function snap(extra) {
+        const base = {
+          lines: [],
+          narr: "",
+          cars: cars.map(c => [...c]),
+          stack: [...stack],
+          ci: -1,            // current car index in sorted cars
+          p: null,
+          s: null,
+          time: null,
+          phase: "",
+          pushValue: null,
+          popValue: null,
+          absorbedCar: null, // [p,s] of car that just merged
+          leadTimes: [...stack],
+          trace: trace.map(r => ({ ...r })),
+          done: false
+        };
+        out.push(Object.assign(base, extra));
+      }
+
+      // init: build + sort
+      snap({
+        lines: [2, 3],
+        narr: "Pair each car as [position, speed], then <b>sort by position descending</b> so the car closest to the target (" + target + ") is processed first.",
+        phase: "SORT"
+      });
+
+      snap({
+        lines: [4],
+        narr: "Create an empty <b>stack</b> of fleet arrival times. Each surviving entry represents one fleet.",
+        phase: "INIT_STACK"
+      });
+
+      for (let ci = 0; ci < cars.length; ci++) {
+        const p = cars[ci][0];
+        const s = cars[ci][1];
+        const time = (target - p) / s;
+
+        // read car + compute time
+        snap({
+          lines: [5, 6],
+          narr: "Car at position <b>p = " + p + "</b>, speed <b>s = " + s + "</b>. Arrival time = (target - p) / s = (" + target + " - " + p + ") / " + s + " = <b>" + fmtTime(time) + "</b>.",
+          ci: ci,
+          p: p,
+          s: s,
+          time: time,
+          phase: "COMPUTE"
+        });
+
+        // push time
+        stack.push(time);
+        snap({
+          lines: [7],
+          narr: "<code>stack.push(" + fmtTime(time) + ")</code> — tentatively treat this car as the lead of a new fleet.",
+          ci: ci,
+          p: p,
+          s: s,
+          time: time,
+          phase: "PUSH",
+          pushValue: time
+        });
+
+        // check merge
+        if (stack.length >= 2 && stack[stack.length - 1] <= stack[stack.length - 2]) {
+          const aheadTime = stack[stack.length - 2];
+          snap({
+            lines: [8],
+            narr: "Top time " + fmtTime(time) + " &le; fleet-ahead time " + fmtTime(aheadTime) + ": this car catches the fleet ahead before the finish, so it merges in.",
+            ci: ci,
+            p: p,
+            s: s,
+            time: time,
+            phase: "CHECK_MERGE_YES"
+          });
+
+          const popped = stack.pop();
+          trace.push({ ci, p, s, time, action: "merge into fleet ahead", merged: true });
+          snap({
+            lines: [9],
+            narr: "<code>stack.pop()</code> removes this car's time (" + fmtTime(popped) + "). It is absorbed; the fleet count does not grow.",
+            ci: ci,
+            p: p,
+            s: s,
+            time: time,
+            phase: "POP",
+            popValue: popped,
+            absorbedCar: [p, s]
+          });
+        } else {
+          let reason;
+          if (stack.length < 2) {
+            reason = "It is the only fleet so far, so it stays as its own fleet.";
+          } else {
+            reason = "Top time " + fmtTime(time) + " &gt; fleet-ahead time " + fmtTime(stack[stack.length - 2]) + ": it never catches up, so it forms its own fleet.";
+          }
+          trace.push({ ci, p, s, time, action: "new fleet", merged: false });
+          snap({
+            lines: [8],
+            narr: reason + " The stack keeps this entry.",
+            ci: ci,
+            p: p,
+            s: s,
+            time: time,
+            phase: "NO_MERGE"
+          });
+        }
+      }
+
+      snap({
+        lines: [12],
+        narr: "Every car processed. <code>return stack.length</code> = <b>" + stack.length + "</b> — the number of distinct fleets that reach the target.",
+        phase: "DONE",
+        done: true
+      });
+
+      return out;
+    }
+
+    function init() {
+      steps = buildSteps();
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    function renderRoad(step) {
+      const wrap = document.createElement("div");
+      wrap.className = "road-wrap";
+
+      const label = document.createElement("div");
+      label.className = "stage-label";
+      label.textContent = "road: 0 -> target (" + target + ") — cars sorted by position descending; absorbed cars merge into the fleet ahead";
+      wrap.appendChild(label);
+
+      const road = document.createElement("div");
+      road.className = "road";
+
+      const startLine = document.createElement("div");
+      startLine.className = "start-line";
+      road.appendChild(startLine);
+
+      const finish = document.createElement("div");
+      finish.className = "finish";
+      road.appendChild(finish);
+
+      const tag = document.createElement("div");
+      tag.className = "target-tag";
+      tag.textContent = "target = " + target;
+      road.appendChild(tag);
+
+      const span = target <= 0 ? 1 : target;
+      step.cars.forEach((car, idx) => {
+        const p = car[0];
+        const s = car[1];
+        const el = document.createElement("div");
+        el.className = "car";
+        // distribute vertical lanes so labels do not overlap
+        const lane = idx % 3;
+        el.style.top = (8 + lane * 30) + "px";
+        const pct = Math.max(2, Math.min(96, (p / span) * 94 + 2));
+        el.style.left = pct + "%";
+
+        if (idx === step.ci && step.phase !== "DONE") el.classList.add("current");
+        if (step.absorbedCar && step.absorbedCar[0] === p && step.absorbedCar[1] === s && idx === step.ci) {
+          el.classList.add("absorbed");
+        }
+
+        const body = document.createElement("div");
+        body.className = "car-body";
+        body.textContent = "p" + p + " s" + s;
+
+        const posLabel = document.createElement("div");
+        posLabel.className = "car-pos";
+        posLabel.textContent = "#" + idx;
+
+        el.appendChild(body);
+        el.appendChild(posLabel);
+        road.appendChild(el);
+      });
+
+      wrap.appendChild(road);
+      return wrap;
+    }
+
+    function renderStack(step) {
+      const zone = document.createElement("div");
+      zone.className = "stack-zone";
+
+      const label = document.createElement("div");
+      label.className = "stack-label";
+      label.textContent = "stack (arrival times) <- top";
+
+      const box = document.createElement("div");
+      box.className = "stack-box";
+      if (step.phase === "POP" || step.phase === "CHECK_MERGE_YES") box.classList.add("popping");
+      if (step.phase === "PUSH") box.classList.add("pushing");
+
+      const items = [...step.stack];
+      const ghostPop = step.phase === "POP" ? step.popValue : null;
+
+      if (items.length === 0 && ghostPop === null) {
+        const empty = document.createElement("div");
+        empty.className = "stack-empty";
+        empty.textContent = "empty";
+        box.appendChild(empty);
+      } else {
+        items.forEach((val, idx) => {
+          const isTop = idx === items.length - 1 && ghostPop === null;
+          const iw = document.createElement("div");
+          iw.className = "stack-item-wrap";
+
+          const it = document.createElement("div");
+          it.className = "stack-item";
+          if (isTop) it.classList.add("top");
+          if (step.phase === "PUSH" && idx === items.length - 1 && val === step.pushValue) {
+            it.classList.add("pushing");
+          }
+          it.textContent = fmtTime(val);
+
+          if (isTop) {
+            const tag = document.createElement("div");
+            tag.className = "top-tag";
+            tag.textContent = "top";
+            iw.appendChild(tag);
+          }
+          iw.appendChild(it);
+          box.appendChild(iw);
+        });
+
+        if (ghostPop !== null) {
+          const iw = document.createElement("div");
+          iw.className = "stack-item-wrap";
+          const it = document.createElement("div");
+          it.className = "stack-item popping";
+          it.textContent = fmtTime(ghostPop);
+          iw.appendChild(it);
+          box.appendChild(iw);
+        }
+      }
+
+      zone.appendChild(label);
+      zone.appendChild(box);
+      return zone;
+    }
+
+    function renderResultCard(step) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = "fleets = stack.length";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      value.textContent = step.stack.length;
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(step) {
+      const traceUi = document.getElementById("trace-ui");
+      const trace = step.trace;
+      if (trace.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No cars processed yet. Step through to grow this trace.</div>';
+        return;
+      }
+
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr>
+              <th>position</th>
+              <th>speed</th>
+              <th>time</th>
+              <th>stack (times)</th>
+              <th>fleets</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      trace.forEach((row, idx) => {
+        const isActive = idx === trace.length - 1;
+        const trClass = row.merged ? "merge-trace" : (isActive ? "active-trace" : "");
+        const stk = stackAfterRow(idx);
+        html += `
+          <tr class="${trClass}">
+            <td><span class="nm">${row.p}</span></td>
+            <td><span class="nm">${row.s}</span></td>
+            <td>${fmtTime(row.time)} <span style="color:#888">(${row.action})</span></td>
+            <td>[${stk.times}]</td>
+            <td>${stk.count}</td>
+          </tr>
+        `;
+      });
+
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    // Reconstruct the stack of times after the first (rowIdx+1) cars (in sorted order)
+    // by replaying the exact algorithm — keeps trace cells correct & self-consistent.
+    function stackAfterRow(rowIdx) {
+      const cars = position.map((p, i) => [p, speed[i]]);
+      cars.sort((a, b) => b[0] - a[0]);
+      const sim = [];
+      for (let ci = 0; ci <= rowIdx && ci < cars.length; ci++) {
+        const p = cars[ci][0];
+        const s = cars[ci][1];
+        const time = (target - p) / s;
+        sim.push(time);
+        if (sim.length >= 2 && sim[sim.length - 1] <= sim[sim.length - 2]) {
+          sim.pop();
+        }
+      }
+      return { times: sim.map(fmtTime).join(", "), count: sim.length };
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function render() {
+      const step = steps[stepIndex];
+
+      document.getElementById("btn-prev").disabled = stepIndex === 0;
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      if (stepIndex >= steps.length - 1) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      highlightLines(step.lines);
+      narrate(step.narr);
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+      visualUi.appendChild(renderRoad(step));
+      visualUi.appendChild(renderStack(step));
+      visualUi.appendChild(renderResultCard(step));
+
+      renderTrace(step);
+
+      const posDisplay = step.p === null ? '<span class="kw">--</span>' : '<span class="nm">' + step.p + '</span>';
+      const spDisplay = step.s === null ? '<span class="kw">--</span>' : '<span class="nm">' + step.s + '</span>';
+      const stackStr = "[" + step.stack.map(fmtTime).join(", ") + "]";
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Original input</span><br>' +
+        '<span class="kw">const</span> target = ' + target + ';<br>' +
+        '<span class="kw">const</span> position = [' + position.join(", ") + '];<br>' +
+        '<span class="kw">const</span> speed = [' + speed.join(", ") + '];<br><br>' +
+        '<span class="cm">// Live state (current car)</span><br>' +
+        createConsoleLine("position", "let", "position[i]", posDisplay) +
+        createConsoleLine("speed", "let", "speed[i]", spDisplay) +
+        createConsoleLine("stack", "const", "stack", '<span class="nm">' + stackStr + '</span>') +
+        '<br><span class="cm">// Output</span><br>' +
+        createConsoleLine("ans", "return", "ans", '<span class="nm">' + step.stack.length + '</span>');
+
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        position: step.p === null ? "--" : step.p,
+        speed: step.s === null ? "--" : step.s,
+        stack: "[" + step.stack.map(fmtTime).join(", ") + "]",
+        ans: step.stack.length
+      };
+      for (const [key, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + key + ':</span> <span class="hud-val">' + hudMap[key] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot
+    loadExample(1);
+  </script>
+</body>
+</html>

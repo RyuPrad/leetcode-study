@@ -145,6 +145,38 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Sliding Window Maximum:** `nums`, `k`, `deque`, `left`, `right`, `res`
 
+### Stack
+
+**Baseball Game:** `operations`, `stack`, `res`
+
+**Valid Parentheses:** `s`, `stack`, `map`
+
+**Evaluate Reverse Polish Notation:** `tokens`, `stack`, `a`, `b`
+
+**Implement Stack using Queues:** `q`, `x`, `i`
+
+**Implement Queue using Stacks:** `sIn`, `sOut`, `x`
+
+**Min Stack:** `stack`, `val`, `min`
+
+**Daily Temperatures:** `temperatures`, `stack`, `i`, `j`, `res`
+
+**Online Stock Span:** `stack`, `price`, `span`
+
+**Largest Rectangle in Histogram:** `heights`, `stack`, `i`, `maxArea`
+
+**Decode String:** `s`, `stack`, `curStr`, `curNum`
+
+**Generate Parentheses:** `n`, `stack`, `open`, `close`, `res`
+
+**Simplify Path:** `path`, `parts`, `stack`
+
+**Asteroid Collision:** `asteroids`, `stack`, `a`, `top`
+
+**Car Fleet:** `target`, `position`, `speed`, `cars`, `stack`
+
+**Maximum Frequency Stack:** `freq`, `group`, `maxFreq`, `val`
+
 ### Binary Search
 
 **Binary Search:** `nums`, `target`, `left`, `right`, `mid`, `ans`

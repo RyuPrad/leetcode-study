@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 150. Evaluate Reverse Polish Notation Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* TOKENS ROW */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      padding: 20px 10px;
+      min-height: 360px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .tokens-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      min-height: 96px;
+      padding-top: 38px;
+      flex-wrap: wrap;
+    }
+
+    .token-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      position: relative;
+    }
+
+    .token-cell {
+      min-width: 52px;
+      height: 52px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #555;
+      border-radius: 8px;
+      background: var(--panel2);
+      color: var(--text);
+      font-size: 18px;
+      font-weight: bold;
+      font-family: Consolas, monospace;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    .index-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-family: Consolas, monospace;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -33px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      background: var(--yellow);
+      color: #1e1e1e;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      z-index: 10;
+    }
+
+    .token-cell.current {
+      border-color: var(--yellow);
+      transform: translateY(-6px) scale(1.08);
+      box-shadow: 0 0 0 3px rgba(215, 186, 125, 0.25), 0 8px 20px rgba(215, 186, 125, 0.28);
+    }
+
+    .token-cell.done { opacity: 0.5; border-color: var(--green); }
+    .token-cell.kind-num.current { border-color: var(--green); background: #26472d; color: var(--greenText); }
+    .token-cell.kind-op.current { border-color: var(--purple); background: #3a2a42; color: #e6c4ec; }
+
+    /* STACK VISUAL (LIFO) */
+    .stack-zone {
+      display: grid;
+      grid-template-columns: 150px minmax(220px, 1fr);
+      gap: 14px;
+      align-items: start;
+      margin-top: 6px;
+    }
+
+    .stack-label {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-weight: bold;
+      padding: 8px 10px;
+      background: var(--panel2);
+      border-radius: 4px;
+      border: 1px solid #444;
+      text-align: center;
+    }
+
+    .stack-box {
+      min-height: 120px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 12px;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 8px;
+      position: relative;
+      transition: all 0.25s ease;
+    }
+
+    .stack-box.pushing { border-color: var(--green); box-shadow: 0 0 16px rgba(106, 153, 85, 0.28); }
+    .stack-box.popping { border-color: var(--red); box-shadow: 0 0 16px rgba(226, 75, 74, 0.28); }
+
+    .top-tag {
+      position: absolute;
+      top: -12px;
+      right: 10px;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--yellow);
+      color: #1e1e1e;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .stack-cell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border: 2px solid var(--green);
+      border-radius: 6px;
+      background: var(--panel2);
+      color: var(--greenText);
+      font-family: Consolas, monospace;
+      font-size: 17px;
+      font-weight: bold;
+      transition: all 0.25s ease;
+    }
+
+    .stack-cell .sc-idx { color: var(--muted); font-size: 12px; font-weight: normal; }
+
+    .stack-cell.top { border-color: var(--yellow); box-shadow: 0 0 0 2px rgba(215,186,125,0.25); }
+
+    .stack-cell.just-pushed {
+      animation: pushIn 0.6s ease;
+      border-color: var(--green);
+      background: #26472d;
+      color: #d7f5c7;
+    }
+
+    .stack-cell.operand-a {
+      border-color: var(--orange);
+      background: #4a3526;
+      color: #ffd9b3;
+    }
+
+    .stack-cell.operand-b {
+      border-color: var(--red);
+      background: #4a2525;
+      color: #ffb3b3;
+      animation: popOut 0.7s ease-in-out infinite;
+    }
+
+    @keyframes pushIn {
+      0% { transform: translateY(-26px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes popOut {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-8px) scale(1.04); }
+    }
+
+    .stack-empty {
+      color: #666;
+      font-family: Consolas, monospace;
+      align-self: center;
+      padding: 18px 0;
+    }
+
+    /* COMPUTE CARD */
+    .compute-card {
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px dashed #555;
+      background: var(--bg);
+      padding: 12px 16px;
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      min-height: 22px;
+      font-size: 16px;
+    }
+    .compute-card .ca { color: #ffd9b3; font-weight: bold; }
+    .compute-card .cb { color: #ffb3b3; font-weight: bold; }
+    .compute-card .cr { color: #d7f5c7; font-weight: bold; }
+
+    .result-card {
+      margin-top: 12px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: var(--greenText);
+      background: var(--panel2);
+    }
+
+    .result-value.final {
+      color: #d7f5c7;
+      background: #233525;
+      border: 1px solid var(--green);
+    }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 13.5px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace {
+      background: #062f4a;
+    }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+      .stack-zone {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 150. Evaluate Reverse Polish Notation</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">DRAG CONTROLS</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">2,1,+,3,*</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">4,13,5,/,+</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">big example</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">3,4,+</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="2, 1, +, 3, *" placeholder="Tokens: 2, 1, +, 3, *" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 460px;">
+      <h2>RPN Evaluation Stack (LIFO)</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">var</span> <span class="fn">evalRPN</span> = <span class="kw">function</span>(tokens) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> stack = [];</div>
+<div id="line-3" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> token <span class="kw">of</span> tokens) {</div>
+<div id="line-4" class="code-line">    <span class="kw">if</span> (token === <span class="str">"+"</span> || token === <span class="str">"-"</span> || token === <span class="str">"*"</span> || token === <span class="str">"/"</span>) {</div>
+<div id="line-5" class="code-line">      <span class="kw">const</span> b = stack.<span class="fn">pop</span>();</div>
+<div id="line-6" class="code-line">      <span class="kw">const</span> a = stack.<span class="fn">pop</span>();</div>
+<div id="line-7" class="code-line">      <span class="kw">if</span> (token === <span class="str">"+"</span>) stack.<span class="fn">push</span>(a + b);</div>
+<div id="line-8" class="code-line">      <span class="kw">else if</span> (token === <span class="str">"-"</span>) stack.<span class="fn">push</span>(a - b);</div>
+<div id="line-9" class="code-line">      <span class="kw">else if</span> (token === <span class="str">"*"</span>) stack.<span class="fn">push</span>(a * b);</div>
+<div id="line-10" class="code-line">      <span class="kw">else</span> stack.<span class="fn">push</span>(<span class="fn">Math</span>.<span class="fn">trunc</span>(a / b));</div>
+<div id="line-11" class="code-line">    } <span class="kw">else</span> {</div>
+<div id="line-12" class="code-line">      stack.<span class="fn">push</span>(<span class="fn">Number</span>(token));</div>
+<div id="line-13" class="code-line">    }</div>
+<div id="line-14" class="code-line">  }</div>
+<div id="line-15" class="code-line">  <span class="kw">return</span> stack[<span class="nm">0</span>];</div>
+<div id="line-16" class="code-line">};</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>Iteration Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables &amp; Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // DRAG LOGIC - works inside normal browsers and Obsidian iframes.
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // HUD STATE
+    let pinned = {
+      token: true,
+      a: true,
+      b: true,
+      stack: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render();
+    }
+
+    // EXAMPLES
+    const examples = {
+      1: ["2", "1", "+", "3", "*"],
+      2: ["4", "13", "5", "/", "+"],
+      3: ["10", "6", "9", "3", "+", "-11", "*", "/", "*", "17", "+", "5", "+"],
+      4: ["3", "4", "+"]
+    };
+
+    const operators = ["+", "-", "*", "/"];
+
+    // STATE
+    let tokens = [];
+    let activeExample = 1;
+    let steps = [];
+    let stepIndex = 0;
+
+    function isOperator(t) {
+      return operators.includes(t);
+    }
+
+    // Precompute every snapshot.
+    function buildSteps() {
+      steps = [];
+      let stack = [];
+
+      steps.push({
+        i: -1, token: null, a: null, b: null, result: null,
+        stack: [...stack], phase: "INIT", lines: [2],
+        justPushed: false, trace: []
+      });
+
+      const trace = [];
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const op = isOperator(token);
+
+        // Read token.
+        steps.push({
+          i, token, a: null, b: null, result: null,
+          stack: [...stack], phase: "READ", isOp: op,
+          lines: op ? [3, 4] : [3, 4, 11],
+          justPushed: false, trace: trace.map(r => ({ ...r }))
+        });
+
+        if (op) {
+          // Pop b (top), then a (next).
+          const b = stack[stack.length - 1];
+          const a = stack[stack.length - 2];
+
+          // Highlight the two operands before popping.
+          steps.push({
+            i, token, a, b, result: null,
+            stack: [...stack], phase: "POPTWO", isOp: true, lines: [5, 6],
+            justPushed: false, trace: trace.map(r => ({ ...r }))
+          });
+
+          stack.pop(); // b
+          stack.pop(); // a
+
+          let result;
+          let line;
+          if (token === "+") { result = a + b; line = 7; }
+          else if (token === "-") { result = a - b; line = 8; }
+          else if (token === "*") { result = a * b; line = 9; }
+          else { result = Math.trunc(a / b); line = 10; }
+
+          // Show the computation (operands gone, result not yet pushed).
+          steps.push({
+            i, token, a, b, result,
+            stack: [...stack], phase: "COMPUTE", isOp: true, lines: [line],
+            justPushed: false, trace: trace.map(r => ({ ...r }))
+          });
+
+          stack.push(result);
+          trace.push({
+            i, token,
+            a: a === undefined ? "-" : a,
+            b: b === undefined ? "-" : b,
+            pushed: result,
+            stack: "[" + stack.join(", ") + "]"
+          });
+
+          steps.push({
+            i, token, a, b, result,
+            stack: [...stack], phase: "PUSH_RESULT", isOp: true, lines: [line],
+            justPushed: true, trace: trace.map(r => ({ ...r }))
+          });
+        } else {
+          const val = Number(token);
+          stack.push(val);
+          trace.push({
+            i, token, a: "-", b: "-", pushed: val,
+            stack: "[" + stack.join(", ") + "]"
+          });
+          steps.push({
+            i, token, a: null, b: null, result: val,
+            stack: [...stack], phase: "PUSH_NUM", isOp: false, lines: [12],
+            justPushed: true, trace: trace.map(r => ({ ...r }))
+          });
+        }
+      }
+
+      const finalRes = stack[0];
+      steps.push({
+        i: tokens.length, token: null, a: null, b: null, result: finalRes,
+        stack: [...stack], phase: "RETURN", lines: [15],
+        justPushed: false, trace: trace.map(r => ({ ...r }))
+      });
+
+      steps.push({
+        i: tokens.length, token: null, a: null, b: null, result: finalRes,
+        stack: [...stack], phase: "END", lines: [15],
+        justPushed: false, trace: trace.map(r => ({ ...r }))
+      });
+    }
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      tokens = [...examples[exNum]];
+      document.getElementById("custom-input").value = tokens.join(", ");
+      init();
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      if (raw === "") {
+        tokens = [];
+      } else {
+        tokens = raw
+          .split(",")
+          .map(part => part.trim())
+          .filter(part => part.length > 0);
+      }
+
+      const valid = tokens.every(t => isOperator(t) || /^-?\d+$/.test(t));
+      if (!valid) {
+        alert("Use tokens separated by commas. Allowed: integers and + - * /. Example: 2, 1, +, 3, *");
+        return;
+      }
+
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      buildSteps();
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex === 0) return;
+      stepIndex--;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    function opSymbol(token) {
+      return token;
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function renderTokensRow(step) {
+      const row = document.createElement("div");
+      row.className = "tokens-row";
+
+      if (tokens.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "stack-empty";
+        empty.textContent = "tokens = []";
+        row.appendChild(empty);
+        return row;
+      }
+
+      tokens.forEach((val, idx) => {
+        const wrap = document.createElement("div");
+        wrap.className = "token-wrap";
+
+        const isCurrent = idx === step.i && step.phase !== "INIT" && step.phase !== "RETURN" && step.phase !== "END";
+        if (isCurrent) {
+          const ptr = document.createElement("div");
+          ptr.className = "pointer";
+          ptr.textContent = "i = " + step.i;
+          wrap.appendChild(ptr);
+        }
+
+        const cell = document.createElement("div");
+        cell.className = "token-cell " + (isOperator(val) ? "kind-op" : "kind-num");
+        cell.textContent = val;
+        const consumed = idx < step.i || (idx === step.i && (step.phase === "PUSH_NUM" || step.phase === "PUSH_RESULT" || step.phase === "COMPUTE"));
+        if (consumed) cell.classList.add("done");
+        if (isCurrent) cell.classList.add("current");
+
+        const idxLabel = document.createElement("div");
+        idxLabel.className = "index-label";
+        idxLabel.textContent = idx;
+
+        wrap.appendChild(cell);
+        wrap.appendChild(idxLabel);
+        row.appendChild(wrap);
+      });
+
+      return row;
+    }
+
+    function renderStackBox(step) {
+      const zone = document.createElement("div");
+      zone.className = "stack-zone";
+
+      const label = document.createElement("div");
+      label.className = "stack-label";
+      label.textContent = "stack (top -> bottom)";
+
+      const box = document.createElement("div");
+      box.className = "stack-box";
+      if ((step.phase === "PUSH_NUM" || step.phase === "PUSH_RESULT") && step.justPushed) box.classList.add("pushing");
+      if (step.phase === "POPTWO") box.classList.add("popping");
+
+      const tag = document.createElement("div");
+      tag.className = "top-tag";
+      tag.textContent = "TOP";
+      box.appendChild(tag);
+
+      if (step.stack.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "stack-empty";
+        empty.textContent = "empty";
+        box.appendChild(empty);
+      } else {
+        step.stack.forEach((val, idx) => {
+          const cell = document.createElement("div");
+          cell.className = "stack-cell";
+          const isTopOfStack = idx === step.stack.length - 1;
+          const isSecond = idx === step.stack.length - 2;
+          if (isTopOfStack) cell.classList.add("top");
+          if (isTopOfStack && (step.phase === "PUSH_NUM" || step.phase === "PUSH_RESULT") && step.justPushed) cell.classList.add("just-pushed");
+          if (step.phase === "POPTWO" && isTopOfStack) cell.classList.add("operand-b");
+          if (step.phase === "POPTWO" && isSecond) cell.classList.add("operand-a");
+
+          const valSpan = document.createElement("span");
+          valSpan.textContent = val;
+          const idxSpan = document.createElement("span");
+          idxSpan.className = "sc-idx";
+          let tagText = "idx " + idx;
+          if (step.phase === "POPTWO" && isTopOfStack) tagText = "b (top)";
+          if (step.phase === "POPTWO" && isSecond) tagText = "a";
+          idxSpan.textContent = tagText;
+          cell.appendChild(valSpan);
+          cell.appendChild(idxSpan);
+          box.appendChild(cell);
+        });
+      }
+
+      zone.appendChild(label);
+      zone.appendChild(box);
+      return zone;
+    }
+
+    function renderComputeCard(step) {
+      const card = document.createElement("div");
+      card.className = "compute-card";
+      if (step.phase === "POPTWO") {
+        card.innerHTML = "Pop <span class=\"cb\">b = " + step.b + "</span> (top), then <span class=\"ca\">a = " + step.a + "</span>. Will compute <span class=\"ca\">a</span> " + opSymbol(step.token) + " <span class=\"cb\">b</span>.";
+      } else if (step.phase === "COMPUTE" || step.phase === "PUSH_RESULT") {
+        let expr = "<span class=\"ca\">" + step.a + "</span> " + opSymbol(step.token) + " <span class=\"cb\">" + step.b + "</span> = <span class=\"cr\">" + step.result + "</span>";
+        if (step.token === "/") {
+          expr += "  <span style=\"color:#888\">(Math.trunc toward zero)</span>";
+        }
+        card.innerHTML = expr;
+      } else {
+        card.innerHTML = "<span style=\"color:#666\">Operators pop two operands (b = top, then a) and push a OP b.</span>";
+      }
+      return card;
+    }
+
+    function renderResultCard(step) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = "return stack[0]";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (step.phase === "RETURN" || step.phase === "END") {
+        value.classList.add("final");
+        value.textContent = "return " + step.result;
+      } else {
+        value.textContent = step.stack.length === 1 ? step.stack[0] : "pending";
+      }
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(step) {
+      const traceUi = document.getElementById("trace-ui");
+      const trace = step.trace;
+      if (!trace || trace.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No tokens processed yet. Step through to build the trace.</div>';
+        return;
+      }
+
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr>
+              <th>token</th>
+              <th>a</th>
+              <th>b</th>
+              <th>pushed</th>
+              <th>stack</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      trace.forEach((row, idx) => {
+        const isActive = idx === trace.length - 1 && (step.phase === "PUSH_NUM" || step.phase === "PUSH_RESULT");
+        html += `
+          <tr class="${isActive ? "active-trace" : ""}">
+            <td>${isOperator(row.token) ? '<span class="op">' + row.token + '</span>' : '<span class="nm">' + row.token + '</span>'}</td>
+            <td>${row.a === "-" ? '<span style="color:#666">-</span>' : '<span class="nm">' + row.a + '</span>'}</td>
+            <td>${row.b === "-" ? '<span style="color:#666">-</span>' : '<span class="nm">' + row.b + '</span>'}</td>
+            <td><span class="nm">${row.pushed}</span></td>
+            <td>${row.stack}</td>
+          </tr>
+        `;
+      });
+
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    function render() {
+      const step = steps[stepIndex];
+
+      document.getElementById("btn-prev").disabled = stepIndex === 0;
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      if (step.phase === "END") {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      highlightLines(step.lines);
+
+      switch (step.phase) {
+        case "INIT":
+          narrate("Create an empty <b>stack</b>. Numbers get pushed; an operator pops its two operands and pushes the result.");
+          break;
+        case "READ":
+          if (step.isOp) {
+            narrate("token = <b>\"" + step.token + "\"</b> is an <b>operator</b>. It needs the top two numbers on the stack.");
+          } else {
+            narrate("token = <b>\"" + step.token + "\"</b> is a <b>number</b>. Push <span style=\"color:#b5cea8\">" + Number(step.token) + "</span> onto the stack.");
+          }
+          break;
+        case "POPTWO":
+          narrate("Pop <b style=\"color:#ffb3b3\">b = " + step.b + "</b> (the top) first, then pop <b style=\"color:#ffd9b3\">a = " + step.a + "</b>. Order matters: we compute <b>a " + step.token + " b</b>.");
+          break;
+        case "COMPUTE": {
+          let extra = "";
+          if (step.token === "/") extra = " Division truncates toward zero with <code>Math.trunc</code>.";
+          narrate("Compute <b>" + step.a + " " + step.token + " " + step.b + " = " + step.result + "</b>." + extra);
+          break;
+        }
+        case "PUSH_RESULT":
+          narrate("Push the result <b style=\"color:#d7f5c7\">" + step.result + "</b> back on top of the stack.");
+          break;
+        case "PUSH_NUM":
+          narrate("Pushed <b style=\"color:#d7f5c7\">" + step.result + "</b> on top of the stack (animates in).");
+          break;
+        case "RETURN":
+          narrate("All tokens processed. One value remains: return <code>stack[0]</code> = <b style=\"color:#b5cea8\">" + step.result + "</b>.");
+          break;
+        case "END":
+          narrate("Done. The expression evaluates to <b style=\"color:#b5cea8\">" + step.result + "</b>.");
+          break;
+      }
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+      visualUi.appendChild(renderTokensRow(step));
+      visualUi.appendChild(renderStackBox(step));
+      visualUi.appendChild(renderComputeCard(step));
+      visualUi.appendChild(renderResultCard(step));
+
+      renderTrace(step);
+
+      const tokenDisplay = step.token === null ? '<span class="kw">undefined</span>' :
+        (isOperator(step.token) ? '<span class="str">"' + step.token + '"</span>' : '<span class="str">"' + step.token + '"</span>');
+      const aDisplay = step.a === null || step.a === undefined ? '<span class="kw">undefined</span>' : '<span class="nm">' + step.a + '</span>';
+      const bDisplay = step.b === null || step.b === undefined ? '<span class="kw">undefined</span>' : '<span class="nm">' + step.b + '</span>';
+      const stackDisplay = '<span class="op">[' + step.stack.join(", ") + ']</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Original input</span><br>' +
+        '<span class="kw">const</span> tokens = [' + tokens.map(t => '"' + t + '"').join(", ") + '];<br><br>' +
+        '<span class="cm">// Live state</span><br>' +
+        createConsoleLine("token", "const", "token", tokenDisplay) +
+        createConsoleLine("a", "const", "a", aDisplay) +
+        createConsoleLine("b", "const", "b", bDisplay) +
+        createConsoleLine("stack", "const", "stack", stackDisplay);
+
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        token: step.token === null ? "undefined" : '"' + step.token + '"',
+        a: step.a === null || step.a === undefined ? "-" : step.a,
+        b: step.b === null || step.b === undefined ? "-" : step.b,
+        stack: "[" + step.stack.join(", ") + "]"
+      };
+      for (const [key, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + key + ':</span> <span class="hud-val">' + hudMap[key] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot
+    tokens = [...examples[1]];
+    init();
+  </script>
+</body>
+</html>
