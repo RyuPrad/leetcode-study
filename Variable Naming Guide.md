@@ -125,6 +125,26 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Trapping Rain Water:** `height`, `left`, `right`, `leftMax`, `rightMax`, `res`
 
+### Sliding Window
+
+**Contains Duplicate II:** `nums`, `k`, `i`, `seen`, `ans`
+
+**Best Time to Buy and Sell Stock:** `prices`, `left`, `right`, `ans`
+
+**Longest Substring Without Repeating Characters:** `s`, `left`, `right`, `seen`, `ans`
+
+**Longest Repeating Character Replacement:** `s`, `k`, `left`, `right`, `freq`, `maxFreq`, `ans`
+
+**Permutation in String:** `s1`, `s2`, `need`, `window`, `left`, `right`
+
+**Minimum Size Subarray Sum:** `target`, `nums`, `left`, `right`, `sum`, `ans`
+
+**Find K Closest Elements:** `arr`, `k`, `x`, `left`, `right`
+
+**Minimum Window Substring:** `s`, `t`, `need`, `window`, `left`, `right`, `have`, `needCount`, `ans`
+
+**Sliding Window Maximum:** `nums`, `k`, `deque`, `left`, `right`, `res`
+
 ### Binary Search
 
 **Binary Search:** `nums`, `target`, `left`, `right`, `mid`, `ans`
