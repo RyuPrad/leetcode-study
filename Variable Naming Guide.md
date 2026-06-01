@@ -421,6 +421,42 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Greatest Common Divisor Traversal:** `nums`, `n`, `dsu`, `parent`, `primeToIndex`, `x`, `p`
 
+### 1-D Dynamic Programming
+
+**Climbing Stairs:** `n`, `dp`, `i`
+
+**Min Cost Climbing Stairs:** `cost`, `n`, `dp`, `i`
+
+**N-th Tribonacci Number:** `n`, `dp`, `i`
+
+**House Robber:** `nums`, `n`, `dp`, `i`
+
+**House Robber II:** `nums`, `n`, `robLine`, `prev`, `curr`, `next`, `x`, `ans`
+
+**Longest Palindromic Substring:** `s`, `start`, `maxLen`, `expand`, `l`, `r`, `i`
+
+**Palindromic Substrings:** `s`, `count`, `expand`, `l`, `r`, `i`
+
+**Decode Ways:** `s`, `n`, `dp`, `one`, `two`, `i`
+
+**Coin Change:** `coins`, `amount`, `dp`, `a`, `coin`, `ans`
+
+**Maximum Product Subarray:** `nums`, `res`, `curMax`, `curMin`, `n`, `tmpMax`, `i`
+
+**Word Break:** `s`, `wordDict`, `words`, `n`, `dp`, `i`, `j`, `ans`
+
+**Longest Increasing Subsequence:** `nums`, `n`, `dp`, `ans`, `i`, `j`
+
+**Partition Equal Subset Sum:** `nums`, `total`, `target`, `dp`, `num`, `i`, `ans`
+
+**Combination Sum IV:** `nums`, `target`, `dp`, `t`, `num`, `ans`
+
+**Perfect Squares:** `n`, `dp`, `i`, `j`
+
+**Integer Break:** `n`, `dp`, `i`, `j`
+
+**Stone Game III:** `stoneValue`, `n`, `dp`, `take`, `i`, `k`, `ans`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
