@@ -345,6 +345,16 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Partition to K Equal Sum Subsets:** `nums`, `k`, `total`, `target`, `used`, `start`, `curSum`
 
+### Tries
+
+**Implement Trie (Prefix Tree):** `root`, `node`, `ch`, `word`, `prefix`, `str`, `children`, `isEnd`
+
+**Design Add and Search Words Data Structure:** `root`, `node`, `ch`, `word`, `i`, `key`, `children`, `isEnd`, `dfs`
+
+**Extra Characters in a String:** `s`, `dictionary`, `root`, `node`, `ch`, `dp`, `i`, `j`, `ans`
+
+**Word Search II:** `board`, `words`, `root`, `node`, `child`, `ch`, `rows`, `cols`, `res`, `r`, `c`, `dirs`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
