@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 252. Meeting Rooms Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* TIMELINE VISUALIZATION */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      padding: 20px 10px;
+      min-height: 340px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .timeline-wrap {
+      position: relative;
+      padding: 10px 0 30px 0;
+      min-width: 520px;
+    }
+
+    .axis {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 22px;
+      height: 2px;
+      background: #555;
+    }
+
+    .tick {
+      position: absolute;
+      bottom: 8px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: var(--muted);
+      font-family: Consolas, monospace;
+    }
+
+    .tick::before {
+      content: "";
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      width: 1px;
+      height: 6px;
+      background: #555;
+    }
+
+    .bar-row {
+      position: relative;
+      height: 34px;
+      margin-bottom: 6px;
+    }
+
+    .bar {
+      position: absolute;
+      height: 30px;
+      border-radius: 6px;
+      border: 2px solid #666;
+      background: var(--panel2);
+      color: var(--text);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .bar-label {
+      position: absolute;
+      left: 6px;
+      top: -18px;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: Consolas, monospace;
+    }
+
+    .bar.prev {
+      border-color: var(--blue);
+      background: #1e3a5c;
+      color: var(--cyan);
+    }
+
+    .bar.current {
+      border-color: var(--yellow);
+      background: #3a3320;
+      color: var(--yellow);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 0 0 3px rgba(215, 186, 125, 0.22), 0 8px 18px rgba(215, 186, 125, 0.25);
+    }
+
+    .bar.ok {
+      border-color: var(--green);
+      background: #233525;
+      color: var(--greenText);
+    }
+
+    .bar.conflict {
+      border-color: var(--red);
+      background: #4a2525;
+      color: #ffb3b3;
+      animation: pulseRed 0.9s ease-in-out infinite;
+    }
+
+    @keyframes pulseRed {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.03); }
+    }
+
+    .empty-array {
+      color: var(--muted);
+      border: 1px dashed #555;
+      border-radius: 6px;
+      padding: 14px 18px;
+      font-family: Consolas, monospace;
+      background: var(--bg);
+    }
+
+    .stage-caption {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: bold;
+      padding: 6px 10px;
+      background: var(--panel2);
+      border-radius: 4px;
+      border: 1px solid #444;
+    }
+
+    .result-card {
+      margin-top: 16px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: #888;
+      background: var(--panel2);
+    }
+
+    .result-value.true {
+      color: var(--greenText);
+      background: #233525;
+      border: 1px solid var(--green);
+    }
+
+    .result-value.false {
+      color: #ffb3b3;
+      background: #4a2525;
+      border: 1px solid var(--red);
+    }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace {
+      background: #062f4a;
+    }
+
+    .trace-table tr.hit-trace {
+      background: rgba(226, 75, 74, 0.14);
+    }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 252. Meeting Rooms</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">⋮⋮ DRAG CONTROLS ⋮⋮</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">[[0,30],[5,10],[15,20]]</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">[[7,10],[2,4]]</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">[[1,5],[5,10]]</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">[[1,5],[4,10]]</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-5" class="btn-ex" onclick="loadExample(5)">[[5,8],[9,15]]</button>
+      <button id="btn-ex-6" class="btn-ex" onclick="loadExample(6)">[[1,5]]</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="0,30; 5,10; 15,20" placeholder="Intervals: 1,3; 2,6; 8,10" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>Timeline (sorted by start)</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">function</span> <span class="fn">canAttendMeetings</span>(intervals) {</div>
+<div id="line-2" class="code-line">  intervals.<span class="fn">sort</span>((a, b) =&gt; a[<span class="nm">0</span>] - b[<span class="nm">0</span>]);</div>
+<div id="line-3" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">1</span>; i &lt; intervals.length; i++) {</div>
+<div id="line-4" class="code-line">    <span class="kw">if</span> (intervals[i][<span class="nm">0</span>] &lt; intervals[i - <span class="nm">1</span>][<span class="nm">1</span>]) <span class="kw">return</span> <span class="kw">false</span>;</div>
+<div id="line-5" class="code-line">  }</div>
+<div id="line-6" class="code-line">  <span class="kw">return</span> <span class="kw">true</span>;</div>
+<div id="line-7" class="code-line">}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>Iteration Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables & Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // DRAG LOGIC — works inside normal browsers and Obsidian iframes.
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        // Some iframe hosts block fullscreen unless the iframe has allowfullscreen.
+        // Since this runs from a user click, opening the visualizer directly is a useful fallback.
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // HUD STATE
+    let pinned = {
+      i: true,
+      curStart: true,
+      prevEnd: true,
+      ans: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render(steps[stepIndex]);
+    }
+
+    // EXAMPLES
+    const examples = {
+      1: [[0,30],[5,10],[15,20]],
+      2: [[7,10],[2,4]],
+      3: [[1,5],[5,10]],
+      4: [[1,5],[4,10]],
+      5: [[5,8],[9,15]],
+      6: [[1,5]]
+    };
+
+    // STATE
+    let intervals = [];
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+
+    // ---- Build precomputed, deep-copied snapshots ----
+    function cloneIv(iv) {
+      return iv.map(p => p.slice());
+    }
+
+    function buildSteps(rawIntervals) {
+      const snaps = [];
+      // Work on a copy so the input is never mutated.
+      const arr = cloneIv(rawIntervals);
+
+      // Trace rows accumulate across steps (immutable copies stored per snapshot).
+      let trace = [];
+
+      function snap(extra) {
+        const base = {
+          phase: extra.phase,
+          intervals: cloneIv(arr),
+          i: extra.i,
+          curStart: extra.curStart,
+          prevEnd: extra.prevEnd,
+          conflictPair: extra.conflictPair ? extra.conflictPair.slice() : null,
+          ans: extra.ans,
+          line: extra.line,
+          narration: extra.narration,
+          trace: trace.map(row => ({ ...row })),
+          done: !!extra.done
+        };
+        snaps.push(base);
+      }
+
+      // INIT (before sort)
+      snap({
+        phase: "INIT",
+        i: null,
+        curStart: null,
+        prevEnd: null,
+        ans: "pending",
+        line: 1,
+        narration: "We want to know if one person can attend <b>every</b> meeting. Two meetings conflict if one starts before the other ends."
+      });
+
+      // SORT
+      arr.sort((a, b) => a[0] - b[0]);
+      snap({
+        phase: "SORT",
+        i: null,
+        curStart: null,
+        prevEnd: null,
+        ans: "pending",
+        line: 2,
+        narration: "Sort the meetings by <b>start time</b>. Now any conflict must involve two <i>adjacent</i> meetings."
+      });
+
+      let ans = true;
+      let conflictAt = -1;
+
+      if (arr.length <= 1) {
+        // Loop never runs.
+        snap({
+          phase: "LOOP_DONE",
+          i: 1,
+          curStart: null,
+          prevEnd: null,
+          ans: "pending",
+          line: 3,
+          narration: arr.length === 0
+            ? "There are no meetings, so there is nothing to conflict. The loop is skipped."
+            : "There is only one meeting, so nothing can overlap. The loop body never runs."
+        });
+      } else {
+        for (let i = 1; i < arr.length; i++) {
+          const curStart = arr[i][0];
+          const prevEnd = arr[i - 1][1];
+
+          // Enter loop / check condition.
+          snap({
+            phase: "LOOP_CHECK",
+            i,
+            curStart: null,
+            prevEnd: null,
+            ans: "pending",
+            line: 3,
+            narration: "Loop with <b>i = " + i + "</b> (" + i + " &lt; " + arr.length + "). Compare meeting <b>" + i + "</b> against the previous meeting <b>" + (i - 1) + "</b>."
+          });
+
+          const overlaps = curStart < prevEnd;
+          trace.push({
+            i,
+            curStart,
+            prevEnd,
+            overlaps,
+            action: overlaps ? "return false" : "no conflict"
+          });
+
+          // Compare step.
+          snap({
+            phase: "COMPARE",
+            i,
+            curStart,
+            prevEnd,
+            conflictPair: overlaps ? [i - 1, i] : null,
+            ans: "pending",
+            line: 4,
+            narration: overlaps
+              ? "<code>intervals[" + i + "][0] = " + curStart + "</code> &lt; <code>intervals[" + (i - 1) + "][1] = " + prevEnd + "</code> &rarr; <b style=\"color:#e24b4a\">true</b>. Meeting " + i + " starts before meeting " + (i - 1) + " ends &mdash; they overlap!"
+              : "<code>intervals[" + i + "][0] = " + curStart + "</code> &lt; <code>intervals[" + (i - 1) + "][1] = " + prevEnd + "</code> &rarr; <b style=\"color:#6a9955\">false</b>. No overlap with the previous meeting."
+          });
+
+          if (overlaps) {
+            ans = false;
+            conflictAt = i;
+            // RETURN false
+            snap({
+              phase: "RETURN_FALSE",
+              i,
+              curStart,
+              prevEnd,
+              conflictPair: [i - 1, i],
+              ans: false,
+              line: 4,
+              narration: "<code>return <b style=\"color:#e24b4a\">false</b></code> immediately &mdash; a conflict means the person cannot attend all meetings."
+            });
+            break;
+          }
+        }
+      }
+
+      if (ans) {
+        // RETURN true (only reached if no conflict)
+        snap({
+          phase: "RETURN_TRUE",
+          i: arr.length,
+          curStart: null,
+          prevEnd: null,
+          ans: true,
+          line: 6,
+          narration: "No adjacent pair overlapped, so <code>return <b style=\"color:#6a9955\">true</b></code> &mdash; the person can attend every meeting."
+        });
+      }
+
+      // FINISHED
+      snap({
+        phase: "DONE",
+        i: ans ? arr.length : conflictAt,
+        curStart: null,
+        prevEnd: null,
+        conflictPair: ans ? null : [conflictAt - 1, conflictAt],
+        ans,
+        line: ans ? 6 : 4,
+        narration: ans
+          ? "&#10003; Done. Every meeting fits without overlap &rarr; <b>true</b>."
+          : "&#10003; Done. A conflict was found &rarr; <b>false</b>. The person cannot attend all meetings.",
+        done: true
+      });
+
+      return snaps;
+    }
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      intervals = cloneIv(examples[exNum]);
+      document.getElementById("custom-input").value = intervals.map(p => p.join(",")).join("; ");
+      init();
+    }
+
+    function parseIntervals(raw) {
+      // Rows separated by ';', endpoints by ','.
+      const rows = raw.split(";").map(r => r.trim()).filter(r => r.length > 0);
+      const out = [];
+      for (const row of rows) {
+        const parts = row.split(",").map(p => p.trim()).filter(p => p.length > 0);
+        if (parts.length !== 2) return null;
+        const a = Number(parts[0]);
+        const b = Number(parts[1]);
+        if (Number.isNaN(a) || Number.isNaN(b)) return null;
+        out.push([a, b]);
+      }
+      return out;
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      if (raw === "") {
+        intervals = [];
+        activeExample = 0;
+        init();
+        return;
+      }
+      const parsed = parseIntervals(raw);
+      if (parsed === null) {
+        alert("Enter intervals as rows separated by ';' and endpoints by ','. Example: 1,3; 2,6; 8,10");
+        return;
+      }
+      intervals = parsed;
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      steps = buildSteps(intervals);
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render(steps[stepIndex]);
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render(steps[stepIndex]);
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render(steps[stepIndex]);
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function formatIntervalsHtml(snap) {
+      if (snap.intervals.length === 0) return "[]";
+      return "[" + snap.intervals.map(p => "[" + p[0] + "," + p[1] + "]").join(", ") + "]";
+    }
+
+    // ---- Timeline rendering ----
+    function renderTimeline(snap) {
+      const wrap = document.createElement("div");
+      wrap.className = "timeline-wrap";
+
+      if (snap.intervals.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty-array";
+        empty.textContent = "intervals = []";
+        wrap.appendChild(empty);
+        return wrap;
+      }
+
+      // Compute min/max across all endpoints for scaling.
+      let lo = Infinity, hi = -Infinity;
+      snap.intervals.forEach(p => {
+        lo = Math.min(lo, p[0]);
+        hi = Math.max(hi, p[1]);
+      });
+      if (lo === hi) hi = lo + 1; // avoid divide by zero
+      const span = hi - lo;
+      const pct = v => ((v - lo) / span) * 100;
+
+      const conflictSet = new Set(snap.conflictPair || []);
+
+      snap.intervals.forEach((p, idx) => {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const leftPct = pct(p[0]);
+        const widthPct = Math.max(pct(p[1]) - leftPct, 3);
+        bar.style.left = leftPct + "%";
+        bar.style.width = widthPct + "%";
+        bar.textContent = "[" + p[0] + "," + p[1] + "]";
+
+        // Coloring based on phase.
+        if (conflictSet.has(idx)) {
+          bar.classList.add("conflict");
+        } else if ((snap.phase === "COMPARE" || snap.phase === "LOOP_CHECK") && idx === snap.i) {
+          bar.classList.add("current");
+        } else if ((snap.phase === "COMPARE" || snap.phase === "LOOP_CHECK") && idx === snap.i - 1) {
+          bar.classList.add("prev");
+        } else if (snap.phase === "RETURN_TRUE" || snap.phase === "DONE") {
+          if (snap.ans === true) bar.classList.add("ok");
+        }
+
+        const label = document.createElement("div");
+        label.className = "bar-label";
+        label.textContent = "idx " + idx;
+        bar.appendChild(label);
+
+        row.appendChild(bar);
+        wrap.appendChild(row);
+      });
+
+      // Axis with a few ticks.
+      const axis = document.createElement("div");
+      axis.className = "axis";
+      wrap.appendChild(axis);
+
+      const tickCount = 5;
+      for (let t = 0; t <= tickCount; t++) {
+        const v = lo + (span * t) / tickCount;
+        const tick = document.createElement("div");
+        tick.className = "tick";
+        tick.style.left = pct(v) + "%";
+        tick.textContent = Math.round(v);
+        wrap.appendChild(tick);
+      }
+
+      return wrap;
+    }
+
+    function renderResultCard(snap) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = "return value (can attend all?)";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (snap.ans === true) {
+        value.classList.add("true");
+        value.textContent = "true";
+      } else if (snap.ans === false) {
+        value.classList.add("false");
+        value.textContent = "false";
+      } else {
+        value.textContent = "pending";
+      }
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(snap) {
+      const traceUi = document.getElementById("trace-ui");
+      if (snap.trace.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No comparisons yet. Step into the loop to compare adjacent meetings.</div>';
+        return;
+      }
+
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr>
+              <th>i</th>
+              <th>intervals[i][0]</th>
+              <th>intervals[i-1][1]</th>
+              <th>start &lt; prevEnd</th>
+              <th>action</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      snap.trace.forEach((row, idx) => {
+        const isActive = idx === snap.trace.length - 1 && (snap.phase === "COMPARE" || snap.phase === "RETURN_FALSE" || snap.phase === "RETURN_TRUE" || snap.phase === "DONE");
+        const trClass = row.overlaps ? "hit-trace" : (isActive ? "active-trace" : "");
+        html += `
+          <tr class="${trClass}">
+            <td>${row.i}</td>
+            <td><span class="nm">${row.curStart}</span></td>
+            <td><span class="nm">${row.prevEnd}</span></td>
+            <td>${row.overlaps ? '<span class="kw">true</span>' : '<span class="kw">false</span>'}</td>
+            <td>${row.action}</td>
+          </tr>
+        `;
+      });
+
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    function render(snap) {
+      // Buttons
+      document.getElementById("btn-prev").disabled = stepIndex === 0;
+      if (snap.done) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      highlightLines([snap.line]);
+      narrate(snap.narration);
+
+      // Visual stage
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+
+      const caption = document.createElement("div");
+      caption.className = "stage-caption";
+      caption.textContent = snap.phase === "INIT"
+        ? "Input order (not yet sorted)"
+        : "Sorted by start time";
+      visualUi.appendChild(caption);
+
+      visualUi.appendChild(renderTimeline(snap));
+      visualUi.appendChild(renderResultCard(snap));
+
+      renderTrace(snap);
+
+      // Console
+      const iDisplay = snap.i === null ? '<span class="kw">—</span>' : (snap.i >= snap.intervals.length ? '<span class="kw">done</span>' : '<span class="nm">' + snap.i + '</span>');
+      const curStartDisplay = snap.curStart === null ? '<span class="kw">—</span>' : '<span class="nm">' + snap.curStart + '</span>';
+      const prevEndDisplay = snap.prevEnd === null ? '<span class="kw">—</span>' : '<span class="nm">' + snap.prevEnd + '</span>';
+      let ansHtml;
+      if (snap.ans === "pending") ansHtml = '<span class="kw">pending</span>';
+      else ansHtml = snap.ans ? '<span class="kw">true</span>' : '<span class="kw">false</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Sorted intervals</span><br>' +
+        '<span class="kw">const</span> intervals = ' + formatIntervalsHtml(snap) + ';<br><br>' +
+        '<span class="cm">// Live state</span><br>' +
+        createConsoleLine("i", "let", "i", iDisplay) +
+        createConsoleLine("curStart", "let", "intervals[i][0]", curStartDisplay) +
+        createConsoleLine("prevEnd", "let", "intervals[i-1][1]", prevEndDisplay) +
+        '<br><span class="cm">// Output</span><br>' +
+        createConsoleLine("ans", "return", "ans", ansHtml);
+
+      // HUD
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        i: snap.i === null ? "—" : (snap.i >= snap.intervals.length ? "done" : snap.i),
+        curStart: snap.curStart === null ? "—" : snap.curStart,
+        prevEnd: snap.prevEnd === null ? "—" : snap.prevEnd,
+        ans: snap.ans
+      };
+      for (const [key, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + key + ':</span> <span class="hud-val">' + hudMap[key] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot
+    intervals = cloneIv(examples[1]);
+    init();
+  </script>
+</body>
+</html>

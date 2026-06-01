@@ -521,6 +521,22 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Candy:** `ratings`, `n`, `candies`, `i`, `ans`
 
+### Intervals
+
+**Insert Interval:** `intervals`, `newInterval`, `res`, `i`, `n`
+
+**Merge Intervals:** `intervals`, `res`, `i`, `last`
+
+**Non-overlapping Intervals:** `intervals`, `count`, `prevEnd`, `i`
+
+**Meeting Rooms:** `intervals`, `i`, `ans`
+
+**Meeting Rooms II:** `intervals`, `starts`, `ends`, `rooms`, `maxRooms`, `s`, `e`
+
+**Meeting Rooms III:** `n`, `meetings`, `count`, `available`, `busy`, `start`, `end`, `room`, `freeTime`, `best`, `r`
+
+**Minimum Interval to Include Each Query:** `intervals`, `queries`, `sortedQueries`, `res`, `heap`, `i`, `q`, `idx`, `l`, `r`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
