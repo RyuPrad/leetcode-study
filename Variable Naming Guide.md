@@ -457,6 +457,40 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Stone Game III:** `stoneValue`, `n`, `dp`, `take`, `i`, `k`, `ans`
 
+### 2-D Dynamic Programming
+
+**Unique Paths:** `m`, `n`, `dp`, `i`, `j`
+
+**Unique Paths II:** `grid`, `m`, `n`, `dp`, `i`, `j`
+
+**Minimum Path Sum:** `grid`, `m`, `n`, `dp`, `i`, `j`
+
+**Longest Common Subsequence:** `text1`, `text2`, `m`, `n`, `dp`, `i`, `j`
+
+**Last Stone Weight II:** `stones`, `total`, `target`, `dp`, `stone`, `j`
+
+**Best Time to Buy and Sell Stock with Cooldown:** `prices`, `n`, `hold`, `sold`, `rest`, `i`, `ans`
+
+**Coin Change II:** `amount`, `coins`, `n`, `dp`, `i`, `a`, `coin`
+
+**Target Sum:** `nums`, `target`, `total`, `subsetSum`, `dp`, `num`, `s`
+
+**Interleaving String:** `s1`, `s2`, `s3`, `m`, `n`, `dp`, `i`, `j`
+
+**Stone Game:** `piles`, `n`, `dp`, `i`, `j`, `len`, `ans`
+
+**Stone Game II:** `piles`, `n`, `suffix`, `dp`, `i`, `m`, `x`, `best`, `ans`
+
+**Longest Increasing Path in a Matrix:** `matrix`, `rows`, `cols`, `memo`, `dirs`, `dfs`, `r`, `c`, `nr`, `nc`, `best`, `ans`
+
+**Distinct Subsequences:** `s`, `t`, `m`, `n`, `dp`, `i`, `j`
+
+**Edit Distance:** `word1`, `word2`, `m`, `n`, `dp`, `i`, `j`
+
+**Burst Balloons:** `nums`, `balloons`, `n`, `dp`, `left`, `right`, `k`, `len`, `ans`
+
+**Regular Expression Matching:** `s`, `p`, `m`, `n`, `dp`, `i`, `j`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
