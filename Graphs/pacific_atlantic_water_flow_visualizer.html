@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 417. Pacific Atlantic Water Flow Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* GRID VISUALIZATION */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 16px 6px;
+      min-height: 340px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .op-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-family: Consolas, monospace;
+      background: var(--panel2);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .op-call {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--cyan);
+    }
+
+    .op-call .keyhl {
+      color: var(--yellow);
+      background: rgba(215, 186, 125, 0.16);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid #555;
+    }
+
+    .grid-wrap {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .grid-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .gcell {
+      width: 54px;
+      height: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #555;
+      border-radius: 8px;
+      background: var(--panel2);
+      color: var(--text);
+      font-size: 20px;
+      font-weight: bold;
+      font-family: Consolas, monospace;
+      position: relative;
+      transition: all 0.2s ease;
+      box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+    }
+
+    .gcell .coord {
+      position: absolute;
+      top: 1px;
+      left: 3px;
+      font-size: 9px;
+      color: var(--muted);
+      font-weight: normal;
+    }
+
+    .gcell .flowmark {
+      position: absolute;
+      bottom: 1px;
+      right: 3px;
+      font-size: 9px;
+      font-weight: bold;
+    }
+
+    /* reachability tints */
+    .gcell.pac {
+      background: #16384f;
+      border-color: var(--blue);
+      color: var(--cyan);
+    }
+
+    .gcell.atl {
+      background: #163f33;
+      border-color: var(--green);
+      color: var(--greenText);
+    }
+
+    .gcell.both {
+      background: #3a2f12;
+      border-color: var(--yellow);
+      color: var(--yellow);
+      box-shadow: 0 0 12px rgba(215, 186, 125, 0.45);
+    }
+
+    .gcell.current {
+      transform: translateY(-4px) scale(1.08);
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(206, 145, 120, 0.3), 0 8px 16px rgba(206, 145, 120, 0.3);
+      z-index: 5;
+    }
+
+    .gcell.frontier {
+      animation: pulseOrange 0.9s ease-in-out infinite;
+    }
+
+    .gcell.answer {
+      animation: pulseGold 1s ease-in-out infinite;
+    }
+
+    @keyframes pulseOrange {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(206,145,120,0.3); }
+      50% { box-shadow: 0 0 14px 3px rgba(206,145,120,0.6); }
+    }
+
+    @keyframes pulseGold {
+      0%, 100% { box-shadow: 0 0 8px rgba(215,186,125,0.4); }
+      50% { box-shadow: 0 0 18px 4px rgba(215,186,125,0.75); }
+    }
+
+    .ocean-label {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .ocean-pac { color: var(--blue); }
+    .ocean-atl { color: var(--green); }
+
+    .result-card {
+      margin-top: 4px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 16px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: var(--greenText);
+      background: var(--panel2);
+      word-break: break-all;
+    }
+
+    .result-value.done {
+      color: var(--yellow);
+      background: #3a2f12;
+      border: 1px solid var(--yellow);
+    }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace {
+      background: #062f4a;
+    }
+
+    .trace-table tr.hit-trace {
+      background: rgba(215, 186, 125, 0.14);
+    }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+      .gcell { width: 44px; height: 44px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 417. Pacific Atlantic Water Flow</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">⋮⋮ DRAG CONTROLS ⋮⋮</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">5x5 classic</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">[[1]]</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">2x2 saddle</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">3x3 spiral</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="1,2,2,3,5; 3,2,3,4,4; 2,4,5,3,1; 6,7,1,4,5; 5,1,1,2,4" placeholder="rows separated by ;  cells by ," />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>Grid — Pacific (top/left) &amp; Atlantic (bottom/right)</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">function</span> <span class="fn">pacificAtlantic</span>(heights) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> rows = heights.length;</div>
+<div id="line-3" class="code-line">  <span class="kw">const</span> cols = heights[<span class="nm">0</span>].length;</div>
+<div id="line-4" class="code-line">  <span class="kw">const</span> pac = <span class="vr">Array</span>.<span class="fn">from</span>({ length: rows }, () => <span class="kw">new</span> <span class="vr">Array</span>(cols).<span class="fn">fill</span>(<span class="kw">false</span>));</div>
+<div id="line-5" class="code-line">  <span class="kw">const</span> atl = <span class="vr">Array</span>.<span class="fn">from</span>({ length: rows }, () => <span class="kw">new</span> <span class="vr">Array</span>(cols).<span class="fn">fill</span>(<span class="kw">false</span>));</div>
+<div id="line-6" class="code-line">  <span class="kw">const</span> dirs = [[<span class="nm">1</span>, <span class="nm">0</span>], [-<span class="nm">1</span>, <span class="nm">0</span>], [<span class="nm">0</span>, <span class="nm">1</span>], [<span class="nm">0</span>, -<span class="nm">1</span>]];</div>
+<div id="line-7" class="code-line">  <span class="kw">const</span> <span class="fn">dfs</span> = (r, c, ocean, prev) => {</div>
+<div id="line-8" class="code-line">    <span class="kw">if</span> (r &lt; <span class="nm">0</span> || r >= rows || c &lt; <span class="nm">0</span> || c >= cols) <span class="kw">return</span>;</div>
+<div id="line-9" class="code-line">    <span class="kw">if</span> (ocean[r][c] || heights[r][c] &lt; prev) <span class="kw">return</span>;</div>
+<div id="line-10" class="code-line">    ocean[r][c] = <span class="kw">true</span>;</div>
+<div id="line-11" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> [dr, dc] <span class="kw">of</span> dirs) <span class="fn">dfs</span>(r + dr, c + dc, ocean, heights[r][c]);</div>
+<div id="line-12" class="code-line">  };</div>
+<div id="line-13" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="nm">0</span>; r &lt; rows; r++) {</div>
+<div id="line-14" class="code-line">    <span class="fn">dfs</span>(r, <span class="nm">0</span>, pac, -<span class="vr">Infinity</span>);</div>
+<div id="line-15" class="code-line">    <span class="fn">dfs</span>(r, cols - <span class="nm">1</span>, atl, -<span class="vr">Infinity</span>);</div>
+<div id="line-16" class="code-line">  }</div>
+<div id="line-17" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c &lt; cols; c++) {</div>
+<div id="line-18" class="code-line">    <span class="fn">dfs</span>(<span class="nm">0</span>, c, pac, -<span class="vr">Infinity</span>);</div>
+<div id="line-19" class="code-line">    <span class="fn">dfs</span>(rows - <span class="nm">1</span>, c, atl, -<span class="vr">Infinity</span>);</div>
+<div id="line-20" class="code-line">  }</div>
+<div id="line-21" class="code-line">  <span class="kw">const</span> res = [];</div>
+<div id="line-22" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="nm">0</span>; r &lt; rows; r++) {</div>
+<div id="line-23" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c &lt; cols; c++) {</div>
+<div id="line-24" class="code-line">      <span class="kw">if</span> (pac[r][c] &amp;&amp; atl[r][c]) res.<span class="fn">push</span>([r, c]);</div>
+<div id="line-25" class="code-line">    }</div>
+<div id="line-26" class="code-line">  }</div>
+<div id="line-27" class="code-line">  <span class="kw">return</span> res;</div>
+<div id="line-28" class="code-line">}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>DFS Visit Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables &amp; Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // DRAG LOGIC — verbatim from the reference visualizer.
+    // ============================================================
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // ============================================================
+    // HUD STATE — pinnable rows like the reference console.
+    // ============================================================
+    let pinned = {
+      phase: true,
+      cell: true,
+      pacCount: true,
+      atlCount: true,
+      res: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render();
+    }
+
+    // ============================================================
+    // EXAMPLES — height matrices.
+    // ============================================================
+    const examples = {
+      1: [[1,2,2,3,5],[3,2,3,4,4],[2,4,5,3,1],[6,7,1,4,5],[5,1,1,2,4]],
+      2: [[1]],
+      3: [[2,1],[1,2]],
+      4: [[1,2,3],[8,9,4],[7,6,5]]
+    };
+
+    // ============================================================
+    // STATE — index into a precomputed steps[] array.
+    // ============================================================
+    let heights = [];
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+
+    // ----- helpers to deep-copy snapshots -----
+    function cloneMatrix(m) {
+      return m.map(row => row.slice());
+    }
+
+    // ----- Precompute steps by running the real DFS -----
+    function buildSteps(grid) {
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const pac = Array.from({ length: rows }, () => new Array(cols).fill(false));
+      const atl = Array.from({ length: rows }, () => new Array(cols).fill(false));
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const built = [];
+      const traceRows = [];
+
+      function countTrue(m) {
+        let n = 0;
+        for (const row of m) for (const v of row) if (v) n++;
+        return n;
+      }
+
+      function snapshot(extra) {
+        built.push({
+          pac: cloneMatrix(pac),
+          atl: cloneMatrix(atl),
+          rows, cols,
+          phase: extra.phase,
+          ocean: extra.ocean === undefined ? null : extra.ocean,
+          cur: extra.cur === undefined ? null : extra.cur.slice(),
+          frontier: extra.frontier === undefined ? null : extra.frontier.slice(),
+          res: extra.res === undefined ? null : extra.res.map(p => p.slice()),
+          answerCells: extra.answerCells === undefined ? null : extra.answerCells.map(p => p.slice()),
+          lines: extra.lines,
+          narration: extra.narration,
+          pacCount: countTrue(pac),
+          atlCount: countTrue(atl),
+          traceLen: traceRows.length
+        });
+      }
+
+      // Initial setup snapshot
+      snapshot({
+        phase: "init",
+        lines: [2, 3, 4, 5, 6],
+        narration: "Set up <code>rows=" + rows + "</code>, <code>cols=" + cols + "</code>, and two boolean matrices <b>pac</b> and <b>atl</b> (all <span class='kw'>false</span>). Water flows from a cell to an equal-or-lower neighbor, so reaching an ocean means walking <b>uphill</b> inward from its border."
+      });
+
+      // A single DFS that records each visited cell as a step.
+      const dfs = (r, c, ocean, prev, oceanName) => {
+        if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+        if (ocean[r][c] || grid[r][c] < prev) return;
+        ocean[r][c] = true;
+        traceRows.push({
+          ocean: oceanName,
+          cell: "(" + r + "," + c + ")",
+          height: grid[r][c],
+          prev: prev === -Infinity ? "-∞" : prev,
+          note: "mark reachable"
+        });
+        snapshot({
+          phase: "dfs",
+          ocean: oceanName,
+          cur: [r, c],
+          lines: [10, 11],
+          narration: "Reach <b>(" + r + "," + c + ")</b> with height <b>" + grid[r][c] + "</b> &ge; prev <b>" + (prev === -Infinity ? "-∞" : prev) + "</b>. Mark it reachable from the <b class='ocean-" + oceanName + "'>" + (oceanName === "pac" ? "Pacific" : "Atlantic") + "</b> ocean, then recurse into the 4 neighbors (only flows uphill)."
+        });
+        for (const [dr, dc] of dirs) dfs(r + dr, c + dc, ocean, grid[r][c], oceanName);
+      };
+
+      // Pacific = top row + left column ; Atlantic = bottom row + right column.
+      for (let r = 0; r < rows; r++) {
+        snapshot({
+          phase: "seed",
+          ocean: "pac",
+          cur: [r, 0],
+          lines: [13, 14],
+          narration: "Seed the <b class='ocean-pac'>Pacific</b> DFS from the left-border cell <b>(" + r + ",0)</b> with prev = <b>-∞</b> (the ocean is lower than everything)."
+        });
+        dfs(r, 0, pac, -Infinity, "pac");
+        snapshot({
+          phase: "seed",
+          ocean: "atl",
+          cur: [r, cols - 1],
+          lines: [13, 15],
+          narration: "Seed the <b class='ocean-atl'>Atlantic</b> DFS from the right-border cell <b>(" + r + "," + (cols - 1) + ")</b> with prev = <b>-∞</b>."
+        });
+        dfs(r, cols - 1, atl, -Infinity, "atl");
+      }
+      for (let c = 0; c < cols; c++) {
+        snapshot({
+          phase: "seed",
+          ocean: "pac",
+          cur: [0, c],
+          lines: [17, 18],
+          narration: "Seed the <b class='ocean-pac'>Pacific</b> DFS from the top-border cell <b>(0," + c + ")</b> with prev = <b>-∞</b>."
+        });
+        dfs(0, c, pac, -Infinity, "pac");
+        snapshot({
+          phase: "seed",
+          ocean: "atl",
+          cur: [rows - 1, c],
+          lines: [17, 19],
+          narration: "Seed the <b class='ocean-atl'>Atlantic</b> DFS from the bottom-border cell <b>(" + (rows - 1) + "," + c + ")</b> with prev = <b>-∞</b>."
+        });
+        dfs(rows - 1, c, atl, -Infinity, "atl");
+      }
+
+      // Collect the intersection.
+      const res = [];
+      snapshot({
+        phase: "collect-start",
+        res: res,
+        lines: [21],
+        narration: "Both floods are done. Now scan every cell: a cell belongs to the answer when it is reachable from <b>both</b> oceans (<code>pac[r][c] && atl[r][c]</code>)."
+      });
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const both = pac[r][c] && atl[r][c];
+          if (both) {
+            res.push([r, c]);
+            traceRows.push({ ocean: "both", cell: "(" + r + "," + c + ")", height: grid[r][c], prev: "—", note: "added to res" });
+          }
+          snapshot({
+            phase: "collect",
+            cur: [r, c],
+            res: res,
+            lines: both ? [24] : [22, 23],
+            narration: both
+              ? "Cell <b>(" + r + "," + c + ")</b> is reachable from both oceans &rarr; <code>res.push([" + r + ", " + c + "])</code>."
+              : "Cell <b>(" + r + "," + c + ")</b> is " + (pac[r][c] ? "Pacific-only" : (atl[r][c] ? "Atlantic-only" : "neither")) + " &rarr; skip."
+          });
+        }
+      }
+
+      snapshot({
+        phase: "done",
+        res: res,
+        answerCells: res,
+        lines: [27],
+        narration: "<b>Finished.</b> <code>return res</code> &mdash; <b>" + res.length + "</b> cell(s) drain to both the Pacific and the Atlantic. They are highlighted in <b style='color:#d7ba7d'>gold</b>."
+      });
+
+      return built;
+    }
+
+    function gridToString(grid) {
+      return grid.map(row => row.join(",")).join("; ");
+    }
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      heights = examples[exNum].map(row => row.slice());
+      document.getElementById("custom-input").value = gridToString(heights);
+      init();
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      if (raw === "") {
+        alert("Enter a height grid, e.g. 1,2,2; 3,2,3; 2,4,5");
+        return;
+      }
+      const rowsRaw = raw.split(";").map(s => s.trim()).filter(s => s.length > 0);
+      const parsed = [];
+      let width = -1;
+      for (const rowRaw of rowsRaw) {
+        const cells = rowRaw.split(",").map(s => s.trim()).filter(s => s.length > 0).map(Number);
+        if (cells.length === 0 || cells.some(Number.isNaN)) {
+          alert("Each row must be comma-separated numbers. Example: 1,2,2; 3,2,3");
+          return;
+        }
+        if (width === -1) width = cells.length;
+        else if (cells.length !== width) {
+          alert("All rows must have the same number of columns.");
+          return;
+        }
+        parsed.push(cells);
+      }
+      heights = parsed;
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      steps = buildSteps(heights);
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    function currentStep() {
+      return steps[stepIndex];
+    }
+
+    function sameCell(a, b) {
+      return a && b && a[0] === b[0] && a[1] === b[1];
+    }
+
+    function inList(list, r, c) {
+      if (!list) return false;
+      return list.some(p => p[0] === r && p[1] === c);
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function renderBanner(st) {
+      const banner = document.createElement("div");
+      banner.className = "op-banner";
+
+      const call = document.createElement("div");
+      call.className = "op-call";
+      let label = "";
+      if (st.phase === "init") label = "setup pac / atl matrices";
+      else if (st.phase === "seed") label = (st.ocean === "pac" ? "Pacific" : "Atlantic") + " seed dfs(" + st.cur[0] + ", " + st.cur[1] + ")";
+      else if (st.phase === "dfs") label = (st.ocean === "pac" ? "Pacific" : "Atlantic") + " dfs visit (" + st.cur[0] + ", " + st.cur[1] + ")";
+      else if (st.phase === "collect-start") label = "collect intersection";
+      else if (st.phase === "collect") label = "check (" + st.cur[0] + ", " + st.cur[1] + ")";
+      else label = "return res";
+      call.innerHTML = '<span class="keyhl">' + label + '</span>';
+      banner.appendChild(call);
+
+      const legend = document.createElement("div");
+      legend.className = "legend";
+      legend.innerHTML =
+        '<span class="legend-item"><span class="legend-swatch" style="background:#16384f;border-color:#569cd6"></span>Pacific</span>' +
+        '<span class="legend-item"><span class="legend-swatch" style="background:#163f33;border-color:#6a9955"></span>Atlantic</span>' +
+        '<span class="legend-item"><span class="legend-swatch" style="background:#3a2f12;border-color:#d7ba7d"></span>Both (answer)</span>';
+      banner.appendChild(legend);
+      return banner;
+    }
+
+    function renderGrid(st) {
+      const wrap = document.createElement("div");
+      wrap.className = "grid-wrap";
+
+      for (let r = 0; r < st.rows; r++) {
+        const rowEl = document.createElement("div");
+        rowEl.className = "grid-row";
+        for (let c = 0; c < st.cols; c++) {
+          const cell = document.createElement("div");
+          cell.className = "gcell";
+
+          const p = st.pac[r][c];
+          const a = st.atl[r][c];
+          const isAnswer = st.answerCells && inList(st.answerCells, r, c);
+          if (isAnswer || (p && a)) cell.classList.add("both");
+          else if (p) cell.classList.add("pac");
+          else if (a) cell.classList.add("atl");
+
+          if (sameCell(st.cur, [r, c])) {
+            cell.classList.add("current");
+            if (st.phase === "dfs" || st.phase === "seed") cell.classList.add("frontier");
+          }
+          if (isAnswer) cell.classList.add("answer");
+
+          const coord = document.createElement("div");
+          coord.className = "coord";
+          coord.textContent = r + "," + c;
+          cell.appendChild(coord);
+
+          const val = document.createElement("div");
+          val.textContent = heights[r][c];
+          cell.appendChild(val);
+
+          const mark = document.createElement("div");
+          mark.className = "flowmark";
+          if (p && a) { mark.textContent = "PA"; mark.style.color = "#d7ba7d"; }
+          else if (p) { mark.textContent = "P"; mark.style.color = "#569cd6"; }
+          else if (a) { mark.textContent = "A"; mark.style.color = "#6a9955"; }
+          cell.appendChild(mark);
+
+          rowEl.appendChild(cell);
+        }
+        wrap.appendChild(rowEl);
+      }
+      return wrap;
+    }
+
+    function renderResultCard(st) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = "res (cells draining to BOTH oceans)";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (st.phase === "done") value.classList.add("done");
+      const list = st.res || [];
+      value.textContent = list.length === 0
+        ? (st.phase === "done" ? "[]" : "—")
+        : "[" + list.map(p => "[" + p[0] + "," + p[1] + "]").join(", ") + "]";
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(st) {
+      const traceUi = document.getElementById("trace-ui");
+      const shown = masterTrace.slice(0, st.traceLen);
+      if (shown.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No cells visited yet. Step through to flood from each ocean border.</div>';
+        return;
+      }
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr><th>#</th><th>ocean</th><th>cell</th><th>height</th><th>prev</th><th>action</th></tr>
+          </thead>
+          <tbody>
+      `;
+      // show only the last ~14 rows so the table stays readable
+      const start = Math.max(0, shown.length - 14);
+      for (let i = start; i < shown.length; i++) {
+        const row = shown[i];
+        const isActive = i === shown.length - 1;
+        const isHit = row.ocean === "both";
+        const trClass = isActive ? "active-trace" : (isHit ? "hit-trace" : "");
+        const oceanColor = row.ocean === "pac" ? "#569cd6" : (row.ocean === "atl" ? "#6a9955" : "#d7ba7d");
+        html += `
+          <tr class="${trClass}">
+            <td>${i + 1}</td>
+            <td><span style="color:${oceanColor};font-weight:bold">${row.ocean}</span></td>
+            <td>${row.cell}</td>
+            <td><span class="nm">${row.height}</span></td>
+            <td>${row.prev}</td>
+            <td>${row.note}</td>
+          </tr>
+        `;
+      }
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    // Build a flat master trace so renderTrace can slice it by traceLen.
+    let masterTrace = [];
+    function buildMasterTrace(grid) {
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const pac = Array.from({ length: rows }, () => new Array(cols).fill(false));
+      const atl = Array.from({ length: rows }, () => new Array(cols).fill(false));
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const rowsOut = [];
+      const dfs = (r, c, ocean, prev, name) => {
+        if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+        if (ocean[r][c] || grid[r][c] < prev) return;
+        ocean[r][c] = true;
+        rowsOut.push({ ocean: name, cell: "(" + r + "," + c + ")", height: grid[r][c], prev: prev === -Infinity ? "-∞" : prev, note: "mark reachable" });
+        for (const [dr, dc] of dirs) dfs(r + dr, c + dc, ocean, grid[r][c], name);
+      };
+      for (let r = 0; r < rows; r++) { dfs(r, 0, pac, -Infinity, "pac"); dfs(r, cols - 1, atl, -Infinity, "atl"); }
+      for (let c = 0; c < cols; c++) { dfs(0, c, pac, -Infinity, "pac"); dfs(rows - 1, c, atl, -Infinity, "atl"); }
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        if (pac[r][c] && atl[r][c]) rowsOut.push({ ocean: "both", cell: "(" + r + "," + c + ")", height: grid[r][c], prev: "—", note: "added to res" });
+      }
+      return rowsOut;
+    }
+
+    function render() {
+      masterTrace = buildMasterTrace(heights);
+      const st = currentStep();
+
+      document.getElementById("btn-prev").disabled = stepIndex <= 0;
+      if (stepIndex >= steps.length - 1 && steps.length > 0) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      highlightLines(st.lines);
+      narrate(st.narration);
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+      visualUi.appendChild(renderBanner(st));
+      visualUi.appendChild(renderGrid(st));
+      visualUi.appendChild(renderResultCard(st));
+
+      renderTrace(st);
+
+      // Console (Variables & Outputs)
+      const phaseDisplay = '<span class="str">"' + st.phase + '"</span>';
+      const cellDisplay = st.cur === null ? '<span class="kw">—</span>' : '<span class="nm">[' + st.cur[0] + ',' + st.cur[1] + ']</span>';
+      const resDisplay = st.res === null
+        ? '<span class="kw">[]</span>'
+        : '<span class="op">[' + st.res.map(p => "[" + p[0] + "," + p[1] + "]").join(",") + ']</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Input height grid</span><br>' +
+        '<span class="kw">const</span> heights = [' + heights.map(r => "[" + r.join(",") + "]").join(", ") + '];<br><br>' +
+        '<span class="cm">// Live state</span><br>' +
+        createConsoleLine("phase", "let", "phase", phaseDisplay) +
+        createConsoleLine("cell", "let", "cell", cellDisplay) +
+        createConsoleLine("pacCount", "let", "pac.true", '<span class="nm">' + st.pacCount + '</span>') +
+        createConsoleLine("atlCount", "let", "atl.true", '<span class="nm">' + st.atlCount + '</span>') +
+        '<br><span class="cm">// Output</span><br>' +
+        createConsoleLine("res", "const", "res", resDisplay);
+
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        phase: st.phase,
+        cell: st.cur === null ? "—" : "[" + st.cur[0] + "," + st.cur[1] + "]",
+        pacCount: st.pacCount,
+        atlCount: st.atlCount,
+        res: (st.res || []).length
+      };
+      for (const [k, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + k + ':</span> <span class="hud-val">' + hudMap[k] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot.
+    heights = examples[1].map(row => row.slice());
+    document.getElementById("custom-input").value = gridToString(heights);
+    init();
+  </script>
+</body>
+</html>
