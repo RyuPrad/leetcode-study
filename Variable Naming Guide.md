@@ -399,6 +399,28 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Word Ladder:** `beginWord`, `endWord`, `wordList`, `words`, `queue`, `visited`, `level`, `cand`
 
+### Advanced Graphs
+
+**Path with Minimum Effort:** `heights`, `rows`, `cols`, `effort`, `heap`, `dirs`, `e`, `r`, `c`, `nr`, `nc`, `ne`
+
+**Network Delay Time:** `times`, `n`, `k`, `adj`, `dist`, `heap`, `node`, `nei`, `w`, `ans`
+
+**Reconstruct Itinerary:** `tickets`, `adj`, `dests`, `res`, `visit`, `airport`, `next`
+
+**Min Cost to Connect All Points:** `points`, `n`, `inMST`, `heap`, `total`, `count`, `cost`, `i`, `j`, `d`
+
+**Swim in Rising Water:** `grid`, `n`, `time`, `heap`, `dirs`, `t`, `r`, `c`, `nr`, `nc`, `nt`
+
+**Alien Dictionary:** `words`, `adj`, `indegree`, `w1`, `w2`, `minLen`, `queue`, `res`, `ch`, `nei`
+
+**Cheapest Flights Within K Stops:** `n`, `flights`, `src`, `dst`, `k`, `dist`, `tmp`, `u`, `v`, `w`
+
+**Find Critical and Pseudo-Critical Edges in Minimum Spanning Tree:** `n`, `edges`, `indexed`, `dsu`, `parent`, `buildMST`, `weight`, `mstWeight`, `critical`, `pseudo`
+
+**Build a Matrix With Conditions:** `k`, `rowConditions`, `colConditions`, `adj`, `indeg`, `order`, `rowPos`, `colPos`, `matrix`, `v`
+
+**Greatest Common Divisor Traversal:** `nums`, `n`, `dsu`, `parent`, `primeToIndex`, `x`, `p`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:

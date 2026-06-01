@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 1489. Find Critical and Pseudo-Critical Edges Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* VISUALIZATION */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px 6px;
+      min-height: 340px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .phase-banner {
+      font-family: Consolas, monospace;
+      background: var(--panel2);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--cyan);
+    }
+    .phase-banner b { color: var(--yellow); }
+
+    .panel-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 720px) { .panel-split { grid-template-columns: 1fr; } }
+
+    .sub-label {
+      font-family: Consolas, monospace;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Graph SVG */
+    .graph-wrap {
+      position: relative;
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid #444;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .graph-svg { display: block; width: 100%; height: 280px; }
+
+    .edge-line { stroke: #3a3a3a; stroke-width: 2; transition: all 0.2s ease; }
+    .edge-line.considering { stroke: var(--yellow); stroke-width: 3.5; }
+    .edge-line.intree { stroke: var(--green); stroke-width: 4; }
+    .edge-line.skipped { stroke: var(--red); stroke-width: 2; stroke-dasharray: 4 4; opacity: 0.5; }
+    .edge-line.forced { stroke: var(--blue); stroke-width: 4; }
+    .edge-line.rejected { stroke: #555; stroke-width: 1.5; stroke-dasharray: 3 4; opacity: 0.4; }
+
+    .edge-label { font-family: Consolas, monospace; font-size: 11px; fill: var(--muted); }
+    .edge-label.intree { fill: var(--greenText); font-weight: bold; }
+    .edge-label.considering { fill: var(--yellow); font-weight: bold; }
+    .edge-label.forced { fill: var(--blue); font-weight: bold; }
+
+    .node-circle { stroke: #666; stroke-width: 2; fill: var(--panel2); transition: all 0.2s ease; }
+    .node-label { font-family: Consolas, monospace; font-size: 14px; font-weight: bold; fill: var(--cyan); text-anchor: middle; }
+
+    /* DSU forest as parent-pointer pills */
+    .dsu-box {
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 12px;
+    }
+    .dsu-cells {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dsu-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+    .dsu-node {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #555; border-radius: 8px;
+      background: var(--panel2); color: var(--cyan);
+      font-weight: bold; font-size: 15px;
+      transition: all 0.2s ease;
+    }
+    .dsu-node.root { border-color: var(--green); background: #26472d; color: var(--greenText); }
+    .dsu-node.touched { border-color: var(--yellow); box-shadow: 0 0 10px rgba(215,186,125,0.4); transform: scale(1.08); }
+    .dsu-arrow { color: var(--muted); font-size: 11px; }
+    .dsu-count {
+      margin-top: 8px; font-family: Consolas, monospace; font-size: 13px; color: var(--cyan);
+    }
+    .dsu-count b { color: var(--greenText); }
+
+    /* Sorted edge list with classifications */
+    .edge-table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
+    .edge-table th, .edge-table td { border-bottom: 1px solid #333; padding: 6px 8px; text-align: center; }
+    .edge-table th { color: var(--cyan); background: var(--panel2); }
+    .edge-table tr.active-edge { background: #3a3320; }
+    .edge-table tr.intree-edge { background: rgba(106,153,85,0.12); }
+    .badge {
+      display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: bold;
+    }
+    .badge.critical { background: #4a2525; color: #ffb3b3; border: 1px solid var(--red); }
+    .badge.pseudo { background: #1e3a5c; color: var(--cyan); border: 1px solid var(--blue); }
+    .badge.none { background: #2d2d30; color: var(--muted); border: 1px solid #444; }
+    .badge.pending { background: #2d2d30; color: #666; border: 1px solid #3c3c3c; }
+
+    .result-card {
+      margin-top: 4px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+    }
+    .result-label { color: var(--cyan); }
+    .result-value {
+      font-size: 16px; font-weight: bold; padding: 5px 12px; border-radius: 4px;
+      color: var(--greenText); background: var(--panel2);
+    }
+    .result-value.done { background: #26472d; border: 1px solid var(--green); box-shadow: 0 0 14px rgba(106,153,85,0.4); }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace { background: #062f4a; }
+    .trace-table tr.crit-trace { background: rgba(226, 75, 74, 0.14); }
+    .trace-table tr.pseudo-trace { background: rgba(86, 156, 214, 0.14); }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 1489. Find Critical and Pseudo-Critical Edges in Minimum Spanning Tree</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">&#x22EE;&#x22EE; DRAG CONTROLS &#x22EE;&#x22EE;</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">LC ex1 (n=5)</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">LC ex2 (all pseudo)</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">triangle</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">parallel ties</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-5" class="btn-ex" onclick="loadExample(5)">bridge</button>
+      <button id="btn-ex-6" class="btn-ex" onclick="loadExample(6)">square + diag</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="5 | [0,1,1],[1,2,1],[2,3,2],[0,3,2],[0,4,3],[3,4,3],[1,4,6]" placeholder="n | [u,v,w],[u,v,w]" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>Kruskal MST &mdash; DSU Forest &amp; Edge Classification</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">DSU</span> {</div>
+<div id="line-2" class="code-line">  <span class="fn">constructor</span>(n) {</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) =&gt; i);</div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.count = n;</div>
+<div id="line-5" class="code-line">  }</div>
+<div id="line-6" class="code-line">  <span class="fn">find</span>(x) {</div>
+<div id="line-7" class="code-line">    <span class="kw">while</span> (<span class="kw">this</span>.parent[x] !== x) {</div>
+<div id="line-8" class="code-line">      <span class="kw">this</span>.parent[x] = <span class="kw">this</span>.parent[<span class="kw">this</span>.parent[x]];</div>
+<div id="line-9" class="code-line">      x = <span class="kw">this</span>.parent[x];</div>
+<div id="line-10" class="code-line">    }</div>
+<div id="line-11" class="code-line">    <span class="kw">return</span> x;</div>
+<div id="line-12" class="code-line">  }</div>
+<div id="line-13" class="code-line">  <span class="fn">union</span>(a, b) {</div>
+<div id="line-14" class="code-line">    <span class="kw">const</span> ra = <span class="kw">this</span>.<span class="fn">find</span>(a), rb = <span class="kw">this</span>.<span class="fn">find</span>(b);</div>
+<div id="line-15" class="code-line">    <span class="kw">if</span> (ra === rb) <span class="kw">return</span> <span class="kw">false</span>;</div>
+<div id="line-16" class="code-line">    <span class="kw">this</span>.parent[ra] = rb;</div>
+<div id="line-17" class="code-line">    <span class="kw">this</span>.count--;</div>
+<div id="line-18" class="code-line">    <span class="kw">return</span> <span class="kw">true</span>;</div>
+<div id="line-19" class="code-line">  }</div>
+<div id="line-20" class="code-line">}</div>
+<div id="line-21" class="code-line"><span class="kw">function</span> <span class="fn">findCriticalAndPseudoCriticalEdges</span>(n, edges) {</div>
+<div id="line-22" class="code-line">  <span class="kw">const</span> indexed = edges.<span class="fn">map</span>((e, i) =&gt; [e[<span class="nm">0</span>], e[<span class="nm">1</span>], e[<span class="nm">2</span>], i]);</div>
+<div id="line-23" class="code-line">  indexed.<span class="fn">sort</span>((a, b) =&gt; a[<span class="nm">2</span>] - b[<span class="nm">2</span>]);</div>
+<div id="line-24" class="code-line">  <span class="kw">const</span> <span class="fn">buildMST</span> = (skip, force) =&gt; {</div>
+<div id="line-25" class="code-line">    <span class="kw">const</span> dsu = <span class="kw">new</span> <span class="vr">DSU</span>(n);</div>
+<div id="line-26" class="code-line">    <span class="kw">let</span> weight = <span class="nm">0</span>;</div>
+<div id="line-27" class="code-line">    <span class="kw">if</span> (force !== -<span class="nm">1</span>) { dsu.<span class="fn">union</span>(indexed[force][<span class="nm">0</span>], indexed[force][<span class="nm">1</span>]); weight += indexed[force][<span class="nm">2</span>]; }</div>
+<div id="line-28" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; indexed.length; i++) {</div>
+<div id="line-29" class="code-line">      <span class="kw">if</span> (i === skip) <span class="kw">continue</span>;</div>
+<div id="line-30" class="code-line">      <span class="kw">if</span> (dsu.<span class="fn">union</span>(indexed[i][<span class="nm">0</span>], indexed[i][<span class="nm">1</span>])) weight += indexed[i][<span class="nm">2</span>];</div>
+<div id="line-31" class="code-line">    }</div>
+<div id="line-32" class="code-line">    <span class="kw">return</span> dsu.count === <span class="nm">1</span> ? weight : <span class="vr">Infinity</span>;</div>
+<div id="line-33" class="code-line">  };</div>
+<div id="line-34" class="code-line">  <span class="kw">const</span> mstWeight = <span class="fn">buildMST</span>(-<span class="nm">1</span>, -<span class="nm">1</span>);</div>
+<div id="line-35" class="code-line">  <span class="kw">const</span> critical = [], pseudo = [];</div>
+<div id="line-36" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; indexed.length; i++) {</div>
+<div id="line-37" class="code-line">    <span class="kw">if</span> (<span class="fn">buildMST</span>(i, -<span class="nm">1</span>) &gt; mstWeight) critical.<span class="fn">push</span>(indexed[i][<span class="nm">3</span>]);</div>
+<div id="line-38" class="code-line">    <span class="kw">else</span> <span class="kw">if</span> (<span class="fn">buildMST</span>(-<span class="nm">1</span>, i) === mstWeight) pseudo.<span class="fn">push</span>(indexed[i][<span class="nm">3</span>]);</div>
+<div id="line-39" class="code-line">  }</div>
+<div id="line-40" class="code-line">  <span class="kw">return</span> [critical, pseudo];</div>
+<div id="line-41" class="code-line">}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>Edge Classification Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables &amp; Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // DRAG LOGIC — verbatim from the reference visualizer.
+    // ============================================================
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        // Some iframe hosts block fullscreen unless the iframe has allowfullscreen.
+        // Since this runs from a user click, opening the visualizer directly is a useful fallback.
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // ============================================================
+    // HUD STATE — pinnable rows like the reference console.
+    // ============================================================
+    let pinned = {
+      phase: true,
+      mstWeight: true,
+      weight: true,
+      critical: true,
+      pseudo: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render();
+    }
+
+    // ============================================================
+    // EXAMPLES — { n, edges: [[u,v,w], ...] }
+    // ============================================================
+    const examples = {
+      1: { n: 5, edges: [[0,1,1],[1,2,1],[2,3,2],[0,3,2],[0,4,3],[3,4,3],[1,4,6]] },
+      2: { n: 4, edges: [[0,1,1],[1,2,1],[2,3,1],[0,3,1]] },
+      3: { n: 3, edges: [[0,1,1],[1,2,2],[0,2,3]] },
+      4: { n: 3, edges: [[0,1,2],[0,1,2],[1,2,1]] },
+      5: { n: 4, edges: [[0,1,1],[1,2,5],[2,3,1]] },
+      6: { n: 4, edges: [[0,1,1],[1,2,1],[2,3,1],[3,0,1],[0,2,2]] }
+    };
+
+    // ============================================================
+    // STATE — index into a precomputed steps[] array.
+    // ============================================================
+    let inputN = 0;
+    let inputEdges = [];
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+    let finalAnswer = [[], []];
+    let sortedEdges = [];   // the `indexed` array, sorted (for static display reference)
+
+    // ---------- The REAL solution (modern operators) ----------
+    class DSU {
+      constructor(n) { this.parent = Array.from({ length: n }, (_, i) => i); this.count = n; }
+      find(x) { while (this.parent[x] !== x) { this.parent[x] = this.parent[this.parent[x]]; x = this.parent[x]; } return x; }
+      union(a, b) { const ra = this.find(a), rb = this.find(b); if (ra === rb) return false; this.parent[ra] = rb; this.count--; return true; }
+    }
+
+    function findCriticalAndPseudoCriticalEdges(n, edges) {
+      const indexed = edges.map((e, i) => [e[0], e[1], e[2], i]);
+      indexed.sort((a, b) => a[2] - b[2]);
+      const buildMST = (skip, force) => {
+        const dsu = new DSU(n);
+        let weight = 0;
+        if (force !== -1) { dsu.union(indexed[force][0], indexed[force][1]); weight += indexed[force][2]; }
+        for (let i = 0; i < indexed.length; i++) {
+          if (i === skip) continue;
+          if (dsu.union(indexed[i][0], indexed[i][1])) weight += indexed[i][2];
+        }
+        return dsu.count === 1 ? weight : Infinity;
+      };
+      const mstWeight = buildMST(-1, -1);
+      const critical = [], pseudo = [];
+      for (let i = 0; i < indexed.length; i++) {
+        if (buildMST(i, -1) > mstWeight) critical.push(indexed[i][3]);
+        else if (buildMST(-1, i) === mstWeight) pseudo.push(indexed[i][3]);
+      }
+      return [critical, pseudo];
+    }
+
+    // ============================================================
+    // BUILD STEPS — instrumented re-implementation of the SAME
+    // algorithm. Each step deep-copies the DSU parent + count, the
+    // current weight, the running classification arrays, and the
+    // active edge index so Step Back is exactly reversible.
+    // ============================================================
+    function buildSteps(n, edges) {
+      const built = [];
+      const traceRows = [];
+
+      // Build the indexed + sorted edge array (origIdx kept in slot 3).
+      const indexed = edges.map((e, i) => [e[0], e[1], e[2], i]);
+      indexed.sort((a, b) => a[2] - b[2]);
+
+      const critical = [];
+      const pseudo = [];
+      let mstWeight = Infinity;
+      // classify[sortedPos] = "critical" | "pseudo" | "none" | "pending"
+      const classify = indexed.map(() => "pending");
+
+      // Helper: instrumented buildMST that pushes snapshots while running.
+      // phase describes the current run ("baseline" | "skip i" | "force i").
+      function snapshot(extra) {
+        built.push({
+          parent: extra.parent ? extra.parent.slice() : null,
+          dsuCount: (extra.dsuCount === undefined) ? null : extra.dsuCount,
+          weight: (extra.weight === undefined) ? null : extra.weight,
+          mstWeight,
+          critical: critical.slice(),
+          pseudo: pseudo.slice(),
+          classify: classify.slice(),
+          phase: extra.phase,
+          phaseLabel: extra.phaseLabel,
+          curEdgePos: (extra.curEdgePos === undefined) ? null : extra.curEdgePos,    // pos in sorted list
+          edgeState: (extra.edgeState === undefined) ? null : extra.edgeState,        // map sortedPos -> visual state
+          touched: (extra.touched === undefined) ? [] : extra.touched,
+          skip: (extra.skip === undefined) ? -1 : extra.skip,
+          force: (extra.force === undefined) ? -1 : extra.force,
+          lines: extra.lines,
+          narration: extra.narration,
+          traceLen: traceRows.length,
+          done: (extra.done === undefined) ? false : extra.done
+        });
+      }
+
+      // Runs Kruskal with optional skip/force, snapshotting each union attempt.
+      // Returns final weight (Infinity if disconnected). edgeStateAcc is mutated
+      // to reflect the visual state of each sorted edge for the run.
+      function runBuildMST(skip, force, phase, phaseLabel, lineMap) {
+        const dsu = new DSU(n);
+        let weight = 0;
+        const edgeState = {}; // sortedPos -> 'intree'|'rejected'|'skipped'|'forced'
+
+        // forced edge first
+        if (force !== -1) {
+          const fe = indexed[force];
+          dsu.union(fe[0], fe[1]);
+          weight += fe[2];
+          edgeState[force] = "forced";
+          snapshot({
+            parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel,
+            curEdgePos: force, edgeState: { ...edgeState }, touched: [fe[0], fe[1]],
+            skip, force, lines: lineMap.force,
+            narration: "<b>Force</b> edge #" + fe[3] + " <code>(" + fe[0] + "&ndash;" + fe[1] + ", w=" + fe[2] + ")</code> into the tree first: <code>union(" + fe[0] + ", " + fe[1] + ")</code>, <code>weight = " + weight + "</code>. Now build the rest of the MST around it."
+          });
+        }
+
+        for (let i = 0; i < indexed.length; i++) {
+          if (i === skip) {
+            edgeState[i] = "skipped";
+            const se = indexed[i];
+            snapshot({
+              parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel,
+              curEdgePos: i, edgeState: { ...edgeState }, skip, force, lines: lineMap.skip,
+              narration: "<code>i === skip</code> &mdash; <b>skip</b> edge #" + se[3] + " <code>(" + se[0] + "&ndash;" + se[1] + ", w=" + se[2] + ")</code>. Pretend it does not exist and <code>continue</code>."
+            });
+            continue;
+          }
+          const e = indexed[i];
+          const ra = dsu.find(e[0]), rb = dsu.find(e[1]);
+          const joins = ra !== rb;
+          if (joins) {
+            dsu.union(e[0], e[1]);
+            weight += e[2];
+            if (edgeState[i] !== "forced") edgeState[i] = "intree";
+            snapshot({
+              parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel,
+              curEdgePos: i, edgeState: { ...edgeState }, touched: [e[0], e[1]],
+              skip, force, lines: lineMap.union,
+              narration: "Edge #" + e[3] + " <code>(" + e[0] + "&ndash;" + e[1] + ", w=" + e[2] + ")</code>: roots <code>find(" + e[0] + ")=" + ra + "</code>, <code>find(" + e[1] + ")=" + rb + "</code> differ &rarr; <code>union</code> joins two components. <code>weight += " + e[2] + "</code> &rarr; <b>" + weight + "</b>."
+            });
+          } else {
+            edgeState[i] = "rejected";
+            snapshot({
+              parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel,
+              curEdgePos: i, edgeState: { ...edgeState }, touched: [e[0], e[1]],
+              skip, force, lines: lineMap.union,
+              narration: "Edge #" + e[3] + " <code>(" + e[0] + "&ndash;" + e[1] + ", w=" + e[2] + ")</code>: both ends share root <code>" + ra + "</code> &rarr; <code>union</code> returns <code>false</code> (a cycle). Reject it."
+            });
+          }
+        }
+
+        const result = dsu.count === 1 ? weight : Infinity;
+        snapshot({
+          parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel,
+          edgeState: { ...edgeState }, skip, force, lines: lineMap.ret,
+          narration: dsu.count === 1
+            ? "All " + n + " nodes are in one component (<code>dsu.count === 1</code>). This spanning tree's weight is <b>" + weight + "</b>."
+            : "<code>dsu.count = " + dsu.count + "</code> &ne; 1 &mdash; the graph is <b>disconnected</b> this way, so <code>buildMST</code> returns <code>Infinity</code>."
+        });
+
+        return { result, edgeState };
+      }
+
+      // ---- Setup ----
+      snapshot({
+        phase: "setup", phaseLabel: "Setup",
+        edgeState: {}, lines: [22, 23],
+        narration: "<b>Index</b> each edge with its original position (slot 3), then <b>sort</b> all " + indexed.length + " edges by weight. Kruskal always considers edges cheapest-first."
+      });
+
+      // ---- Baseline MST ----
+      const base = runBuildMST(-1, -1, "baseline", "buildMST(-1, -1) &mdash; baseline MST", {
+        force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+      });
+      mstWeight = base.result;
+      // mark which edges are in the baseline tree (helps visualization on later phases)
+      snapshot({
+        phase: "baseline-done", phaseLabel: "Baseline complete",
+        edgeState: { ...base.edgeState }, lines: [34],
+        narration: "Baseline <code>mstWeight = " + mstWeight + "</code>. Now test every edge: is it <b>critical</b> (the MST is worse without it) or <b>pseudo-critical</b> (it can belong to some MST)?"
+      });
+
+      // ---- Per-edge classification ----
+      for (let i = 0; i < indexed.length; i++) {
+        const e = indexed[i];
+
+        // Phase A: skip edge i.
+        snapshot({
+          phase: "classify-start", phaseLabel: "Edge #" + e[3] + " &mdash; test critical",
+          edgeState: { [i]: "considering" }, curEdgePos: i, lines: [36, 37],
+          touched: [e[0], e[1]],
+          narration: "Classify edge #" + e[3] + " <code>(" + e[0] + "&ndash;" + e[1] + ", w=" + e[2] + ")</code>. First run <code>buildMST(skip = " + i + ")</code> &mdash; rebuild the MST <b>without</b> this edge."
+        });
+
+        const skipRun = runBuildMST(i, -1, "skip", "buildMST(" + i + ", -1) &mdash; without edge #" + e[3], {
+          force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+        });
+
+        if (skipRun.result > mstWeight) {
+          critical.push(e[3]);
+          classify[i] = "critical";
+          traceRows.push({ origIdx: e[3], u: e[0], v: e[1], w: e[2], skipW: skipRun.result, forceW: "&mdash;", cls: "critical" });
+          snapshot({
+            phase: "classified", phaseLabel: "Edge #" + e[3] + " is CRITICAL",
+            edgeState: { ...skipRun.edgeState }, curEdgePos: i, lines: [37],
+            narration: "Without edge #" + e[3] + ", the best MST weighs <b>" + (skipRun.result === Infinity ? "&infin; (disconnected)" : skipRun.result) + "</b> &gt; <code>mstWeight (" + mstWeight + ")</code>. Removing it hurts &mdash; edge #" + e[3] + " is <b style=\"color:#e24b4a\">CRITICAL</b>. Push to <code>critical</code>."
+          });
+          continue;
+        }
+
+        // Phase B: force edge i (only reached when skip did NOT make it worse).
+        snapshot({
+          phase: "force-start", phaseLabel: "Edge #" + e[3] + " &mdash; test pseudo-critical",
+          edgeState: { [i]: "considering" }, curEdgePos: i, lines: [38],
+          touched: [e[0], e[1]],
+          narration: "Skipping edge #" + e[3] + " still gave weight <b>" + skipRun.result + " === mstWeight</b>, so it is <b>not</b> critical. Now run <code>buildMST(force = " + i + ")</code> &mdash; force it in and see if an MST still has weight <code>mstWeight</code>."
+        });
+
+        const forceRun = runBuildMST(-1, i, "force", "buildMST(-1, " + i + ") &mdash; forcing edge #" + e[3], {
+          force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+        });
+
+        if (forceRun.result === mstWeight) {
+          pseudo.push(e[3]);
+          classify[i] = "pseudo";
+          traceRows.push({ origIdx: e[3], u: e[0], v: e[1], w: e[2], skipW: skipRun.result, forceW: forceRun.result, cls: "pseudo" });
+          snapshot({
+            phase: "classified", phaseLabel: "Edge #" + e[3] + " is PSEUDO-CRITICAL",
+            edgeState: { ...forceRun.edgeState }, curEdgePos: i, lines: [38],
+            narration: "Forcing edge #" + e[3] + " yields an MST of weight <b>" + forceRun.result + " === mstWeight</b>. It belongs to <b>some</b> optimal MST &mdash; edge #" + e[3] + " is <b style=\"color:#569cd6\">PSEUDO-CRITICAL</b>. Push to <code>pseudo</code>."
+          });
+        } else {
+          classify[i] = "none";
+          traceRows.push({ origIdx: e[3], u: e[0], v: e[1], w: e[2], skipW: skipRun.result, forceW: forceRun.result, cls: "none" });
+          snapshot({
+            phase: "classified", phaseLabel: "Edge #" + e[3] + " is neither",
+            edgeState: { ...forceRun.edgeState }, curEdgePos: i, lines: [38, 39],
+            narration: "Forcing edge #" + e[3] + " gives weight <b>" + forceRun.result + " &gt; mstWeight (" + mstWeight + ")</b>. It is in no optimal MST &mdash; neither critical nor pseudo-critical."
+          });
+        }
+      }
+
+      // ---- Final answer ----
+      snapshot({
+        phase: "done", phaseLabel: "Finished", done: true,
+        edgeState: {}, lines: [40],
+        narration: "Every edge classified. <code>return [critical, pseudo]</code> = <b>[[" + critical.join(",") + "], [" + pseudo.join(",") + "]]</b>."
+      });
+
+      return { built, traceRows, answer: [critical.slice(), pseudo.slice()], indexed };
+    }
+
+    // ============================================================
+    // Graph layout: nodes on a circle.
+    // ============================================================
+    const VW = 560, VH = 280;
+    function computeLayout(n) {
+      const cx = VW / 2, cy = VH / 2;
+      const R = Math.min(VW, VH) / 2 - 40;
+      const pos = [];
+      for (let k = 0; k < n; k++) {
+        const ang = -Math.PI / 2 + (2 * Math.PI * k) / n;
+        pos.push({ x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) });
+      }
+      return pos;
+    }
+    let layout = [];
+    let indexedCache = [];
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      inputN = examples[exNum].n;
+      inputEdges = examples[exNum].edges.map(e => e.slice());
+      document.getElementById("custom-input").value = toInputString(inputN, inputEdges);
+      init();
+    }
+
+    function toInputString(n, edges) {
+      return n + " | " + edges.map(e => "[" + e[0] + "," + e[1] + "," + e[2] + "]").join(",");
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      const barIdx = raw.indexOf("|");
+      if (barIdx === -1) {
+        alert("Format: n | [u,v,w],[u,v,w]  e.g.  5 | [0,1,1],[1,2,1]");
+        return;
+      }
+      const nPart = raw.slice(0, barIdx).trim();
+      const n = Number(nPart);
+      if (!Number.isInteger(n) || n < 1 || n > 9) {
+        alert("n must be an integer from 1 to 9 (kept small so the graph stays readable). Got: " + nPart);
+        return;
+      }
+      const edgePart = raw.slice(barIdx + 1);
+      const matches = edgePart.match(/\[\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*\]/g);
+      if (!matches || matches.length === 0) {
+        alert("Could not parse edges. Use [u,v,w],[u,v,w] e.g. [0,1,1],[1,2,1].");
+        return;
+      }
+      const parsed = matches.map(m => {
+        const nums = m.replace(/[\[\]\s]/g, "").split(",").map(Number);
+        return [nums[0], nums[1], nums[2]];
+      });
+      for (const e of parsed) {
+        if (e.some(Number.isNaN) || e[0] < 0 || e[1] < 0 || e[0] >= n || e[1] >= n) {
+          alert("Each edge is [u,v,w] with 0 <= u,v < n. Bad edge near: [" + e.join(",") + "] (n=" + n + ").");
+          return;
+        }
+      }
+      inputN = n;
+      inputEdges = parsed;
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      const result = buildSteps(inputN, inputEdges);
+      steps = result.built;
+      finalAnswer = result.answer;
+      indexedCache = result.indexed;
+      layout = computeLayout(inputN);
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    function currentStep() {
+      if (steps.length === 0) {
+        return {
+          parent: null, dsuCount: null, weight: null, mstWeight: Infinity,
+          critical: [], pseudo: [], classify: [], phase: "setup", phaseLabel: "Setup",
+          curEdgePos: null, edgeState: {}, touched: [], skip: -1, force: -1,
+          lines: [21], narration: "No input.", traceLen: 0, done: false
+        };
+      }
+      return steps[stepIndex];
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function fmtInf(v) { return v === Infinity ? "&infin;" : v; }
+
+    // ---------- Graph SVG render ----------
+    function renderGraph(st) {
+      const wrap = document.createElement("div");
+      wrap.className = "graph-wrap";
+
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("class", "graph-svg");
+      svg.setAttribute("viewBox", "0 0 " + VW + " " + VH);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+      // Draw all edges using the sorted-index visual state.
+      indexedCache.forEach((e, pos) => {
+        const a = layout[e[0]], b = layout[e[1]];
+        if (!a || !b) return;
+        let cls = "edge-line";
+        const stt = st.edgeState ? st.edgeState[pos] : undefined;
+        if (stt === "intree") cls += " intree";
+        else if (stt === "forced") cls += " forced";
+        else if (stt === "skipped") cls += " skipped";
+        else if (stt === "rejected") cls += " rejected";
+        if (st.curEdgePos === pos && (st.phase === "classify-start" || st.phase === "force-start")) cls += " considering";
+
+        // offset parallel edges slightly using a quadratic curve when same endpoints repeat
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+        line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+        line.setAttribute("class", cls);
+        svg.appendChild(line);
+
+        const lbl = document.createElementNS(svgNS, "text");
+        let lblCls = "edge-label";
+        if (stt === "intree") lblCls += " intree";
+        else if (stt === "forced") lblCls += " forced";
+        if (st.curEdgePos === pos && (st.phase === "classify-start" || st.phase === "force-start")) lblCls += " considering";
+        lbl.setAttribute("x", (a.x + b.x) / 2);
+        lbl.setAttribute("y", (a.y + b.y) / 2 - 3);
+        lbl.setAttribute("class", lblCls);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.textContent = "#" + e[3] + ":" + e[2];
+        svg.appendChild(lbl);
+      });
+
+      // Draw nodes.
+      const touched = st.touched || [];
+      for (let k = 0; k < inputN; k++) {
+        const pos = layout[k];
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", pos.x);
+        circle.setAttribute("cy", pos.y);
+        circle.setAttribute("r", 17);
+        let cls = "node-circle";
+        if (touched.includes(k)) cls += " touched";
+        circle.setAttribute("class", cls);
+        if (touched.includes(k)) { circle.style.stroke = "var(--yellow)"; circle.style.strokeWidth = "3"; }
+        svg.appendChild(circle);
+
+        const label = document.createElementNS(svgNS, "text");
+        label.setAttribute("x", pos.x);
+        label.setAttribute("y", pos.y + 5);
+        label.setAttribute("class", "node-label");
+        label.textContent = k;
+        svg.appendChild(label);
+      }
+
+      wrap.appendChild(svg);
+      return wrap;
+    }
+
+    // ---------- DSU forest render ----------
+    function renderDSU(st) {
+      const box = document.createElement("div");
+      box.className = "dsu-box";
+
+      const cells = document.createElement("div");
+      cells.className = "dsu-cells";
+
+      const parent = st.parent || Array.from({ length: inputN }, (_, i) => i);
+      const touched = st.touched || [];
+      for (let k = 0; k < inputN; k++) {
+        const cell = document.createElement("div");
+        cell.className = "dsu-cell";
+
+        const node = document.createElement("div");
+        node.className = "dsu-node";
+        const isRoot = parent[k] === k;
+        if (isRoot) node.classList.add("root");
+        if (touched.includes(k)) node.classList.add("touched");
+        node.textContent = k;
+        cell.appendChild(node);
+
+        const arrow = document.createElement("div");
+        arrow.className = "dsu-arrow";
+        arrow.innerHTML = isRoot ? "&#8635; self" : ("&#8593; " + parent[k]);
+        cell.appendChild(arrow);
+
+        cells.appendChild(cell);
+      }
+      box.appendChild(cells);
+
+      const count = document.createElement("div");
+      count.className = "dsu-count";
+      const dc = st.dsuCount === null ? "&mdash;" : st.dsuCount;
+      count.innerHTML = "dsu.count = <b>" + dc + "</b>  (components remaining; MST needs count = 1)";
+      box.appendChild(count);
+
+      return box;
+    }
+
+    // ---------- Sorted edge list render ----------
+    function renderEdgeList(st) {
+      const tbl = document.createElement("table");
+      tbl.className = "edge-table";
+      let html = "<thead><tr><th>#orig</th><th>edge</th><th>w</th><th>state</th><th>class</th></tr></thead><tbody>";
+      indexedCache.forEach((e, pos) => {
+        const stt = st.edgeState ? st.edgeState[pos] : undefined;
+        let rowCls = "";
+        if (st.curEdgePos === pos) rowCls = "active-edge";
+        else if (stt === "intree" || stt === "forced") rowCls = "intree-edge";
+
+        let stateTxt = "&mdash;";
+        if (stt === "intree") stateTxt = '<span style="color:var(--greenText)">in tree</span>';
+        else if (stt === "forced") stateTxt = '<span style="color:var(--blue)">forced</span>';
+        else if (stt === "skipped") stateTxt = '<span style="color:var(--red)">skipped</span>';
+        else if (stt === "rejected") stateTxt = '<span style="color:var(--muted)">cycle</span>';
+        if (st.curEdgePos === pos && (st.phase === "classify-start" || st.phase === "force-start")) {
+          stateTxt = '<span style="color:var(--yellow)">testing</span>';
+        }
+
+        const cls = st.classify[pos];
+        let badge = '<span class="badge pending">?</span>';
+        if (cls === "critical") badge = '<span class="badge critical">critical</span>';
+        else if (cls === "pseudo") badge = '<span class="badge pseudo">pseudo</span>';
+        else if (cls === "none") badge = '<span class="badge none">neither</span>';
+
+        html += '<tr class="' + rowCls + '">' +
+          '<td><span class="nm">' + e[3] + '</span></td>' +
+          '<td>' + e[0] + "&ndash;" + e[1] + '</td>' +
+          '<td><span class="nm">' + e[2] + '</span></td>' +
+          '<td>' + stateTxt + '</td>' +
+          '<td>' + badge + '</td>' +
+          '</tr>';
+      });
+      html += "</tbody>";
+      tbl.innerHTML = html;
+      return tbl;
+    }
+
+    function renderResultCard(st) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = st.done ? "return [critical, pseudo]" : "classified so far";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (st.done) value.classList.add("done");
+      value.innerHTML = "[[" + st.critical.join(", ") + "], [" + st.pseudo.join(", ") + "]]";
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(st) {
+      const traceUi = document.getElementById("trace-ui");
+      const shown = masterTrace.slice(0, st.traceLen);
+      if (shown.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No edges classified yet. Step through the baseline build, then each edge\'s skip / force tests.</div>';
+        return;
+      }
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr><th>edge #</th><th>u&ndash;v</th><th>w</th><th>skip MST</th><th>force MST</th><th>class</th></tr>
+          </thead>
+          <tbody>
+      `;
+      shown.forEach((row, i) => {
+        const isActive = i === shown.length - 1;
+        let trClass = "";
+        if (row.cls === "critical") trClass = "crit-trace";
+        else if (row.cls === "pseudo") trClass = "pseudo-trace";
+        if (isActive) trClass = "active-trace";
+        let badge = '<span class="badge none">neither</span>';
+        if (row.cls === "critical") badge = '<span class="badge critical">critical</span>';
+        else if (row.cls === "pseudo") badge = '<span class="badge pseudo">pseudo</span>';
+        html += `
+          <tr class="${trClass}">
+            <td><span class="nm">${row.origIdx}</span></td>
+            <td>${row.u}&ndash;${row.v}</td>
+            <td><span class="nm">${row.w}</span></td>
+            <td>${fmtInf(row.skipW)}</td>
+            <td>${row.forceW === "&mdash;" ? "&mdash;" : fmtInf(row.forceW)}</td>
+            <td>${badge}</td>
+          </tr>
+        `;
+      });
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    let masterTrace = [];
+
+    function render() {
+      masterTrace = buildSteps(inputN, inputEdges).traceRows;
+
+      const st = currentStep();
+
+      document.getElementById("btn-prev").disabled = stepIndex <= 0;
+      if (stepIndex >= steps.length - 1 && steps.length > 0) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      highlightLines(st.lines);
+      narrate(st.narration);
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+
+      const banner = document.createElement("div");
+      banner.className = "phase-banner";
+      banner.innerHTML = "<b>Phase:</b> " + st.phaseLabel + " &nbsp;&middot;&nbsp; mstWeight = <b>" + fmtInf(st.mstWeight) + "</b>";
+      visualUi.appendChild(banner);
+
+      const split = document.createElement("div");
+      split.className = "panel-split";
+
+      const left = document.createElement("div");
+      const ll = document.createElement("div");
+      ll.className = "sub-label";
+      ll.textContent = "Graph (edges labeled #orig:weight)";
+      left.appendChild(ll);
+      left.appendChild(renderGraph(st));
+
+      const right = document.createElement("div");
+      const rl = document.createElement("div");
+      rl.className = "sub-label";
+      rl.textContent = "DSU parent forest";
+      right.appendChild(rl);
+      right.appendChild(renderDSU(st));
+
+      split.appendChild(left);
+      split.appendChild(right);
+      visualUi.appendChild(split);
+
+      const el = document.createElement("div");
+      el.className = "sub-label";
+      el.textContent = "Edges sorted by weight";
+      el.style.marginTop = "6px";
+      visualUi.appendChild(el);
+      visualUi.appendChild(renderEdgeList(st));
+
+      visualUi.appendChild(renderResultCard(st));
+
+      renderTrace(st);
+
+      // Console (Variables & Outputs).
+      const phaseDisplay = '<span class="str">"' + st.phase + '"</span>';
+      const mstwDisplay = st.mstWeight === Infinity ? '<span class="kw">Infinity</span>' : '<span class="nm">' + st.mstWeight + '</span>';
+      const weightDisplay = st.weight === null ? '<span class="kw">&mdash;</span>' : '<span class="nm">' + st.weight + '</span>';
+      const criticalHtml = '<span class="op">[' + st.critical.join(", ") + ']</span>';
+      const pseudoHtml = '<span class="op">[' + st.pseudo.join(", ") + ']</span>';
+      const parentHtml = st.parent ? '<span class="op">[' + st.parent.join(", ") + ']</span>' : '<span class="kw">&mdash;</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Input</span><br>' +
+        '<span class="kw">const</span> n = <span class="nm">' + inputN + '</span>;<br>' +
+        '<span class="kw">const</span> edges = [' + inputEdges.map(e => "[" + e.join(",") + "]").join(", ") + '];<br><br>' +
+        '<span class="cm">// Live state (Kruskal classification)</span><br>' +
+        createConsoleLine("phase", "let", "phase", phaseDisplay) +
+        createConsoleLine("mstWeight", "const", "mstWeight", mstwDisplay) +
+        createConsoleLine("weight", "let", "weight", weightDisplay) +
+        '<div class="console-line"><button class="pin-btn" disabled>INFO</button><span><span class="kw">const</span> dsu.parent = ' + parentHtml + ';</span></div>' +
+        createConsoleLine("critical", "const", "critical", criticalHtml) +
+        createConsoleLine("pseudo", "const", "pseudo", pseudoHtml) +
+        '<br><span class="cm">// Output</span><br>' +
+        '<div class="console-line"><button class="pin-btn" disabled>RESULT</button><span><span class="kw">return</span> [[' +
+          (st.done ? finalAnswer[0].join(", ") : st.critical.join(", ")) + '], [' +
+          (st.done ? finalAnswer[1].join(", ") : st.pseudo.join(", ")) + ']];</span></div>';
+
+      // HUD (mirrors pinned console rows).
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        phase: st.phase,
+        mstWeight: fmtInf(st.mstWeight),
+        weight: st.weight === null ? "&mdash;" : st.weight,
+        critical: "[" + st.critical.join(",") + "]",
+        pseudo: "[" + st.pseudo.join(",") + "]"
+      };
+      for (const [k, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + k + ':</span> <span class="hud-val">' + hudMap[k] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot.
+    inputN = examples[1].n;
+    inputEdges = examples[1].edges.map(e => e.slice());
+    document.getElementById("custom-input").value = toInputString(inputN, inputEdges);
+    init();
+  </script>
+</body>
+</html>
