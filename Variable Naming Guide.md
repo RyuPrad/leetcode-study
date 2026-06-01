@@ -183,6 +183,30 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Search Insert Position:** `nums`, `target`, `left`, `right`, `mid`, `ans`
 
+**Guess Number Higher or Lower:** `n`, `left`, `right`, `mid`, `pick`, `res`
+
+**Sqrt(x):** `x`, `left`, `right`, `mid`, `ans`
+
+**Search a 2D Matrix:** `matrix`, `target`, `m`, `n`, `left`, `right`, `mid`
+
+**Koko Eating Bananas:** `piles`, `h`, `left`, `right`, `mid`, `ans`
+
+**Capacity to Ship Packages Within D Days:** `weights`, `days`, `left`, `right`, `mid`, `ans`
+
+**Find Minimum in Rotated Sorted Array:** `nums`, `left`, `right`, `mid`, `ans`
+
+**Search in Rotated Sorted Array:** `nums`, `target`, `left`, `right`, `mid`
+
+**Search in Rotated Sorted Array II:** `nums`, `target`, `left`, `right`, `mid`
+
+**Time Based Key-Value Store:** `store`, `key`, `value`, `timestamp`, `left`, `right`, `mid`, `res`
+
+**Split Array Largest Sum:** `nums`, `k`, `left`, `right`, `mid`, `ans`
+
+**Median of Two Sorted Arrays:** `nums1`, `nums2`, `m`, `n`, `left`, `right`, `i`, `j`, `left1`, `right1`, `left2`, `right2`
+
+**Find in Mountain Array:** `arr`, `target`, `n`, `left`, `right`, `mid`, `peak`, `res`
+
 ### Linked List
 
 **Merge Two Sorted Lists:** `list1`, `list2`, `dummy`, `tail`, `curr`
