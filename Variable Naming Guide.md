@@ -105,6 +105,26 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **3Sum:** `nums`, `res`, `i`, `left`, `right`, `sum`
 
+**Reverse String:** `s`, `left`, `right`
+
+**Valid Palindrome II:** `s`, `left`, `right`
+
+**Merge Strings Alternately:** `word1`, `word2`, `i`, `j`, `res`
+
+**Merge Sorted Array:** `nums1`, `nums2`, `m`, `n`, `i`, `j`, `k`
+
+**Remove Duplicates from Sorted Array:** `nums`, `left`, `right`, `k`
+
+**Two Sum II - Input Array Is Sorted:** `numbers`, `target`, `left`, `right`, `sum`, `res`
+
+**4Sum:** `nums`, `target`, `i`, `j`, `left`, `right`, `sum`, `res`
+
+**Rotate Array:** `nums`, `k`, `left`, `right`
+
+**Boats to Save People:** `people`, `limit`, `left`, `right`, `boats`
+
+**Trapping Rain Water:** `height`, `left`, `right`, `leftMax`, `rightMax`, `res`
+
 ### Binary Search
 
 **Binary Search:** `nums`, `target`, `left`, `right`, `mid`, `ans`
