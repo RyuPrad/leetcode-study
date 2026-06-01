@@ -565,6 +565,28 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Detect Squares:** `counts`, `point`, `key`, `x`, `y`, `px`, `py`, `c1`, `c2`, `c3`, `res`
 
+### Bit Manipulation
+
+**Single Number:** `nums`, `res`, `num`
+
+**Number of 1 Bits:** `n`, `count`
+
+**Counting Bits:** `n`, `dp`, `i`
+
+**Add Binary:** `a`, `b`, `res`, `i`, `j`, `carry`, `sum`
+
+**Reverse Bits:** `n`, `res`, `i`
+
+**Missing Number:** `nums`, `res`, `i`
+
+**Sum of Two Integers:** `a`, `b`, `carry`
+
+**Reverse Integer:** `x`, `sign`, `res`
+
+**Bitwise AND of Numbers Range:** `left`, `right`, `shift`
+
+**Minimum Array End:** `n`, `x`, `result`, `remaining`, `bit`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
