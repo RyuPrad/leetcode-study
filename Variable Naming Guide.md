@@ -311,6 +311,40 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **IPO:** `k`, `w`, `projects`, `maxHeap`, `i`, `j`
 
+### Backtracking
+
+**Sum of All Subset XOR Totals:** `nums`, `ans`, `i`, `xorSoFar`
+
+**Subsets:** `nums`, `res`, `path`, `i`
+
+**Subsets II:** `nums`, `res`, `path`, `start`, `i`
+
+**Combination Sum:** `candidates`, `target`, `res`, `path`, `start`, `remain`, `i`
+
+**Combination Sum II:** `candidates`, `target`, `res`, `path`, `start`, `remain`, `i`
+
+**Combinations:** `n`, `k`, `res`, `path`, `start`, `i`
+
+**Permutations:** `nums`, `res`, `path`, `used`, `i`
+
+**Permutations II:** `nums`, `res`, `path`, `used`, `i`
+
+**Letter Combinations of a Phone Number:** `digits`, `map`, `res`, `path`, `i`
+
+**Word Search:** `board`, `word`, `rows`, `cols`, `r`, `c`, `i`
+
+**Palindrome Partitioning:** `s`, `res`, `path`, `start`, `end`
+
+**Word Break II:** `s`, `wordDict`, `words`, `res`, `path`, `start`, `end`, `word`
+
+**N-Queens:** `n`, `res`, `board`, `cols`, `diag`, `antiDiag`, `r`, `c`
+
+**N-Queens II:** `n`, `count`, `cols`, `diag`, `antiDiag`, `r`, `c`
+
+**Matchsticks to Square:** `matchsticks`, `total`, `side`, `sides`, `i`, `j`
+
+**Partition to K Equal Sum Subsets:** `nums`, `k`, `total`, `target`, `used`, `start`, `curSum`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
