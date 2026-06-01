@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 752. Open the Lock Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* BFS STATE-SPACE VISUALIZATION */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 16px 6px;
+      min-height: 340px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .op-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-family: Consolas, monospace;
+      background: var(--panel2);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .op-call {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--cyan);
+    }
+
+    .op-call .targethl {
+      color: var(--yellow);
+      background: rgba(215, 186, 125, 0.16);
+      border-radius: 4px;
+      padding: 1px 6px;
+      letter-spacing: 2px;
+    }
+
+    .turn-badge {
+      font-size: 15px;
+      color: var(--greenText);
+      background: rgba(181, 206, 168, 0.12);
+      border-radius: 4px;
+      padding: 3px 10px;
+      border: 1px solid #3a4a30;
+    }
+
+    .lock-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .section-label {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .frontier-box, .visited-box, .dead-box {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-content: flex-start;
+      min-height: 64px;
+      transition: all 0.22s ease;
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .frontier-box { border-color: #3a4a5c; }
+    .frontier-box.active { border-color: var(--yellow); box-shadow: 0 0 14px rgba(215,186,125,0.22); }
+    .visited-box { border-color: #2f4a30; }
+    .dead-box { border-color: #4a2f2f; }
+
+    .lock-state {
+      display: flex;
+      gap: 3px;
+      font-family: Consolas, monospace;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: var(--panel2);
+      color: var(--greenText);
+      transition: all 0.22s ease;
+    }
+
+    .lock-state .digit {
+      display: inline-flex;
+      width: 20px;
+      justify-content: center;
+    }
+
+    .lock-state.current {
+      border-color: var(--yellow);
+      background: #3a3320;
+      transform: scale(1.08);
+      box-shadow: 0 0 12px rgba(215,186,125,0.45);
+    }
+
+    .lock-state.target {
+      border-color: var(--green);
+      background: #233525;
+      color: #d7f5c7;
+      animation: pulse 0.9s ease-in-out infinite;
+    }
+
+    .lock-state.just-added {
+      border-color: var(--green);
+      background: #26472d;
+      box-shadow: 0 0 10px rgba(106,153,85,0.45);
+    }
+
+    .lock-state.candidate {
+      border-color: var(--blue);
+      background: #1e3a5c;
+      color: var(--cyan);
+    }
+
+    .lock-state.cand-dup {
+      border-color: var(--muted);
+      opacity: 0.55;
+      text-decoration: line-through;
+    }
+
+    .lock-state.cand-dead {
+      border-color: var(--red);
+      background: #4a2525;
+      color: #ffb3b3;
+      text-decoration: line-through;
+    }
+
+    .lock-state.dead {
+      border-color: var(--red);
+      background: #3a2020;
+      color: #ffb3b3;
+    }
+
+    .lock-state .digit.spin {
+      color: var(--yellow);
+      background: rgba(215,186,125,0.2);
+      border-radius: 3px;
+    }
+
+    .box-empty {
+      color: #666;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      align-self: center;
+    }
+
+    .visited-count {
+      color: var(--muted);
+      font-size: 12px;
+      font-family: Consolas, monospace;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .result-card {
+      margin-top: 4px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: #888;
+      background: var(--panel2);
+    }
+
+    .result-value.found {
+      color: var(--greenText);
+      background: #233525;
+      border: 1px solid var(--green);
+    }
+
+    .result-value.fail {
+      color: #ffb3b3;
+      background: #4a2525;
+      border: 1px solid var(--red);
+    }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace {
+      background: #062f4a;
+    }
+
+    .trace-table tr.hit-trace {
+      background: rgba(106, 153, 85, 0.14);
+    }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Leetcode 752. Open the Lock</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">⋮⋮ DRAG CONTROLS ⋮⋮</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">target 0202</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">target 0009</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">boxed-in (-1)</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">target 0000</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-5" class="btn-ex" onclick="loadExample(5)">no deadends</button>
+      <button id="btn-ex-6" class="btn-ex" onclick="loadExample(6)">start blocked</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="0201,0101,0102,1212,2002 | 0202" placeholder="deadends | target" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>BFS State-Space (level by level)</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">function</span> <span class="fn">openLock</span>(deadends, target) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> dead = <span class="kw">new</span> <span class="fn">Set</span>(deadends);</div>
+<div id="line-3" class="code-line">  <span class="kw">if</span> (dead.<span class="fn">has</span>(<span class="str">"0000"</span>)) <span class="kw">return</span> -<span class="nm">1</span>;</div>
+<div id="line-4" class="code-line">  <span class="kw">if</span> (target === <span class="str">"0000"</span>) <span class="kw">return</span> <span class="nm">0</span>;</div>
+<div id="line-5" class="code-line">  <span class="kw">const</span> visited = <span class="kw">new</span> <span class="fn">Set</span>([<span class="str">"0000"</span>]);</div>
+<div id="line-6" class="code-line">  <span class="kw">let</span> queue = [<span class="str">"0000"</span>];</div>
+<div id="line-7" class="code-line">  <span class="kw">let</span> turns = <span class="nm">0</span>;</div>
+<div id="line-8" class="code-line">  <span class="kw">while</span> (queue.length > <span class="nm">0</span>) {</div>
+<div id="line-9" class="code-line">    <span class="kw">const</span> next = [];</div>
+<div id="line-10" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> state <span class="kw">of</span> queue) {</div>
+<div id="line-11" class="code-line">      <span class="kw">if</span> (state === target) <span class="kw">return</span> turns;</div>
+<div id="line-12" class="code-line">      <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="nm">4</span>; i++) {</div>
+<div id="line-13" class="code-line">        <span class="kw">for</span> (<span class="kw">const</span> d <span class="kw">of</span> [<span class="nm">1</span>, -<span class="nm">1</span>]) {</div>
+<div id="line-14" class="code-line">          <span class="kw">const</span> digit = (<span class="fn">Number</span>(state[i]) + d + <span class="nm">10</span>) % <span class="nm">10</span>;</div>
+<div id="line-15" class="code-line">          <span class="kw">const</span> nextState = state.<span class="fn">slice</span>(<span class="nm">0</span>, i) + digit + state.<span class="fn">slice</span>(i + <span class="nm">1</span>);</div>
+<div id="line-16" class="code-line">          <span class="kw">if</span> (!visited.<span class="fn">has</span>(nextState) && !dead.<span class="fn">has</span>(nextState)) {</div>
+<div id="line-17" class="code-line">            visited.<span class="fn">add</span>(nextState);</div>
+<div id="line-18" class="code-line">            next.<span class="fn">push</span>(nextState);</div>
+<div id="line-19" class="code-line">          }</div>
+<div id="line-20" class="code-line">        }</div>
+<div id="line-21" class="code-line">      }</div>
+<div id="line-22" class="code-line">    }</div>
+<div id="line-23" class="code-line">    queue = next;</div>
+<div id="line-24" class="code-line">    turns++;</div>
+<div id="line-25" class="code-line">  }</div>
+<div id="line-26" class="code-line">  <span class="kw">return</span> -<span class="nm">1</span>;</div>
+<div id="line-27" class="code-line">}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>BFS Level Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables & Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // DRAG LOGIC — verbatim from the reference visualizer.
+    // ============================================================
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        // Some iframe hosts block fullscreen unless the iframe has allowfullscreen.
+        // Since this runs from a user click, opening the visualizer directly is a useful fallback.
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+    // ============================================================
+    // HUD STATE — pinnable rows like the reference console.
+    // ============================================================
+    let pinned = {
+      turns: true,
+      frontier: true,
+      visited: true,
+      ans: true
+    };
+
+    function togglePin(vName) {
+      pinned[vName] = !pinned[vName];
+      render();
+    }
+
+    // ============================================================
+    // EXAMPLES — { deadends: [...], target: "...." }
+    // ============================================================
+    const examples = {
+      1: { deadends: ["0201", "0101", "0102", "1212", "2002"], target: "0202" },
+      2: { deadends: ["8888"], target: "0009" },
+      3: { deadends: ["8887", "8889", "8878", "8898", "8788", "8988", "7888", "9888"], target: "8888" },
+      4: { deadends: [], target: "0000" },
+      5: { deadends: [], target: "0012" },
+      6: { deadends: ["0000"], target: "0202" }
+    };
+
+    // ============================================================
+    // STATE — index into a precomputed steps[] array.
+    // ============================================================
+    let deadends = [];
+    let target = "0000";
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+    let trace = [];
+
+    // ----- Precompute steps by running the real BFS implementation -----
+    // Mirrors the SPEC openLock() exactly. To keep memory O(1) per snapshot
+    // (and Step Back exactly reversible) we never deep-copy the whole visited
+    // set / frontier into each step. Instead we keep TWO append-only shared
+    // logs and store only small indices on each snapshot:
+    //   visitedLog[]  — visited states in insertion order (BFS only ever adds)
+    //   levels[]      — levels[L] is the frontier array for level L (built once)
+    // A snapshot records visitedLen (slice visitedLog[0..visitedLen]) and
+    // levelIdx (frontier = levels[levelIdx]). render() reconstructs the arrays
+    // by slicing these shared logs, so reading a step is pure + reversible.
+    //
+    // DETAIL BUDGET: examples like the "boxed-in" target explore almost the
+    // entire 10000-state space. Showing one snapshot per neighbour would be
+    // ~80k steps. So within a level we emit full per-pop / per-neighbour
+    // detail until DETAIL_BUDGET pops, then collapse the rest of that level
+    // into ONE fast-forward snapshot. The algorithm still runs fully, so the
+    // final answer and the visited/frontier sizes are always exact.
+    const DETAIL_BUDGET = 24;
+
+    function buildSteps(deadList, tgt) {
+      const built = [];
+      const traceRows = [];
+      trace = traceRows;   // module-level alias so render() can slice by traceLen
+      const dead = new Set(deadList);
+      const visitedSet = new Set();
+      const visitedLog = [];
+      const levels = [];
+      let turns = 0;
+      let answer = "pending";
+      let done = false;
+
+      function addVisited(s) { visitedSet.add(s); visitedLog.push(s); }
+
+      function snap(extra) {
+        built.push({
+          visitedLog: visitedLog,            // shared reference (immutable use)
+          levels: levels,                    // shared reference (immutable use)
+          visitedLen: visitedLog.length,
+          levelIdx: (extra.levelIdx === undefined) ? null : extra.levelIdx,
+          deadList: deadList,                // shared reference (immutable use)
+          turns,
+          target: tgt,
+          ans: (extra.ans === undefined) ? answer : extra.ans,
+          lines: extra.lines,
+          narration: extra.narration,
+          currentState: (extra.currentState === undefined) ? null : extra.currentState,
+          candidate: (extra.candidate === undefined) ? null : extra.candidate,
+          candStatus: (extra.candStatus === undefined) ? null : extra.candStatus,
+          spinIndex: (extra.spinIndex === undefined) ? null : extra.spinIndex,
+          justAdded: (extra.justAdded === undefined) ? null : extra.justAdded,
+          nextLen: (extra.nextLen === undefined) ? null : extra.nextLen,
+          foundTarget: (extra.foundTarget === undefined) ? false : extra.foundTarget,
+          traceLen: traceRows.length
+        });
+      }
+
+      // Line 2: build dead set
+      snap({
+        lines: [2],
+        narration: "Build <code>dead</code> = a Set of " + deadList.length + " deadend state" + (deadList.length === 1 ? "" : "s") + ". These are combinations the lock can never show."
+      });
+
+      // Line 3: dead.has("0000")?
+      if (dead.has("0000")) {
+        snap({
+          lines: [3],
+          narration: "<code>dead.has(\"0000\")</code> is <b style=\"color:#e24b4a\">true</b> — the starting state itself is a deadend. The lock can never move; return <b>-1</b> immediately.",
+          ans: -1
+        });
+        answer = -1;
+        traceRows.push({ level: "—", action: "start 0000 is a deadend", frontier: "(blocked)", visited: 0 });
+        snap({
+          lines: [3],
+          narration: "✓ Done. The start <code>\"0000\"</code> is blocked, so the answer is <b style=\"color:#e24b4a\">-1</b>.",
+          ans: -1,
+          foundTarget: false
+        });
+        return built;
+      }
+      snap({
+        lines: [3],
+        narration: "<code>dead.has(\"0000\")</code> is <b style=\"color:#6a9955\">false</b>. The starting state is usable, so BFS can begin."
+      });
+
+      // Line 4: target === "0000"?
+      if (tgt === "0000") {
+        answer = 0;
+        traceRows.push({ level: 0, action: "target equals start 0000", frontier: "0000", visited: 0 });
+        snap({
+          lines: [4],
+          narration: "<code>target === \"0000\"</code> is <b style=\"color:#6a9955\">true</b>. The lock already shows the target, so <b>0</b> turns are needed.",
+          ans: 0,
+          foundTarget: true
+        });
+        snap({
+          lines: [4],
+          narration: "✓ Done. The target is the starting state <code>\"0000\"</code>, so the answer is <b style=\"color:#6a9955\">0</b>.",
+          ans: 0,
+          foundTarget: true
+        });
+        return built;
+      }
+      snap({
+        lines: [4],
+        narration: "<code>target === \"0000\"</code> is <b style=\"color:#e24b4a\">false</b>. We must search for <code>" + tgt + "</code>."
+      });
+
+      // Line 5-7: init visited, queue, turns
+      addVisited("0000");
+      snap({
+        lines: [5],
+        narration: "Seed <code>visited = { \"0000\" }</code> so we never re-explore the start.",
+        justAdded: "0000"
+      });
+      levels.push(["0000"]);
+      snap({
+        lines: [6],
+        levelIdx: 0,
+        narration: "Seed the BFS frontier: <code>queue = [\"0000\"]</code>. This is level 0.",
+        currentState: null
+      });
+      snap({
+        lines: [7],
+        levelIdx: 0,
+        narration: "<code>turns = 0</code>. <code>turns</code> counts BFS levels; it is the number of single-digit moves taken so far."
+      });
+
+      // BFS loop
+      while (levels[turns].length > 0 && !done) {
+        const queue = levels[turns];
+        // Line 8 + 9: enter while, new level
+        snap({
+          lines: [8, 10],
+          levelIdx: turns,
+          narration: "Level <b>" + turns + "</b>: the frontier has <b>" + queue.length + "</b> state" + (queue.length === 1 ? "" : "s") + ". Expand each one to discover the next level."
+        });
+        const next = [];
+        const levelStart = queue;
+        let popCount = 0;
+        let collapsed = false;
+
+        for (let qi = 0; qi < queue.length; qi++) {
+          const state = queue[qi];
+          // Line 11: state === target?
+          if (state === tgt) {
+            answer = turns;
+            traceRows.push({ level: turns, action: "popped TARGET " + state, frontier: frontierLabel(levelStart), visited: visitedSet.size });
+            snap({
+              lines: [11],
+              levelIdx: turns,
+              narration: "Pop <code>" + state + "</code> — it <b>equals the target</b>! BFS found the shortest path. Return <code>turns = " + turns + "</code>.",
+              currentState: state,
+              ans: turns,
+              foundTarget: true
+            });
+            done = true;
+            break;
+          }
+
+          // Detail budget: once we have shown enough pops in this level, run
+          // the remaining pops silently (algorithm still exact) and emit a
+          // single collapse snapshot afterwards.
+          if (popCount >= DETAIL_BUDGET) {
+            for (let qj = qi; qj < queue.length; qj++) {
+              const st2 = queue[qj];
+              if (st2 === tgt) { answer = turns; done = true; break; }
+              for (let i = 0; i < 4; i++) {
+                for (const d of [1, -1]) {
+                  const digit = (Number(st2[i]) + d + 10) % 10;
+                  const ns = st2.slice(0, i) + digit + st2.slice(i + 1);
+                  if (!visitedSet.has(ns) && !dead.has(ns)) { addVisited(ns); next.push(ns); }
+                }
+              }
+            }
+            if (done) {
+              traceRows.push({ level: turns, action: "popped TARGET " + tgt, frontier: frontierLabel(levelStart), visited: visitedSet.size });
+              snap({
+                lines: [11],
+                levelIdx: turns,
+                narration: "Among the remaining states in level " + turns + ", <code>" + tgt + "</code> appears — it equals the target! Return <code>turns = " + turns + "</code>.",
+                currentState: tgt,
+                ans: turns,
+                foundTarget: true
+              });
+            } else {
+              snap({
+                lines: [12, 16, 17, 18],
+                levelIdx: turns,
+                nextLen: next.length,
+                narration: "Fast-forward: the remaining <b>" + (queue.length - qi) + "</b> states in level " + turns + " are expanded the same way. The next frontier now holds <b>" + next.length + "</b> new state" + (next.length === 1 ? "" : "s") + ".",
+                currentState: null
+              });
+            }
+            collapsed = true;
+            break;
+          }
+
+          popCount++;
+          snap({
+            lines: [11],
+            levelIdx: turns,
+            nextLen: next.length,
+            narration: "Pop <code>" + state + "</code> from this level. It is not the target, so generate its 8 neighbour states (each wheel ±1).",
+            currentState: state
+          });
+
+          // Lines 12-19: generate neighbours
+          for (let i = 0; i < 4; i++) {
+            for (const d of [1, -1]) {
+              const digit = (Number(state[i]) + d + 10) % 10;
+              const nextState = state.slice(0, i) + digit + state.slice(i + 1);
+              if (dead.has(nextState)) {
+                snap({
+                  lines: [16],
+                  levelIdx: turns,
+                  nextLen: next.length,
+                  narration: "Turn wheel " + i + " by " + (d === 1 ? "+1" : "-1") + " → <code>" + nextState + "</code>. It is a <b style=\"color:#e24b4a\">deadend</b>, so skip it.",
+                  currentState: state,
+                  candidate: nextState,
+                  candStatus: "dead",
+                  spinIndex: i
+                });
+              } else if (visitedSet.has(nextState)) {
+                snap({
+                  lines: [16],
+                  levelIdx: turns,
+                  nextLen: next.length,
+                  narration: "Turn wheel " + i + " by " + (d === 1 ? "+1" : "-1") + " → <code>" + nextState + "</code>. Already in <code>visited</code>, so skip it.",
+                  currentState: state,
+                  candidate: nextState,
+                  candStatus: "dup",
+                  spinIndex: i
+                });
+              } else {
+                addVisited(nextState);
+                next.push(nextState);
+                snap({
+                  lines: [16, 17, 18],
+                  levelIdx: turns,
+                  nextLen: next.length,
+                  narration: "Turn wheel " + i + " by " + (d === 1 ? "+1" : "-1") + " → <code>" + nextState + "</code>. New & safe — add to <code>visited</code> and the next frontier.",
+                  currentState: state,
+                  candidate: nextState,
+                  candStatus: "new",
+                  spinIndex: i,
+                  justAdded: nextState
+                });
+              }
+            }
+          }
+        }
+
+        if (done) break;
+
+        // Lines 23-24: advance level
+        levels.push(next);
+        const fromLevel = turns;
+        turns++;
+        traceRows.push({ level: fromLevel, action: (collapsed ? "expanded (incl. fast-fwd) → " : "expanded " + levelStart.length + " → ") + next.length + " new", frontier: frontierLabel(levelStart), visited: visitedSet.size });
+        snap({
+          lines: [23, 24],
+          levelIdx: turns,
+          narration: "Level " + fromLevel + " fully expanded. <code>queue = next</code> (" + next.length + " state" + (next.length === 1 ? "" : "s") + "), <code>turns++ → " + turns + "</code>.",
+          currentState: null
+        });
+      }
+
+      if (!done) {
+        // queue emptied without finding target
+        answer = -1;
+        traceRows.push({ level: turns, action: "frontier empty — unreachable", frontier: "(empty)", visited: visitedSet.size });
+        snap({
+          lines: [26],
+          levelIdx: turns,
+          narration: "The frontier is empty but the target was never reached — every path is blocked by deadends. Return <b style=\"color:#e24b4a\">-1</b>.",
+          ans: -1,
+          foundTarget: false
+        });
+      }
+
+      // final done snapshot
+      const finalAns = answer;
+      snap({
+        lines: finalAns === -1 ? [26] : [11],
+        levelIdx: done ? turns : null,
+        narration: finalAns === -1
+          ? "✓ Done. <code>" + tgt + "</code> is unreachable. The answer is <b style=\"color:#e24b4a\">-1</b>."
+          : "✓ Done. The shortest sequence reaches <code>" + tgt + "</code> in <b style=\"color:#6a9955\">" + finalAns + "</b> turn" + (finalAns === 1 ? "" : "s") + ".",
+        ans: finalAns,
+        foundTarget: finalAns !== -1
+      });
+
+      return built;
+    }
+
+    // Compact label for a frontier in the trace table (avoids 1000-char cells).
+    function frontierLabel(arr) {
+      if (arr.length === 0) return "(empty)";
+      if (arr.length <= 8) return arr.join(" ");
+      return arr.slice(0, 8).join(" ") + " … (+" + (arr.length - 8) + ")";
+    }
+
+    function loadExample(exNum) {
+      activeExample = exNum;
+      deadends = examples[exNum].deadends.slice();
+      target = examples[exNum].target;
+      document.getElementById("custom-input").value = (deadends.join(",") || "") + " | " + target;
+      init();
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      const parts = raw.split("|");
+      if (parts.length < 2) {
+        alert("Format: deadends | target\nExample: 0201,0101 | 0202\n(use an empty left side for no deadends)");
+        return;
+      }
+      const deadRaw = parts[0].trim();
+      const tgtRaw = parts[1].trim();
+      let parsedDead = [];
+      if (deadRaw !== "") {
+        parsedDead = deadRaw.split(",").map(s => s.trim()).filter(s => s.length > 0);
+      }
+      const valid4 = s => /^[0-9]{4}$/.test(s);
+      if (!valid4(tgtRaw)) {
+        alert("target must be exactly 4 digits (0-9). Got \"" + tgtRaw + "\".");
+        return;
+      }
+      for (const d of parsedDead) {
+        if (!valid4(d)) {
+          alert("Each deadend must be exactly 4 digits. Got \"" + d + "\".");
+          return;
+        }
+      }
+      deadends = parsedDead;
+      target = tgtRaw;
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      steps = buildSteps(deadends, target);
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    // Step engine: just move the index into the precomputed steps[].
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) {
+      document.getElementById("narration-ui").innerHTML = text;
+    }
+
+    // Derive a render-ready view from a raw snapshot by slicing the shared
+    // append-only logs. Reading is pure: the same stepIndex always yields the
+    // same arrays, so Step Back is exactly reversible.
+    function viewOf(raw) {
+      const visited = raw.visitedLog.slice(0, raw.visitedLen);
+      const queue = (raw.levelIdx !== null && raw.levels[raw.levelIdx]) ? raw.levels[raw.levelIdx].slice() : [];
+      return {
+        queue,
+        visited,
+        deadList: raw.deadList,
+        turns: raw.turns,
+        target: raw.target,
+        ans: raw.ans,
+        lines: raw.lines,
+        narration: raw.narration,
+        currentState: raw.currentState,
+        candidate: raw.candidate,
+        candStatus: raw.candStatus,
+        spinIndex: raw.spinIndex,
+        justAdded: raw.justAdded,
+        foundTarget: raw.foundTarget,
+        traceLen: raw.traceLen
+      };
+    }
+
+    function currentStep() {
+      if (steps.length === 0) {
+        return {
+          queue: [], visited: [], deadList: [], turns: 0, target: target,
+          ans: "pending", lines: [1], narration: "Press Step Over.",
+          currentState: null, candidate: null, candStatus: null, spinIndex: null,
+          justAdded: null, foundTarget: false, traceLen: 0
+        };
+      }
+      return viewOf(steps[stepIndex]);
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    function lockStateHtml(state, classes, spinIndex) {
+      let inner = "";
+      for (let k = 0; k < state.length; k++) {
+        const cls = (spinIndex !== null && spinIndex === k) ? "digit spin" : "digit";
+        inner += '<span class="' + cls + '">' + state[k] + '</span>';
+      }
+      return '<div class="lock-state ' + classes + '">' + inner + '</div>';
+    }
+
+    function renderOpBanner(st) {
+      const banner = document.createElement("div");
+      banner.className = "op-banner";
+
+      const call = document.createElement("div");
+      call.className = "op-call";
+      call.innerHTML = 'openLock( target = <span class="targethl">' + st.target + '</span> )';
+      banner.appendChild(call);
+
+      const turn = document.createElement("div");
+      turn.className = "turn-badge";
+      turn.textContent = "turns = " + st.turns;
+      banner.appendChild(turn);
+
+      const vc = document.createElement("div");
+      vc.className = "turn-badge";
+      vc.textContent = "visited = " + st.visited.length;
+      banner.appendChild(vc);
+
+      return banner;
+    }
+
+    function renderFrontier(st) {
+      const wrap = document.createElement("div");
+
+      const label = document.createElement("span");
+      label.className = "section-label";
+      label.textContent = "queue — current frontier (level " + st.turns + ")";
+      wrap.appendChild(label);
+
+      const box = document.createElement("div");
+      box.className = "frontier-box";
+      if (st.currentState !== null) box.classList.add("active");
+
+      if (st.queue.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "box-empty";
+        empty.textContent = "(empty)";
+        box.appendChild(empty);
+      } else {
+        const CAP = 60;
+        // Always keep the current/target state visible even if it is beyond CAP.
+        let toShow = st.queue;
+        let hiddenBefore = 0;
+        if (st.queue.length > CAP) {
+          const ci = st.currentState ? st.queue.indexOf(st.currentState) : -1;
+          if (ci >= CAP) {
+            hiddenBefore = ci;
+            toShow = st.queue.slice(ci, ci + CAP);
+          } else {
+            toShow = st.queue.slice(0, CAP);
+          }
+        }
+        if (hiddenBefore > 0) {
+          const more = document.createElement("span");
+          more.className = "box-empty";
+          more.textContent = "… (" + hiddenBefore + " earlier)";
+          box.appendChild(more);
+        }
+        toShow.forEach(state => {
+          let classes = "";
+          if (state === st.currentState) classes = st.foundTarget && state === st.target ? "target" : "current";
+          else if (state === st.target && st.foundTarget) classes = "target";
+          const html = lockStateHtml(state, classes, state === st.currentState ? st.spinIndex : null);
+          box.insertAdjacentHTML("beforeend", html);
+        });
+        const shownEnd = hiddenBefore + toShow.length;
+        if (shownEnd < st.queue.length) {
+          const more = document.createElement("span");
+          more.className = "box-empty";
+          more.textContent = "… (+" + (st.queue.length - shownEnd) + " more)";
+          box.appendChild(more);
+        }
+      }
+      wrap.appendChild(box);
+      return wrap;
+    }
+
+    function renderCandidate(st) {
+      const wrap = document.createElement("div");
+      const label = document.createElement("span");
+      label.className = "section-label";
+      label.textContent = "candidate transformation (wheel ±1)";
+      wrap.appendChild(label);
+
+      const box = document.createElement("div");
+      box.className = "frontier-box";
+
+      if (st.candidate === null) {
+        const empty = document.createElement("span");
+        empty.className = "box-empty";
+        empty.textContent = st.currentState ? "generating neighbours…" : "(no candidate this step)";
+        box.appendChild(empty);
+      } else {
+        // show source -> candidate
+        if (st.currentState) {
+          box.insertAdjacentHTML("beforeend", lockStateHtml(st.currentState, "current", st.spinIndex));
+          const arr = document.createElement("span");
+          arr.style.cssText = "align-self:center;color:#888;font-size:18px;font-family:Consolas,monospace;";
+          arr.textContent = "→";
+          box.appendChild(arr);
+        }
+        let candCls = "candidate";
+        if (st.candStatus === "dead") candCls = "cand-dead";
+        else if (st.candStatus === "dup") candCls = "cand-dup";
+        else if (st.candStatus === "new") candCls = "just-added";
+        box.insertAdjacentHTML("beforeend", lockStateHtml(st.candidate, candCls, null));
+      }
+      wrap.appendChild(box);
+      return wrap;
+    }
+
+    function renderVisitedDead(st) {
+      const row = document.createElement("div");
+      row.className = "lock-row";
+
+      // visited
+      const vWrap = document.createElement("div");
+      vWrap.style.flex = "1";
+      vWrap.style.minWidth = "240px";
+      const vLabel = document.createElement("span");
+      vLabel.className = "section-label";
+      vLabel.textContent = "visited set (" + st.visited.length + ")";
+      vWrap.appendChild(vLabel);
+      const vBox = document.createElement("div");
+      vBox.className = "visited-box";
+      if (st.visited.length === 0) {
+        const e = document.createElement("span"); e.className = "box-empty"; e.textContent = "empty"; vBox.appendChild(e);
+      } else {
+        const VCAP = 120;
+        // Show the most recent VCAP visited states (insertion order) so the
+        // newly added one is always visible.
+        const start = Math.max(0, st.visited.length - VCAP);
+        if (start > 0) {
+          const more = document.createElement("span");
+          more.className = "box-empty";
+          more.textContent = "… (" + start + " earlier) ";
+          vBox.appendChild(more);
+        }
+        for (let vi = start; vi < st.visited.length; vi++) {
+          const state = st.visited[vi];
+          let cls = "";
+          if (state === st.justAdded) cls = "just-added";
+          if (state === st.target && st.foundTarget) cls = "target";
+          vBox.insertAdjacentHTML("beforeend", lockStateHtml(state, cls, null));
+        }
+      }
+      vWrap.appendChild(vBox);
+      row.appendChild(vWrap);
+
+      // deadends
+      const dWrap = document.createElement("div");
+      dWrap.style.flex = "1";
+      dWrap.style.minWidth = "200px";
+      const dLabel = document.createElement("span");
+      dLabel.className = "section-label";
+      dLabel.textContent = "dead set (" + st.deadList.length + ")";
+      dWrap.appendChild(dLabel);
+      const dBox = document.createElement("div");
+      dBox.className = "dead-box";
+      if (st.deadList.length === 0) {
+        const e = document.createElement("span"); e.className = "box-empty"; e.textContent = "none"; dBox.appendChild(e);
+      } else {
+        st.deadList.forEach(state => {
+          const isHit = state === st.candidate && st.candStatus === "dead";
+          dBox.insertAdjacentHTML("beforeend", lockStateHtml(state, isHit ? "dead" : "dead", null));
+        });
+      }
+      dWrap.appendChild(dBox);
+      row.appendChild(dWrap);
+
+      return row;
+    }
+
+    function renderResultCard(st) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = "return value (min turns)";
+
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (st.ans === "pending") {
+        value.textContent = "pending";
+      } else if (st.ans === -1) {
+        value.classList.add("fail");
+        value.textContent = "-1";
+      } else {
+        value.classList.add("found");
+        value.textContent = st.ans;
+      }
+
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(st) {
+      const traceUi = document.getElementById("trace-ui");
+      const shown = trace.slice(0, st.traceLen);
+      if (shown.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No levels processed yet. Step through to build the BFS trace.</div>';
+        return;
+      }
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr><th>#</th><th>level</th><th>event</th><th>frontier</th><th>visited</th></tr>
+          </thead>
+          <tbody>
+      `;
+      shown.forEach((row, i) => {
+        const isActive = i === shown.length - 1;
+        const isHit = /TARGET/.test(row.action) || /equals/.test(row.action);
+        const trClass = isHit ? "hit-trace" : (isActive ? "active-trace" : "");
+        html += `
+          <tr class="${trClass}">
+            <td>${i + 1}</td>
+            <td><span class="nm">${row.level}</span></td>
+            <td>${row.action}</td>
+            <td style="color:var(--greenText)">${row.frontier}</td>
+            <td><span class="nm">${row.visited}</span></td>
+          </tr>
+        `;
+      });
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    function render() {
+      // `trace` was populated by buildSteps() during init(); render slices it
+      // by the current step's traceLen so the table grows one row at a time.
+      const st = currentStep();
+
+      // Button states.
+      document.getElementById("btn-prev").disabled = stepIndex <= 0;
+      if (stepIndex >= steps.length - 1 && steps.length > 0) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      // Active example button highlight.
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      highlightLines(st.lines);
+      narrate(st.narration);
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+      visualUi.appendChild(renderOpBanner(st));
+      visualUi.appendChild(renderFrontier(st));
+      visualUi.appendChild(renderCandidate(st));
+      visualUi.appendChild(renderVisitedDead(st));
+      visualUi.appendChild(renderResultCard(st));
+
+      renderTrace(st);
+
+      // Console (Variables & Outputs). Cap long lists so giant frontiers do
+      // not produce kilobyte-long strings.
+      const capList = (arr, n) => arr.length <= n
+        ? arr.map(s => '"' + s + '"').join(", ")
+        : arr.slice(0, n).map(s => '"' + s + '"').join(", ") + ", … +" + (arr.length - n);
+      const turnsDisp = '<span class="nm">' + st.turns + '</span>';
+      const frontierDisp = '<span class="op">[' + capList(st.queue, 30) + ']</span>';
+      const visitedDisp = '<span class="op">{ ' + capList(st.visited, 30) + ' }</span>';
+      const ansDisp = st.ans === "pending"
+        ? '<span class="kw">pending</span>'
+        : '<span class="nm">' + st.ans + '</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Inputs</span><br>' +
+        '<span class="kw">const</span> target = <span class="str">"' + st.target + '"</span>;<br>' +
+        '<span class="kw">const</span> deadends = [' + st.deadList.map(s => '<span class="str">"' + s + '"</span>').join(", ") + '];<br><br>' +
+        '<span class="cm">// Live BFS state</span><br>' +
+        createConsoleLine("turns", "let", "turns", turnsDisp) +
+        createConsoleLine("frontier", "let", "queue", frontierDisp) +
+        createConsoleLine("visited", "const", "visited", visitedDisp) +
+        '<br><span class="cm">// Output</span><br>' +
+        createConsoleLine("ans", "return", "ans", ansDisp);
+
+      // HUD (mirrors pinned console rows).
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        turns: st.turns,
+        frontier: st.queue.length <= 10 ? ("[" + st.queue.join(", ") + "]") : (st.queue.length + " states"),
+        visited: st.visited.length + " states",
+        ans: st.ans
+      };
+      for (const [k, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + k + ':</span> <span class="hud-val">' + hudMap[k] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    // Boot.
+    deadends = examples[1].deadends.slice();
+    target = examples[1].target;
+    document.getElementById("custom-input").value = deadends.join(",") + " | " + target;
+    init();
+  </script>
+</body>
+</html>
