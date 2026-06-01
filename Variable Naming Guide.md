@@ -237,6 +237,54 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Reverse Nodes in k-Group:** `head`, `dummy`, `groupPrev`, `groupNext`, `kth`, `prev`, `curr`, `next`, `k`
 
+### Trees
+
+**Binary Tree Inorder Traversal:** `root`, `node`, `res`
+
+**Binary Tree Preorder Traversal:** `root`, `node`, `res`
+
+**Binary Tree Postorder Traversal:** `root`, `node`, `res`
+
+**Binary Tree Level Order Traversal:** `root`, `res`, `queue`, `level`, `node`
+
+**Invert Binary Tree:** `root`, `node`, `ans`
+
+**Maximum Depth of Binary Tree:** `root`, `node`, `depth`, `ans`
+
+**Diameter of Binary Tree:** `root`, `node`, `left`, `right`, `ans`
+
+**Balanced Binary Tree:** `root`, `node`, `left`, `right`, `balanced`
+
+**Same Tree:** `p`, `q`, `ans`
+
+**Subtree of Another Tree:** `root`, `subRoot`, `node`, `ans`
+
+**Binary Tree Right Side View:** `root`, `res`, `queue`, `node`
+
+**Count Good Nodes in Binary Tree:** `root`, `node`, `count`, `maxSoFar`
+
+**Lowest Common Ancestor of a Binary Search Tree:** `root`, `node`, `p`, `q`, `ans`
+
+**Insert into a Binary Search Tree:** `root`, `node`, `val`, `ans`
+
+**Delete Node in a BST:** `root`, `node`, `key`, `min`, `ans`
+
+**Validate Binary Search Tree:** `root`, `node`, `low`, `high`, `ans`
+
+**Kth Smallest Element in a BST:** `root`, `k`, `stack`, `node`
+
+**Construct Binary Tree from Preorder and Inorder Traversal:** `preorder`, `inorder`, `root`, `rootVal`, `mid`
+
+**Construct Quad Tree:** `grid`, `r`, `c`, `n`, `same`
+
+**House Robber III:** `root`, `node`, `left`, `right`, `withRoot`, `withoutRoot`, `res`
+
+**Delete Leaves With a Given Value:** `root`, `node`, `target`
+
+**Binary Tree Maximum Path Sum:** `root`, `node`, `left`, `right`, `ans`
+
+**Serialize and Deserialize Binary Tree:** `root`, `res`, `node`, `data`, `vals`, `i`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
