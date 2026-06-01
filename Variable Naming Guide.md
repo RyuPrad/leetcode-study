@@ -71,6 +71,32 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Concatenation of Array:** `nums`, `res`, `i`, `n`
 
+**Remove Element:** `nums`, `val`, `i`, `k`, `ans`
+
+**Majority Element:** `nums`, `num`, `count`, `ans`
+
+**Majority Element II:** `nums`, `num`, `cand1`, `cand2`, `count1`, `count2`, `res`
+
+**Sort Colors:** `nums`, `low`, `mid`, `high`
+
+**Sort an Array:** `nums`, `left`, `mid`, `right`, `i`, `j`, `k`, `temp`
+
+**Design HashSet:** `size`, `buckets`, `key`, `idx`
+
+**Design HashMap:** `size`, `buckets`, `key`, `value`, `idx`
+
+**Subarray Sum Equals K:** `nums`, `k`, `num`, `sum`, `freq`, `count`
+
+**Range Sum Query 2D - Immutable:** `matrix`, `prefix`, `row1`, `col1`, `row2`, `col2`
+
+**Best Time to Buy and Sell Stock II:** `prices`, `i`, `ans`
+
+**Valid Sudoku:** `board`, `r`, `c`, `val`, `rows`, `cols`, `boxes`, `b`, `ans`
+
+**Longest Consecutive Sequence:** `nums`, `seen`, `num`, `curr`, `length`, `ans`
+
+**First Missing Positive:** `nums`, `n`, `i`, `j`, `ans`
+
 ### Two Pointers
 
 **Valid Palindrome:** `s`, `left`, `right`, `ans`
