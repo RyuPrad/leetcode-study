@@ -285,6 +285,32 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Serialize and Deserialize Binary Tree:** `root`, `res`, `node`, `data`, `vals`, `i`
 
+### Heap / Priority Queue
+
+**Kth Largest Element in a Stream:** `k`, `heap`, `val`, `nums`, `num`
+
+**Last Stone Weight:** `stones`, `heap`, `s`, `a`, `b`
+
+**K Closest Points to Origin:** `points`, `k`, `heap`, `dist`, `res`, `i`
+
+**Kth Largest Element in an Array:** `nums`, `k`, `heap`, `num`
+
+**Task Scheduler:** `tasks`, `n`, `freq`, `heap`, `time`, `queue`, `cnt`
+
+**Design Twitter:** `time`, `tweets`, `following`, `heap`, `res`
+
+**Single-Threaded CPU:** `tasks`, `indexed`, `heap`, `time`, `i`, `res`
+
+**Reorganize String:** `s`, `freq`, `heap`, `res`, `prev`
+
+**Longest Happy String:** `heap`, `res`
+
+**Car Pooling:** `trips`, `capacity`, `heap`, `cur`
+
+**Find Median from Data Stream:** `small`, `large`, `num`, `median`
+
+**IPO:** `k`, `w`, `projects`, `maxHeap`, `i`, `j`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:

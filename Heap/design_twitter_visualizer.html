@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 355. Design Twitter Visualizer</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --panel2: #2d2d30;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --muted: #888;
+      --blue: #569cd6;
+      --cyan: #9cdcfe;
+      --green: #6a9955;
+      --greenText: #b5cea8;
+      --yellow: #d7ba7d;
+      --purple: #c586c0;
+      --red: #e24b4a;
+      --orange: #ce9178;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .page-title {
+      margin: 0 0 18px 0;
+      color: #cccccc;
+      font-size: 24px;
+      letter-spacing: 0.2px;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      color: #cccccc;
+    }
+
+    /* FLOATING DRAGGABLE CONTROLS */
+    .floating-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(30, 30, 30, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 99999;
+      border: 1px solid #444;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 310px;
+      max-width: 380px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      padding: 10px 6px;
+      border-bottom: 1px solid #444;
+      letter-spacing: 2px;
+      background: rgba(45, 45, 48, 0.7);
+      border-radius: 6px 6px 2px 2px;
+    }
+
+    .drag-handle:hover {
+      color: var(--yellow);
+      background: rgba(60, 60, 64, 0.9);
+    }
+
+    .floating-controls.dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--yellow);
+      outline: 1px solid var(--yellow);
+    }
+
+    .hud-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #555;
+      word-break: break-all;
+    }
+
+    .hud-container:empty {
+      display: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hud-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--cyan);
+      gap: 10px;
+    }
+
+    .hud-val {
+      color: var(--greenText);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .btn-row, .custom-row {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:hover { background: #1177bb; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      color: #888;
+    }
+
+    .btn-ex {
+      background: #4d4d4d;
+      font-size: 12px;
+    }
+
+    .btn-ex:hover { background: #666; }
+
+    .btn-ex.active {
+      background: var(--green);
+      color: #1e1e1e;
+      box-shadow: 0 0 10px rgba(106, 153, 85, 0.6);
+    }
+
+    .btn-small {
+      flex: 0.8;
+      font-size: 12px;
+      background: #5a5a5a;
+    }
+
+    .btn-dock {
+      background: #3a3a3a;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen {
+      background: #8b3a62;
+      font-size: 12px;
+    }
+
+    .btn-fullscreen:hover {
+      background: #a94a77;
+    }
+
+    :fullscreen body,
+    body:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    input {
+      flex: 2;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* ===== HEAP RENDERING (array + binary tree) ===== */
+    .visual-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 16px 6px;
+      min-height: 340px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .op-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-family: Consolas, monospace;
+      background: var(--panel2);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .op-call {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--cyan);
+    }
+
+    .op-call .keyhl {
+      color: var(--yellow);
+      background: rgba(215, 186, 125, 0.16);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .op-call .valhl {
+      color: var(--greenText);
+      background: rgba(181, 206, 168, 0.14);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .heap-wrap {
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 12px 14px;
+    }
+
+    .heap-title {
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .heap-tag {
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+
+    .heap-tag.min { color: var(--cyan); background: #1e3a5c; border: 1px solid var(--blue); }
+    .heap-tag.max { color: #ffd9b3; background: #46331e; border: 1px solid var(--orange); }
+
+    .heap-arrayrow {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .hcell-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hcell {
+      min-width: 46px;
+      height: 46px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #555;
+      border-radius: 8px;
+      background: var(--panel2);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: bold;
+      font-family: Consolas, monospace;
+      transition: all 0.22s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    .hcell-idx {
+      color: var(--muted);
+      font-size: 11px;
+      font-family: Consolas, monospace;
+    }
+
+    .hcell.root { border-color: var(--green); box-shadow: 0 0 10px rgba(106,153,85,0.4); }
+    .hcell.sift { border-color: var(--yellow); background: #3a3320; transform: translateY(-4px) scale(1.06); box-shadow: 0 0 12px rgba(215,186,125,0.45); }
+    .hcell.swap { border-color: var(--orange); background: #46331e; animation: pulseSwap 0.8s ease-in-out infinite; }
+    .hcell.added { border-color: var(--green); background: #26472d; color: var(--greenText); }
+    .hcell.popped { border-color: var(--red); background: #4a2525; color: #ffb3b3; text-decoration: line-through; opacity: 0.75; }
+
+    @keyframes pulseSwap {
+      0%, 100% { transform: translateY(-2px) scale(1.04); }
+      50% { transform: translateY(-7px) scale(1.12); }
+    }
+
+    .heap-empty {
+      color: #666;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      padding: 6px 0;
+    }
+
+    /* tree (SVG-positioned) */
+    .heap-tree {
+      position: relative;
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .tree-svg { display: block; }
+
+    .tree-node {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      margin-left: -22px;
+      margin-top: -22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #555;
+      border-radius: 50%;
+      background: var(--panel2);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: bold;
+      font-family: Consolas, monospace;
+      transition: all 0.2s ease;
+      box-shadow: 0 3px 5px rgba(0,0,0,0.35);
+    }
+
+    .tree-node.root { border-color: var(--green); box-shadow: 0 0 10px rgba(106,153,85,0.45); }
+    .tree-node.sift { border-color: var(--yellow); background: #3a3320; box-shadow: 0 0 12px rgba(215,186,125,0.5); }
+    .tree-node.swap { border-color: var(--orange); background: #46331e; }
+    .tree-node.added { border-color: var(--green); background: #26472d; color: var(--greenText); }
+    .tree-node.popped { border-color: var(--red); background: #4a2525; color: #ffb3b3; }
+
+    .tree-idx {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* generic state boxes (timelines, maps, lists) */
+    .state-grid {
+      display: grid;
+      grid-template-columns: 130px minmax(220px, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .state-label {
+      font-family: Consolas, monospace;
+      color: var(--cyan);
+      font-weight: bold;
+      padding: 8px 10px;
+      background: var(--panel2);
+      border-radius: 4px;
+      border: 1px solid #444;
+      text-align: center;
+    }
+
+    .state-box {
+      min-height: 44px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .state-box.active { border-color: var(--yellow); box-shadow: 0 0 12px rgba(215,186,125,0.22); }
+
+    .pill {
+      background: var(--panel2);
+      color: var(--greenText);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-family: Consolas, monospace;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .pill .pk { color: var(--cyan); }
+    .pill .psep { color: var(--muted); }
+    .pill .pv { color: var(--greenText); }
+    .pill.dim { opacity: 0.45; }
+    .pill.scanning { border-color: var(--yellow); background: #3a3320; transform: scale(1.07); box-shadow: 0 0 10px rgba(215,186,125,0.4); }
+    .pill.admit { border-color: var(--blue); background: #1e3a5c; box-shadow: 0 0 10px rgba(86,156,214,0.45); }
+    .pill.picked { border-color: var(--green); background: #233525; animation: pulseSwap 0.8s ease-in-out infinite; }
+
+    .chain-arrow { color: var(--muted); font-family: Consolas, monospace; font-size: 16px; }
+    .state-empty { color: #666; font-family: Consolas, monospace; font-size: 13px; }
+
+    .result-card {
+      margin-top: 4px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--bg);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: Consolas, monospace;
+    }
+
+    .result-label { color: var(--cyan); }
+
+    .result-value {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 5px 12px;
+      border-radius: 4px;
+      color: #888;
+      background: var(--panel2);
+    }
+
+    .result-value.hit { color: var(--greenText); background: #233525; border: 1px solid var(--green); }
+    .result-value.void { color: var(--cyan); background: #1e3a5c; border: 1px solid var(--blue); }
+
+    /* CODE PANEL */
+    .code-panel {
+      background: var(--bg);
+      font-family: Consolas, monospace;
+      font-size: 13.5px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 10px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      padding: 2px 15px;
+      border-left: 4px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: #062f4a;
+      border-left-color: var(--blue);
+    }
+
+    .kw { color: var(--purple); }
+    .fn { color: #dcdcaa; }
+    .cm { color: var(--green); }
+    .nm { color: var(--greenText); }
+    .vr { color: var(--cyan); }
+    .op { color: var(--text); }
+    .str { color: var(--orange); }
+
+    /* CONSOLE */
+    .console {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      line-height: 1.6;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pin-btn {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-right: 15px;
+      flex-shrink: 0;
+      width: 75px;
+      transition: 0.2s;
+    }
+
+    .pin-btn:hover { background: #333; }
+
+    .pin-btn.active {
+      background: #0e639c;
+      color: white;
+      border-color: #0e639c;
+      font-weight: bold;
+    }
+
+    .narration {
+      background: var(--panel2);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    /* Trace table */
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trace-table th,
+    .trace-table td {
+      border-bottom: 1px solid #333;
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    .trace-table th {
+      color: var(--cyan);
+      background: var(--panel2);
+      font-weight: bold;
+    }
+
+    .trace-table tr.active-trace { background: #062f4a; }
+    .trace-table tr.hit-trace { background: rgba(106, 153, 85, 0.14); }
+
+    .trace-empty {
+      font-family: Consolas, monospace;
+      color: #888;
+      background: var(--bg);
+      border: 1px dashed #555;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .floating-controls {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        min-width: 290px;
+      }
+      .state-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+</head>
+<body>
+  <h1 class="page-title">Leetcode 355. Design Twitter</h1>
+
+  <div class="floating-controls" id="drag-container">
+    <div class="drag-handle" id="drag-handle">DRAG CONTROLS</div>
+    <div id="hud-ui" class="hud-container"></div>
+
+    <div class="btn-row">
+      <button id="btn-ex-1" class="btn-ex" onclick="loadExample(1)">post/follow/feed</button>
+      <button id="btn-ex-2" class="btn-ex" onclick="loadExample(2)">merge 3 users</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-ex-3" class="btn-ex" onclick="loadExample(3)">10-cap feed</button>
+      <button id="btn-ex-4" class="btn-ex" onclick="loadExample(4)">unfollow self stays</button>
+    </div>
+
+    <div class="custom-row">
+      <input id="custom-input" value="post 1 5; feed 1; follow 1 2; post 2 6; feed 1" placeholder="post 1 5; feed 1; follow 1 2; post 2 6; feed 1" />
+      <button class="btn-small" onclick="loadCustom()">Load</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
+      <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-prev" onclick="prevStep()" disabled>Step Back</button>
+      <button id="btn-next" onclick="nextStep()">Step Over</button>
+      <button id="btn-reset" onclick="init()">Reset</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
+      <h2>Timelines + Following Map + Max-Heap (by time)</h2>
+      <div id="visual-ui" class="visual-stage"></div>
+      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+    </div>
+
+    <div class="panel" style="flex: 1.35;">
+      <h2>Live Debugger</h2>
+      <div class="code-panel">
+<div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">Twitter</span> {</div>
+<div id="line-2" class="code-line">  <span class="fn">constructor</span>() {</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.time = <span class="nm">0</span>;</div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.tweets = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -> [[time, tweetId]]</span></div>
+<div id="line-5" class="code-line">    <span class="kw">this</span>.following = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -> Set</span></div>
+<div id="line-6" class="code-line">  }</div>
+<div id="line-7" class="code-line">  <span class="fn">postTweet</span>(userId, tweetId) {</div>
+<div id="line-8" class="code-line">    <span class="kw">if</span> (!<span class="kw">this</span>.tweets.<span class="fn">has</span>(userId)) <span class="kw">this</span>.tweets.<span class="fn">set</span>(userId, []);</div>
+<div id="line-9" class="code-line">    <span class="kw">this</span>.tweets.<span class="fn">get</span>(userId).<span class="fn">push</span>([<span class="kw">this</span>.time++, tweetId]);</div>
+<div id="line-10" class="code-line">  }</div>
+<div id="line-11" class="code-line">  <span class="fn">getNewsFeed</span>(userId) {</div>
+<div id="line-12" class="code-line">    <span class="kw">const</span> heap = <span class="kw">new</span> <span class="vr">MaxHeap</span>(); <span class="cm">// by entry[0] = time</span></div>
+<div id="line-13" class="code-line">    <span class="kw">const</span> users = <span class="kw">new</span> <span class="fn">Set</span>(<span class="kw">this</span>.following.<span class="fn">get</span>(userId) || []);</div>
+<div id="line-14" class="code-line">    users.<span class="fn">add</span>(userId);</div>
+<div id="line-15" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> u <span class="kw">of</span> users) {</div>
+<div id="line-16" class="code-line">      <span class="kw">for</span> (<span class="kw">const</span> entry <span class="kw">of</span> (<span class="kw">this</span>.tweets.<span class="fn">get</span>(u) || [])) {</div>
+<div id="line-17" class="code-line">        heap.<span class="fn">push</span>(entry);</div>
+<div id="line-18" class="code-line">      }</div>
+<div id="line-19" class="code-line">    }</div>
+<div id="line-20" class="code-line">    <span class="kw">const</span> res = [];</div>
+<div id="line-21" class="code-line">    <span class="kw">while</span> (heap.<span class="fn">size</span>() && res.length < <span class="nm">10</span>) {</div>
+<div id="line-22" class="code-line">      res.<span class="fn">push</span>(heap.<span class="fn">pop</span>()[<span class="nm">1</span>]);</div>
+<div id="line-23" class="code-line">    }</div>
+<div id="line-24" class="code-line">    <span class="kw">return</span> res;</div>
+<div id="line-25" class="code-line">  }</div>
+<div id="line-26" class="code-line">  <span class="fn">follow</span>(followerId, followeeId) {</div>
+<div id="line-27" class="code-line">    <span class="kw">if</span> (!<span class="kw">this</span>.following.<span class="fn">has</span>(followerId)) <span class="kw">this</span>.following.<span class="fn">set</span>(followerId, <span class="kw">new</span> <span class="fn">Set</span>());</div>
+<div id="line-28" class="code-line">    <span class="kw">this</span>.following.<span class="fn">get</span>(followerId).<span class="fn">add</span>(followeeId);</div>
+<div id="line-29" class="code-line">  }</div>
+<div id="line-30" class="code-line">  <span class="fn">unfollow</span>(followerId, followeeId) {</div>
+<div id="line-31" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.following.<span class="fn">has</span>(followerId)) <span class="kw">this</span>.following.<span class="fn">get</span>(followerId).<span class="fn">delete</span>(followeeId);</div>
+<div id="line-32" class="code-line">  }</div>
+<div id="line-33" class="code-line">}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="margin-top: 0;">
+    <div class="panel" style="flex: 1.2;">
+      <h2>Operation Trace</h2>
+      <div id="trace-ui"></div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <h2>Variables & Outputs</h2>
+      <div class="console" id="console-ui"></div>
+    </div>
+  </div>
+
+  <script>
+
+    // ============================================================
+    // DRAG LOGIC - verbatim from the reference visualizer.
+    // ============================================================
+    const dragContainer = document.getElementById("drag-container");
+    const dragHandle = document.getElementById("drag-handle");
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function beginDrag(e) {
+      if (e.type === "mousedown" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const rect = dragContainer.getBoundingClientRect();
+
+      dragContainer.style.left = rect.left + "px";
+      dragContainer.style.top = rect.top + "px";
+      dragContainer.style.right = "auto";
+      dragContainer.style.bottom = "auto";
+
+      startX = point.x;
+      startY = point.y;
+      startLeft = rect.left;
+      startTop = rect.top;
+      isDragging = true;
+
+      dragContainer.classList.add("dragging");
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getPoint(e);
+      const dx = point.x - startX;
+      const dy = point.y - startY;
+
+      const maxLeft = Math.max(0, window.innerWidth - dragContainer.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - dragContainer.offsetHeight);
+
+      const nextLeft = Math.min(Math.max(0, startLeft + dx), maxLeft);
+      const nextTop = Math.min(Math.max(0, startTop + dy), maxTop);
+
+      dragContainer.style.left = nextLeft + "px";
+      dragContainer.style.top = nextTop + "px";
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      isDragging = false;
+      dragContainer.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+    }
+
+    // Use several event families because embedded webviews can be inconsistent.
+    dragHandle.addEventListener("mousedown", beginDrag, false);
+    document.addEventListener("mousemove", moveDrag, false);
+    document.addEventListener("mouseup", endDrag, false);
+
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    document.addEventListener("touchmove", moveDrag, { passive: false });
+    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("touchcancel", endDrag, { passive: false });
+
+    dragHandle.addEventListener("pointerdown", beginDrag, false);
+    document.addEventListener("pointermove", moveDrag, false);
+    document.addEventListener("pointerup", endDrag, false);
+    document.addEventListener("pointercancel", endDrag, false);
+
+    function dockControls(side) {
+      dragContainer.style.top = "20px";
+      dragContainer.style.bottom = "auto";
+      if (side === "left") {
+        dragContainer.style.left = "20px";
+        dragContainer.style.right = "auto";
+      } else {
+        dragContainer.style.right = "20px";
+        dragContainer.style.left = "auto";
+      }
+    }
+
+    async function toggleFullScreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        // Some iframe hosts block fullscreen unless the iframe has allowfullscreen.
+        // Since this runs from a user click, opening the visualizer directly is a useful fallback.
+        const opened = window.open(window.location.href, "_blank");
+        if (!opened) {
+          alert("Fullscreen was blocked. Add allowfullscreen to the iframe, or open this HTML file directly in your browser.");
+        }
+      }
+    }
+
+    function updateFullScreenButton() {
+      const btn = document.getElementById("btn-fullscreen");
+      if (!btn) return;
+      btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+    }
+
+    document.addEventListener("fullscreenchange", updateFullScreenButton);
+
+
+    // ============================================================
+    // SHARED HEAP RENDERING (array view + binary tree view).
+    // A heap snapshot is just an array of values (numbers, or tuples
+    // rendered via labelFn). flags = { sift:Set, swap:Set, added:idx,
+    // popped:value-shown-as-ghost(handled by caller via extra cells) }.
+    // ============================================================
+    function renderHeapView(title, kind, arr, flags, labelFn) {
+      flags = flags || {};
+      labelFn = labelFn || (v => String(v));
+      const wrap = document.createElement("div");
+      wrap.className = "heap-wrap";
+
+      const head = document.createElement("div");
+      head.className = "heap-title";
+      const tag = document.createElement("span");
+      tag.className = "heap-tag " + (kind === "min" ? "min" : "max");
+      tag.textContent = kind === "min" ? "MIN-HEAP" : "MAX-HEAP";
+      head.appendChild(tag);
+      const ttl = document.createElement("span");
+      ttl.innerHTML = title + ' <span style="color:var(--muted)">size = ' + arr.length + "</span>";
+      head.appendChild(ttl);
+      wrap.appendChild(head);
+
+      // ----- array row -----
+      const row = document.createElement("div");
+      row.className = "heap-arrayrow";
+      if (arr.length === 0) {
+        const e = document.createElement("div");
+        e.className = "heap-empty";
+        e.textContent = "data = []  (empty)";
+        row.appendChild(e);
+      } else {
+        arr.forEach((v, i) => {
+          const cw = document.createElement("div");
+          cw.className = "hcell-wrap";
+          const cell = document.createElement("div");
+          cell.className = "hcell";
+          if (i === 0) cell.classList.add("root");
+          if (flags.sift && flags.sift.has(i)) cell.classList.add("sift");
+          if (flags.swap && flags.swap.has(i)) cell.classList.add("swap");
+          if (flags.added === i) cell.classList.add("added");
+          cell.textContent = labelFn(v);
+          const idx = document.createElement("div");
+          idx.className = "hcell-idx";
+          idx.textContent = i;
+          cw.appendChild(cell);
+          cw.appendChild(idx);
+          row.appendChild(cw);
+        });
+      }
+      wrap.appendChild(row);
+
+      // ----- binary tree -----
+      const tree = buildTree(arr, flags, labelFn);
+      wrap.appendChild(tree);
+      return wrap;
+    }
+
+    function buildTree(arr, flags, labelFn) {
+      const tree = document.createElement("div");
+      tree.className = "heap-tree";
+      if (arr.length === 0) {
+        const e = document.createElement("div");
+        e.className = "heap-empty";
+        e.textContent = "(tree empty)";
+        tree.appendChild(e);
+        return tree;
+      }
+      const depth = Math.floor(Math.log2(arr.length)) + 1;
+      const leafCount = Math.pow(2, depth - 1);
+      const W = Math.max(280, leafCount * 64);
+      const levelH = 64;
+      const H = depth * levelH + 20;
+
+      const xmlns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(xmlns, "svg");
+      svg.setAttribute("class", "tree-svg");
+      svg.setAttribute("width", W);
+      svg.setAttribute("height", H);
+
+      function nodeX(i) {
+        const level = Math.floor(Math.log2(i + 1));
+        const idxInLevel = i - (Math.pow(2, level) - 1);
+        const slots = Math.pow(2, level);
+        return W * (idxInLevel + 0.5) / slots;
+      }
+      function nodeY(i) {
+        const level = Math.floor(Math.log2(i + 1));
+        return 28 + level * levelH;
+      }
+
+      // edges first
+      for (let i = 1; i < arr.length; i++) {
+        const p = (i - 1) >> 1;
+        const line = document.createElementNS(xmlns, "line");
+        line.setAttribute("x1", nodeX(p));
+        line.setAttribute("y1", nodeY(p));
+        line.setAttribute("x2", nodeX(i));
+        line.setAttribute("y2", nodeY(i));
+        line.setAttribute("stroke", "#555");
+        line.setAttribute("stroke-width", "2");
+        svg.appendChild(line);
+      }
+      tree.appendChild(svg);
+
+      // node chips positioned absolutely over the svg
+      arr.forEach((v, i) => {
+        const node = document.createElement("div");
+        node.className = "tree-node";
+        if (i === 0) node.classList.add("root");
+        if (flags.sift && flags.sift.has(i)) node.classList.add("sift");
+        if (flags.swap && flags.swap.has(i)) node.classList.add("swap");
+        if (flags.added === i) node.classList.add("added");
+        node.style.left = nodeX(i) + "px";
+        node.style.top = nodeY(i) + "px";
+        node.textContent = labelFn(v);
+        const idx = document.createElement("div");
+        idx.className = "tree-idx";
+        idx.textContent = i;
+        node.appendChild(idx);
+        tree.appendChild(node);
+      });
+      tree.style.position = "relative";
+      tree.style.height = H + "px";
+      return tree;
+    }
+
+
+    // ============================================================
+    // EMBEDDED ES6 MAX-HEAP keyed by entry[0] = time (most recent
+    // tweet on top). Pure ES6 class form (no legacy patterns).
+    // Elements are [time, tweetId] tuples.
+    // ============================================================
+    class MaxHeap {
+      constructor() { this.data = []; }
+      size() { return this.data.length; }
+      peek() { return this.data[0]; }
+      // compare by time (element[0]); newer tweets are "larger".
+      _gt(a, b) { return a[0] > b[0]; }
+      push(val) {
+        this.data.push(val);
+        this._siftUp(this.data.length - 1);
+      }
+      pop() {
+        const top = this.data[0];
+        const last = this.data.pop();
+        if (this.data.length > 0) {
+          this.data[0] = last;
+          this._siftDown(0);
+        }
+        return top;
+      }
+      _siftUp(i) {
+        while (i > 0) {
+          const parent = (i - 1) >> 1;
+          if (!this._gt(this.data[i], this.data[parent])) break;
+          [this.data[parent], this.data[i]] = [this.data[i], this.data[parent]];
+          i = parent;
+        }
+      }
+      _siftDown(i) {
+        const n = this.data.length;
+        while (true) {
+          let largest = i;
+          const l = 2 * i + 1, r = 2 * i + 2;
+          if (l < n && this._gt(this.data[l], this.data[largest])) largest = l;
+          if (r < n && this._gt(this.data[r], this.data[largest])) largest = r;
+          if (largest === i) break;
+          [this.data[largest], this.data[i]] = [this.data[i], this.data[largest]];
+          i = largest;
+        }
+      }
+    }
+
+    // ============================================================
+    // HUD STATE - pinnable rows.
+    // ============================================================
+    let pinned = { op: true, time: true, heap: true, feed: true };
+    function togglePin(vName) { pinned[vName] = !pinned[vName]; render(); }
+
+    // ============================================================
+    // EXAMPLES - each is a list of operations:
+    //   { method: "postTweet", a: userId, b: tweetId }
+    //   { method: "getNewsFeed", a: userId }
+    //   { method: "follow"|"unfollow", a, b }
+    // ============================================================
+    const examples = {
+      1: [
+        { method: "postTweet", a: 1, b: 5 },
+        { method: "getNewsFeed", a: 1 },
+        { method: "follow", a: 1, b: 2 },
+        { method: "postTweet", a: 2, b: 6 },
+        { method: "getNewsFeed", a: 1 },
+        { method: "unfollow", a: 1, b: 2 },
+        { method: "getNewsFeed", a: 1 }
+      ],
+      2: [
+        { method: "postTweet", a: 1, b: 101 },
+        { method: "postTweet", a: 2, b: 201 },
+        { method: "postTweet", a: 3, b: 301 },
+        { method: "follow", a: 1, b: 2 },
+        { method: "follow", a: 1, b: 3 },
+        { method: "postTweet", a: 2, b: 202 },
+        { method: "getNewsFeed", a: 1 }
+      ],
+      3: [
+        { method: "postTweet", a: 1, b: 10 },
+        { method: "postTweet", a: 1, b: 11 },
+        { method: "postTweet", a: 1, b: 12 },
+        { method: "postTweet", a: 1, b: 13 },
+        { method: "postTweet", a: 1, b: 14 },
+        { method: "postTweet", a: 1, b: 15 },
+        { method: "postTweet", a: 1, b: 16 },
+        { method: "postTweet", a: 1, b: 17 },
+        { method: "postTweet", a: 1, b: 18 },
+        { method: "postTweet", a: 1, b: 19 },
+        { method: "postTweet", a: 1, b: 20 },
+        { method: "getNewsFeed", a: 1 }
+      ],
+      4: [
+        { method: "postTweet", a: 1, b: 5 },
+        { method: "follow", a: 1, b: 2 },
+        { method: "postTweet", a: 2, b: 6 },
+        { method: "getNewsFeed", a: 1 },
+        { method: "unfollow", a: 1, b: 2 },
+        { method: "getNewsFeed", a: 1 }
+      ]
+    };
+
+    // ============================================================
+    // STATE - index into a precomputed steps[] array.
+    // ============================================================
+    let ops = [];
+    let steps = [];
+    let stepIndex = 0;
+    let activeExample = 1;
+    let masterTrace = [];
+
+    // A heap element [time, tweetId] is shown as "t<time>:#<id>".
+    function entryLabel(e) { return "t" + e[0] + ":#" + e[1]; }
+
+    // ----- snapshot helpers: clone tweets/following maps -----
+    function cloneTweets(m) {
+      const o = {};
+      for (const [u, list] of m) o[u] = list.map(e => e.slice());
+      return o;
+    }
+    function cloneFollowing(m) {
+      const o = {};
+      for (const [u, set] of m) o[u] = [...set];
+      return o;
+    }
+
+    // ----- Precompute steps by running the real implementation -----
+    function buildSteps(opList) {
+      let time = 0;
+      const tweets = new Map();
+      const following = new Map();
+      const built = [];
+      const traceRows = [];
+
+      function snap(extra) {
+        built.push({
+          time,
+          tweets: cloneTweets(tweets),
+          following: cloneFollowing(following),
+          method: extra.method,
+          a: (extra.a === undefined) ? null : extra.a,
+          b: (extra.b === undefined) ? null : extra.b,
+          heap: (extra.heap ? extra.heap.map(e => e.slice()) : []),
+          feedUsers: extra.feedUsers || null,
+          scanUser: (extra.scanUser === undefined) ? null : extra.scanUser,
+          pushedEntry: (extra.pushedEntry === undefined) ? null : extra.pushedEntry,
+          heapAdded: (extra.heapAdded === undefined) ? null : extra.heapAdded,
+          poppedTweet: (extra.poppedTweet === undefined) ? null : extra.poppedTweet,
+          feed: extra.feed ? extra.feed.slice() : [],
+          lines: extra.lines,
+          narration: extra.narration,
+          result: (extra.result === undefined) ? "void" : extra.result,
+          traceLen: traceRows.length
+        });
+      }
+
+      snap({
+        method: "init", lines: [2, 3, 4, 5],
+        narration: "Constructor: a global clock <code>time = 0</code>, a <code>tweets</code> map (user -> list of [time, tweetId]), and a <code>following</code> map (user -> set of followees)."
+      });
+
+      opList.forEach((op) => {
+        if (op.method === "postTweet") {
+          const userId = op.a, tweetId = op.b;
+          snap({
+            method: "postTweet", a: userId, b: tweetId, lines: [7],
+            narration: "<b>postTweet(" + userId + ", " + tweetId + ")</b> - record a tweet for user <b>" + userId + "</b> with the current timestamp."
+          });
+          if (!tweets.has(userId)) tweets.set(userId, []);
+          snap({
+            method: "postTweet", a: userId, b: tweetId, lines: [8],
+            narration: "Make sure user <b>" + userId + "</b> has a tweet list (create an empty one if this is their first tweet)."
+          });
+          tweets.get(userId).push([time, tweetId]);
+          const stamped = time;
+          time++;
+          snap({
+            method: "postTweet", a: userId, b: tweetId, lines: [9],
+            narration: "Append <code>[time=" + stamped + ", tweetId=" + tweetId + "]</code> to user <b>" + userId + "</b>'s timeline, then increment the global clock to <b>" + time + "</b>."
+          });
+          traceRows.push({ op: "postTweet(" + userId + "," + tweetId + ")", result: "time " + stamped });
+
+        } else if (op.method === "follow") {
+          const a = op.a, b = op.b;
+          snap({
+            method: "follow", a, b, lines: [26],
+            narration: "<b>follow(" + a + ", " + b + ")</b> - user <b>" + a + "</b> starts following user <b>" + b + "</b>."
+          });
+          if (!following.has(a)) following.set(a, new Set());
+          following.get(a).add(b);
+          snap({
+            method: "follow", a, b, lines: [27, 28],
+            narration: "Add <b>" + b + "</b> to user <b>" + a + "</b>'s following set. Their feed will now merge <b>" + b + "</b>'s tweets too."
+          });
+          traceRows.push({ op: "follow(" + a + "," + b + ")", result: "ok" });
+
+        } else if (op.method === "unfollow") {
+          const a = op.a, b = op.b;
+          snap({
+            method: "unfollow", a, b, lines: [30],
+            narration: "<b>unfollow(" + a + ", " + b + ")</b> - user <b>" + a + "</b> stops following user <b>" + b + "</b>."
+          });
+          const had = following.has(a) && following.get(a).has(b);
+          if (following.has(a)) following.get(a).delete(b);
+          snap({
+            method: "unfollow", a, b, lines: [31],
+            narration: had
+              ? "Remove <b>" + b + "</b> from user <b>" + a + "</b>'s following set."
+              : "User <b>" + a + "</b> was not following <b>" + b + "</b>; nothing changes."
+          });
+          traceRows.push({ op: "unfollow(" + a + "," + b + ")", result: had ? "removed" : "noop" });
+
+        } else { // getNewsFeed
+          const userId = op.a;
+          const heap = new MaxHeap();
+          snap({
+            method: "getNewsFeed", a: userId, lines: [11, 12], heap: heap.data,
+            narration: "<b>getNewsFeed(" + userId + ")</b> - build a fresh max-heap keyed by tweet time to merge the newest tweets."
+          });
+          const users = new Set(following.get(userId) || []);
+          users.add(userId);
+          const userArr = [...users];
+          snap({
+            method: "getNewsFeed", a: userId, lines: [13, 14], heap: heap.data, feedUsers: userArr,
+            narration: "The feed merges tweets from everyone <b>" + userId + "</b> follows, plus <b>" + userId + "</b>: users { " + userArr.join(", ") + " }."
+          });
+
+          for (const u of userArr) {
+            snap({
+              method: "getNewsFeed", a: userId, lines: [15, 16], heap: heap.data.map(e => e.slice()),
+              feedUsers: userArr, scanUser: u,
+              narration: "Scan user <b>" + u + "</b>'s timeline and push each of their tweets into the heap."
+            });
+            const list = tweets.get(u) || [];
+            for (const entry of list) {
+              heap.push(entry.slice());
+              snap({
+                method: "getNewsFeed", a: userId, lines: [17], heap: heap.data.map(e => e.slice()),
+                feedUsers: userArr, scanUser: u, pushedEntry: entry.slice(), heapAdded: heap.data.length - 1,
+                narration: "Push <code>[time=" + entry[0] + ", tweetId=" + entry[1] + "]</code> from user <b>" + u + "</b> (sift-up keeps the newest tweet at the root)."
+              });
+            }
+          }
+
+          const res = [];
+          snap({
+            method: "getNewsFeed", a: userId, lines: [20, 21], heap: heap.data.map(e => e.slice()),
+            feedUsers: userArr, feed: res.slice(),
+            narration: "All tweets are in the heap. Pop the newest (largest time) up to 10 times to build the feed."
+          });
+          while (heap.size() && res.length < 10) {
+            const topTweet = heap.data[0][1];
+            snap({
+              method: "getNewsFeed", a: userId, lines: [21, 22], heap: heap.data.map(e => e.slice()),
+              feedUsers: userArr, feed: res.slice(), poppedTweet: topTweet,
+              narration: "Heap root is <code>[time=" + heap.data[0][0] + ", tweetId=" + topTweet + "]</code> - the most recent remaining tweet. Pop it and append tweetId <b>" + topTweet + "</b> to <code>res</code>."
+            });
+            res.push(heap.pop()[1]);
+            snap({
+              method: "getNewsFeed", a: userId, lines: [22], heap: heap.data.map(e => e.slice()),
+              feedUsers: userArr, feed: res.slice(),
+              narration: "Feed so far: [" + res.join(", ") + "]. The heap re-heapified, exposing the next-newest tweet."
+            });
+          }
+          traceRows.push({ op: "getNewsFeed(" + userId + ")", result: "[" + res.join(", ") + "]" });
+          snap({
+            method: "getNewsFeed", a: userId, lines: [24], heap: heap.data.map(e => e.slice()),
+            feedUsers: userArr, feed: res.slice(), result: "hit",
+            narration: "Return the merged feed <b>[" + res.join(", ") + "]</b> - the 10 most recent tweet IDs, newest first."
+          });
+        }
+      });
+
+      masterTrace = traceRows;
+      return built;
+    }
+
+    // ----- input handling -----
+    function loadExample(exNum) {
+      activeExample = exNum;
+      ops = examples[exNum].map(o => ({ ...o }));
+      document.getElementById("custom-input").value = opsToString(ops);
+      init();
+    }
+
+    function opsToString(opList) {
+      return opList.map(o => {
+        if (o.method === "postTweet") return "post " + o.a + " " + o.b;
+        if (o.method === "getNewsFeed") return "feed " + o.a;
+        if (o.method === "follow") return "follow " + o.a + " " + o.b;
+        return "unfollow " + o.a + " " + o.b;
+      }).join("; ");
+    }
+
+    function loadCustom() {
+      const raw = document.getElementById("custom-input").value.trim();
+      if (raw === "") {
+        alert("Enter operations, e.g. post 1 5; feed 1; follow 1 2; post 2 6; feed 1");
+        return;
+      }
+      const parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
+      const parsed = [];
+      for (const part of parts) {
+        const tokens = part.split(/\s+/);
+        const method = (tokens[0] || "").toLowerCase();
+        const a = Number(tokens[1]);
+        if (method === "post" || method === "posttweet") {
+          const b = Number(tokens[2]);
+          if (tokens.length < 3 || Number.isNaN(a) || Number.isNaN(b)) {
+            alert("post needs userId and tweetId. Example: post 1 5  (got \"" + part + "\")");
+            return;
+          }
+          parsed.push({ method: "postTweet", a, b });
+        } else if (method === "feed" || method === "getnewsfeed") {
+          if (tokens.length < 2 || Number.isNaN(a)) {
+            alert("feed needs a userId. Example: feed 1  (got \"" + part + "\")");
+            return;
+          }
+          parsed.push({ method: "getNewsFeed", a });
+        } else if (method === "follow") {
+          const b = Number(tokens[2]);
+          if (tokens.length < 3 || Number.isNaN(a) || Number.isNaN(b)) {
+            alert("follow needs followerId and followeeId. Example: follow 1 2  (got \"" + part + "\")");
+            return;
+          }
+          parsed.push({ method: "follow", a, b });
+        } else if (method === "unfollow") {
+          const b = Number(tokens[2]);
+          if (tokens.length < 3 || Number.isNaN(a) || Number.isNaN(b)) {
+            alert("unfollow needs followerId and followeeId. Example: unfollow 1 2  (got \"" + part + "\")");
+            return;
+          }
+          parsed.push({ method: "unfollow", a, b });
+        } else {
+          alert("Unknown operation: \"" + part + "\".\nUse post, feed, follow, or unfollow.");
+          return;
+        }
+      }
+      ops = parsed;
+      activeExample = 0;
+      init();
+    }
+
+    function init() {
+      steps = buildSteps(ops);
+      stepIndex = 0;
+      document.getElementById("btn-next").disabled = false;
+      document.getElementById("btn-next").textContent = "Step Over";
+      render();
+    }
+
+    function nextStep() {
+      if (stepIndex >= steps.length - 1) return;
+      stepIndex++;
+      render();
+    }
+
+    function prevStep() {
+      if (stepIndex <= 0) return;
+      stepIndex--;
+      render();
+    }
+
+    function highlightLines(linesArray) {
+      document.querySelectorAll(".code-line").forEach(el => el.classList.remove("active"));
+      linesArray.forEach(lineNum => {
+        const el = document.getElementById("line-" + lineNum);
+        if (el) el.classList.add("active");
+      });
+    }
+
+    function narrate(text) { document.getElementById("narration-ui").innerHTML = text; }
+
+    function currentStep() {
+      if (steps.length === 0) {
+        return { time: 0, tweets: {}, following: {}, method: "init", a: null, b: null, heap: [],
+          feedUsers: null, scanUser: null, pushedEntry: null, heapAdded: null, poppedTweet: null,
+          feed: [], lines: [1], narration: "No operations.", result: "void", traceLen: 0 };
+      }
+      return steps[stepIndex];
+    }
+
+    function createConsoleLine(varKey, keyword, varName, varValue) {
+      const isActive = pinned[varKey];
+      const btnClass = isActive ? "pin-btn active" : "pin-btn";
+      const btnText = isActive ? "HUD ON" : "HUD OFF";
+      return `
+        <div class="console-line">
+          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
+        </div>
+      `;
+    }
+
+    // ----- visual builders -----
+    function renderOpBanner(st) {
+      const banner = document.createElement("div");
+      banner.className = "op-banner";
+      const call = document.createElement("div");
+      call.className = "op-call";
+      if (st.method === "init") {
+        call.innerHTML = '<span class="kw">new</span> Twitter()';
+      } else if (st.method === "postTweet") {
+        call.innerHTML = 'postTweet(<span class="keyhl">' + st.a + '</span>, <span class="valhl">' + st.b + '</span>)';
+      } else if (st.method === "getNewsFeed") {
+        call.innerHTML = 'getNewsFeed(<span class="keyhl">' + st.a + '</span>)';
+      } else {
+        call.innerHTML = st.method + '(<span class="keyhl">' + st.a + '</span>, <span class="valhl">' + st.b + '</span>)';
+      }
+      banner.appendChild(call);
+      const eq = document.createElement("div");
+      eq.className = "hash-eq";
+      eq.innerHTML = "global time = <span class=\"idxhl\">" + st.time + "</span>";
+      banner.appendChild(eq);
+      return banner;
+    }
+
+    function renderTimelines(st) {
+      const grid = document.createElement("div");
+      grid.className = "state-grid";
+      const label = document.createElement("div");
+      label.className = "state-label";
+      label.innerHTML = "tweets<br>(user -><br>timeline)";
+      const box = document.createElement("div");
+      box.className = "state-box";
+      box.style.flexDirection = "column";
+      box.style.alignItems = "stretch";
+      const userIds = Object.keys(st.tweets);
+      if (userIds.length === 0) {
+        const e = document.createElement("span");
+        e.className = "state-empty";
+        e.textContent = "no tweets yet";
+        box.appendChild(e);
+      } else {
+        userIds.forEach(u => {
+          const rowEl = document.createElement("div");
+          rowEl.style.display = "flex";
+          rowEl.style.alignItems = "center";
+          rowEl.style.gap = "8px";
+          rowEl.style.flexWrap = "wrap";
+          rowEl.style.marginBottom = "6px";
+          const tag = document.createElement("span");
+          tag.className = "pill";
+          const inFeed = st.feedUsers && st.feedUsers.indexOf(Number(u)) !== -1;
+          if (st.scanUser !== null && Number(u) === st.scanUser) tag.classList.add("scanning");
+          else if (inFeed) tag.classList.add("admit");
+          tag.innerHTML = '<span class="pk">user ' + u + '</span>';
+          rowEl.appendChild(tag);
+          st.tweets[u].forEach(entry => {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            const justPushed = st.pushedEntry && st.pushedEntry[0] === entry[0] && st.pushedEntry[1] === entry[1];
+            if (justPushed) pill.classList.add("picked");
+            pill.innerHTML = '<span class="psep">t' + entry[0] + '</span> <span class="pv">#' + entry[1] + '</span>';
+            rowEl.appendChild(pill);
+          });
+          box.appendChild(rowEl);
+        });
+      }
+      grid.appendChild(label);
+      grid.appendChild(box);
+      return grid;
+    }
+
+    function renderFollowing(st) {
+      const grid = document.createElement("div");
+      grid.className = "state-grid";
+      const label = document.createElement("div");
+      label.className = "state-label";
+      label.innerHTML = "following<br>(user -> set)";
+      const box = document.createElement("div");
+      box.className = "state-box";
+      const followers = Object.keys(st.following).filter(u => st.following[u].length > 0);
+      if (followers.length === 0) {
+        const e = document.createElement("span");
+        e.className = "state-empty";
+        e.textContent = "no follows yet";
+        box.appendChild(e);
+      } else {
+        followers.forEach(u => {
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          pill.innerHTML = '<span class="pk">' + u + '</span><span class="psep"> -> {</span><span class="pv">' +
+            st.following[u].join(", ") + '</span><span class="psep">}</span>';
+          box.appendChild(pill);
+        });
+      }
+      grid.appendChild(label);
+      grid.appendChild(box);
+      return grid;
+    }
+
+    function renderFeed(st) {
+      const grid = document.createElement("div");
+      grid.className = "state-grid";
+      const label = document.createElement("div");
+      label.className = "state-label";
+      label.textContent = "res (feed)";
+      const box = document.createElement("div");
+      box.className = "state-box";
+      if (st.feed.length === 0) {
+        const e = document.createElement("span");
+        e.className = "state-empty";
+        e.textContent = (st.method === "getNewsFeed") ? "building..." : "(only during getNewsFeed)";
+        box.appendChild(e);
+      } else {
+        st.feed.forEach((tid, p) => {
+          if (p > 0) {
+            const arr = document.createElement("span");
+            arr.className = "chain-arrow";
+            arr.textContent = "->";
+            box.appendChild(arr);
+          }
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          if (p === st.feed.length - 1 && st.poppedTweet === null) pill.classList.add("picked");
+          pill.innerHTML = '<span class="pv">#' + tid + '</span>';
+          box.appendChild(pill);
+        });
+      }
+      grid.appendChild(label);
+      grid.appendChild(box);
+      return grid;
+    }
+
+    function renderResultCard(st) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+      const label = document.createElement("div");
+      label.className = "result-label";
+      label.textContent = (st.method === "getNewsFeed") ? "getNewsFeed() returns" : "return value";
+      const value = document.createElement("div");
+      value.className = "result-value";
+      if (st.result === "hit") {
+        value.classList.add("hit");
+        value.textContent = "[" + st.feed.join(", ") + "]";
+      } else if (st.method === "init") {
+        value.textContent = "-";
+      } else if (st.method === "getNewsFeed") {
+        value.classList.add("void");
+        value.textContent = "[" + st.feed.join(", ") + "]";
+      } else {
+        value.classList.add("void");
+        value.textContent = "void";
+      }
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+
+    function renderTrace(st) {
+      const traceUi = document.getElementById("trace-ui");
+      const shown = masterTrace.slice(0, st.traceLen);
+      if (shown.length === 0) {
+        traceUi.innerHTML = '<div class="trace-empty">No operations completed yet. Step through to build the trace.</div>';
+        return;
+      }
+      let html = `
+        <table class="trace-table">
+          <thead>
+            <tr><th>#</th><th>operation</th><th>result / feed</th></tr>
+          </thead>
+          <tbody>
+      `;
+      shown.forEach((row, i) => {
+        const isActive = i === shown.length - 1;
+        const isFeed = row.op.startsWith("getNewsFeed");
+        const trClass = isActive ? "active-trace" : (isFeed ? "hit-trace" : "");
+        html += `
+          <tr class="${trClass}">
+            <td>${i + 1}</td>
+            <td>${row.op}</td>
+            <td><span class="nm">${row.result}</span></td>
+          </tr>
+        `;
+      });
+      html += "</tbody></table>";
+      traceUi.innerHTML = html;
+    }
+
+    function heapSummary(arr) {
+      return "[" + arr.map(e => "[" + e[0] + "," + e[1] + "]").join(", ") + "]";
+    }
+
+    function followingSummary(following) {
+      const keys = Object.keys(following).filter(u => following[u].length > 0);
+      if (keys.length === 0) return "{}";
+      return "{ " + keys.map(u => u + ":{" + following[u].join(",") + "}").join(", ") + " }";
+    }
+
+    function render() {
+      const st = currentStep();
+
+      document.getElementById("btn-prev").disabled = stepIndex <= 0;
+      if (stepIndex >= steps.length - 1 && steps.length > 0) {
+        document.getElementById("btn-next").disabled = true;
+        document.getElementById("btn-next").textContent = "Finished!";
+      } else {
+        document.getElementById("btn-next").disabled = false;
+        document.getElementById("btn-next").textContent = "Step Over";
+      }
+
+      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      if (activeExample > 0) {
+        const activeBtn = document.getElementById("btn-ex-" + activeExample);
+        if (activeBtn) activeBtn.classList.add("active");
+      }
+
+      highlightLines(st.lines);
+      narrate(st.narration);
+
+      const visualUi = document.getElementById("visual-ui");
+      visualUi.innerHTML = "";
+      visualUi.appendChild(renderOpBanner(st));
+      visualUi.appendChild(renderTimelines(st));
+      visualUi.appendChild(renderFollowing(st));
+      const flags = { added: st.heapAdded };
+      visualUi.appendChild(renderHeapView("merge heap (newest tweet on top)", "max", st.heap, flags, entryLabel));
+      visualUi.appendChild(renderFeed(st));
+      visualUi.appendChild(renderResultCard(st));
+
+      renderTrace(st);
+
+      const opDisplay = st.method === "init" ? '<span class="kw">constructor</span>'
+        : st.method === "postTweet" ? 'postTweet(<span class="nm">' + st.a + '</span>, <span class="nm">' + st.b + '</span>)'
+        : st.method === "getNewsFeed" ? 'getNewsFeed(<span class="nm">' + st.a + '</span>)'
+        : st.method + '(<span class="nm">' + st.a + '</span>, <span class="nm">' + st.b + '</span>)';
+      const heapHtml = '<span class="op">' + heapSummary(st.heap) + '</span>';
+      const feedHtml = '<span class="op">[' + st.feed.join(", ") + ']</span>';
+
+      document.getElementById("console-ui").innerHTML =
+        '<span class="cm">// Operation sequence</span><br>' +
+        '<span class="kw">const</span> ops = [' + ops.map(opsToCallString).join(", ") + '];<br><br>' +
+        '<span class="cm">// Live state</span><br>' +
+        createConsoleLine("op", "let", "op", opDisplay) +
+        createConsoleLine("time", "let", "this.time", '<span class="nm">' + st.time + '</span>') +
+        '<div class="console-line"><button class="pin-btn" disabled>INFO</button><span><span class="kw">const</span> following = ' + followingSummary(st.following) + ';</span></div>' +
+        createConsoleLine("heap", "const", "heap.data", heapHtml) +
+        '<br><span class="cm">// Output (during getNewsFeed)</span><br>' +
+        createConsoleLine("feed", "return", "res", feedHtml);
+
+      const hudUi = document.getElementById("hud-ui");
+      hudUi.innerHTML = "";
+      const hudMap = {
+        op: st.method === "init" ? "ctor"
+          : st.method === "postTweet" ? "post(" + st.a + "," + st.b + ")"
+          : st.method === "getNewsFeed" ? "feed(" + st.a + ")"
+          : st.method.slice(0, 6) + "(" + st.a + "," + st.b + ")",
+        time: st.time,
+        heap: heapSummary(st.heap),
+        feed: "[" + st.feed.join(", ") + "]"
+      };
+      for (const [k, isPinnedValue] of Object.entries(pinned)) {
+        if (isPinnedValue) {
+          const div = document.createElement("div");
+          div.className = "hud-item";
+          div.innerHTML = '<span>' + k + ':</span> <span class="hud-val">' + hudMap[k] + '</span>';
+          hudUi.appendChild(div);
+        }
+      }
+    }
+
+    function opsToCallString(o) {
+      if (o.method === "postTweet") return "postTweet(" + o.a + "," + o.b + ")";
+      if (o.method === "getNewsFeed") return "getNewsFeed(" + o.a + ")";
+      return o.method + "(" + o.a + "," + o.b + ")";
+    }
+
+    // Boot.
+    ops = examples[1].map(o => ({ ...o }));
+    document.getElementById("custom-input").value = opsToString(ops);
+    init();
+  </script>
+</body>
+</html>
