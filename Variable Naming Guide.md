@@ -355,6 +355,50 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Word Search II:** `board`, `words`, `root`, `node`, `child`, `ch`, `rows`, `cols`, `res`, `r`, `c`, `dirs`
 
+### Graphs
+
+**Island Perimeter:** `grid`, `rows`, `cols`, `r`, `c`, `perimeter`
+
+**Verifying an Alien Dictionary:** `words`, `order`, `rank`, `i`, `j`, `w1`, `w2`, `ans`
+
+**Find the Town Judge:** `n`, `trust`, `score`, `a`, `b`, `i`, `ans`
+
+**Number of Islands:** `grid`, `rows`, `cols`, `r`, `c`, `count`, `dfs`
+
+**Max Area of Island:** `grid`, `rows`, `cols`, `r`, `c`, `area`, `ans`, `dfs`
+
+**Clone Graph:** `node`, `visited`, `dfs`, `copy`, `nei`, `val`, `neighbors`
+
+**Walls and Gates:** `rooms`, `rows`, `cols`, `INF`, `queue`, `dirs`, `nr`, `nc`
+
+**Rotting Oranges:** `grid`, `rows`, `cols`, `queue`, `fresh`, `minutes`, `dirs`, `nr`, `nc`
+
+**Pacific Atlantic Water Flow:** `heights`, `rows`, `cols`, `pac`, `atl`, `dirs`, `dfs`, `res`
+
+**Surrounded Regions:** `board`, `rows`, `cols`, `dfs`, `r`, `c`
+
+**Open the Lock:** `deadends`, `target`, `dead`, `visited`, `queue`, `turns`, `state`, `digit`, `nextState`
+
+**Course Schedule:** `numCourses`, `prerequisites`, `adj`, `indegree`, `queue`, `count`, `node`, `next`, `ans`
+
+**Course Schedule II:** `numCourses`, `prerequisites`, `adj`, `indegree`, `queue`, `order`, `node`, `next`
+
+**Graph Valid Tree:** `n`, `edges`, `dsu`, `parent`, `a`, `b`, `ra`, `rb`, `ans`
+
+**Course Schedule IV:** `numCourses`, `prerequisites`, `queries`, `adj`, `reach`, `dfs`, `src`, `nei`, `res`
+
+**Number of Connected Components in an Undirected Graph:** `n`, `edges`, `dsu`, `parent`, `count`, `a`, `b`, `ra`, `rb`
+
+**Redundant Connection:** `edges`, `dsu`, `parent`, `rank`, `a`, `b`, `ra`, `rb`, `ans`
+
+**Accounts Merge:** `accounts`, `dsu`, `parent`, `emailToId`, `email`, `groups`, `root`, `res`
+
+**Evaluate Division:** `equations`, `values`, `queries`, `graph`, `dfs`, `src`, `dst`, `visited`, `w`, `res`
+
+**Minimum Height Trees:** `n`, `edges`, `adj`, `degree`, `leaves`, `remaining`, `nei`, `ans`
+
+**Word Ladder:** `beginWord`, `endWord`, `wordList`, `words`, `queue`, `visited`, `level`, `cand`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
