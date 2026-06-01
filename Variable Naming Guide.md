@@ -537,6 +537,34 @@ Use the same variable names everywhere in this vault: Markdown notes, code block
 
 **Minimum Interval to Include Each Query:** `intervals`, `queries`, `sortedQueries`, `res`, `heap`, `i`, `q`, `idx`, `l`, `r`
 
+### Math & Geometry
+
+**Excel Sheet Column Title:** `columnNumber`, `res`, `rem`
+
+**Greatest Common Divisor of Strings:** `str1`, `str2`, `gcd`, `len`, `ans`
+
+**Insert Greatest Common Divisors in Linked List:** `head`, `curr`, `node`, `gcd`
+
+**Transpose Matrix:** `matrix`, `m`, `n`, `res`, `i`, `j`
+
+**Rotate Image:** `matrix`, `n`, `i`, `j`, `temp`
+
+**Spiral Matrix:** `matrix`, `res`, `top`, `bottom`, `left`, `right`, `i`, `j`
+
+**Set Matrix Zeroes:** `matrix`, `m`, `n`, `rows`, `cols`, `i`, `j`
+
+**Happy Number:** `n`, `seen`, `sum`, `digit`, `ans`
+
+**Plus One:** `digits`, `i`
+
+**Roman to Integer:** `s`, `map`, `res`, `i`
+
+**Pow(x, n):** `x`, `n`, `res`
+
+**Multiply Strings:** `num1`, `num2`, `m`, `n`, `pos`, `mul`, `p1`, `p2`, `sum`, `res`
+
+**Detect Squares:** `counts`, `point`, `key`, `x`, `y`, `px`, `py`, `c1`, `c2`, `c3`, `res`
+
 ## UI vs algorithm variables
 
 Keep descriptive names for UI-only helpers:
