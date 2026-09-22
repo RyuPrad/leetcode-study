@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Tries/design_add_and_search_words_data_structure_visualizer.html"
+  src="design_add_and_search_words_data_structure_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

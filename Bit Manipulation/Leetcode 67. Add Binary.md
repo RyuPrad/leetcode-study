@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Bit%20Manipulation/add_binary_visualizer.html"
+  src="add_binary_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

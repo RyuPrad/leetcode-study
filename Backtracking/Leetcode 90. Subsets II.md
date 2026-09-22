@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Backtracking/subsets_ii_visualizer.html"
+  src="subsets_ii_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

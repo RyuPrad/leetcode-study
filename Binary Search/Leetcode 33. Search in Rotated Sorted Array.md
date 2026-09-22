@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Binary%20Search/search_in_rotated_sorted_array_visualizer.html"
+  src="search_in_rotated_sorted_array_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

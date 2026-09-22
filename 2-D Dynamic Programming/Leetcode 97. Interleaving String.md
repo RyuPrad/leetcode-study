@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/2-D%20Dynamic%20Programming/interleaving_string_visualizer.html"
+  src="interleaving_string_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

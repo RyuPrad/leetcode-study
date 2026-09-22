@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Binary%20Search/guess_number_higher_or_lower_visualizer.html"
+  src="guess_number_higher_or_lower_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

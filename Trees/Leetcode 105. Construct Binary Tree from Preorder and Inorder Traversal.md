@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Trees/construct_binary_tree_from_preorder_and_inorder_traversal_visualizer.html"
+  src="construct_binary_tree_from_preorder_and_inorder_traversal_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

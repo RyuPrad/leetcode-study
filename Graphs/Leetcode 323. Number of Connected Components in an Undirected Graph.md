@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/number_of_connected_components_in_an_undirected_graph_visualizer.html"
+  src="number_of_connected_components_in_an_undirected_graph_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

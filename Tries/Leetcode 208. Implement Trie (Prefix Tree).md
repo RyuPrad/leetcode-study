@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Tries/implement_trie_prefix_tree_visualizer.html"
+  src="implement_trie_prefix_tree_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

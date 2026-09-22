@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Heap/find_median_from_data_stream_visualizer.html"
+  src="find_median_from_data_stream_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Trees/delete_node_in_a_bst_visualizer.html"
+  src="delete_node_in_a_bst_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

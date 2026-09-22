@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/course_schedule_ii_visualizer.html"
+  src="course_schedule_ii_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

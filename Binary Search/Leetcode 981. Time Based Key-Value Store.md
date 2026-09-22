@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Binary%20Search/time_based_key_value_store_visualizer.html"
+  src="time_based_key_value_store_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

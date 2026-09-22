@@ -1,8 +1,11 @@
 import { chromium } from "playwright";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import path from "path";
+import { collectCatalog } from "./content.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const catalog = collectCatalog();
+const visualizerFor = (number) => path.join(root, catalog.entries.find((entry) => entry.number === number).visualizerPath);
 
 async function collectConsoleErrors(page) {
   const errors = [];
@@ -21,9 +24,9 @@ async function clickStep(page, id, times) {
 }
 
 async function testTwoSum(page) {
-  const file = path.join(root, "Array & Hashing/two_sum_visualizer.html");
+  const file = visualizerFor(1);
   const errors = collectConsoleErrors(page);
-  await page.goto(`file://${file}`);
+  await page.goto(pathToFileURL(file).href);
   await clickStep(page, "btn-next", 6);
   await clickStep(page, "btn-prev", 2);
   await clickStep(page, "btn-next", 2);
@@ -31,9 +34,9 @@ async function testTwoSum(page) {
 }
 
 async function testConcatenation(page) {
-  const file = path.join(root, "Array & Hashing/concatenation_of_array_visualizer.html");
+  const file = visualizerFor(1929);
   const errors = collectConsoleErrors(page);
-  await page.goto(`file://${file}`);
+  await page.goto(pathToFileURL(file).href);
   // Through first and second write for i=0
   await clickStep(page, "btn-next", 5);
   const consoleText = await page.locator("#console-ui").innerText();
@@ -44,9 +47,9 @@ async function testConcatenation(page) {
 }
 
 async function testBinarySearch(page) {
-  const file = path.join(root, "Binary Search/binary_search_visualizer.html");
+  const file = visualizerFor(704);
   const errors = collectConsoleErrors(page);
-  await page.goto(`file://${file}`);
+  await page.goto(pathToFileURL(file).href);
   await clickStep(page, "btn-next", 6);
   const hudText = await page.locator("#hud-ui").innerText();
   if (!hudText.includes("ans")) {
@@ -56,7 +59,6 @@ async function testBinarySearch(page) {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage();
 
 const tests = [
   ["Two Sum", testTwoSum],
@@ -66,6 +68,7 @@ const tests = [
 
 let failed = false;
 for (const [name, fn] of tests) {
+  const page = await browser.newPage();
   const errors = await fn(page);
   if (errors.length) {
     failed = true;
@@ -74,6 +77,7 @@ for (const [name, fn] of tests) {
   } else {
     console.log(`PASS ${name}`);
   }
+  await page.close();
 }
 
 await browser.close();

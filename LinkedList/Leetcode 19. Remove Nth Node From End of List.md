@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/LinkedList/remove_nth_node_from_end_of_list_visualizer.html"
+  src="remove_nth_node_from_end_of_list_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

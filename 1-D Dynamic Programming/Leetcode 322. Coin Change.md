@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/1-D%20Dynamic%20Programming/coin_change_visualizer.html"
+  src="coin_change_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

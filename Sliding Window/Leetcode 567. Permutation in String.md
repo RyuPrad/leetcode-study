@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Sliding%20Window/permutation_in_string_visualizer.html"
+  src="permutation_in_string_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

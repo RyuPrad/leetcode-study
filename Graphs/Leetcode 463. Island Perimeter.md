@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/island_perimeter_visualizer.html"
+  src="island_perimeter_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

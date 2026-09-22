@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/minimum_height_trees_visualizer.html"
+  src="minimum_height_trees_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

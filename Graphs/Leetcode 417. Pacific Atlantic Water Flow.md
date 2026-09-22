@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/pacific_atlantic_water_flow_visualizer.html"
+  src="pacific_atlantic_water_flow_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

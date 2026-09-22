@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/2-D%20Dynamic%20Programming/stone_game_visualizer.html"
+  src="stone_game_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Intervals/minimum_interval_to_include_each_query_visualizer.html"
+  src="minimum_interval_to_include_each_query_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

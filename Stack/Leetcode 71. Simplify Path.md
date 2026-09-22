@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Stack/simplify_path_visualizer.html"
+  src="simplify_path_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

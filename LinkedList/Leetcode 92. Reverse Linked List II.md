@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/LinkedList/reverse_linked_list_ii_visualizer.html"
+  src="reverse_linked_list_ii_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

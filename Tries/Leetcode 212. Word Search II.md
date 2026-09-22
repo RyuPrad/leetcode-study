@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Tries/word_search_ii_visualizer.html"
+  src="word_search_ii_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

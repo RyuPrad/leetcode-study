@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/2-D%20Dynamic%20Programming/best_time_to_buy_and_sell_stock_with_cooldown_visualizer.html"
+  src="best_time_to_buy_and_sell_stock_with_cooldown_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -2,11 +2,12 @@ import fs from "fs";
 import path from "path";
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "url";
+import { collectCatalog } from "./content.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPORTS_DIR = path.join(ROOT, "reports");
 const EXCLUDED_DIRS = new Set([".git", "node_modules", ".obsidian"]);
-const MAX_STEPS = 80;
+const MAX_STEPS = 2000;
 const TEXT_LIMIT = 12000;
 const UI_ONLY_LINES = new Set(["HUD ON", "HUD OFF", "INFO"]);
 const IGNORED_BUTTON_TEXT = new Set(["HUD ON", "HUD OFF", "INFO"]);
@@ -149,8 +150,8 @@ async function captureSnapshot(page) {
       heading: text("h1"),
       subtitle: text(".subtitle"),
       hudText: text("#hud-ui"),
-      consoleText: text("#console-ui"),
-      narrationText: text("#narration-ui"),
+      consoleText: text("#console-ui, #console"),
+      narrationText: text("#narration-ui, #narration, #narr"),
       traceText: text("#trace-ui"),
       resultText: resultText(),
       visibleButtons,
@@ -457,7 +458,7 @@ function buildMarkdownReport(report) {
 }
 
 async function main() {
-  const htmlFiles = findHtmlFiles(ROOT).sort((a, b) => a.localeCompare(b));
+  const htmlFiles = collectCatalog().visualizers.map((file) => path.join(ROOT, file));
   const visualizers = [];
 
   const browser = await chromium.launch();
@@ -483,7 +484,7 @@ async function main() {
     try {
       console.log(`Capturing ${currentFile}...`);
       const report = await captureVisualizer(page, filePath);
-      report.errors = fileErrors;
+      report.errors = [...fileErrors, ...report.errors];
       visualizers.push(report);
     } catch (error) {
       visualizers.push({
@@ -539,6 +540,7 @@ async function main() {
   console.log(`Reports written to ${path.relative(ROOT, REPORTS_DIR)}/`);
   console.log(`Visualizers with errors: ${withErrors.length}`);
   if (withErrors.length) {
+    process.exitCode = 1;
     for (const entry of withErrors) {
       console.log(`  ${entry.file}`);
     }

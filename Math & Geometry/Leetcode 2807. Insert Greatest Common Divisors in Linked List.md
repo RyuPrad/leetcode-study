@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Math%20%26%20Geometry/insert_greatest_common_divisors_in_linked_list_visualizer.html"
+  src="insert_greatest_common_divisors_in_linked_list_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

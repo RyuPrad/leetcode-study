@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Bit%20Manipulation/number_of_1_bits_visualizer.html"
+  src="number_of_1_bits_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Heap/longest_happy_string_visualizer.html"
+  src="longest_happy_string_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Sliding%20Window/best_time_to_buy_and_sell_stock_visualizer.html"
+  src="best_time_to_buy_and_sell_stock_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

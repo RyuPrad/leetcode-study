@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Backtracking/combinations_visualizer.html"
+  src="combinations_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

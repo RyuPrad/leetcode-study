@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Advanced%20Graphs/cheapest_flights_within_k_stops_visualizer.html"
+  src="cheapest_flights_within_k_stops_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

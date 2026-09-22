@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Advanced%20Graphs/network_delay_time_visualizer.html"
+  src="network_delay_time_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

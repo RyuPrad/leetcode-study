@@ -2,7 +2,7 @@
 
 <iframe
   title="LeetCode 143 Reorder List Phase View Visualizer"
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/LinkedList/reorderListVisualizer.html"
+  src="reorderListVisualizer.html"
   width="100%"
   height="950"
   style="border: 0;"

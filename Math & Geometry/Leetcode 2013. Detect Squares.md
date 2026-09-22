@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Math%20%26%20Geometry/detect_squares_visualizer.html"
+  src="detect_squares_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

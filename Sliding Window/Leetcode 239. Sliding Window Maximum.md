@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Sliding%20Window/sliding_window_maximum_visualizer.html"
+  src="sliding_window_maximum_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

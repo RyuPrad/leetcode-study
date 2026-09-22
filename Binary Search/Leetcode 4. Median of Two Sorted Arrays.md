@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Binary%20Search/median_of_two_sorted_arrays_visualizer.html"
+  src="median_of_two_sorted_arrays_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

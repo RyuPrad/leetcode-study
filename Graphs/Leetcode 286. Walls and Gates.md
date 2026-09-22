@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/walls_and_gates_visualizer.html"
+  src="walls_and_gates_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

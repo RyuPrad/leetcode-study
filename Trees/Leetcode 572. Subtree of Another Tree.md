@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Trees/subtree_of_another_tree_visualizer.html"
+  src="subtree_of_another_tree_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Tries/extra_characters_in_a_string_visualizer.html"
+  src="extra_characters_in_a_string_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

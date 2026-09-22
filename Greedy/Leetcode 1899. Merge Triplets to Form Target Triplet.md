@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Greedy/merge_triplets_to_form_target_triplet_visualizer.html"
+  src="merge_triplets_to_form_target_triplet_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Greedy/partition_labels_visualizer.html"
+  src="partition_labels_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -2,7 +2,7 @@
 
 <iframe
   title="LeetCode 141 Linked List Cycle Visualizer"
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/LinkedList/linkedListCycleVisualizer.html"
+  src="linkedListCycleVisualizer.html"
   width="100%"
   height="900"
   style="border: 0;"

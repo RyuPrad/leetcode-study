@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Math%20%26%20Geometry/excel_sheet_column_title_visualizer.html"
+  src="excel_sheet_column_title_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Graphs/verifying_an_alien_dictionary_visualizer.html"
+  src="verifying_an_alien_dictionary_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

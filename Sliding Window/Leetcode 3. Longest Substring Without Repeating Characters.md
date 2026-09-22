@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Sliding%20Window/longest_substring_without_repeating_characters_visualizer.html"
+  src="longest_substring_without_repeating_characters_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

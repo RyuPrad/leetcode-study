@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Array%20%26%20Hashing/sort_an_array_visualizer.html"
+  src="sort_an_array_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Trees/serialize_and_deserialize_binary_tree_visualizer.html"
+  src="serialize_and_deserialize_binary_tree_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

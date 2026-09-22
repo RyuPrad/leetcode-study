@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/1-D%20Dynamic%20Programming/longest_increasing_subsequence_visualizer.html"
+  src="longest_increasing_subsequence_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

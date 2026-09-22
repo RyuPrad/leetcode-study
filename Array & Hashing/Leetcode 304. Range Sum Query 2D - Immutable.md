@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Array%20%26%20Hashing/range_sum_query_2d_immutable_visualizer.html"
+  src="range_sum_query_2d_immutable_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"

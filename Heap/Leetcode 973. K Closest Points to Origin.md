@@ -1,6 +1,6 @@
 
 <iframe
-  src="file:///C:/Users/ryupr/Documents/Obsidian%20Vault/Leetcode/Heap/k_closest_points_to_origin_visualizer.html"
+  src="k_closest_points_to_origin_visualizer.html"
   width="100%"
   height="800px"
   frameborder="0"
