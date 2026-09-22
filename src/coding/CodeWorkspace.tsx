@@ -6,11 +6,12 @@ import type { CodingProblem, CodeDraft, Submission, JudgeEvent, JudgeResult, Jud
 import { CODE_LIMIT, INPUT_LIMIT, JOB_TIMEOUT } from '../../shared/coding';
 import JudgeWorker from './judge.worker?worker';
 import {setTabOutEnabled,useTabOutEnabled} from './editor-preferences';
+import type {EditorFocusRequest} from './editor-focus';
 import './coding.css';
 const CodeEditor=lazy(()=>import('./CodeEditor'));
 const DebugWorkspace=lazy(()=>import('./DebugWorkspace'));
 const pretty=(value:unknown)=>JSON.stringify(value,null,2);
-export default function CodeWorkspace({problemId,draft,submissions,active}:{problemId:string;draft?:CodeDraft;submissions:Submission[];active:boolean}) {
+export default function CodeWorkspace({problemId,draft,submissions,active,focusRequest,onRequestFocus}:{problemId:string;draft?:CodeDraft;submissions:Submission[];active:boolean;focusRequest:EditorFocusRequest|null;onRequestFocus:()=>void}) {
   const problem=(definitions as CodingProblem[]).find(p=>p.id===problemId)!;
   const tabOutEnabled=useTabOutEnabled();
   const [source,setSource]=useState(draft?.source??problem.starter),[cases,setCases]=useState(draft?.cases??pretty(problem.examples.map(t=>t.input)));
@@ -72,7 +73,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active}:{prob
     const end=()=>{element.removeEventListener('pointermove',move);element.removeEventListener('lostpointercapture',end);};element.addEventListener('pointermove',move);element.addEventListener('lostpointercapture',end);
   }
   return <div className="coding-workspace" hidden={!active} ref={workspace} style={{'--description-width':`${leftWidth}%`,'--results-height':`${bottomHeight}%`} as React.CSSProperties}>
-    {debugCases&&<Suspense fallback={<div className="editor-loading">Loading debugger?</div>}><DebugWorkspace problem={problem} source={source} cases={debugCases} active={active} onClose={()=>setDebugCases(null)}/></Suspense>}
+    {debugCases&&<Suspense fallback={<div className="editor-loading">Loading debugger?</div>}><DebugWorkspace problem={problem} source={source} cases={debugCases} active={active} onClose={()=>{setDebugCases(null);onRequestFocus();}}/></Suspense>}
     <section className="code-description" aria-label="Problem description">
       <div className="code-section-label"><Code2 size={15}/>DESCRIPTION<span>JavaScript</span></div>
       <div className="description-body"><h2>{problem.number}. {problem.title}</h2><p>{problem.description}</p><div className="contract"><span>{problem.kind==='design'?'Class contract':'Function contract'}</span><code>{problem.kind==='design'?problem.entry:`${problem.entry}(${problem.parameters.filter(p=>![141,374].includes(problem.number)||!['pos','pick'].includes(p)).join(', ')})`}</code></div>
@@ -84,7 +85,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active}:{prob
     <div className="code-splitter vertical" role="separator" aria-label="Resize description" aria-orientation="vertical" aria-valuenow={Math.round(leftWidth)} tabIndex={0} onPointerDown={e=>drag(e,'x')} onKeyDown={e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();setLeftWidth(v=>Math.max(24,Math.min(60,v+(e.key==='ArrowLeft'?-2:2))));}}}/>
     <section className="code-right" ref={right} aria-label="Coding workspace">
       <div className="code-toolbar"><span className="language-label"><i/>JavaScript</span><button className="tabout-toggle" aria-label="TabOut" aria-pressed={tabOutEnabled} title="Tab jumps past the next closing bracket or quote on this line. Shift+Tab jumps backward. Toggle to use normal indentation." onClick={()=>setTabOutEnabled(!tabOutEnabled)}>TabOut <span>{tabOutEnabled?'On':'Off'}</span></button><span className={`draft-status ${saveStatus==='Save failed'?'error-text':''}`} aria-live="polite">{saveStatus==='Saved locally'&&<Check size={12}/>} {saveStatus}</span><button className="icon-button" title="Reset code" aria-label="Reset code" disabled={!!busy} onClick={()=>setConfirm('reset')}><RotateCcw size={14}/></button><div className="run-actions">{busy?<button className="stop-code" onClick={stop}><Square size={12}/>Stop</button>:<><button className="run-code" title="Run examples or custom cases (Ctrl+Enter)" onClick={()=>start('run')}><Play size={13}/>Run</button><button className="run-code" title="Debug one case with live breakpoints" onClick={startDebug}>Debug</button><button className="submit-code" title="Submit to local tests (Ctrl+Shift+Enter)" onClick={()=>start('submit')}><Send size={13}/>Submit</button></>}</div></div>
-      <Suspense fallback={<div className="editor-loading">Loading editor…</div>}><CodeEditor source={source} onChange={changeSource} problemId={problemId} active={active} line={line} tabOutEnabled={tabOutEnabled}/></Suspense>
+      <Suspense fallback={<div className="editor-loading">Loading editor…</div>}><CodeEditor source={source} onChange={changeSource} problemId={problemId} active={active&&!debugCases&&!confirm&&!preview} focusRequest={focusRequest} line={line} tabOutEnabled={tabOutEnabled}/></Suspense>
       <div className="code-splitter horizontal" role="separator" aria-label="Resize test results" aria-orientation="horizontal" aria-valuenow={Math.round(bottomHeight)} tabIndex={0} onPointerDown={e=>drag(e,'y')} onKeyDown={e=>{if(['ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();setBottomHeight(v=>Math.max(22,Math.min(70,v+(e.key==='ArrowUp'?2:-2))));}}}/>
       <div className="code-bottom"><div className="code-panel-tabs" role="tablist" aria-label="Code panels">{(['cases','results','submissions'] as const).map(p=><button key={p} role="tab" aria-selected={panel===p} onClick={()=>setPanel(p)}>{p==='cases'?'Test cases':p==='results'?'Local test results':`Submissions (${submissions.length})`}</button>)}</div>
         {error&&<div className="code-error" role="alert">{error}<button className="icon-button" aria-label="Dismiss code error" onClick={()=>setError('')}><X size={12}/></button></div>}

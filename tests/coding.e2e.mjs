@@ -14,15 +14,29 @@ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console'
 async function open(n){const p=problems.find(p=>p.number===n);if(await page.getByRole('button',{name:'Back to library',exact:true}).count())await page.getByRole('button',{name:'Back to library',exact:true}).click();await page.getByRole('searchbox',{name:'Search problems'}).fill(String(n));await page.getByRole('button',{name:`Open ${p.title}`,exact:true}).click();await page.getByRole('tab',{name:'Code',exact:true}).click();await page.locator('.monaco-editor').waitFor();}
 async function waitDraft(source){for(let attempt=0;attempt<100;attempt++){if(await page.evaluate(async source=>(await window.study.bootstrap()).data.drafts['leetcode:'+document.querySelector('.description-body h2').textContent.split('.')[0]]?.source.replace(/\r\n/g,'\n')===source.replace(/\r\n/g,'\n'),source))return;await page.waitForTimeout(50);}throw Error('Draft did not reach the expected source');}
 async function code(source){await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).focus();await page.keyboard.press('Control+A');await page.evaluate(text=>{const clipboardData=new DataTransfer();clipboardData.setData("text/plain",text);document.activeElement.dispatchEvent(new ClipboardEvent("paste",{bubbles:true,cancelable:true,clipboardData}));},source);await waitDraft(source);}
+const solutionFocused=()=>page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='JavaScript solution');
 async function run(source,mode='run',expected='Accepted'){await code(source);await page.getByRole('button',{name:mode==='run'?'Run':'Submit',exact:true}).click();await page.locator('.judge-summary strong').waitFor({timeout:40000});assert.equal(await page.locator('.judge-summary strong').innerText(),expected,await page.locator('.code-panel-scroll').innerText());}
 try{
   await page.locator('.problem-table').waitFor();await app.evaluate(({session})=>session.defaultSession.enableNetworkEmulation({offline:true}));
   if(process.env.STUDY_TEST_EXE)assert.ok(await app.evaluate(({app})=>app.isPackaged));
   await open(1);
+  await solutionFocused();await page.keyboard.insertText('// ready\n');await waitDraft('// ready\n'+problems.find(p=>p.number===1).starter);
   const tabout=()=>page.getByRole('button',{name:'TabOut',exact:true});
   assert.equal(await tabout().getAttribute('aria-pressed'),'true');
   const navigation='function twoSum() { return ["hello"]; }',cursor=navigation.indexOf('hello')+2;
   async function position(){await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).focus();await page.keyboard.press('Control+Home');for(let i=0;i<cursor;i++)await page.keyboard.press('ArrowRight');}
+  for(const view of ['Learn','Visualizer','Notes','History']){
+    await code(navigation);await position();
+    await page.getByRole('tab',{name:new RegExp('^'+view+'(?:$|\\s|\\d)')}).click();await page.getByRole('tab',{name:'Code',exact:true}).click();
+    // Do not focus the editor here: typing must work from the Code tab activation.
+    await solutionFocused();await page.keyboard.insertText('X');await waitDraft(navigation.slice(0,cursor)+'X'+navigation.slice(cursor));
+    await page.keyboard.press('Control+Z');await waitDraft(navigation);
+  }
+  await position();await page.keyboard.press('Shift+ArrowRight');await page.keyboard.press('Shift+ArrowRight');
+  await page.getByRole('tab',{name:'Notes',exact:true}).click();
+  await page.getByRole('tab',{name:'Code',exact:true}).press('Enter');await solutionFocused();await page.keyboard.insertText('X');
+  await waitDraft(navigation.slice(0,cursor)+'X'+navigation.slice(cursor+2));
+  console.log('PASS first opening, all four problem tabs, keyboard tab activation, restored caret/selection and undo without refocusing');
   await code(navigation);await position();await page.keyboard.press('Tab');await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
   assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1']?.source,navigation,'TabOut does not change or save source');
   await page.keyboard.insertText('/*cursor*/');const expected=navigation.replace('"]','"/*cursor*/]');
@@ -39,6 +53,7 @@ try{
   await run('function twoSum(){return [0,0];}','submit','Wrong answer');assert.equal(await page.getByLabel('Problem progress').inputValue(),'completed');
   await run('function twoSum( {','run','Syntax error');
   await run('function twoSum(){throw new Error("location");}','run','Runtime error');
+  await page.getByRole('button',{name:'Go to error line',exact:true}).first().click();await solutionFocused();
   await run('function twoSum(){while(true){}}','run','Time limit exceeded');
   await code('function twoSum(){while(true){}}');await page.getByRole('button',{name:'Run',exact:true}).click();await page.getByRole('button',{name:'Stop',exact:true}).click();await page.getByText('Cancelled',{exact:true}).waitFor();
   await run(reference);
@@ -47,7 +62,9 @@ try{
   await page.keyboard.press('Control+Enter');await page.locator('.judge-summary strong').waitFor();assert.equal(await page.locator('.judge-summary strong').innerText(),'Accepted');
   await page.getByRole('tab',{name:'Test cases',exact:true}).click();await page.getByLabel('Custom test cases').fill('[[[4,5,9],100]]');await page.getByRole('button',{name:'Run',exact:true}).click();await page.getByRole('alert').filter({hasText:'Exactly one'}).waitFor();await page.getByLabel('Custom test cases').fill('[[[4,5,9],9]]');
   await page.getByRole('tab',{name:/Submissions \(/}).click();assert.equal(await page.locator('.submission-list button').count(),2);await page.locator('.submission-list button').last().click();await page.getByRole('button',{name:'Reopen code',exact:true}).click();await page.getByRole('button',{name:'Replace draft',exact:true}).click();
-  await page.getByRole('button',{name:'Reset code',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.getByRole('button',{name:'Reset code',exact:true}).click();
+  assert.ok(await page.getByRole('dialog',{name:'Reset solution',exact:true}).evaluate(el=>el.contains(document.activeElement)),'reset dialog retains focus');
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
   console.log('PASS custom cases, keyboard Run, invalid input, saved submission reopen, reset confirmation');
   const backupPath=path.join(directory,'coding-backup.json');
   await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});dialog.showMessageBox=async()=>({response:1,checkboxChecked:false});},backupPath);

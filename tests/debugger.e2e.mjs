@@ -29,7 +29,7 @@ async function code(source){
 async function start(source){await code(source);await focus();await page.getByRole('button',{name:'Debug',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.debug-status.paused,.debug-result'));}
 async function step(name){const before=await index();await control(name).click();await page.waitForFunction(before=>document.querySelector('.debug-status.paused')&&document.querySelector('.debug-timeline>span').textContent!==before,before);}
 async function breakpoint(line){const editor=page.locator('.debug-source .monaco-editor');const number=editor.locator('.line-numbers').filter({hasText:new RegExp(`^${line}$`)});const row=await number.boundingBox(),box=await editor.boundingBox();assert.ok(row&&box);await page.mouse.click(box.x+10,row.y+row.height/2);}
-async function close(){await page.locator('.debug-toolbar').getByRole('button',{name:/Stop \/ edit|Back to code/}).click();await page.locator('.debug-workspace').waitFor({state:'detached'});}
+async function close(){await page.locator('.debug-toolbar').getByRole('button',{name:/Stop \/ edit|Back to code/}).click();await page.locator('.debug-workspace').waitFor({state:'detached'});await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='JavaScript solution');}
 async function finish(){await control('Continue').click();await page.locator('.debug-result').waitFor({timeout:30000});assert.match(await page.locator('.debug-result strong').innerText(),/matches expected/);}
 const source=`function twoSum(nums,target) {
   const seen = new Map();
@@ -68,10 +68,13 @@ try{
   await page.getByLabel('Debug test case').selectOption('1');await paused();await step('Step Over');
   await page.getByRole('button',{name:'Focus diagram',exact:true}).click();assert.ok(await page.locator('.debug-source').isHidden());await page.getByRole('button',{name:'Focus diagram',exact:true}).click();
   for(const [pauseName,pauseAction] of [['tab',async()=>{await page.getByRole('tab',{name:'Notes',exact:true}).click();}],['minimize',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].minimize());}],['blur event',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].emit('blur'));}],['suspend',async()=>{await app.evaluate(({powerMonitor})=>powerMonitor.emit('suspend'));}]]){
-    console.log('Testing pause',pauseName);await page.locator('.debug-toolbar').getByRole('button',{name:/Restart/}).click();await paused();await focus();await control('Play').click();await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);
+    console.log('Testing pause',pauseName);await page.locator('.debug-toolbar').getByRole('button',{name:/Restart/}).click();await paused();await focus();await control('Play').click();await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'JavaScript solution','Code tab must not focus the covered solution during Debug');
   }
   await finish();const state=await page.evaluate(()=>window.study.bootstrap());assert.equal(state.data.submissions.length,0);assert.notEqual(await page.getByLabel('Problem progress').inputValue(),'completed');await close();
-  console.log('PASS case switching, focus, zoom, tab/native pauses, expected result, no submission side effects');
+  await page.keyboard.insertText(' // resumed');
+  for(let attempt=0;attempt<100;attempt++){if((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source===source+' // resumed')break;await page.waitForTimeout(50);}
+  assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source,source+' // resumed','Stop/edit resumes at the solution cursor without focusing it in the test');
+  console.log('PASS case switching, focus, zoom, tab/native pauses, expected result, Stop/edit caret restoration and no submission side effects');
 
   await page.getByRole('tab',{name:'Test cases',exact:true}).click();await page.getByRole('radio',{name:'Custom cases',exact:true}).check();await page.getByLabel('Custom test cases').fill('[[[4,5,9],9]]');await start(definitions.find(p=>p.number===1).reference);await finish();await close();
   for(const [bad,diagnostic] of [['async function twoSum(){}',/synchronous/],['function twoSum( {',/Unexpected token/],['function twoSum(){throw Error("debug test");}',/debug test/]]){

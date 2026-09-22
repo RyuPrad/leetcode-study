@@ -6,7 +6,7 @@ Browse and search the bundled library, step through algorithms, inspect live var
 
 ## Using the app
 
-Install `LeetCode-Study-0.5.1-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
+Install `LeetCode-Study-0.5.2-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
 
 - **Library:** search by number, title, topic, or note text; filter by progress; browse bookmarks and the review queue.
 - **Learn:** all 250 visualizers have a fixed guided example with three authored predictions (750 in total). Read the question beside the diagram and reference code, choose an answer or an outlined diagram item, ask for either of two hints, or choose Show me. Watch the change and read why it works. Basics explanations cover the actual JavaScript being used. Answers and position save automatically; returning starts paused. Guided completion is separate from solving the coding problem.
@@ -23,7 +23,9 @@ Shortcuts: **Ctrl+K** searches; **Left/Right** step through a visualizer outside
 
 ## Running code
 
-Open a problem and select **Code**. Keep the provided function/class name and edit its body. Custom tests use JSON arrays of argument arrays, such as `[[[2,7,11,15],9],[[3,2,4],6]]` for Two Sum. Trees use level-order arrays with `null`; lists use value arrays; design problems use matching operations/arguments arrays. The description shows each contract.
+Open a problem and select **Code** to start typing immediately. Returning from Learn, Visualizer, Notes or History restores your cursor, selection (including multiple cursors) and scroll position, with the editor focused. This lasts for the current problem visit; leaving the problem or closing the app starts a new editor view. Stop / edit in Debug also returns you to your solution cursor.
+
+Keep the provided function/class name and edit its body. Custom tests use JSON arrays of argument arrays, such as `[[[2,7,11,15],9],[[3,2,4],6]]` for Two Sum. Trees use level-order arrays with `null`; lists use value arrays; design problems use matching operations/arguments arrays. The description shows each contract.
 
 Results show output, expected output, console messages, execution time, and error locations. Each test starts in a fresh QuickJS interpreter inside a disposable worker with a 2 second time limit and 64 MiB memory limit; jobs stop at 30 seconds. Console and result sizes are bounded. Code has no filesystem, Node.js, desktop bridge, or network access.
 
@@ -142,4 +144,4 @@ Guided content is authored in `scripts/author-guided-a.mjs`, `scripts/author-gui
 
 Operation descriptions are compiled from the reference JavaScript into checked-in `visualizer-ui/operations.json`, using explicit per-line rules and real state values rather than CSS colors. After intentionally changing reference code, capture traces, run `node scripts/author-operations.mjs`, and rerun `npm run test:operations`. The build validates all 250 operation sets and creates the ignored offline JavaScript bundle. The operation suite covers every default reference transition, lookup/write distinctions, source locations, replay without double execution, and Detailed/Compact playback timing.
 
-`npm run test:editor` uses the actual CodeEditor component and JavaScript tokenizer in Chromium to check TabOut boundaries, keyboard fallback behavior, suggestions, snippets, focus navigation and undo. Coding desktop tests also exercise Tab/Shift+Tab in Electron, unchanged drafts during jumps, preference persistence and toolbar scaling. Lines for which the editor has skipped tokenization retain native Tab behavior.
+`npm run test:editor` uses the actual CodeEditor component and JavaScript tokenizer in Chromium to check TabOut boundaries, keyboard fallback behavior, suggestions, snippets, focus navigation and undo. It also checks view restoration and focus across tab switches, deferred loading, competing controls, dialogs, Debug, replacements and new models. Coding desktop tests also exercise Tab/Shift+Tab in Electron, unchanged drafts during jumps, preference persistence and toolbar scaling. Lines for which the editor has skipped tokenization retain native Tab behavior.

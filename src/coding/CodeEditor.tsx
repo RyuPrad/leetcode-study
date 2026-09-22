@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { VisualLocation } from '../../shared/visualization';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 import {installTabOut} from './tab-out';
+import type {EditorFocusRequest} from './editor-focus';
 // Register services before the first editor; TypeScript loads further contributions lazily.
 import 'monaco-editor/editor/contrib/codelens/browser/codeLensCache.js';
 import 'monaco-editor/editor/common/services/treeViewsDndService.js';
@@ -30,13 +31,15 @@ typescript.javascriptDefaults.setDiagnosticsOptions({noSemanticValidation:true,n
 typescript.javascriptDefaults.setCompilerOptions({target:typescript.ScriptTarget.ESNext,allowNonTsExtensions:true,allowJs:true,checkJs:false});
 typescript.javascriptDefaults.addExtraLib('declare class ListNode { val: number; next: ListNode | null; constructor(val?: number, next?: ListNode | null); }\ndeclare class TreeNode { val: number; left: TreeNode | null; right: TreeNode | null; constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null); }\ndeclare function guess(n: number): number;\ndeclare class Node { val: any; next: Node | null; random: Node | null; neighbors: Node[]; isLeaf: boolean; topLeft: Node | null; topRight: Node | null; bottomLeft: Node | null; bottomRight: Node | null; constructor(val?: any, second?: any, topLeft?: any, topRight?: any, bottomLeft?: any, bottomRight?: any); }','study-structures.d.ts');
 monaco.editor.defineTheme('study',{base:'vs-dark',inherit:true,rules:[],colors:{'editor.background':'#101722','editor.lineHighlightBackground':'#172235','editorLineNumber.foreground':'#536783','editorCursor.foreground':'#a3c3ff','editor.selectionBackground':'#30496b'}});
-export default function CodeEditor({source,onChange,problemId,active,line,readOnly=false,tabOutEnabled=false,traceLocation=null,breakpoints=[],executableLines=[],onBreakpointsChange}:{source:string;onChange:(value:string)=>void;problemId:string;active:boolean;line:number|null;readOnly?:boolean;tabOutEnabled?:boolean;traceLocation?:VisualLocation|null;breakpoints?:number[];executableLines?:number[];onBreakpointsChange?:(lines:number[])=>void}) {
+export default function CodeEditor({source,onChange,problemId,active,line,focusRequest=null,readOnly=false,tabOutEnabled=false,traceLocation=null,breakpoints=[],executableLines=[],onBreakpointsChange}:{source:string;onChange:(value:string)=>void;problemId:string;active:boolean;line:number|null;focusRequest?:EditorFocusRequest|null;readOnly?:boolean;tabOutEnabled?:boolean;traceLocation?:VisualLocation|null;breakpoints?:number[];executableLines?:number[];onBreakpointsChange?:(lines:number[])=>void}) {
   const host=useRef<HTMLDivElement>(null), editor=useRef<monaco.editor.IStandaloneCodeEditor|null>(null), change=useRef(onChange);
   change.current=onChange;
   const debugRef=useRef({breakpoints,onBreakpointsChange});debugRef.current={breakpoints,onBreakpointsChange};
   const markers=useRef<monaco.editor.IEditorDecorationsCollection|null>(null),trace=useRef<monaco.editor.IEditorDecorationsCollection|null>(null);
   const tabOut=useRef<ReturnType<typeof installTabOut>|null>(null);
-  useEffect(()=>{
+  const savedView=useRef<monaco.editor.ICodeEditorViewState|null>(null);
+  useLayoutEffect(()=>{
+    savedView.current=null;
     const model=monaco.editor.createModel(source,'javascript',monaco.Uri.parse(`study://solution/${problemId.replace(':','-')}.js`));
     const instance=monaco.editor.create(host.current!,{model,theme:'study',automaticLayout:true,minimap:{enabled:false},fontSize:13,fontFamily:'Consolas, monospace',lineNumbersMinChars:3,scrollBeyondLastLine:false,padding:{top:16,bottom:16},tabSize:2,insertSpaces:true,wordWrap:'on',ariaLabel:readOnly?'Debug source':'JavaScript solution',accessibilitySupport:'auto',fixedOverflowWidgets:true,readOnly,glyphMargin:!!onBreakpointsChange});
     editor.current=instance;
@@ -48,9 +51,26 @@ export default function CodeEditor({source,onChange,problemId,active,line,readOn
     const key=instance.onKeyDown(event=>{if(event.keyCode===monaco.KeyCode.F9&&debugRef.current.onBreakpointsChange){event.preventDefault();toggle(instance.getPosition()?.lineNumber||1);}});
     return ()=>{listener.dispose();mouse.dispose();key.dispose();tabOut.current?.dispose();tabOut.current=null;instance.dispose();model.dispose();editor.current=null;};
   },[problemId]);
-  useEffect(()=>{const model=editor.current?.getModel();if(model&&model.getValue()!==source)model.setValue(source);},[source]);
-  useEffect(()=>{if(active)requestAnimationFrame(()=>editor.current?.layout());},[active]);
-  useEffect(()=>{if(line&&editor.current){editor.current.revealLineInCenter(line);editor.current.setPosition({lineNumber:line,column:1});editor.current.focus();}},[line]);
+  useLayoutEffect(()=>{const model=editor.current?.getModel();if(model&&model.getValue()!==source){savedView.current=null;model.setValue(source);}},[source]);
+  useLayoutEffect(()=>{
+    const instance=editor.current;
+    if(!active||readOnly)focusRequest?.cancel();
+    if(!active||!instance)return;
+    const frame=requestAnimationFrame(()=>{
+      instance.layout();
+      if(!readOnly&&savedView.current){instance.restoreViewState(savedView.current);savedView.current=null;}
+      if(focusRequest&&!focusRequest.signal.aborted){
+        focusRequest.cancel();
+        if(document.hasFocus()&&!document.querySelector('dialog[open]')&&host.current?.getClientRects().length)instance.focus();
+      }
+    });
+    return()=>{
+      cancelAnimationFrame(frame);
+      // Monaco retains the model/undo stack; snapshot the view before hidden layout.
+      if(!readOnly&&editor.current===instance)savedView.current=instance.saveViewState();
+    };
+  },[active,focusRequest,problemId,readOnly]);
+  useEffect(()=>{if(line&&active&&editor.current){savedView.current=null;editor.current.revealLineInCenter(line);editor.current.setPosition({lineNumber:line,column:1});editor.current.focus();}},[line]);
   useEffect(()=>{editor.current?.updateOptions({readOnly});},[readOnly]);
   useEffect(()=>{tabOut.current?.setEnabled(tabOutEnabled&&!readOnly);},[tabOutEnabled,readOnly]);
   useEffect(()=>{markers.current?.set(breakpoints.map(n=>({range:new monaco.Range(n,1,n,1),options:{glyphMarginClassName:executableLines.includes(n)?'debug-breakpoint':'debug-breakpoint pending',glyphMarginHoverMessage:{value:executableLines.includes(n)?'Breakpoint — click to remove':'No executable statement on this line'},stickiness:monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges}})));},[breakpoints,executableLines]);
