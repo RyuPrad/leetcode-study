@@ -1,25 +1,26 @@
-# Windows desktop validation - v0.5.3
+# Windows desktop validation - v0.5.4
 
-Validated September 24, 2026, on Windows 11 x64 with Node.js 24 and Electron 44.4.3. History-based visualizers now highlight the source line authored for the operation phase, so a displayed array write points to the array assignment. Remove Duplicates highlights `nums[left] = nums[right];` on line 7 for a write; a duplicate comparison highlights line 5 and leaves the skipped write unhighlighted.
+Validated September 24, 2026, on Windows 11 x64 with Node.js 24 and Electron 44.4.3. History-based code highlighting now uses the current execution location when an authored phase name occurs on multiple source lines. The audit covered all 45 history visualizers and 1,137 recorded states. It found 13 reused phase labels whose single-line mapping caused 37 stale highlights across 11 problems: 11, 15, 35, 74, 92, 167, 374, 410, 704, 875, and 1011. Remove Duplicates now highlights both `left++` and `nums[left] = nums[right];` for its combined write.
 
 | Check | Result |
 | --- | --- |
-| Operation walkthroughs | Passed for all 250 lessons and 9,537 transitions; zero failures |
-| Remove Duplicates regression | Passed for `[1,2,2]`: write highlights line 7 as a copy; duplicate comparison highlights line 5 and not line 7 |
+| Operation walkthroughs | Passed all 250 lessons and 9,537 transitions; zero failures; exact source-line highlights checked |
+| Phase-to-line audit | All recorded states resolve to their current trace line or an explicit authored mapping; all 13 ambiguous phase mappings now defer to the live trace location |
+| Remove Duplicates regression | Passed for `[1,2,2]`: write highlights lines 6 and 7 together; duplicate comparison highlights line 5 only |
 | Reference visualizer parity | Passed for all 250 visualizers |
 | Lesson content | Passed all 250 lesson checks |
-| Final packaged Electron | Offline regression passed the focused code-line checks, playback controls, zoom layout, restart, and upgrade from the exact v0.5.2 app payload |
-| Profile upgrade | All schema-3 progress, sessions, drafts, submissions, and guided records survived; no data-schema change |
-| Installer archive | Extracted `resources/app.asar` matches the packaged build SHA-256 exactly |
+| Final packaged Electron | Offline run passed exact highlighting for Remove Duplicates and the 11 affected problems, plus playback, zoom, and restart checks |
+| Profile upgrade | Exact v0.5.3 app payload preserved all schema-3 progress, sessions, drafts, submissions, and guided records; study-data schema is unchanged |
+| Windows build | TypeScript and production build passed; x64 NSIS installer generated |
 
-The authoring script classifies computed array assignments as value writes rather than object-pointer updates. The operations view uses the authored phase-to-line mapping for history-based visualizers; precomputed operations retain their existing line selection. The v0.5.2 editor and focus behavior is documented in [the previous report](desktop-validation-0.5.2.md). Earlier full debugger-parity coverage remains in [the v0.5.0 report](desktop-validation-0.5.0.md).
+For phases that occur on only one source line, the authored phase mapping remains in use. For reused phase names, the visualizer uses the active trace location so separate branches and statements do not all point to the same line. The Remove Duplicates write is explicitly authored as a combined two-line operation. Earlier release behavior is documented in [the v0.5.3 report](desktop-validation-0.5.3.md); the v0.5.2 editor and focus behavior remains in [the v0.5.2 report](desktop-validation-0.5.2.md).
 
 ## Release artifact
 
-- Installer: `release/LeetCode-Study-0.5.3-Setup.exe`
-- Size: **115,908,894 bytes**
+- Installer: `release/LeetCode-Study-0.5.4-Setup.exe`
+- Size: **115,908,343 bytes**
 - Signature: **unsigned**
-- Installer SHA-256: `C985B7FBAB79092A4A6C2BBFD641BABCAB573E8F84B18BCFDCBFC9F8BE8011D4`
-- Packaged `resources/app.asar` SHA-256: `A3E3820FC0890757083421CEADFA3B50DA329F9761FC9010C7E0D6A70025BD23`
+- Installer SHA-256: `B27A326A87814B20119A672E02C21EABC3FA81B2287A658E405DD62938AF00BB`
+- Packaged `resources/app.asar` SHA-256: `F93CE1DFF19C3465DEFC9C37C833036DEF6202C2A308AE4C1842CF660C8FA927`
 
-The NSIS installation/upgrade UI was not executed. The final packaged app was exercised offline from the extracted installer payload with an isolated data directory, leaving the normal installation and personal profile untouched. Code signing and automatic updates are not configured. Windows 10 remains a packaging target and was not tested on a separate machine.
+The NSIS installation UI was not executed. The final packaged app was exercised offline from `release/win-unpacked` with isolated data directories; the normal installation and personal profile were untouched. The installer payload was not separately extracted for an archive-parity check. Code signing and automatic updates are not configured. Windows 10 remains a packaging target and was not tested on a separate machine.

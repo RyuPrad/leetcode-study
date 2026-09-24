@@ -19,15 +19,17 @@
   const why=make('details','operation-why');why.append(make('summary','','Why this algorithm works'),make('p','',source.spec.why));card.append(why);
   diagram.querySelector('.study-view-tools').before(card);
   function describe(){
-   const raw=source.read(),frame=adapter.snapshot();let line=frame.location.line;
+   const raw=source.read(),frame=adapter.snapshot();let line=frame.location.line,locations=null;
    if(source.spec.mode==='precomputed'&&source.index()+1<source.count()){const future=source.readAt(source.index()+1);line=Number(future.line||(future.lines||future.hl||future.highlight||future.highlightLines||[])[0])||line;}
-   if(source.spec.mode==='history'){const phase=raw.execState||frame.phase,normalized=String(phase).replace(/_/g,' '),mapped=rules.phases?.[phase]??rules.phases?.[normalized]??rules.phases?.[frame.phase];if(Number.isInteger(Number(mapped)))line=Number(mapped);}
+   if(source.spec.mode==='history'){const phase=raw.execState||frame.phase,normalized=String(phase).replace(/_/g,' '),mapped=rules.phases?.[phase]??rules.phases?.[normalized]??rules.phases?.[frame.phase];if(Array.isArray(mapped))locations=mapped.map(Number);else if(mapped!==undefined&&mapped!==null&&Number.isInteger(Number(mapped)))locations=[Number(mapped)];}
+   locations=[...new Set((locations?.length?locations:[line]).filter(Number.isInteger))];line=locations.at(-1)??line;
    const rule=rules.lines[line]||rules.lines[Object.keys(rules.lines)[0]];
-   const op={kind:rule.kind,location:{line,column:1,endLine:line,endColumn:1},focus:rule.focus+'.',action:rule.action+'.',result:'',code:rule.code,targets:[],links:[],index:source.index(),phase:raw.execState||frame.phase};
+   const op={kind:rule.kind,location:{line,column:1,endLine:line,endColumn:1},locations,focus:rule.focus+'.',action:rule.action+'.',result:'',code:locations.map(n=>rules.lines[n]?.code).filter(Boolean).join('\n')||rule.code,targets:[],links:[],index:source.index(),phase:raw.execState||frame.phase};
    const objects=new Map(frame.objects.map(o=>[o.id,o]));
    const valueText=value=>value&&typeof value==='object'&&'ref'in value?(()=>{const object=objects.get(value.ref);return object?.kind==='function'?null:object?`${object.kind} [${object.entries.slice(0,5).map(e=>`${e.key}: ${plain(e.value)}`).join(', ')}${object.entries.length>5?', …':''}]`:value.ref;})():plain(value);
    const inputs=frame.stack[0].variables.filter(v=>rule.inputs?.includes(v.name)).map(v=>{const text=valueText(v.value);return text===null?null:`${v.name} = ${text}`;}).filter(Boolean).slice(0,4);
    if(inputs.length)op.focus+=' '+inputs.join('; ')+'.';
+   if(source.spec.number===26&&raw.execState==='WRITE'){op.focus='Look at the advancing index and the new array slot.';op.action='Advance left, then copy nums[right] into the new unique position.';}
    if(source.spec.number===1){
     const {i,num,need,target,nums}=raw;op.i=i;op.num=num;op.need=need;
     const definitions={
@@ -42,7 +44,7 @@
      END_FOUND:['return',9,'The matching pair is ready.','The walkthrough is complete.'],
      END_NONE:['return',14,'Every input number has been checked.','Finish without a matching pair.']
     };
-    const d=definitions[raw.execState];if(d){[op.kind,op.location.line,op.focus,op.action]=d;op.code=rules.lines[op.location.line]?.code||op.code;}
+    const d=definitions[raw.execState];if(d){[op.kind,op.location.line,op.focus,op.action]=d;op.locations=[op.location.line];op.code=rules.lines[op.location.line]?.code||op.code;}
     if(raw.execState==='CHECK_MAP')op.targets=['.map-box','.formula-piece.need'];
     if(['READ_CURRENT','SET_MAP'].includes(raw.execState))op.targets=[`[data-study-key="cell:${i}"]`];
    }
@@ -70,11 +72,11 @@
    badge.textContent=kinds[operation.kind]||'Step';position.textContent=blocked?'Prediction first':mode==='compact'?'Current operation':`${['Focus','Action','Result'][stage]} · ${stage+1}/3`;
    caption.textContent=blocked?'Answer the prediction to watch this operation.':operation[['focus','action','result'][stage]]||operation.focus;code.textContent=operation.code;
    previous.disabled=!enabled||playing||blocked||stage===0;next.disabled=!enabled||playing||blocked||document.getElementById('btn-next').disabled&&stage!==1;controls.hidden=mode==='compact';
-   if(!blocked){for(const selector of operation.targets)visual.querySelectorAll(selector).forEach(e=>e.classList.add('operation-target'));(document.getElementById(`line-${operation.location.line}`)||document.getElementById(`l${operation.location.line}`))?.classList.add('operation-code');}
+   if(!blocked){for(const selector of operation.targets)visual.querySelectorAll(selector).forEach(e=>e.classList.add('operation-target'));for(const line of operation.locations||[operation.location.line])(document.getElementById(`line-${line}`)||document.getElementById(`l${line}`))?.classList.add('operation-code');}
    // Two Sum previously calculated has() in its renderer before the check ran.
    if(source.spec.number===1){const raw=source.read(),check=visual.querySelectorAll('.formula-piece')[3];if(check){const known=raw.lastCheckHit;check.textContent=`seen.has(need) = ${known===null?'not checked':String(known)}`;}const label=visual.querySelector('.memory-label');if(label)label.textContent='Number → original index';if(raw.lastCheckHit===null)visual.querySelector('.map-box')?.classList.remove('hit','miss');}
    onChange?.();
-   adapter.snapshot().operations=[{kind:operation.kind,location:operation.location,focus:operation.focus,action:operation.action,result:stage===2?operation.result:''}];
+   adapter.snapshot().operations=[{kind:operation.kind,location:operation.location,locations:operation.locations||[operation.location.line],focus:operation.focus,action:operation.action,result:stage===2?operation.result:''}];
   }
   function refresh(){operation=describe();lastPrepared=operation;stage=mode==='compact'?2:0;beforeVisual=null;if(stage===2)operation={...operation,result:operation.focus};render();preparedVisual=visual.cloneNode(true);}
   function pause(){window.dispatchEvent(new CustomEvent('study:moment-pause'));}

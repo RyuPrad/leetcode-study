@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {parse} from '@babel/parser';
 const lessons=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8'));
 const labels={read:['Read the selected value','Read without changing the source'],lookup:['Look at the collection and the requested key','Check membership without adding an entry'],compare:['Look at the values being compared','Evaluate the condition'],calculate:['Look at the inputs to this calculation','Calculate the expression'],write:['Look at the destination','Store the new value'],copy:['Look at the source and destination','Copy the value; keep the source'],swap:['Look at the two positions','Exchange the selected values'],remove:['Look at the item being removed','Remove the selected entry'],pointer:['Look at the node and its reference','Update the reference'],call:['Look at the function and its arguments','Run this call'],return:['Look at the function result','Return this value to the caller'],control:['Look at the highlighted instruction','Continue this part of the algorithm']};
+let deferredPhases=0;
 const output=lessons.map(spec=>{
  const trace=JSON.parse(fs.readFileSync(`.test-data/guided-authoring/${spec.number}.json`,'utf8'));
  const source=trace.code.map(c=>c.text).join('\n'),ast=parse(source,{sourceType:'script',allowReturnOutsideFunction:true});
@@ -24,11 +25,16 @@ const output=lessons.map(spec=>{
  }
  walk(ast.program);
  const lines=Object.fromEntries(trace.code.filter(c=>c.text.trim()).map(c=>{const rule=candidates.get(c.line)||{kind:'control',text:c.text.trim(),inputs:[]};const [focus,action]=labels[rule.kind];return[c.line,{kind:rule.kind,code:c.text.trim(),focus,action,inputs:rule.inputs}];}));
- const phases=Object.fromEntries(trace.steps.map(s=>[s.phase,s.line]));
- // The WRITE phase for Remove Duplicates includes both left++ and the array copy.
- // Feature the copy itself in the operation trace so the in-place write is visible.
- if(spec.number===26)phases.WRITE=7;
+ const phaseLines=new Map();
+ for(const step of trace.steps){if(!step.phase||!Number.isInteger(Number(step.line)))continue;let lines=phaseLines.get(step.phase);if(!lines)phaseLines.set(step.phase,lines=new Set());lines.add(Number(step.line));}
+ // Reused phase names (for example, a comparison's different branches) must
+ // use the current trace location instead of collapsing to one stale line.
+ const reused=([...phaseLines].filter(([,lines])=>lines.size>1));
+ if(spec.mode==='history')deferredPhases+=reused.length;
+ const phases=Object.fromEntries([...phaseLines].filter(([,lines])=>lines.size===1).map(([phase,lines])=>[phase,[...lines][0]]));
+ // This one recorded WRITE transition advances left and then copies the value.
+ if(spec.number===26)phases.WRITE=[6,7];
  return {id:spec.id,mode:spec.mode,lines,phases};
 });
 fs.writeFileSync('visualizer-ui/operations.json',JSON.stringify(output,null,2)+'\n');
-console.log(`Compiled operation rules for ${output.length} lessons.`);
+console.log(`Compiled operation rules for ${output.length} lessons; ${deferredPhases} reused history phases follow their current trace location.`);
