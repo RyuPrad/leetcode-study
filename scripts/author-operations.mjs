@@ -14,7 +14,7 @@ const output=lessons.map(spec=>{
   else if(['IfStatement','WhileStatement','DoWhileStatement','ForStatement'].includes(n.type))add(n,'compare',8);
   else if(['ForOfStatement','ForInStatement'].includes(n.type))add(n,'read',8);
   else if(n.type==='AssignmentExpression'||n.type==='UpdateExpression'){
-   const left=n.left||n.argument;let kind=left.type==='ArrayPattern'?'swap':left.type==='MemberExpression'&&['next','left','right','parent'].includes(left.property.name)?'pointer':n.right?.type==='MemberExpression'?'copy':'write';add(n,kind,7);
+   const left=n.left||n.argument;let kind=left.type==='ArrayPattern'?'swap':left.type==='MemberExpression'&&!left.computed&&['next','left','right','parent'].includes(left.property.name)?'pointer':n.right?.type==='MemberExpression'?'copy':'write';add(n,kind,7);
   }else if(n.type==='VariableDeclaration')add(n,'calculate',2);
   else if(n.type==='CallExpression'){
    const c=n.callee;const method=c.type==='MemberExpression'&&!c.computed?c.property.name:'';
@@ -25,6 +25,9 @@ const output=lessons.map(spec=>{
  walk(ast.program);
  const lines=Object.fromEntries(trace.code.filter(c=>c.text.trim()).map(c=>{const rule=candidates.get(c.line)||{kind:'control',text:c.text.trim(),inputs:[]};const [focus,action]=labels[rule.kind];return[c.line,{kind:rule.kind,code:c.text.trim(),focus,action,inputs:rule.inputs}];}));
  const phases=Object.fromEntries(trace.steps.map(s=>[s.phase,s.line]));
+ // The WRITE phase for Remove Duplicates includes both left++ and the array copy.
+ // Feature the copy itself in the operation trace so the in-place write is visible.
+ if(spec.number===26)phases.WRITE=7;
  return {id:spec.id,mode:spec.mode,lines,phases};
 });
 fs.writeFileSync('visualizer-ui/operations.json',JSON.stringify(output,null,2)+'\n');

@@ -21,6 +21,7 @@
   function describe(){
    const raw=source.read(),frame=adapter.snapshot();let line=frame.location.line;
    if(source.spec.mode==='precomputed'&&source.index()+1<source.count()){const future=source.readAt(source.index()+1);line=Number(future.line||(future.lines||future.hl||future.highlight||future.highlightLines||[])[0])||line;}
+   if(source.spec.mode==='history'){const phase=raw.execState||frame.phase,normalized=String(phase).replace(/_/g,' '),mapped=rules.phases?.[phase]??rules.phases?.[normalized]??rules.phases?.[frame.phase];if(Number.isInteger(Number(mapped)))line=Number(mapped);}
    const rule=rules.lines[line]||rules.lines[Object.keys(rules.lines)[0]];
    const op={kind:rule.kind,location:{line,column:1,endLine:line,endColumn:1},focus:rule.focus+'.',action:rule.action+'.',result:'',code:rule.code,targets:[],links:[],index:source.index(),phase:raw.execState||frame.phase};
    const objects=new Map(frame.objects.map(o=>[o.id,o]));
