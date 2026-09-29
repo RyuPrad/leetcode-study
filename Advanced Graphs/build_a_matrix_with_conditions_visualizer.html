@@ -838,7 +838,7 @@
       // shared display state across phases
       let rowOrderFinal = null, colOrderFinal = null;
       let rowPosObj = {}, colPosObj = {};
-      let matrix = Array.from({ length: k }, () => new Array(k).fill(0));
+      let matrix = [];
 
       function snap(extra) {
         built.push({
@@ -861,6 +861,7 @@
           placingVal: (extra.placingVal === undefined) ? null : extra.placingVal,
           placingRC: (extra.placingRC === undefined) ? null : extra.placingRC,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           ans: (extra.ans === undefined) ? null : (extra.ans === "EMPTY" ? [] : cloneMatrix(extra.ans)),
           done: (extra.done === undefined) ? false : extra.done,
@@ -868,25 +869,35 @@
         });
       }
 
+      snap({phase: "ready", lines: [], executedLine: null, narration: "Ready to build the matrix."});
       // Run a topo sort, emitting snapshots. Returns order or null.
       function runTopo(which, conditions, accentLines) {
         const label = which === "row" ? "rowConditions" : "colConditions";
         const adj = Array.from({ length: k + 1 }, () => []);
         const indeg = new Array(k + 1).fill(0);
         snap({
-          phase: "topo", which, adj, indeg, lines: [2, 3, 4],
+          phase: "topo", which, adj, indeg, lines: [4],
           narration: "Start <code>topo(" + label + ")</code>. Build an adjacency list and an indegree array for nodes 1.." + k + "."
         });
-        for (const [a, b] of conditions) { adj[a].push(b); indeg[b]++; }
+        for (const [a, b] of conditions) {
+          adj[a].push(b);
+          snap({phase: "topo", which, adj, indeg, lines: [5], narration: "Add this condition's edge. Indegrees stay unchanged."});
+          indeg[b]++;
+          snap({phase: "topo", which, adj, indeg, lines: [5], narration: "Increment this condition's destination indegree."});
+        }
         snap({
           phase: "topo", which, adj, indeg, lines: [5],
           narration: "Apply every condition <code>[a, b]</code>: add edge <code>a &rarr; b</code> and increment <code>indeg[b]</code>. " +
             "Indegrees are now [" + indeg.slice(1).join(", ") + "] for nodes 1.." + k + "."
         });
         const queue = [];
-        for (let i = 1; i <= k; i++) if (indeg[i] === 0) queue.push(i);
+        snap({phase: "topo", which, adj, indeg, queue, lines: [6], narration: "Create the empty queue."});
+        for (let i = 1; i <= k; i++) if (indeg[i] === 0) {
+          queue.push(i);
+          snap({phase: "topo", which, adj, indeg, queue, lines: [7], narration: "Append this zero-indegree node to the queue."});
+        }
         snap({
-          phase: "topo", which, adj, indeg, queue, head: 0, lines: [6, 7],
+          phase: "topo", which, adj, indeg, queue, head: 0, lines: [7],
           narration: "Seed the queue with every node whose indegree is 0: <b>[" + queue.join(", ") + "]</b>." +
             (queue.length === 0 ? " Empty queue &mdash; a cycle blocks every node." : "")
         });
@@ -894,22 +905,28 @@
         let head = 0;
         const settled = [];
         snap({
-          phase: "topo", which, adj, indeg, queue, head, order, settled: settled.slice(), lines: [8, 9, 10],
+          phase: "topo", which, adj, indeg, queue, head, order, settled: settled.slice(), lines: [9],
           narration: "Run Kahn's algorithm: pop the head, append it to <code>order</code>, and relax its outgoing edges."
         });
         while (head < queue.length) {
+          snap({phase: "topo", which, adj, indeg, queue, head, order, settled, lines: [10], narration: "The queue contains another node."});
           const node = queue[head++];
+          snap({phase: "topo", which, adj, indeg, queue, head, order, settled, popping: node, lines: [11], narration: "Read the queue head and advance head. The order stays unchanged."});
           order.push(node);
           snap({
             phase: "topo", which, adj, indeg, queue, head, order, settled: settled.slice(),
-            popping: node, lines: [11, 12],
+            popping: node, lines: [12],
             narration: "Pop <b>" + node + "</b> and append it &rarr; <code>order = [" + order.join(", ") + "]</code>."
           });
           const decremented = [];
           for (const nei of adj[node]) {
             indeg[nei]--;
             decremented.push(nei);
-            if (indeg[nei] === 0) queue.push(nei);
+            snap({phase: "topo", which, adj, indeg, queue, head, order, settled, decremented, lines: [13], narration: "Decrease this neighbor's indegree. The queue stays unchanged."});
+            if (indeg[nei] === 0) {
+              queue.push(nei);
+              snap({phase: "topo", which, adj, indeg, queue, head, order, settled, decremented, lines: [13], narration: "This neighbor now has zero indegree; append it to the queue."});
+            }
           }
           settled.push(node);
           snap({
@@ -935,10 +952,12 @@
       // ---- rows ----
       const rowOrder = runTopo("row", prob.rowConditions);
       if (rowOrder !== null) rowOrderFinal = rowOrder;
+      snap({phase: "orders", lines: [17], narration: "Store the completed row order."});
 
       // ---- cols ---- (only if rows succeeded? algorithm runs both unconditionally)
       const colOrder = runTopo("col", prob.colConditions);
       if (colOrder !== null) colOrderFinal = colOrder;
+      snap({phase: "orders", lines: [18], narration: "Store the completed column order."});
 
       // ---- null check ----
       if (rowOrder === null || colOrder === null) {
@@ -953,13 +972,14 @@
       }
 
       // ---- build position maps ----
-      rowOrder.forEach((v, i) => { rowPosObj[v] = i; });
+      snap({phase: "pos", lines: [20], narration: "Create empty row and column position maps."});
+      rowOrder.forEach((v, i) => { rowPosObj[v] = i; snap({phase: "pos", lines: [21], narration: "Map this value to its row index."}); });
       snap({
-        phase: "pos", lines: [20, 21],
+        phase: "pos", lines: [21],
         narration: "Both orders exist. Map each value to its <b>row index</b>: " +
           rowOrder.map((v, i) => v + "&rarr;r" + i).join(", ") + "."
       });
-      colOrder.forEach((v, i) => { colPosObj[v] = i; });
+      colOrder.forEach((v, i) => { colPosObj[v] = i; snap({phase: "pos", lines: [22], narration: "Map this value to its column index."}); });
       snap({
         phase: "pos", lines: [22],
         narration: "Map each value to its <b>column index</b>: " +
@@ -967,6 +987,7 @@
       });
 
       // ---- allocate matrix ----
+      matrix = Array.from({length: k}, () => new Array(k).fill(0));
       snap({
         phase: "alloc", lines: [23],
         narration: "Allocate a " + k + "&times;" + k + " matrix of zeros. Each value 1.." + k + " will be placed at <code>(rowPos[v], colPos[v])</code>."
@@ -1306,7 +1327,7 @@
         for (let c = 0; c < st.k; c++) {
           const cell = document.createElement("div");
           cell.className = "mcell";
-          const val = st.matrix[r][c];
+          const val = st.matrix[r]?.[c] ?? "";
           if (val === 0) {
             cell.classList.add("zero");
             cell.textContent = "0";
@@ -1475,7 +1496,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({problem, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({problem, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({problem, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

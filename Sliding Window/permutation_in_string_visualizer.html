@@ -929,19 +929,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const st = historyStack.pop();
-      need = { ...st.need };
-      windowMap = { ...st.windowMap };
-      left = st.left;
-      right = st.right;
-      ans = st.ans;
-      execState = st.execState;
-      trace = st.trace.map(row => ({ ...row }));
-      leavingIndex = st.leavingIndex;
-      lastMatch = st.lastMatch;
+      restoreState(st);
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+need = {
+  ...snapshot.need
+};
+windowMap = {
+  ...snapshot.windowMap
+};
+left = snapshot.left;
+right = snapshot.right;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+leavingIndex = snapshot.leavingIndex;
+lastMatch = snapshot.lastMatch;
+}
 
     function windowSize() {
       if (right < left) return 0;
@@ -956,31 +975,27 @@
     function nextStep() {
       if (execState === "END_TRUE" || execState === "END_FALSE") return;
       saveState();
-      leavingIndex = null;
+      if (!["REMOVE_LEFT_COUNT", "DELETE_ZERO_COUNT", "ADVANCE_LEFT"].includes(execState)) leavingIndex = null;
       lastMatch = null;
 
       switch (execState) {
-        case "INIT":
-          need = {};
-          windowMap = {};
-          left = 0;
-          right = -1;
-          execState = "GUARD";
-          break;
-
-        case "GUARD":
+        case "INIT": execState = "GUARD"; break;
+ case "INIT_NEED": need = {}; execState = "BUILD_NEED"; break;
+ case "INIT_WINDOW": windowMap = {}; execState = "INIT_LEFT"; break;
+ case "INIT_LEFT": left = 0; right = -1; execState = "LOOP_CHECK"; break;
+ case "GUARD":
           if (s1.length > s2.length) {
             ans = false;
             execState = "RETURN_FALSE";
           } else {
-            execState = "BUILD_NEED";
+            execState = "INIT_NEED";
           }
           break;
 
         case "BUILD_NEED":
           need = {};
           for (const c of s1) need[c] = (need[c] || 0) + 1;
-          execState = "LOOP_CHECK";
+          execState = "INIT_WINDOW";
           break;
 
         case "LOOP_CHECK":
@@ -993,6 +1008,12 @@
           break;
 
         case "ADD_RIGHT": {
+          const c = s2[right];
+          execState = "ADD_RIGHT_COUNT";
+          break;
+        }
+
+        case "ADD_RIGHT_COUNT": {
           const c = s2[right];
           windowMap[c] = (windowMap[c] || 0) + 1;
           execState = "SIZE_CHECK";
@@ -1009,13 +1030,29 @@
 
         case "SHRINK": {
           const d = s2[left];
-          windowMap[d]--;
-          if (windowMap[d] === 0) delete windowMap[d];
           leavingIndex = left;
+          execState = "REMOVE_LEFT_COUNT";
+          break;
+        }
+
+        case "REMOVE_LEFT_COUNT": {
+          const d = s2[leavingIndex];
+          windowMap[d]--;
+          execState = "DELETE_ZERO_COUNT";
+          break;
+        }
+
+        case "DELETE_ZERO_COUNT": {
+          const d = s2[leavingIndex];
+          if (windowMap[d] === 0) delete windowMap[d];
+          execState = "ADVANCE_LEFT";
+          break;
+        }
+
+        case "ADVANCE_LEFT":
           left++;
           execState = "MATCH_CHECK";
           break;
-        }
 
         case "MATCH_CHECK": {
           const isFull = windowSize() === s1.length;
@@ -1091,7 +1128,7 @@
       }
 
       const windowActive = right >= 0 && right >= left &&
-        ["ADD_RIGHT", "SIZE_CHECK", "SHRINK", "MATCH_CHECK", "RETURN_TRUE", "END_TRUE", "RETURN_FALSE", "END_FALSE"].includes(execState);
+        ["ADD_RIGHT", "ADD_RIGHT_COUNT", "SIZE_CHECK", "SHRINK", "REMOVE_LEFT_COUNT", "DELETE_ZERO_COUNT", "ADVANCE_LEFT", "MATCH_CHECK", "RETURN_TRUE", "END_TRUE", "RETURN_FALSE", "END_FALSE"].includes(execState);
       const isMatchNow = (execState === "RETURN_TRUE" || execState === "END_TRUE") ||
         (execState === "MATCH_CHECK" && lastMatch === true);
 
@@ -1142,8 +1179,8 @@
         if (idx < left) cell.classList.add("checked");
         if (inWindow) cell.classList.add("in-window");
         if (inWindow && isMatchNow) cell.classList.add("match");
-        if (isRight && execState === "ADD_RIGHT") cell.classList.add("current");
-        if (idx === leavingIndex && (execState === "MATCH_CHECK" || execState === "SHRINK")) cell.classList.add("leaving");
+        if (isRight && ["ADD_RIGHT", "ADD_RIGHT_COUNT"].includes(execState)) cell.classList.add("current");
+        if (idx === leavingIndex && ["SHRINK", "REMOVE_LEFT_COUNT", "DELETE_ZERO_COUNT", "ADVANCE_LEFT", "MATCH_CHECK"].includes(execState)) cell.classList.add("leaving");
 
         const idxLabel = document.createElement("div");
         idxLabel.className = "index-label";
@@ -1286,6 +1323,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1304,12 +1344,12 @@
 
       const size = windowSize();
       switch (execState) {
-        case "INIT":
-          highlightLines([3, 5, 6]);
-          narrate("Set up the empty <b>need</b> and <b>window</b> maps and put <b>left = 0</b>.");
-          break;
-        case "GUARD":
-          highlightLines([2]);
+        case "INIT":  narrate('Enter the permutation check.'); break;
+ case "INIT_NEED":  narrate('Create the required-frequency map.'); break;
+ case "INIT_WINDOW":  narrate('Create the window-frequency map.'); break;
+ case "INIT_LEFT":  narrate('Initialize the left boundary.'); break;
+ case "GUARD":
+
           if (s1.length > s2.length) {
             narrate("<b>s1</b> is longer than <b>s2</b>, so no window can fit. Return <b>false</b> right away.");
           } else {
@@ -1317,11 +1357,11 @@
           }
           break;
         case "BUILD_NEED":
-          highlightLines([4]);
+
           narrate("Build <b>need</b> = the character frequencies of <b>s1</b>. The window must match this exactly.");
           break;
         case "LOOP_CHECK":
-          highlightLines([7]);
+
           if (right + 1 < s2.length) {
             narrate("Loop continues: slide <b>right</b> to index <b>" + (right + 1) + "</b> in <b>s2</b>.");
           } else {
@@ -1329,11 +1369,15 @@
           }
           break;
         case "ADD_RIGHT":
-          highlightLines([8, 9]);
-          narrate("Add <b>s2[" + right + "] = '" + s2[right] + "'</b> into <b>window</b>: window['" + s2[right] + "'] = <b>" + windowMap[s2[right]] + "</b>.");
+
+          narrate("Read <b>s2[" + right + "] = '" + s2[right] + "'</b> as the character to add to the window.");
+          break;
+        case "ADD_RIGHT_COUNT":
+
+          narrate("Add <b>'" + s2[right] + "'</b> to <b>window</b>; its count is now <b>" + windowMap[s2[right]] + "</b>.");
           break;
         case "SIZE_CHECK":
-          highlightLines([10]);
+
           if (size > s1.length) {
             narrate("Window size <b>" + size + "</b> exceeds <b>|s1| = " + s1.length + "</b>. Drop the left cell to keep it fixed-width.");
           } else {
@@ -1341,11 +1385,25 @@
           }
           break;
         case "SHRINK":
-          highlightLines([11, 12, 13, 14]);
-          narrate("Remove the leaving char <b>'" + s2[leavingIndex] + "'</b> from <b>window</b> and advance <b>left</b> to <b>" + left + "</b>.");
+
+          narrate("Read the character leaving the oversized window: <b>s2[" + left + "] = '" + s2[left] + "'</b>.");
+          break;
+        case "REMOVE_LEFT_COUNT":
+
+          narrate("Decrease the window count for the leaving character <b>'" + s2[leavingIndex] + "'</b>.");
+          break;
+        case "DELETE_ZERO_COUNT":
+
+          narrate(windowMap[s2[leavingIndex]] === undefined
+            ? "The leaving character count reached 0, so remove its key from <b>window</b>."
+            : "The leaving character still has a positive count, so keep its key in <b>window</b>.");
+          break;
+        case "ADVANCE_LEFT":
+
+          narrate("Advance <b>left</b> to index <b>" + (left + 1) + "</b> after removing the old left character.");
           break;
         case "MATCH_CHECK":
-          highlightLines([16]);
+
           if (size === s1.length && lastMatch) {
             narrate("Window is full and <b>window === need</b>! Substring <b>\"" + windowSubstring() + "\"</b> is a permutation of <b>s1</b>.");
           } else if (size === s1.length) {
@@ -1355,19 +1413,19 @@
           }
           break;
         case "RETURN_TRUE":
-          highlightLines([17]);
+
           narrate("Return <b style=\"color:#6a9955\">true</b> &mdash; a permutation of <b>s1</b> exists inside <b>s2</b>.");
           break;
         case "RETURN_FALSE":
-          highlightLines([20]);
+
           narrate("Return <b style=\"color:#e24b4a\">false</b> &mdash; no window of <b>s2</b> matched <b>need</b>.");
           break;
         case "END_TRUE":
-          highlightLines([17]);
+
           narrate("Done. <b>s2</b> contains a permutation of <b>s1</b>: <b>\"" + windowSubstring() + "\"</b>.");
           break;
         case "END_FALSE":
-          highlightLines([20]);
+
           narrate("Done. No permutation of <b>s1</b> appears in <b>s2</b>. Answer is <b>false</b>.");
           break;
       }
@@ -1417,14 +1475,146 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 1,
+      phase: execState
+    };
+  case "INIT_NEED":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_WINDOW":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "GUARD":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "BUILD_NEED":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADD_RIGHT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADD_RIGHT_COUNT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "SIZE_CHECK":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "SHRINK":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "REMOVE_LEFT_COUNT":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "DELETE_ZERO_COUNT":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "ADVANCE_LEFT":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "MATCH_CHECK":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "END_TRUE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "END_FALSE":
+    return {
+      line: 20,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     s1 = examples[1][0];
     s2 = examples[1][1];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":567,"title":"Permutation in String","topic":"Sliding Window","why":"A fixed-length window is a permutation when its character frequencies equal the target frequencies.","meanings":{"s1":"pattern string whose permutation we search for","s2":"text string we slide the window across","need":"character frequencies of s1 the window must match","window":"character frequencies inside the current fixed-width window","left":"left bound of the window","right":"right bound of the window"},"entityClasses":["hud-item","cell","map-pills","set-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s1, s2, need, windowMap, left, right, ans, execState, leavingIndex, lastMatch, ...({})}),

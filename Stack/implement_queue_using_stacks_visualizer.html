@@ -903,7 +903,7 @@
     // step records deep snapshots of sIn and sOut, the highlighted code
     // line(s), narration, live x/ans, visual flags, and a traceLen marker so
     // the trace table grows.
-    function buildSteps(opList) {
+    function originalInstructionBuilder(opList) {
       const sIn = [];
       const sOut = [];
       const built = [];
@@ -1429,13 +1429,42 @@
     document.getElementById("custom-input").value = opsToString(ops);
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,3,4,7,10,11,14,15,16,19,22]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":232,"title":"Implement Queue using Stacks","topic":"Stack","why":"Transferring values between two stacks reverses their order so the oldest value leaves first.","meanings":{"sIn":"input stack; every `push` lands here (newest on top)","sOut":"output stack; serves the oldest element. Filled by pouring `sIn` into it, which reverses the order so the oldest element ends up on top","x":"the value being pushed"},"entityClasses":["hud-item","scell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({ops, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, masterTrace, ...(steps[position] || {})}),
+      read: () => ({ops,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({ops,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

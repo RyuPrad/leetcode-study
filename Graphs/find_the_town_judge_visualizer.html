@@ -762,87 +762,25 @@
     let activeExample = 1;
 
     // ----- The canonical solution, instrumented to push snapshots -----
-    function buildSteps(N, trustList) {
-      const built = [];
-      const traceRows = [];
-      const score = new Array(N + 1).fill(0);
-
-      function snapshot(extra) {
-        built.push({
-          score: score.slice(),
-          edgeIdx: (extra.edgeIdx === undefined) ? null : extra.edgeIdx,
-          a: (extra.a === undefined) ? null : extra.a,
-          b: (extra.b === undefined) ? null : extra.b,
-          i: (extra.i === undefined) ? null : extra.i,
-          phase: extra.phase,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          judge: (extra.judge === undefined) ? null : extra.judge,
-          rejected: (extra.rejected === undefined) ? null : extra.rejected,
-          lines: extra.lines,
-          narration: extra.narration,
-          trace: traceRows.map(r => ({ ...r }))
-        });
-      }
-
-      // line 2: build score array
-      snapshot({
-        phase: "init", lines: [2],
-        narration: "Create <code>score</code> of length <b>n+1 = " + (N + 1) + "</b>, all zeros. <code>score[p]</code> = (people who trust p) − (people p trusts). The judge needs <b>n−1 = " + (N - 1) + "</b>."
-      });
-
-      // tally trust edges
-      for (let e = 0; e < trustList.length; e++) {
-        const a = trustList[e][0];
-        const b = trustList[e][1];
-        snapshot({
-          phase: "tally-read", edgeIdx: e, a, b, lines: [3],
-          narration: "Edge <b>[" + a + ", " + b + "]</b>: person <b>" + a + "</b> trusts person <b>" + b + "</b>."
-        });
-        score[a]--;
-        snapshot({
-          phase: "tally-dec", edgeIdx: e, a, b, lines: [4],
-          narration: "<code>score[" + a + "]--</code> → <b>" + score[a] + "</b>. Trusting someone disqualifies you from being the judge."
-        });
-        score[b]++;
-        snapshot({
-          phase: "tally-inc", edgeIdx: e, a, b, lines: [5],
-          narration: "<code>score[" + b + "]++</code> → <b>" + score[b] + "</b>. Person <b>" + b + "</b> gains one inbound trust."
-        });
-        traceRows.push({ phase: "edge", label: "[" + a + "," + b + "]", a, b, sa: score[a], sb: score[b], note: "score[" + a + "]=" + score[a] + ", score[" + b + "]=" + score[b] });
-      }
-
-      // scan for judge
-      let foundJudge = -1;
-      for (let i = 1; i <= N; i++) {
-        const isJudge = score[i] === N - 1;
-        snapshot({
-          phase: "scan", i, lines: [7, 8],
-          ans: foundJudge === -1 ? "pending" : foundJudge,
-          judge: isJudge ? i : null,
-          rejected: isJudge ? null : i,
-          narration: "Check person <b>" + i + "</b>: is <code>score[" + i + "] (" + score[i] + ") === n−1 (" + (N - 1) + ")</code>? " +
-            (isJudge
-              ? "<b style=\"color:#6a9955\">Yes</b> — everyone trusts " + i + " and " + i + " trusts no one. Found the judge."
-              : "<b style=\"color:#e24b4a\">No</b> — keep scanning.")
-        });
-        traceRows.push({ phase: "check", label: "person " + i, a: i, b: "", sa: score[i], sb: "", note: "score[" + i + "]=" + score[i] + (isJudge ? " === " + (N - 1) + " ✓ judge" : " ≠ " + (N - 1)) });
-        if (isJudge) { foundJudge = i; break; }
-      }
-
-      if (foundJudge !== -1) {
-        snapshot({
-          phase: "return-judge", i: foundJudge, judge: foundJudge, ans: foundJudge, lines: [8],
-          narration: "<code>return " + foundJudge + "</code>. Person <b>" + foundJudge + "</b> is the town judge."
-        });
-      } else {
-        snapshot({
-          phase: "return-none", ans: -1, lines: [10],
-          narration: "No person satisfies <code>score[i] === n−1</code>. <code>return -1</code> — there is no town judge."
-        });
-      }
-
-      return built;
-    }
+    function buildSteps(N,trustList){
+  const built=[],traceRows=[];let score=[];
+  function snapshot(extra){built.push({score:score.slice(),edgeIdx:null,a:null,b:null,i:null,ans:'pending',judge:null,rejected:null,...extra,executedLine:extra.lines?.[0]??null,trace:traceRows.map(r=>({...r}))});}
+  snapshot({phase:'ready',lines:[],narration:'Ready to create the trust scores.'});
+  score=new Array(N+1).fill(0);snapshot({phase:'init',lines:[2],narration:'Create score with '+(N+1)+' zero entries.'});
+  for(let e=0;e<trustList.length;e++){
+    const [a,b]=trustList[e];snapshot({phase:'tally-read',edgeIdx:e,a,b,lines:[3],narration:'Read the trust edge ['+a+', '+b+'].'});
+    score[a]--;snapshot({phase:'tally-dec',edgeIdx:e,a,b,lines:[4],narration:'Decrease score['+a+'] to '+score[a]+'.'});
+    score[b]++;traceRows.push({phase:'edge',label:'['+a+','+b+']',a,b,sa:score[a],sb:score[b],note:'score['+a+']='+score[a]+', score['+b+']='+score[b]});
+    snapshot({phase:'tally-inc',edgeIdx:e,a,b,lines:[5],narration:'Increase score['+b+'] to '+score[b]+'.'});
+  }
+  for(let i=1;i<=N;i++){
+    snapshot({phase:'scan-header',i,lines:[7],narration:'Visit person '+i+'. The trust scores stay unchanged.'});
+    const isJudge=score[i]===N-1;traceRows.push({phase:'check',label:'person '+i,a:i,b:'',sa:score[i],sb:'',note:'score['+i+']='+score[i]+(isJudge?' = required score; judge':' != required score')});
+    snapshot({phase:'scan',i,lines:[8],judge:isJudge?i:null,rejected:isJudge?null:i,narration:'Check score['+i+'] === '+(N-1)+': '+isJudge+'.'});
+    if(isJudge){snapshot({phase:'return-judge',i,judge:i,ans:i,lines:[8],narration:'Return person '+i+' as the judge.'});return built;}
+  }
+  snapshot({phase:'return-none',ans:-1,lines:[10],narration:'Return -1 because no person has the required score.'});return built;
+}
 
     // node positions on a circle, computed once per example
     function computePositions(N) {
@@ -1172,7 +1110,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({n, trust, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({n, trust, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({n, trust, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

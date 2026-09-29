@@ -808,6 +808,7 @@
     .edge-card.r .ec-val { color: var(--orange); }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -1061,113 +1062,64 @@
 
     // ---- Precompute steps[] by simulating the exact algorithm ----
     function buildSteps(a1, a2) {
-      const built = [];
-      const traceRows = [];
-
-      // The solution swaps so that the binary search runs on the smaller array.
-      let swapped = false;
-      let A = a1;
-      let B = a2;
-      if (A.length > B.length) { const tmp = A; A = B; B = tmp; swapped = true; }
-
-      const m = A.length;
-      const n = B.length;
-      const half = Math.floor((m + n + 1) / 2);
-      let left = 0;
-      let right = m;
-      let answer = 0;
-
-      function snap(extra) {
-        built.push({
-          A: A.slice(), B: B.slice(), swapped, m, n, half,
-          left: extra.left === undefined ? null : extra.left,
-          right: extra.right === undefined ? null : extra.right,
-          i: extra.i === undefined ? null : extra.i,
-          j: extra.j === undefined ? null : extra.j,
-          left1: extra.left1 === undefined ? null : extra.left1,
-          right1: extra.right1 === undefined ? null : extra.right1,
-          left2: extra.left2 === undefined ? null : extra.left2,
-          right2: extra.right2 === undefined ? null : extra.right2,
-          valid: extra.valid === undefined ? null : extra.valid,
-          ans: extra.ans === undefined ? null : extra.ans,
-          done: extra.done === undefined ? false : extra.done,
-          lines: extra.lines,
-          narration: extra.narration,
-          traceLen: traceRows.length
-        });
+      const built = [], traceRows = [];
+      let A = a1, B = a2, swapped = false;
+      let m = null, n = null, half = null, left = null, right = null;
+      let i = null, j = null, left1 = null, right1 = null, left2 = null, right2 = null;
+      let valid = null, answer = null;
+      function snap(executedLine, narration, done = false) {
+        built.push({A: A.slice(), B: B.slice(), swapped, m, n, half, left, right,
+          i, j, left1, right1, left2, right2, valid, ans: answer, done,
+          executedLine, lines: executedLine ? [executedLine] : [1], narration, traceLen: traceRows.length});
       }
-
-      snap({
-        left, right, lines: swapped ? [2, 3] : [2],
-        narration: swapped
-          ? "<code>nums1.length (" + a1.length + ") &gt; nums2.length (" + a2.length + ")</code>, so we recurse with the arrays swapped. The binary search always runs on the <b>smaller</b> array."
-          : "<code>nums1.length (" + a1.length + ") &lt;= nums2.length (" + a2.length + ")</code>, so no swap is needed. We binary-search nums1, the smaller array."
-      });
-      snap({
-        left, right, lines: [5, 6, 7, 8, 9],
-        narration: "Set <code>m = " + m + "</code>, <code>n = " + n + "</code>, <code>left = 0</code>, <code>right = m = " + m + "</code>, and <code>half = floor((m + n + 1) / 2) = " + half + "</code> (the size of the combined left part)."
-      });
-
+      snap(null, 'The sorted inputs are ready. Step Over to check their lengths.');
+      snap(2, 'Check whether nums1 is longer than nums2.');
+      if (A.length > B.length) {
+        [A, B] = [B, A]; swapped = true;
+        snap(3, 'Call the function with the arrays swapped.');
+        snap(2, 'The recursive call already has the shorter array first.');
+      }
+      m = A.length; snap(5, 'Read m = ' + m + '.');
+      n = B.length; snap(6, 'Read n = ' + n + '.');
+      left = 0; snap(7, 'Set left to 0.');
+      right = m; snap(8, 'Set right to m = ' + right + '.');
+      half = Math.floor((m + n + 1) / 2); snap(9, 'Calculate the left partition size: ' + half + '.');
       while (left <= right) {
-        snap({
-          left, right, lines: [10],
-          narration: "<code>left &lt;= right</code> (" + left + " &lt;= " + right + ") is true - keep adjusting the cut."
-        });
-        const i = Math.floor((left + right) / 2);
-        const j = half - i;
-        snap({
-          left, right, i, j, lines: [11, 12],
-          narration: "Cut nums1 after <code>i = floor((" + left + " + " + right + ") / 2) = " + i + "</code> elements, so nums2 gives <code>j = half - i = " + half + " - " + i + " = " + j + "</code> elements to the left part."
-        });
-        const left1 = i > 0 ? A[i - 1] : -Infinity;
-        const right1 = i < m ? A[i] : Infinity;
-        const left2 = j > 0 ? B[j - 1] : -Infinity;
-        const right2 = j < n ? B[j] : Infinity;
-        snap({
-          left, right, i, j, left1, right1, left2, right2, lines: [13, 14, 15, 16],
-          narration: "Edges around the cut: <code>left1 = " + inf(left1) + "</code>, <code>right1 = " + inf(right1) + "</code>, <code>left2 = " + inf(left2) + "</code>, <code>right2 = " + inf(right2) + "</code>."
-        });
-
-        const valid = left1 <= right2 && left2 <= right1;
+        i = j = left1 = right1 = left2 = right2 = valid = null;
+        snap(10, 'Check left <= right: the search range is available.');
+        i = Math.floor((left + right) / 2); snap(11, 'Calculate i = ' + i + '. j is not calculated yet.');
+        j = half - i; snap(12, 'Calculate j = half - i = ' + j + '.');
+        left1 = i > 0 ? A[i - 1] : -Infinity; snap(13, 'Read left1 = ' + inf(left1) + '.');
+        right1 = i < m ? A[i] : Infinity; snap(14, 'Read right1 = ' + inf(right1) + '.');
+        left2 = j > 0 ? B[j - 1] : -Infinity; snap(15, 'Read left2 = ' + inf(left2) + '.');
+        right2 = j < n ? B[j] : Infinity; snap(16, 'Read right2 = ' + inf(right2) + '.');
+        valid = left1 <= right2 && left2 <= right1;
+        snap(17, 'Check both partition boundaries: ' + valid + '.');
         if (valid) {
-          traceRows.push({ left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: "valid" });
-          snap({
-            left, right, i, j, left1, right1, left2, right2, valid: true, lines: [17],
-            narration: "Check <code>left1 &lt;= right2</code> (" + inf(left1) + " &lt;= " + inf(right2) + ") and <code>left2 &lt;= right1</code> (" + inf(left2) + " &lt;= " + inf(right1) + ") - <b style=\"color:#73d66b\">both true</b>. This cut is valid."
-          });
+          traceRows.push({left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: 'valid'});
+          snap(18, 'Check whether the total length is odd.');
           if ((m + n) % 2 === 1) {
-            answer = Math.max(left1, left2);
-            snap({
-              left, right, i, j, left1, right1, left2, right2, valid: true, ans: answer, done: true, lines: [18, 19],
-              narration: "Total length <code>m + n = " + (m + n) + "</code> is odd, so the median is the largest left edge: <code>max(left1, left2) = max(" + inf(left1) + ", " + inf(left2) + ") = <b style=\"color:#73d66b\">" + answer + "</b></code>."
-            });
+            answer = Math.max(left1, left2); snap(19, 'Return the larger left boundary: ' + answer + '.', true);
           } else {
             answer = (Math.max(left1, left2) + Math.min(right1, right2)) / 2;
-            snap({
-              left, right, i, j, left1, right1, left2, right2, valid: true, ans: answer, done: true, lines: [18, 21],
-              narration: "Total length <code>m + n = " + (m + n) + "</code> is even, so the median averages the two middle edges: <code>(max(" + inf(left1) + ", " + inf(left2) + ") + min(" + inf(right1) + ", " + inf(right2) + ")) / 2 = <b style=\"color:#73d66b\">" + answer + "</b></code>."
-            });
+            snap(21, 'Return the average of the two middle boundaries: ' + answer + '.', true);
           }
-          return { built, traceRows, answer };
-        } else if (left1 > right2) {
-          traceRows.push({ left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: "i too big -> right = i-1" });
-          snap({
-            left, right, i, j, left1, right1, left2, right2, valid: false, lines: [22, 23],
-            narration: "<code>left1 (" + inf(left1) + ") &gt; right2 (" + inf(right2) + ")</code> - the nums1 cut is too far right. Move <code>right = i - 1 = " + (i - 1) + "</code>."
-          });
+          return {built, traceRows, answer};
+        }
+        snap(22, 'Check whether left1 is larger than right2.');
+        if (left1 > right2) {
           right = i - 1;
+          traceRows.push({left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: 'i too big -> right = i-1'});
+          snap(23, 'Move right to i - 1 = ' + right + '.');
         } else {
-          traceRows.push({ left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: "i too small -> left = i+1" });
-          snap({
-            left, right, i, j, left1, right1, left2, right2, valid: false, lines: [24, 25],
-            narration: "<code>left2 (" + inf(left2) + ") &gt; right1 (" + inf(right1) + ")</code> - the nums1 cut is too far left. Move <code>left = i + 1 = " + (i + 1) + "</code>."
-          });
           left = i + 1;
+          traceRows.push({left, right, i, j, left1: inf(left1), right1: inf(right1), left2: inf(left2), right2: inf(right2), valid: 'i too small -> left = i+1'});
+          snap(25, 'Move left to i + 1 = ' + left + '.');
         }
       }
-
-      snap({ left, right, ans: 0, done: true, lines: [28], narration: "Loop ended without a valid cut (should not happen for sorted inputs). Return 0." });
-      return { built, traceRows, answer };
+      snap(10, 'The search range is empty.');
+      answer = 0; snap(28, 'Return 0 because no partition was found.', true);
+      return {built, traceRows, answer};
     }
 
     function loadExample(n) {
@@ -1179,23 +1131,11 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      if (parts.length !== 2) { alert("Use the format: nums1 | nums2   e.g. 1,3 | 2"); return; }
-      function parse(s) {
-        s = s.replace(/[\[\]]/g, "").trim();
-        if (s === "") return [];
-        return s.split(",").map(x => Number(x.trim())).filter(x => Number.isFinite(x));
-      }
-      const a1 = parse(parts[0]);
-      const a2 = parse(parts[1]);
-      if (a1.length === 0 && a2.length === 0) { alert("At least one array must be non-empty."); return; }
-      if (!isSorted(a1) || !isSorted(a2)) { alert("Both arrays must be sorted in ascending order."); return; }
-      nums1 = a1;
-      nums2 = a2;
-      activeExample = 0;
-      init();
-    }
+ try { const parser=window.StudyNumericInput;
+ const [aText,bText]=parser.parts(document.getElementById('custom-input').value,2,'Two sorted arrays'); const a=parser.list(aText,{label:'First array'}),b=parser.list(bText,{label:'Second array'}); if(!a.length&&!b.length)throw Error('At least one array must be non-empty.');if(!isSorted(a)||!isSorted(b))throw Error('Both arrays must be sorted in non-decreasing order.'); nums1=a;nums2=b;
+ activeExample=0;init();return true;
+ } catch(error) {alert(error.message);return false;}
+}
 
     function init() {
       const out = buildSteps(nums1, nums2);
@@ -1428,7 +1368,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({nums1, nums2, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums1, nums2, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nums1, nums2, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

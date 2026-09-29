@@ -623,6 +623,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -869,22 +870,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseInput(text) {
-      const parts = text.split("|");
-      if (parts.length !== 2) {
-        alert("Use the format: numbers | target, e.g. 2,7,11,15 | 9");
-        return null;
-      }
-      const rawParts = parts[0].split(",").map(p => p.trim()).filter(p => p.length > 0);
-      const nums = rawParts.map(p => Number(p));
-      const tgt = Number(parts[1].trim());
-      if (nums.length < 2 || nums.some(n => !Number.isFinite(n)) || !Number.isFinite(tgt)) {
-        alert("Use the format: numbers | target, e.g. 2,7,11,15 | 9");
-        return null;
-      }
-      const sorted = nums.slice().sort((a, b) => a - b);
-      return { numbers: sorted, target: tgt };
-    }
+    function parseInput(text) { try { const [arrayText, targetText] = StudyNumericInput.parts(text, 2, 'Numbers and target'); const numbers = StudyNumericInput.list(arrayText, {json: false, minLength: 2, label: 'Numbers'}); const target = StudyNumericInput.integer(targetText, {label: 'Target'}); return {numbers: numbers.slice().sort((a,b)=>a-b), target}; } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -901,11 +887,12 @@
 
     function loadCustom() {
       const parsed = parseInput(document.getElementById("custom-input").value);
-      if (!parsed) return;
+      if (!parsed) return false;
       numbers = parsed.numbers;
       target = parsed.target;
       activeExample = 0;
       init();
+      return true;
     }
 
     function init() {
@@ -942,21 +929,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      numbers = prev.numbers.slice();
-      target = prev.target;
-      left = prev.left;
-      right = prev.right;
-      sum = prev.sum;
-      res = prev.res.slice();
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      foundPair = prev.foundPair ? prev.foundPair.slice() : null;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+numbers = snapshot.numbers.slice();
+target = snapshot.target;
+left = snapshot.left;
+right = snapshot.right;
+sum = snapshot.sum;
+res = snapshot.res.slice();
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+foundPair = snapshot.foundPair ? snapshot.foundPair.slice() : null;
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(action) {
       trace.push({
@@ -977,12 +981,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = numbers.length - 1;
-          sum = null;
-          lastAction = "Initialized left = 0 and right = numbers.length - 1.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ sum = null;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = numbers.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left < right) {
@@ -997,27 +1006,37 @@
         case "CALC_SUM":
           sum = numbers[left] + numbers[right];
           lastAction = "Computed sum = numbers[left] + numbers[right].";
-          execState = "COMPARE";
+          execState = sum === target ? "COMPARE_EQUAL" : sum < target ? "COMPARE_LESS" : "COMPARE_GREATER";
           break;
 
-        case "COMPARE":
-          if (sum === target) {
-            foundPair = [left, right];
-            res = [left + 1, right + 1];
-            addTrace("sum === target -> return [" + (left + 1) + ", " + (right + 1) + "]");
-            lastAction = "sum equals target. Return the 1-based indices.";
-            execState = "RETURN_FOUND";
-          } else if (sum < target) {
-            addTrace("sum < target -> left++");
-            left++;
-            lastAction = "sum is too small, so move left right to increase the sum.";
-            execState = "WHILE_CHECK";
-          } else {
-            addTrace("sum > target -> right--");
-            right--;
-            lastAction = "sum is too large, so move right left to decrease the sum.";
-            execState = "WHILE_CHECK";
-          }
+        case "COMPARE_EQUAL":
+          foundPair = [left, right];
+          res = [left + 1, right + 1];
+          addTrace("sum === target -> return [" + (left + 1) + ", " + (right + 1) + "]");
+          lastAction = "sum equals target. Return the 1-based indices.";
+          execState = "RETURN_FOUND";
+          break;
+
+        case "COMPARE_LESS":
+          execState = "MOVE_LEFT";
+          break;
+
+        case "COMPARE_GREATER":
+          execState = "MOVE_RIGHT";
+          break;
+
+        case "MOVE_LEFT":
+          addTrace("sum < target -> left++");
+          left++;
+          lastAction = "sum is too small, so move left right to increase the sum.";
+          execState = "WHILE_CHECK";
+          break;
+
+        case "MOVE_RIGHT":
+          addTrace("sum > target -> right--");
+          right--;
+          lastAction = "sum is too large, so move right left to decrease the sum.";
+          execState = "WHILE_CHECK";
           break;
 
         case "RETURN_FOUND":
@@ -1281,45 +1300,138 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Set <code>left = 0</code> and <code>right = numbers.length - 1</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           narrate(left < right ? 'Since <code>left &lt; right</code>, look at this pair.' : 'The pointers met. No pair was found, so return <code>[]</code>.');
           break;
         case "CALC_SUM":
-          highlightLines([5]);
+
           narrate('Compute <code>sum = numbers[' + left + '] + numbers[' + right + '] = ' + sum + '</code>.');
           break;
-        case "COMPARE":
-          highlightLines(sum === target ? [6, 7] : sum < target ? [8, 9] : [10, 11]);
-          narrate(sum === target
-            ? 'The sum equals the target. Return the <b>1-based</b> indices <code>[' + (left + 1) + ', ' + (right + 1) + ']</code>.'
-            : sum < target
-              ? 'The sum is too small. Move <code>left</code> right to increase it.'
-              : 'The sum is too large. Move <code>right</code> left to decrease it.');
+        case "COMPARE_EQUAL":
+
+          narrate('The sum equals the target. The next step returns the <b>1-based</b> indices <code>[' + (left + 1) + ', ' + (right + 1) + ']</code>.');
+          break;
+        case "COMPARE_LESS":
+
+          narrate('The sum is too small. Move <code>left</code> in the next step.');
+          break;
+        case "COMPARE_GREATER":
+
+          narrate('The sum is too large. Move <code>right</code> in the next step.');
           break;
         case "RETURN_FOUND":
-          highlightLines([7]);
+
           narrate('Return <code>[left + 1, right + 1]</code>.');
           break;
         case "RETURN_EMPTY":
-          highlightLines([14]);
+
           narrate('Return <code>[]</code> because no pair summed to the target.');
           break;
         case "END_FOUND":
-          highlightLines([7]);
+
           narrate('Done. The pair at 1-based indices <b>' + JSON.stringify(res) + '</b> sums to the target.');
           break;
         case "END_EMPTY":
-          highlightLines([14]);
+
           narrate('Done. No two numbers summed to the target.');
+          break;
+        case "MOVE_LEFT":
+
+          narrate('Move <code>left</code> right to increase the sum.');
+          break;
+        case "MOVE_RIGHT":
+
+          narrate('Move <code>right</code> left to decrease the sum.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CALC_SUM":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COMPARE_EQUAL":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "COMPARE_LESS":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "COMPARE_GREATER":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "RETURN_FOUND":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "RETURN_EMPTY":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "END_FOUND":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "END_EMPTY":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 11,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1347,8 +1459,36 @@
     loadExample(1);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":167,"title":"Two Sum II - Input Array Is Sorted","topic":"Two Pointers","why":"A sum below target requires a larger left value; a sum above target requires a smaller right value.","meanings":{"numbers":"sorted (1-indexed) input array","target":"value the two numbers must add up to","left":"left pointer, starts at index 0","right":"right pointer, starts at the last index","sum":"numbers[left] + numbers[right]","res":"returned 1-based index pair [left + 1, right + 1]"},"entityClasses":["hud-item","num-box","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({numbers, target, left, right, sum, res, execState, foundPair, lastAction, ...({})}),

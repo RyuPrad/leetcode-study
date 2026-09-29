@@ -631,7 +631,7 @@
 <div id="line-3" class="code-line">  <span class="kw">let</span> <span class="vr">curStr</span> = <span class="str">""</span>;</div>
 <div id="line-4" class="code-line">  <span class="kw">let</span> <span class="vr">curNum</span> = <span class="nm">0</span>;</div>
 <div id="line-5" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> <span class="vr">c</span> <span class="kw">of</span> <span class="vr">s</span>) {</div>
-<div id="line-6" class="code-line">    <span class="kw">if</span> (<span class="vr">c</span> >= <span class="str">"0"</span> && <span class="vr">c</span> <= <span class="str">"9"</span>) {</div>
+<div id="line-6" class="code-line">    <span class="kw">if</span> (<span class="vr">c</span> &gt;= <span class="str">"0"</span> && <span class="vr">c</span> &lt;= <span class="str">"9"</span>) {</div>
 <div id="line-7" class="code-line">      <span class="vr">curNum</span> = <span class="vr">curNum</span> * <span class="nm">10</span> + <span class="fn">Number</span>(<span class="vr">c</span>);</div>
 <div id="line-8" class="code-line">    } <span class="kw">else if</span> (<span class="vr">c</span> === <span class="str">"["</span>) {</div>
 <div id="line-9" class="code-line">      <span class="vr">stack</span>.<span class="fn">push</span>([<span class="vr">curStr</span>, <span class="vr">curNum</span>]);</div>
@@ -822,115 +822,19 @@
 
     // Build precomputed steps[] by simulating decodeString while recording snapshots.
     function buildSteps(input) {
-      const out = [];
-      const stack = [];
-      let curStr = "";
-      let curNum = 0;
-
-      function snapshot(extra) {
-        const base = {
-          charIndex: extra.charIndex,
-          c: extra.c,
-          curStr: curStr,
-          curNum: curNum,
-          stack: stack.map(fr => [fr[0], fr[1]]),
-          lines: extra.lines,
-          narr: extra.narr,
-          phase: extra.phase || "scan",
-          justPushed: extra.justPushed || false,
-          justPopped: extra.justPopped || false,
-          poppedFrame: extra.poppedFrame || null,
-          trace: extra.trace || null,
-          done: extra.done || false
-        };
-        out.push(base);
+      const out=[],stack=[];let curStr="",curNum=0,charIndex=-1,c=null;
+      const snap=(line,phase,narr,extra={})=>out.push({charIndex,c,curStr,curNum,stack:stack.map(f=>[...f]),executedLine:line,lines:line?[line]:[1],narr,phase,justPushed:false,justPopped:false,poppedFrame:null,trace:null,done:false,...extra});
+      snap(null,"init","Ready to decode the string.");snap(2,"init","Create the empty stack.");snap(3,"init","Initialize the current string.");snap(4,"init","Initialize the repeat count.");
+      for(charIndex=0;charIndex<input.length;charIndex++) {
+        c=input[charIndex];snap(5,"scan","Read the next character.");snap(6,"scan","Check whether it is a digit.");
+        if(c>="0"&&c<="9") {curNum=curNum*10+Number(c);snap(7,"digit","Append this digit to the repeat count.",{trace:{char:c,curNum,curStr,stackStr:stackToStr(stack),action:"digit"}});continue;}
+        snap(8,"scan","Check whether this opens a group.");
+        if(c==="[") {stack.push([curStr,curNum]);snap(9,"push","Save the outer string and repeat count.",{justPushed:true});curStr="";snap(10,"scan","Start the inner string.");curNum=0;snap(11,"scan","Reset the inner repeat count.",{trace:{char:c,curNum,curStr,stackStr:stackToStr(stack),action:"push"}});continue;}
+        snap(12,"scan","Check whether this closes a group.");
+        if(c==="]") {const popped=stack.pop(),prevStr=popped[0],num=popped[1];snap(13,"pop","Restore the saved outer string and count.",{justPopped:true,poppedFrame:[prevStr,num],prevStr,num});curStr=prevStr+curStr.repeat(num);snap(14,"scan","Repeat the inner string and append it to the outer string.",{trace:{char:c,curNum,curStr,stackStr:stackToStr(stack),action:"pop"}});}
+        else {curStr+=c;snap(16,"letter","Append the character to the current string.",{trace:{char:c,curNum,curStr,stackStr:stackToStr(stack),action:"letter"}});}
       }
-
-      // initial step
-      out.push({
-        charIndex: -1,
-        c: null,
-        curStr: "",
-        curNum: 0,
-        stack: [],
-        lines: [2, 3, 4],
-        narr: 'Initialize an empty <b>stack</b>, <b>curStr = ""</b> and <b>curNum = 0</b>. We scan the string left to right.',
-        phase: "init",
-        justPushed: false,
-        justPopped: false,
-        poppedFrame: null,
-        trace: null,
-        done: false
-      });
-
-      const trace = [];
-
-      for (let idx = 0; idx < input.length; idx++) {
-        const c = input[idx];
-        if (c >= "0" && c <= "9") {
-          curNum = curNum * 10 + Number(c);
-          trace.push({ char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "digit" });
-          snapshot({
-            charIndex: idx, c: c, lines: [6, 7],
-            narr: "<code>'" + c + "'</code> is a digit. Build the number: <b>curNum = " + curNum + "</b>.",
-            phase: "digit",
-            trace: { char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "digit" }
-          });
-        } else if (c === "[") {
-          stack.push([curStr, curNum]);
-          const justFrame = [curStr, curNum];
-          curStr = "";
-          curNum = 0;
-          trace.push({ char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "push" });
-          snapshot({
-            charIndex: idx, c: c, lines: [8, 9, 10, 11],
-            narr: "<code>'['</code> opens a group. <b>push([\"" + justFrame[0] + "\", " + justFrame[1] + "])</b> onto the stack, then reset <b>curStr=\"\"</b> and <b>curNum=0</b>.",
-            phase: "push", justPushed: true,
-            trace: { char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "push" }
-          });
-        } else if (c === "]") {
-          const popped = stack.pop();
-          const prevStr = popped[0];
-          const num = popped[1];
-          const inner = curStr;
-          curStr = prevStr + curStr.repeat(num);
-          trace.push({ char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "pop" });
-          snapshot({
-            charIndex: idx, c: c, lines: [12, 13, 14],
-            narr: "<code>']'</code> closes a group. <b>pop()</b> gives <b>[\"" + prevStr + "\", " + num + "]</b>. Repeat the inner <b>\"" + inner + "\"</b> " + num + "x and prepend: <b>curStr = \"" + curStr + "\"</b>.",
-            phase: "pop", justPopped: true, poppedFrame: [prevStr, num],
-            trace: { char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "pop" }
-          });
-        } else {
-          curStr += c;
-          trace.push({ char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "letter" });
-          snapshot({
-            charIndex: idx, c: c, lines: [15, 16],
-            narr: "<code>'" + c + "'</code> is a letter. Append it: <b>curStr = \"" + curStr + "\"</b>.",
-            phase: "letter",
-            trace: { char: c, curNum: curNum, curStr: curStr, stackStr: stackToStr(stack), action: "letter" }
-          });
-        }
-      }
-
-      // final return step
-      out.push({
-        charIndex: input.length,
-        c: null,
-        curStr: curStr,
-        curNum: curNum,
-        stack: stack.map(fr => [fr[0], fr[1]]),
-        lines: [19],
-        narr: 'Done scanning. Return <b>curStr = "' + curStr + '"</b>.',
-        phase: "done",
-        justPushed: false,
-        justPopped: false,
-        poppedFrame: null,
-        trace: null,
-        done: true
-      });
-
-      return out;
+      c=null;snap(5,"scan","There are no more characters.");snap(19,"done","Return the decoded string.",{done:true});return out;
     }
 
     function stackToStr(stack) {
@@ -1261,7 +1165,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({s, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({s, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({s, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

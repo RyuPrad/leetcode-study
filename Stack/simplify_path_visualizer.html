@@ -796,71 +796,17 @@
 
     // Build precomputed steps[] simulating simplifyPath.
     function buildSteps(p) {
-      const out = [];
-      const stack = [];
-      const partsArr = p.split("/");
-
-      out.push({
-        partIndex: -1,
-        part: null,
-        action: null,
-        stack: [],
-        lines: [2, 3],
-        narr: 'Split <b>path</b> on <b>"/"</b> into <b>parts</b> = [' + partsArr.map(x => '"' + x + '"').join(", ") + ']. Start with an empty directory <b>stack</b>.',
-        phase: "init",
-        justPushed: null,
-        justPopped: null,
-        trace: null,
-        done: false
-      });
-
-      for (let idx = 0; idx < partsArr.length; idx++) {
-        const part = partsArr[idx];
-        if (part === "" || part === ".") {
-          out.push({
-            partIndex: idx, part: part, action: "skip",
-            stack: stack.slice(), lines: [5, 6],
-            narr: 'part = <b>"' + part + '"</b> ' + (part === "" ? "(empty segment)" : "(current dir)") + ' &rarr; <b>continue</b> (skip, stack unchanged).',
-            phase: "skip", justPushed: null, justPopped: null,
-            trace: { part: part, action: "skip", stackStr: stackStr(stack) },
-            done: false
-          });
-        } else if (part === "..") {
-          let popped = null;
-          if (stack.length) popped = stack.pop();
-          out.push({
-            partIndex: idx, part: part, action: "pop",
-            stack: stack.slice(), lines: [7, 8],
-            narr: popped !== null
-              ? 'part = <b>".."</b> &rarr; go up one directory: <b>pop "' + popped + '"</b> off the stack.'
-              : 'part = <b>".."</b> but the stack is empty &rarr; already at root, nothing to pop.',
-            phase: "pop", justPushed: null, justPopped: popped,
-            trace: { part: part, action: popped !== null ? 'pop "' + popped + '"' : "pop (empty)", stackStr: stackStr(stack) },
-            done: false
-          });
-        } else {
-          stack.push(part);
-          out.push({
-            partIndex: idx, part: part, action: "push",
-            stack: stack.slice(), lines: [9, 10],
-            narr: 'part = <b>"' + part + '"</b> is a directory name &rarr; <b>push "' + part + '"</b> onto the stack.',
-            phase: "push", justPushed: part, justPopped: null,
-            trace: { part: part, action: 'push "' + part + '"', stackStr: stackStr(stack) },
-            done: false
-          });
-        }
+      const out=[],stack=[],partsArr=p.split("/");let partIndex=-1,part=null;
+      const snap=(line,phase,narr,extra={})=>out.push({partIndex,part,action:null,stack:stack.slice(),executedLine:line,lines:line?[line]:[1],narr,phase,justPushed:null,justPopped:null,trace:null,done:false,...extra});
+      snap(null,"init","Ready to simplify the path.");snap(2,"init","Create the empty directory stack.");snap(3,"init","Split the path on /.");
+      for(partIndex=0;partIndex<partsArr.length;partIndex++){
+        part=partsArr[partIndex];snap(4,"scan","Read the next path segment.");snap(5,"scan","Check whether the segment is empty or the current directory.");
+        if(part===""||part==="."){snap(6,"skip","Skip this segment.",{action:"skip",trace:{part,action:"skip",stackStr:stackStr(stack)}});continue;}
+        snap(7,"scan","Check whether this segment goes to the parent directory.");
+        if(part==="..") {const popped=stack.length?stack.pop():null;snap(8,"pop",popped===null?"The stack is empty; stay at root.":"Pop directory "+popped+".",{action:"pop",justPopped:popped,trace:{part,action:popped===null?"pop (empty)":"pop "+popped,stackStr:stackStr(stack)}});}
+        else {stack.push(part);snap(10,"push","Push directory "+part+".",{action:"push",justPushed:part,trace:{part,action:"push "+part,stackStr:stackStr(stack)}});}
       }
-
-      const canonical = "/" + stack.join("/");
-      out.push({
-        partIndex: partsArr.length, part: null, action: null,
-        stack: stack.slice(), lines: [13],
-        narr: 'All parts processed. Canonical path = <b>"/" + stack.join("/")</b> = <b>"' + canonical + '"</b>.',
-        phase: "done", justPushed: null, justPopped: null,
-        trace: null, done: true, result: canonical
-      });
-
-      return out;
+      part=null;snap(4,"scan","There are no more segments.");snap(13,"done","Join the directory stack to form the canonical path.",{done:true,result:"/"+stack.join("/")});return out;
     }
 
     function stackStr(stack) {
@@ -1166,7 +1112,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({path, parts, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({path, parts, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({path, parts, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

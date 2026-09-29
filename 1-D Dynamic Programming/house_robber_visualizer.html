@@ -812,7 +812,7 @@
     // ----- Precompute steps by running the real algorithm -----
     // Deep-copies dp per step. Handles the n===1 early return (no dp
     // array). dp has length n (NOT n+1). Final step carries the answer.
-    function buildSteps(numsArr) {
+    function originalInstructionBuilder(numsArr) {
       const built = [];
       const traceRows = [];
       const nVal = numsArr.length;
@@ -1251,13 +1251,42 @@
     document.getElementById("custom-input").value = nums.join(", ");
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8,10]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":198,"title":"House Robber","topic":"1-D Dynamic Programming","why":"Taking the current house excludes its neighbor; skipping it keeps the best previous result.","meanings":{"nums":"Input array; `nums[i]` is the loot stored in house `i`. Adjacent houses cannot both be robbed.","n":"`nums.length` — the number of houses. If `n === 1`, the function returns `nums[0]` directly.","dp":"Array of length `n` where `dp[i]` is the maximum loot obtainable from houses `0..i`. Base cases `dp[0] = nums[0]` and `dp[1] = max(nums[0], nums[1])`.","i":"Loop index, from `2` to `n - 1`, marking the house currently being decided via `dp[i] = max(dp[i-1], dp[i-2] + nums[i])` — skip house `i`, or rob it and add the best from two houses back."},"entityClasses":["hud-item","cell","house-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nums, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, masterTrace, ...(steps[position] || {})}),
+      read: () => ({nums,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nums,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -895,19 +895,34 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nodeMap = cloneMap(s.nodeMap);
-      prevId = s.prevId;
-      currId = s.currId;
-      nextId = s.nextId;
-      loopI = s.loopI;
-      phase = s.phase;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
+      restoreState(s);
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nodeMap = cloneMap(snapshot.nodeMap);
+prevId = snapshot.prevId;
+currId = snapshot.currId;
+nextId = snapshot.nextId;
+loopI = snapshot.loopI;
+phase = snapshot.phase;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+}
 
     function lbl(id) {
       if (id === null || id === undefined) return "null";
@@ -1206,6 +1221,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1224,19 +1242,19 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([1]);
+
           narrate("Reverse the sublist between positions <b>left = " + left + "</b> and <b>right = " + right + "</b> using head-insertion.");
           break;
         case "DUMMY":
-          highlightLines([2]);
+
           narrate("Create a <b>dummy</b> node pointing at <b>head</b> so the node before <code>left</code> always exists.");
           break;
         case "SET_PREV":
-          highlightLines([3]);
+
           narrate("<code>prev = dummy</code>. <b>prev</b> will stop just before position <code>left</code>.");
           break;
         case "WALK_CHECK":
-          highlightLines([4]);
+
           if (loopI < left - 1) {
             narrate("Walk loop: <b>i = " + loopI + " &lt; left - 1 = " + (left - 1) + "</b>, advance <b>prev</b>.");
           } else {
@@ -1244,15 +1262,15 @@
           }
           break;
         case "WALK_MOVE":
-          highlightLines([5]);
+
           narrate("<code>prev = prev.next</code> - moving prev forward toward position " + left + ".");
           break;
         case "SET_CURR":
-          highlightLines([7]);
+
           narrate("<code>curr = prev.next</code>. <b>curr</b> is the first node of the section to reverse and stays fixed - it slides toward the back as others jump in front of it.");
           break;
         case "REV_CHECK":
-          highlightLines([8]);
+
           if (loopI < right - left) {
             narrate("Reverse loop: <b>i = " + loopI + " &lt; right - left = " + (right - left) + "</b>, do one more head-insertion.");
           } else {
@@ -1260,27 +1278,27 @@
           }
           break;
         case "READ_NEXT":
-          highlightLines([9]);
+
           narrate("<code>next = curr.next</code> - grab the node we will move to the front of the reversed section.");
           break;
         case "DETACH":
-          highlightLines([10]);
+
           narrate("<code>curr.next = next.next</code> - unlink <b>next</b> by pointing curr past it.");
           break;
         case "FRONT":
-          highlightLines([11]);
+
           narrate("<code>next.next = prev.next</code> - point <b>next</b> at the current front of the reversed section.");
           break;
         case "SPLICE":
-          highlightLines([12]);
+
           narrate("<code>prev.next = next</code> - splice <b>next</b> in right after prev. It is now the new front.");
           break;
         case "RETURN":
-          highlightLines([14]);
+
           narrate("<code>return dummy.next</code> - the head of the fully rewired list.");
           break;
         case "END":
-          highlightLines([14]);
+
           narrate("Done. Result list = <b>" + JSON.stringify(ans) + "</b>.");
           break;
       }
@@ -1333,6 +1351,80 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 1,
+      phase: execState
+    };
+  case "DUMMY":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "SET_PREV":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WALK_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WALK_MOVE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "SET_CURR":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "REV_CHECK":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "READ_NEXT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "DETACH":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "FRONT":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "SPLICE":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 14,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     inputList = [...examples[1].list];
     left = examples[1].left;
@@ -1340,8 +1432,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":92,"title":"Reverse Linked List II","topic":"LinkedList","why":"Reverse only the requested segment and reconnect it to the unchanged prefix and suffix.","meanings":{"head":"head node of the input linked list","dummy":"sentinel node before `head` so the node before `left` always exists","prev":"node fixed just before position `left`; the reversed section is head-inserted after it","curr":"first node of the section to reverse; stays put and slides toward the back","next":"node being detached from after `curr` and spliced to the front each iteration","left":"start position of the sublist to reverse (1-indexed)","right":"end position of the sublist to reverse (1-indexed)"},"entityClasses":["hud-item","node","dummy-node","nodeMap"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({inputList, left, right, nodeMap, DUMMY, prevId, currId, nextId, loopI, phase, ans, execState, ...({})}),

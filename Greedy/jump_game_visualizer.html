@@ -752,10 +752,10 @@
     let activeExample = 1;
 
     // BUILD precomputed steps[]. Each entry is an immutable deep-copied snapshot.
-    function buildSteps(inputNums) {
+    function originalInstructionBuilder(inputNums) {
       const localSteps = [];
       const n = inputNums.length;
-      let goal = n - 1;
+      let goal = null;
       let ans = null;
 
       // helper to push a deep snapshot
@@ -769,9 +769,11 @@
           covers: null,
           reachEnd: null,
           narration: ""
-        }, extra));
+        }, extra, {executedLine: extra.executedLine === null ? null : ({INIT:2,LOOP:3,CHECK:4,MOVE:4,SKIP:4,DONE:6})[extra.phase]}));
       }
 
+      snap({phase: "INIT", executedLine: null, narration: "Ready to scan reachability from right to left."});
+      goal = n - 1;
       // INIT
       snap({
         phase: "INIT",
@@ -780,6 +782,7 @@
 
       // iterate i from n-2 down to 0
       for (let i = n - 2; i >= 0; i--) {
+        snap({phase: "LOOP", i, narration: "Move to the next index."});
         const reachEnd = i + inputNums[i];
         // CHECK step (before deciding)
         snap({
@@ -1070,7 +1073,7 @@
           highlightLines([2]);
           break;
         case "CHECK":
-          highlightLines([3, 4]);
+          highlightLines([4]);
           break;
         case "MOVE":
           highlightLines([4]);
@@ -1130,13 +1133,42 @@
     nums = examples[1].slice();
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,6]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":55,"title":"Jump Game","topic":"Greedy","why":"A position is usable only if it is within the farthest reach established by earlier positions.","meanings":{"nums":"Input array; `nums[i]` is the max jump length from index `i`.","goal":"The leftmost index currently known to reach the last cell; starts at `nums.length - 1` and shrinks left.","i":"Loop pointer scanning the array from right to left (`nums.length - 2` down to `0`).","ans":"Final boolean: `true` iff `goal` reaches `0`, meaning the start can chain to the end."},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({nums, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nums, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

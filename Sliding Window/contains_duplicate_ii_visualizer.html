@@ -664,6 +664,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -931,34 +932,20 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      const numPart = (parts[0] || "").trim();
-      const kPart = (parts[1] || "").trim();
-
-      if (numPart === "") {
-        nums = [];
-      } else {
-        nums = numPart
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
+      try {
+        const parser = window.StudyNumericInput;
+        const [arrayText, parameterText] = parser.optionalParameter(document.getElementById("custom-input").value, '0', 'Numbers and k');
+        const parsed = parser.list(arrayText, {json: false, label: 'Numbers'});
+        const parsedK = parser.integer(parameterText, {min: 0, label: 'k'});
+        nums = parsed;
+        k = parsedK;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-
-      if (nums.some(Number.isNaN)) {
-        alert("Please enter numbers separated by commas, then a pipe and k. Example: 1,2,3,1 | 3");
-        return;
-      }
-
-      k = kPart === "" ? 0 : Number(kPart);
-      if (Number.isNaN(k) || k < 0) {
-        alert("k must be a non-negative integer. Example: 1,2,3,1 | 3");
-        return;
-      }
-
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -996,21 +983,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      k = s.k;
-      seen = [...s.seen];
-      i = s.i;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      justAdded = s.justAdded;
-      justLeft = s.justLeft;
-      duplicateValue = s.duplicateValue;
-      lastCheckHit = s.lastCheckHit;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+k = snapshot.k;
+seen = [...snapshot.seen];
+i = snapshot.i;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+justAdded = snapshot.justAdded;
+justLeft = snapshot.justLeft;
+duplicateValue = snapshot.duplicateValue;
+lastCheckHit = snapshot.lastCheckHit;
+}
 
     function nextStep() {
       if (execState === "END_TRUE" || execState === "END_FALSE") return;
@@ -1325,6 +1329,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1343,11 +1350,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Create an empty <b>seen</b> Set. It holds the values in the current window of size at most <b>k + 1</b>.");
           break;
         case "LOOP_CHECK":
-          highlightLines([3]);
+
           if (i < nums.length) {
             narrate("Loop continues: <b>i = " + i + "</b> is inside the array. The window will cover indices <b>[" + windowLeft() + ".." + i + "]</b>.");
           } else {
@@ -1355,7 +1362,7 @@
           }
           break;
         case "EVICT_CHECK":
-          highlightLines([4]);
+
           if (i > k) {
             narrate("<code>i &gt; k</code> is <b>true</b> (" + i + " &gt; " + k + "). The window is full, so the oldest value <code>nums[" + (i - k - 1) + "]</code> must leave.");
           } else {
@@ -1363,11 +1370,11 @@
           }
           break;
         case "EVICT_DELETE":
-          highlightLines([5]);
+
           narrate("<code>seen.delete(nums[" + (i - k - 1) + "]) = " + justLeft + "</code>. This value slides out of the left edge of the window.");
           break;
         case "HAS_CHECK":
-          highlightLines([7]);
+
           if (seen.includes(nums[i])) {
             narrate("<code>seen.has(" + nums[i] + ")</code> is <b style=\"color:#e24b4a\">true</b>. The same value already sits inside the window, so a duplicate is within distance k.");
           } else {
@@ -1375,27 +1382,27 @@
           }
           break;
         case "ADD_SET":
-          highlightLines([10]);
+
           narrate("<code>seen.add(" + nums[i] + ")</code> - extend the window to the right by adding the new value.");
           break;
         case "ADVANCE_LOOP":
-          highlightLines([11, 3]);
+
           narrate("Advance the right edge: <b>i++</b>. The window slides forward by one position.");
           break;
         case "RETURN_TRUE":
-          highlightLines([8]);
+
           narrate("Return <b style=\"color:#e24b4a\">true</b> immediately. Two equal values (<b>" + duplicateValue + "</b>) are within distance k.");
           break;
         case "RETURN_FALSE":
-          highlightLines([12]);
+
           narrate("Scanned the whole array with no nearby duplicate. Return <b style=\"color:#6a9955\">false</b>.");
           break;
         case "END_TRUE":
-          highlightLines([8]);
+
           narrate("Done. A duplicate value <b>" + (duplicateValue ?? nums[i]) + "</b> appears within distance k. Answer: <b>true</b>.");
           break;
         case "END_FALSE":
-          highlightLines([12]);
+
           narrate("Done. No value repeats within distance k. Answer: <b>false</b>.");
           break;
       }
@@ -1447,14 +1454,106 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "EVICT_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "EVICT_DELETE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "HAS_CHECK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADD_SET":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "ADVANCE_LOOP":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "END_TRUE":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "END_FALSE":
+    return {
+      line: 12,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = [...examples[1].nums];
     k = examples[1].k;
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":219,"title":"Contains Duplicate II","topic":"Sliding Window","why":"Keep only values within k previous positions; a matching value in that window satisfies the distance constraint.","meanings":{"nums":"input array of numbers","k":"maximum allowed distance between two equal values","i":"loop index; the right edge of the sliding window","seen":"Set of the values currently inside the window `[i-k, i]`","ans":"boolean answer: `true` if a duplicate exists within distance `k`, else `false`"},"entityClasses":["hud-item","cell","set-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, k, seen, i, ans, execState, justAdded, justLeft, duplicateValue, lastCheckHit, ...({})}),

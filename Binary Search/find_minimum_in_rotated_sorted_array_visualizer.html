@@ -677,6 +677,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -932,22 +933,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseNums(text) {
-      try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) throw new Error("Input must be an array.");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n))) {
-          throw new Error("Use only integers.");
-        }
-        return clean;
-      } catch (err) {
-        const fallback = text.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && Number.isInteger(n));
-        if (fallback.length > 0) return fallback;
-        alert("Please enter a valid integer array like [4,5,6,7,0,1,2]");
-        return null;
-      }
-    }
+    function parseNums(text) { try { return StudyNumericInput.list(text, {min: -Infinity, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -963,14 +949,15 @@
 
     function loadCustom() {
       const parsed = parseNums(document.getElementById("custom-input").value);
-      if (!parsed) return;
+      if (!parsed) return false;
       if (parsed.length < 1) {
         alert("Need at least 1 number.");
-        return;
+        return false;
       }
       nums = parsed;
       activeExample = 0;
       init();
+      return true;
     }
 
     function init() {
@@ -1012,23 +999,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      midValue = prev.midValue;
-      rightValue = prev.rightValue;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
-      discardedLeftMax = prev.discardedLeftMax;
-      discardedRightMin = prev.discardedRightMin;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+midValue = snapshot.midValue;
+rightValue = snapshot.rightValue;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+discardedLeftMax = snapshot.discardedLeftMax;
+discardedRightMin = snapshot.discardedRightMin;
+}
 
     function addTrace(action) {
       trace.push({
@@ -1048,17 +1054,22 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = nums.length - 1;
-          mid = null;
-          midValue = null;
-          rightValue = null;
-          ans = null;
-          discardedLeftMax = -1;
-          discardedRightMin = nums.length;
-          lastAction = "Initialize left at 0 and right at nums.length - 1.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ mid = null;
+midValue = null;
+rightValue = null;
+ans = null;
+discardedLeftMax = -1;
+discardedRightMin = nums.length;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = nums.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left < right) {
@@ -1377,46 +1388,114 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start with <code>left = 0</code> and <code>right = nums.length - 1</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           narrate(left < right ? 'Since <code>left &lt; right</code>, more than one cell remains in the window.' : 'The window is a single cell because <code>left &gt;= right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([5]);
+
           narrate('Calculate the middle index using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "COMPARE":
           if (midValue > rightValue) {
-            highlightLines([6, 7]);
+
             narrate('<code>nums[mid] &gt; nums[right]</code>: the right portion is the rotated (smaller) side, so the minimum sits to the right of mid.');
           } else {
-            highlightLines([6, 8, 9]);
+
             narrate('<code>nums[mid] &lt;= nums[right]</code>: mid is in the sorted tail, so the minimum is mid or to its left.');
           }
           break;
         case "MOVE_LEFT":
-          highlightLines([7]);
+
           narrate('Discard the left half including mid by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([9]);
+
           narrate('Keep mid as a candidate and discard the right half by setting <code>right = mid</code>.');
           break;
         case "RETURN_MIN":
-          highlightLines([12]);
+
           narrate('left equals right, so <code>nums[left]</code> is the minimum.');
           break;
         case "END":
-          highlightLines([12]);
+
           narrate('Done. The minimum element is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COMPARE":
+    if (midValue > rightValue) {
+      return {
+        line: 6,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 6,
+        phase: execState
+      };
+    }
+  case "MOVE_LEFT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "RETURN_MIN":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 12,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1445,8 +1524,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":153,"title":"Find Minimum in Rotated Sorted Array","topic":"Binary Search","why":"The midpoint's relation to the boundary identifies which side still contains the rotation minimum.","meanings":{"nums":"The rotated sorted input array to search.","left":"Left boundary index of the current search window.","right":"Right boundary index of the current search window.","mid":"Middle index, `Math.floor((left + right) / 2)`.","ans":"The minimum value, equal to `nums[left]` once `left` meets `right`."},"entityClasses":["hud-item","cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, left, right, mid, midValue, rightValue, ans, execState, lastAction, discardedLeftMax, discardedRightMin, ...({})}),

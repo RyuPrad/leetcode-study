@@ -773,6 +773,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -1095,29 +1096,12 @@
     }
 
     function loadCustom() {
-      const rawNums = document.getElementById("custom-input").value.trim();
-      const rawTarget = document.getElementById("target-input").value.trim();
-
-      if (rawNums === "") {
-        nums = [];
-      } else {
-        nums = rawNums
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      target = Number(rawTarget);
-
-      if (nums.some(Number.isNaN) || Number.isNaN(target)) {
-        alert("Please enter only numbers. Example nums: 2, 7, 11, 15 and target: 9");
-        return;
-      }
-
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false,label:'Numbers'}); const parsedTarget = parser.integer(document.getElementById('target-input').value,{label:'Target'}); nums = parsed; target = parsedTarget;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       seen = [];
@@ -1160,24 +1144,46 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      target = s.target;
-      seen = s.seen.map(entry => ({ ...entry }));
-      i = s.i;
-      num = s.num;
-      need = s.need;
-      resultStatus = s.resultStatus;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      justAddedKey = s.justAddedKey;
-      hitKey = s.hitKey;
-      hitIndex = s.hitIndex;
-      res = s.res ? [...s.res] : null;
-      lastCheckHit = s.lastCheckHit;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+target = snapshot.target;
+seen = snapshot.seen.map(entry => ({
+  ...entry
+}));
+i = snapshot.i;
+num = snapshot.num;
+need = snapshot.need;
+resultStatus = snapshot.resultStatus;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+justAddedKey = snapshot.justAddedKey;
+hitKey = snapshot.hitKey;
+hitIndex = snapshot.hitIndex;
+res = snapshot.res ? [...snapshot.res] : null;
+lastCheckHit = snapshot.lastCheckHit;
+}
 
     function nextStep() {
       if (execState === "END_FOUND" || execState === "END_NONE") return;
@@ -1534,6 +1540,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1552,11 +1561,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Create an empty <b>Map</b>. It stores <code>number → index</code> for values we have already passed.");
           break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (i < nums.length) {
             narrate("The loop continues because <b>i = " + i + "</b> is still inside the array.");
           } else {
@@ -1564,15 +1573,15 @@
           }
           break;
         case "READ_CURRENT":
-          highlightLines([5]);
+
           narrate("Read num: <b>num = nums[" + i + "] = " + num + "</b>.");
           break;
         case "COMPUTE_NEEDED":
-          highlightLines([6]);
+
           narrate("Compute the complement: <code>need = target - num</code>. Here, <b>" + target + " - " + num + " = " + need + "</b>.");
           break;
         case "CHECK_MAP":
-          highlightLines([8]);
+
           if (hasSeenKey(need)) {
             narrate("<code>seen.has(" + need + ")</code> is <b style=\"color:#e24b4a\">true</b>. The matching previous value is already in the map.");
           } else {
@@ -1580,23 +1589,23 @@
           }
           break;
         case "SET_MAP":
-          highlightLines([12]);
+
           narrate("Store the current number and its index: <code>seen.set(" + num + ", " + i + ")</code>.");
           break;
         case "ADVANCE_LOOP":
-          highlightLines([13, 4]);
+
           narrate("Move to the next index. The map now remembers every value seen so far.");
           break;
         case "RETURN_PAIR":
-          highlightLines([9]);
+
           narrate("Return <b style=\"color:#e24b4a\">[" + res[0] + ", " + res[1] + "]</b>. We found two different indices whose values add to the target.");
           break;
         case "END_FOUND":
-          highlightLines([9]);
+
           narrate("✓ Done. <b>nums[" + res[0] + "] + nums[" + res[1] + "] = " + nums[res[0]] + " + " + nums[res[1]] + " = " + target + "</b>.");
           break;
         case "END_NONE":
-          highlightLines([14]);
+
           narrate("✓ Done. No pair was found for this custom input.");
           break;
       }
@@ -1649,14 +1658,101 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "READ_CURRENT":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COMPUTE_NEEDED":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "CHECK_MAP":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SET_MAP":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "ADVANCE_LOOP":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN_PAIR":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END_FOUND":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END_NONE":
+    return {
+      line: 14,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = [...examples[1].nums];
     target = examples[1].target;
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":1,"title":"Two Sum","topic":"Array & Hashing","why":"Checking the complement before storing the current number prevents using the same array position twice.","meanings":{"nums":"input array","target":"value we need two numbers to sum to","i":"current index","num":"value at nums[i]","need":"complement: target - num","seen":"map of value → index already visited","res":"returned index pair"},"entityClasses":["hud-item","cell","map-pill","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, target, seen, i, num, need, resultStatus, execState, justAddedKey, hitKey, hitIndex, res, lastCheckHit, ...({})}),

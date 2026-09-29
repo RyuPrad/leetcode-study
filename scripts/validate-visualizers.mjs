@@ -24,7 +24,7 @@ async function inspect(page, file) {
   try {
     const sourceRoot = capture ? path.join(ROOT, '.baseline/content') : ROOT;
     await page.goto(pathToFileURL(path.join(sourceRoot, file)).href, { waitUntil: 'load', timeout: 15000 });
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       function snapshot() {
         const text = selector => {
           const source = document.querySelector(selector);
@@ -44,9 +44,14 @@ async function inspect(page, file) {
       reset.click();
       const restarted = snapshot();
       let count = 0;
-      while (!next.disabled && !/finished/i.test(next.textContent) && count < 2000) { next.click(); count++; }
+      if (window.studyLessonAdapter) {
+        await window.studyLessonAdapter.seek(50000);
+        count = window.studyLessonSource.index();
+      } else {
+        while (!next.disabled && !/finished/i.test(next.textContent) && count < 50000) { next.click(); count++; }
+      }
       const final = snapshot();
-      return { initial, forward, back, restarted, final, count, capped: count >= 2000, redesigned: document.body.dataset.workspaceVersion === '1', layout: { scroll: document.documentElement.scrollWidth, width: innerWidth, controlsVisible: !!next.getBoundingClientRect().height } };
+      return { initial, forward, back, restarted, final, count, capped: !next.disabled && !/finished/i.test(next.textContent), redesigned: document.body.dataset.workspaceVersion === '1', layout: { scroll: document.documentElement.scrollWidth, width: innerWidth, controlsVisible: !!next.getBoundingClientRect().height } };
     });
     const hashes = Object.fromEntries(['initial', 'forward', 'back', 'restarted', 'final'].map(key => [key, createHash('sha256').update(JSON.stringify(result[key])).digest('hex')]));
     const entry = { ...hashes, steps: result.count, capped: result.capped, errors };
@@ -58,7 +63,7 @@ async function inspect(page, file) {
       if (!expected) failures.push(`${file}: missing baseline`);
       else for (const key of Object.keys(hashes)) if (entry[key] !== expected[key]) failures.push(`${file}: ${key} differs from expected behavior`);
       if (errors.length) failures.push(`${file}: ${errors.join('; ')}`);
-      if (result.capped) failures.push(`${file}: did not finish within 2000 steps`);
+      if (result.capped) failures.push(`${file}: did not finish within the explicit 50000-step verification limit`);
     }
   } catch (error) { failures.push(`${file}: ${error.message}`); }
   finally { page.off('pageerror', handler); pending.delete(file); }
@@ -78,4 +83,4 @@ fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
 if (capture && !failures.length) { fs.mkdirSync(path.dirname(baselineFile), { recursive: true }); fs.writeFileSync(baselineFile, JSON.stringify(results, null, 2)); }
 fs.writeFileSync(path.join(ROOT, 'test-results/visualizers.json'), JSON.stringify({ count: selected.length, failures, results }, null, 2));
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }
-else console.log(`${selected.length} visualizers ${capture ? 'captured' : 'match their original behavior'}.`);
+else console.log(`${selected.length} visualizers ${capture ? 'captured' : 'match their reviewed expected behavior'}.`);

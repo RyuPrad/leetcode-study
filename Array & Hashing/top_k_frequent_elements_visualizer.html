@@ -528,7 +528,7 @@
 <div id="line-5" class="code-line">    freq.set(num, (freq.get(num) || <span class="nm">0</span>) + <span class="nm">1</span>);</div>
 <div id="line-6" class="code-line">  }</div>
 <div id="line-7" class="code-line"></div>
-<div id="line-8" class="code-line">  <span class="kw">const</span> buckets = <span class="fn">Array.from</span>({ length: nums.length + <span class="nm">1</span> }, () => []);</div>
+<div id="line-8" class="code-line">  <span class="kw">const</span> buckets = <span class="fn">Array.from</span>({ length: nums.length + <span class="nm">1</span> }, () =&gt; []);</div>
 <div id="line-9" class="code-line"></div>
 <div id="line-10" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [num, countVal] <span class="kw">of</span> freq) {</div>
 <div id="line-11" class="code-line">    buckets[countVal].push(num);</div>
@@ -536,7 +536,7 @@
 <div id="line-13" class="code-line"></div>
 <div id="line-14" class="code-line">  <span class="kw">const</span> res = [];</div>
 <div id="line-15" class="code-line"></div>
-<div id="line-16" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> freq = buckets.length - <span class="nm">1</span>; freq >= <span class="nm">0</span>; freq--) {</div>
+<div id="line-16" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> freq = buckets.length - <span class="nm">1</span>; freq &gt;= <span class="nm">0</span>; freq--) {</div>
 <div id="line-17" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> num <span class="kw">of</span> buckets[freq]) {</div>
 <div id="line-18" class="code-line">      res.push(num);</div>
 <div id="line-19" class="code-line">      <span class="kw">if</span> (res.length === k) <span class="kw">return</span> res;</div>
@@ -668,7 +668,7 @@
     let currentStep = 0;
     let autoTimer = null;
 
-    function buildSnapshots(inputNums, inputK) {
+    function originalInstructionBuilder(inputNums, inputK) {
       const out = [];
       const freq = new Map();
       const buckets = Array.from({ length: inputNums.length + 1 }, () => []);
@@ -968,13 +968,42 @@
     updateSpeedLabel();
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,4,5,8,10,11,14,16,17,18,19,23]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSnapshots(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : snapshots);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":347,"title":"Top K Frequent Element","topic":"Array & Hashing","why":"Count occurrences before selecting the k values with the highest frequencies.","meanings":{"nums":"input array","k":"number of most frequent elements to return","freq":"map of value → frequency count","buckets":"array where index = frequency","res":"top k frequent elements"},"entityClasses":["hud-item","cell","bucketed","bucket","bucket-body","pill","progress-bar","buckets","bucketFreq","bucketNum"],"entitySelectors":[],"mode":"precomputed"},
       index: () => currentStep,
       count: () => snapshots.length,
       read: () => ({nums, k, ...(snapshots[currentStep] || {})}),
-      readAt: (position) => ({nums, k, ...(snapshots[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nums, k, ...(snapshots[studySnapshotIndex] || {})}),
       phases: () => snapshots.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { currentStep = Math.max(0, Math.min(snapshots.length - 1, index)); render(); },
     };

@@ -712,6 +712,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -990,21 +991,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseNums(text) {
-      const body = text.split("|")[0];
-      try {
-        const parsed = JSON.parse(body.trim());
-        if (!Array.isArray(parsed)) throw new Error("not array");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n) || n < 0)) throw new Error("bad");
-        return clean;
-      } catch (err) {
-        const fallback = body.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && Number.isInteger(n) && n >= 0);
-        if (fallback.length > 0) return fallback;
-        alert("Please enter non-negative integers like 7,2,5,10,8 (use the | to add k, e.g. 7,2,5,10,8 | 2)");
-        return null;
-      }
-    }
+    function parseNums(text) { try { return StudyNumericInput.list(text.split("|")[0], {min: 0, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -1021,28 +1008,22 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parsed = parseNums(raw);
-      if (!parsed) return;
-      if (parsed.length < 1) {
-        alert("Need at least 1 number.");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const [arrayText, parameterText] = parser.optionalParameter(document.getElementById("custom-input").value, document.getElementById("target-input").value, 'Numbers and k');
+        const parsed = parser.list(arrayText, {min: 0, minLength: 1, label: 'Numbers'});
+        if (!Number.isSafeInteger(parsed.reduce((sum, value) => sum + value, 0))) throw Error('The sum of numbers must be a safe integer.');
+        const parsedK = parser.integer(parameterText, {min: 1, max: parsed.length, label: 'k'});
+        nums = parsed;
+        k = parsedK;
+        document.getElementById("target-input").value = k;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      let kVal;
-      if (raw.includes("|")) {
-        kVal = Number(raw.split("|")[1].trim());
-      } else {
-        kVal = Number(document.getElementById("target-input").value);
-      }
-      if (!Number.isFinite(kVal) || !Number.isInteger(kVal) || kVal < 1 || kVal > parsed.length) {
-        alert("k must be an integer between 1 and the array length (" + parsed.length + ").");
-        return;
-      }
-      nums = parsed;
-      k = kVal;
-      document.getElementById("target-input").value = k;
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -1089,26 +1070,48 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      k = prev.k;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      ans = prev.ans;
-      pieces = prev.pieces;
-      cur = prev.cur;
-      simIndex = prev.simIndex;
-      feasible = prev.feasible;
-      pieceLoads = prev.pieceLoads.map(d => d.slice());
-      overflowAt = prev.overflowAt;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+k = snapshot.k;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+ans = snapshot.ans;
+pieces = snapshot.pieces;
+cur = snapshot.cur;
+simIndex = snapshot.simIndex;
+feasible = snapshot.feasible;
+pieceLoads = snapshot.pieceLoads.map(d => d.slice());
+overflowAt = snapshot.overflowAt;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace() {
       trace.push({
@@ -1128,19 +1131,29 @@
 
       switch (execState) {
         case "INIT":
-          left = Math.max(...nums);
-          right = sumArray(nums);
-          ans = right;
-          mid = null;
-          pieces = null;
-          cur = null;
-          simIndex = -1;
-          feasible = null;
-          pieceLoads = [];
-          overflowAt = -1;
-          lastAction = "Initialize left = max(nums) = " + left + ", right = sum(nums) = " + right + ". ans = right.";
-          execState = "WHILE_CHECK";
-          break;
+ left = Math.max(...nums);
+ mid = null;
+pieces = null;
+cur = null;
+simIndex = -1;
+feasible = null;
+pieceLoads = [];
+overflowAt = -1;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = sumArray(nums);
+
+ lastAction = "Initialize right.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = right;
+
+ lastAction = "Initialize ans.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1154,41 +1167,63 @@
 
         case "CALC_MID":
           mid = Math.floor((left + right) / 2);
+          lastAction = "Candidate max sum mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Start with pieces = 1, cur = 0.";
+          execState = "INIT_PIECES";
+          break;
+
+        case "INIT_PIECES":
           pieces = 1;
+          execState = "INIT_CUR";
+          break;
+
+        case "INIT_CUR":
           cur = 0;
           simIndex = -1;
           feasible = null;
           overflowAt = -1;
           pieceLoads = [[]];
-          lastAction = "Candidate max sum mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Start with pieces = 1, cur = 0.";
           execState = "SIM_STEP";
           break;
 
         case "SIM_STEP":
           if (simIndex + 1 < nums.length) {
             simIndex++;
-            const num = nums[simIndex];
             overflowAt = -1;
-            if (cur + num > mid) {
-              pieces++;
-              cur = 0;
-              pieceLoads.push([]);
-              overflowAt = simIndex;
-              cur += num;
-              pieceLoads[pieceLoads.length - 1].push(num);
-              lastAction = "Adding " + num + " would push the current piece over " + mid + ". Start piece " + pieces + " and put it there. cur = " + cur + ".";
-            } else {
-              cur += num;
-              pieceLoads[pieceLoads.length - 1].push(num);
-              lastAction = "Number " + num + " fits in piece " + pieces + ". cur = " + cur + " (<= " + mid + ").";
-            }
-            if (simIndex + 1 >= nums.length) {
-              execState = "SIM_DONE";
-            }
+            lastAction = "Inspect number " + nums[simIndex] + " against maximum sum " + mid + ".";
+            execState = "CHECK_OVERFLOW";
           } else {
             execState = "SIM_DONE";
           }
           break;
+
+        case "CHECK_OVERFLOW":
+          if (cur + nums[simIndex] > mid) {
+            overflowAt = simIndex;
+            execState = "COUNT_PIECE";
+          } else {
+            execState = "ADD_NUMBER";
+          }
+          break;
+
+        case "COUNT_PIECE":
+          pieces++;
+          execState = "RESET_CUR";
+          break;
+
+        case "RESET_CUR":
+          cur = 0;
+          pieceLoads.push([]);
+          execState = "ADD_NUMBER";
+          break;
+
+        case "ADD_NUMBER": {
+          const num = nums[simIndex];
+          cur += num;
+          pieceLoads[pieceLoads.length - 1].push(num);
+          lastAction = "Number " + num + " fits in piece " + pieces + ". cur = " + cur + " (<= " + mid + ").";
+          execState = simIndex + 1 >= nums.length ? "SIM_DONE" : "SIM_STEP";
+          break;
+        }
 
         case "SIM_DONE":
           feasible = pieces <= k;
@@ -1199,21 +1234,26 @@
           } else {
             lastAction = "Greedy split used pieces = " + pieces + " > k = " + k + ". Max sum " + mid + " is TOO TIGHT.";
           }
-          execState = "COMPARE";
+          execState = feasible ? "COMPARE_FEASIBLE" : "COMPARE_INFEASIBLE";
           break;
 
-        case "COMPARE":
-          if (feasible) {
-            lastAction = "Feasible: record ans = mid = " + mid + ", then try a smaller max sum with right = mid - 1.";
-            execState = "MOVE_RIGHT";
-          } else {
-            lastAction = "Infeasible: the allowed max sum must grow, so left = mid + 1.";
-            execState = "MOVE_LEFT";
-          }
+        case "COMPARE_FEASIBLE":
+          lastAction = "Feasible: record ans = mid = " + mid + ", then try a smaller max sum with right = mid - 1.";
+          execState = "RECORD_ANS";
+          break;
+
+        case "COMPARE_INFEASIBLE":
+          lastAction = "Infeasible: the allowed max sum must grow, so left = mid + 1.";
+          execState = "MOVE_LEFT";
+          break;
+
+        case "RECORD_ANS":
+          ans = mid;
+          lastAction = "Record " + mid + " as the best feasible maximum sum so far.";
+          execState = "MOVE_RIGHT";
           break;
 
         case "MOVE_RIGHT":
-          ans = mid;
           right = mid - 1;
           mid = null;
           pieces = null;
@@ -1360,7 +1400,8 @@
       nums.forEach((num, idx) => {
         const pkg = document.createElement("div");
         pkg.className = "sim-pkg";
-        if (speedKnown && idx === simIndex && execState === "SIM_STEP") {
+        const activeNumber = execState === "SIM_STEP" ? idx === simIndex + 1 : idx === simIndex && ["CHECK_OVERFLOW", "COUNT_PIECE", "RESET_CUR", "ADD_NUMBER"].includes(execState);
+        if (speedKnown && activeNumber) {
           pkg.classList.add(idx === overflowAt ? "overflow" : "active");
         } else if (speedKnown && idx <= simIndex) {
           pkg.classList.add("placed");
@@ -1385,7 +1426,7 @@
         const box = document.createElement("div");
         box.className = "day-box";
         const isLast = idx === pieceLoads.length - 1;
-        if (isLast && execState === "SIM_STEP") box.classList.add("current");
+        if (isLast && ["SIM_STEP", "CHECK_OVERFLOW", "COUNT_PIECE", "RESET_CUR", "ADD_NUMBER"].includes(execState)) box.classList.add("current");
         else box.classList.add("full");
         const loadSum = load.reduce((a, b) => a + b, 0);
         let chips = "";
@@ -1563,59 +1604,205 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Set <code>left = max(nums)</code>, <code>right = sum(nums)</code>, and start <code>ans = right</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, there is still a max-sum value to test.' : 'The value window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([6, 7, 8]);
-          narrate('Pick candidate max sum <code>mid = floor((left + right) / 2)</code>. Start with <code>pieces = 1</code> and <code>cur = 0</code>.');
+
+          narrate('Pick the middle candidate for the largest allowed subarray sum.');
+          break;
+        case "INIT_PIECES":
+
+          narrate('Start by counting one subarray.');
+          break;
+        case "INIT_CUR":
+
+          narrate('Start the current subarray sum at zero.');
           break;
         case "SIM_STEP":
-          if (simIndex === overflowAt && overflowAt !== -1) {
-            highlightLines([10, 11, 12, 14]);
-            narrate('Adding <code>' + nums[simIndex] + '</code> would exceed <code>' + mid + '</code>, so start a new piece (<code>pieces++</code>) and put it there.');
-          } else {
-            highlightLines([10, 14]);
-            narrate('Number <code>' + nums[simIndex] + '</code> still fits in the current piece, so add it to <code>cur</code>.');
-          }
+
+          narrate(simIndex + 1 < nums.length
+            ? 'Read the next number, <b>' + nums[simIndex + 1] + '</b>.'
+            : 'All numbers have been placed; finish the greedy loop.');
+          break;
+        case "CHECK_OVERFLOW":
+
+          narrate(cur + nums[simIndex] > mid
+            ? 'This number would exceed the allowed sum, so begin another piece.'
+            : 'This number fits in the current piece.');
+          break;
+        case "COUNT_PIECE":
+
+          narrate('Start one additional subarray for this number.');
+          break;
+        case "RESET_CUR":
+
+          narrate('Reset the running sum for the new subarray.');
+          break;
+        case "ADD_NUMBER":
+
+          narrate('Add <b>' + nums[simIndex] + '</b> to the current piece; its sum becomes <b>' + (cur + nums[simIndex]) + '</b>.');
           break;
         case "SIM_DONE":
-          highlightLines([16]);
+
           narrate('Greedy split finished: <code>pieces = ' + pieces + '</code>. Compare against <code>k = ' + k + '</code>.');
           break;
-        case "COMPARE":
-          if (feasible) {
-            highlightLines([16, 17, 18]);
-            narrate('<code>pieces &lt;= k</code> is <b style="color:#73d66b">true</b>: max sum ' + mid + ' works, so record it and shrink the limit.');
-          } else {
-            highlightLines([19, 20]);
-            narrate('<code>pieces &lt;= k</code> is <b style="color:#ff5c68">false</b>: this max sum is too tight, relax it.');
-          }
+        case "COMPARE_FEASIBLE":
+
+          narrate('<code>pieces &lt;= k</code> is <b style="color:#73d66b">true</b>: max sum ' + mid + ' works, so record it and shrink the limit.');
+          break;
+        case "COMPARE_INFEASIBLE":
+
+          narrate('<code>pieces &lt;= k</code> is <b style="color:#ff5c68">false</b>: this max sum is too tight, relax it.');
+          break;
+        case "RECORD_ANS":
+
+          narrate('Save this feasible maximum sum as the current best answer.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([17, 18]);
-          narrate('Record <code>ans = mid</code> and discard larger sums with <code>right = mid - 1</code>.');
+
+          narrate('Discard larger sums with <code>right = mid - 1</code>.');
           break;
         case "MOVE_LEFT":
-          highlightLines([20]);
+
           narrate('Discard smaller sums with <code>left = mid + 1</code>.');
           break;
         case "RETURN_ANS":
-          highlightLines([23]);
+
           narrate('Return <code>ans</code>, the smallest feasible largest-sum.');
           break;
         case "END":
-          highlightLines([23]);
+
           narrate('&#10003; Done. The minimized largest subarray sum is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "INIT_PIECES":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "INIT_CUR":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SIM_STEP":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "CHECK_OVERFLOW":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "COUNT_PIECE":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "RESET_CUR":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "ADD_NUMBER":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "SIM_DONE":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "COMPARE_FEASIBLE":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "COMPARE_INFEASIBLE":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "RECORD_ANS":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "RETURN_ANS":
+    return {
+      line: 23,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 23,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1645,8 +1832,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":410,"title":"Split Array Largest Sum","topic":"Binary Search","why":"A proposed maximum sum determines how many groups are needed; binary search finds the smallest feasible maximum.","meanings":{"nums":"array of non-negative integers to split","k":"number of contiguous subarrays to split into","left":"low end of the candidate largest-sum range (starts at max(nums))","right":"high end of the candidate largest-sum range (starts at sum(nums))","mid":"candidate largest-sum value being tested = floor((left + right) / 2)","ans":"smallest feasible largest-sum found so far (the answer)"},"entityClasses":["hud-item","sim-pkg","day-box","day-chip","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, k, left, right, mid, ans, pieces, cur, simIndex, feasible, pieceLoads, overflowAt, execState, lastAction, ...({})}),

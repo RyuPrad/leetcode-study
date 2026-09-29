@@ -1017,22 +1017,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      strs = [...s.strs];
-      i = s.i;
-      j = s.j;
-      char = s.char;
-      prefix = s.prefix;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      confirmedPrefixLength = s.confirmedPrefixLength;
-      mismatch = s.mismatch;
-      mismatchReason = s.mismatchReason;
-      lastCompared = s.lastCompared ? { ...s.lastCompared } : null;
-      currentColumnMatchedRows = [...s.currentColumnMatchedRows];
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+strs = [...snapshot.strs];
+i = snapshot.i;
+j = snapshot.j;
+char = snapshot.char;
+prefix = snapshot.prefix;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+confirmedPrefixLength = snapshot.confirmedPrefixLength;
+mismatch = snapshot.mismatch;
+mismatchReason = snapshot.mismatchReason;
+lastCompared = snapshot.lastCompared ? {
+  ...snapshot.lastCompared
+} : null;
+currentColumnMatchedRows = [...snapshot.currentColumnMatchedRows];
+}
 
     function nextStep() {
       if (execState === "END_FOUND" || execState === "END_FULL" || execState === "END_EMPTY") return;
@@ -1348,6 +1368,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1366,11 +1389,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Start by handling the edge case. If <code>strs</code> is empty, return an empty string.");
           break;
         case "OUTER_CHECK":
-          highlightLines([4]);
+
           if (strs.length === 0) {
             narrate("The array is empty, so the answer is <code>\"\"</code>.");
           } else if (i < strs[0].length) {
@@ -1380,11 +1403,11 @@
           }
           break;
         case "READ_CHAR":
-          highlightLines([5]);
+
           narrate("Read the reference character: <code>char = strs[0][" + i + "] = \"" + escapeHtml(char) + "\"</code>.");
           break;
         case "INNER_CHECK":
-          highlightLines([7]);
+
           if (j < strs.length) {
             narrate("Now compare the reference character against <code>strs[" + j + "][" + i + "]</code>.");
           } else {
@@ -1392,31 +1415,31 @@
           }
           break;
         case "COMPARE":
-          highlightLines([8]);
+
           narrate("Check the stopping condition: either this string ended, or its character is different from the reference character.");
           break;
         case "ADVANCE_J":
-          highlightLines([11, 7]);
+
           narrate("This row matched. Move to the next string in the same column.");
           break;
         case "COLUMN_DONE":
-          highlightLines([12, 4]);
+
           narrate("All strings matched this column, so the confirmed prefix is now <b>\"" + escapeHtml(currentPrefix()) + "\"</b>. Move to the next column.");
           break;
         case "RETURN_PREFIX":
-          highlightLines([9]);
+
           narrate("Stop immediately. The longest common prefix ends before index <b>" + i + "</b>, so return <code>strs[0].slice(0, " + i + ")</code>.");
           break;
         case "END_FOUND":
-          highlightLines([9]);
+
           narrate("✓ Done. The first mismatch/end was found, so the answer is <b>\"" + escapeHtml(prefix) + "\"</b>.");
           break;
         case "END_FULL":
-          highlightLines([14]);
+
           narrate("✓ Done. No mismatch was found, so the full first string is the answer: <b>\"" + escapeHtml(prefix) + "\"</b>.");
           break;
         case "END_EMPTY":
-          highlightLines([2]);
+
           narrate("✓ Done. Empty input returns <b>\"\"</b>.");
           break;
       }
@@ -1465,13 +1488,105 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "OUTER_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "READ_CHAR":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "INNER_CHECK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADVANCE_J":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "COLUMN_DONE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN_PREFIX":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END_FOUND":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END_FULL":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "END_EMPTY":
+    return {
+      line: 2,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     strs = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":14,"title":"Longest Common Prefix","topic":"Array & Hashing","why":"A prefix ends at the first column where a string ends or its character differs.","meanings":{"strs":"input strings","prefix":"longest shared prefix so far","i":"column index","j":"string index"},"entityClasses":["hud-item","index-cell","char-cell","char","legend-item","otherChar"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({strs, i, j, char, prefix, execState, confirmedPrefixLength, mismatch, mismatchReason, lastCompared, currentColumnMatchedRows, ...({})}),

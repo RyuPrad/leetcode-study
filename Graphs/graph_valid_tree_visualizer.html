@@ -609,7 +609,7 @@
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">DSU</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>(n) {</div>
-<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) => i);</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) =&gt; i);</div>
 <div id="line-4" class="code-line">  }</div>
 <div id="line-5" class="code-line">  <span class="fn">find</span>(x) {</div>
 <div id="line-6" class="code-line">    <span class="kw">while</span> (<span class="kw">this</span>.parent[x] !== x) {</div>
@@ -852,103 +852,27 @@
 
     function cloneArr(a) { return a.slice(); }
 
-    function buildSteps(n, edgList) {
-      const built = [];
-      const traceRows = [];
-      let ans = null; // null = pending, true/false once decided
-
-      // We always create the DSU snapshot fields even before construction,
-      // using a placeholder identity parent so the forest renders.
-      let dsu = new DSU(n);
-
-      function snap(extra) {
-        built.push({
-          parent: cloneArr(dsu.parent),
-          n,
-          edgeCount: edgList.length,
-          edge: extra.edge === undefined ? null : extra.edge,
-          a: extra.a === undefined ? null : extra.a,
-          b: extra.b === undefined ? null : extra.b,
-          ra: extra.ra === undefined ? null : extra.ra,
-          rb: extra.rb === undefined ? null : extra.rb,
-          changed: extra.changed === undefined ? null : extra.changed,
-          phase: extra.phase,
-          gatePass: extra.gatePass === undefined ? null : extra.gatePass,
-          lines: extra.lines,
-          narration: extra.narration,
-          ans: ans,
-          status: extra.status === undefined ? "running" : extra.status,
-          traceLen: traceRows.length
-        });
-      }
-
-      // Step: edge-count gate
-      const gatePass = edgList.length === n - 1;
-      snap({
-        phase: "gate", lines: [22], gatePass,
-        narration: gatePass
-          ? "Gate check: a tree on <b>" + n + "</b> nodes must have exactly <b>n − 1 = " + (n - 1) + "</b> edges. We have <b>" + edgList.length + "</b> ✓ — continue to the cycle check."
-          : "Gate check: a tree on <b>" + n + "</b> nodes needs <b>n − 1 = " + (n - 1) + "</b> edges, but we have <b>" + edgList.length + "</b>. Counts differ → <b style=\"color:#e24b4a\">return false</b> immediately."
-      });
-
-      if (!gatePass) {
-        ans = false;
-        traceRows.push({ idx: "—", edge: "edge-count", ra: edgList.length, rb: n - 1, result: "count != n-1 → false" });
-        snap({
-          phase: "done", lines: [22], gatePass: false, status: "done",
-          narration: "✗ Finished. Edge count (" + edgList.length + ") ≠ n − 1 (" + (n - 1) + "), so this is <b>not a valid tree</b>."
-        });
-        return built;
-      }
-
-      // construct DSU
-      dsu = new DSU(n);
-      snap({
-        phase: "build", lines: [23], gatePass: true,
-        narration: "Edge count is right. Build a <code>DSU(" + n + ")</code>; each node starts as its own set. Now union every edge — any edge that connects two already-joined nodes is a cycle."
-      });
-
-      let cycle = false;
-      for (let ei = 0; ei < edgList.length; ei++) {
-        const [a, b] = edgList[ei];
-        snap({
-          phase: "read", lines: [24, 25, 12], edge: [a, b], a, b,
-          narration: "Edge <b>[" + a + ", " + b + "]</b> → <code>union(" + a + ", " + b + ")</code>."
-        });
-        const ra = dsu.find(a);
-        const rb = dsu.find(b);
-        snap({
-          phase: "find", lines: [13, 14], edge: [a, b], a, b, ra, rb,
-          narration: "<code>ra = find(" + a + ") = " + ra + "</code>, <code>rb = find(" + b + ") = " + rb + "</code>."
-        });
-        if (ra === rb) {
-          cycle = true;
-          ans = false;
-          traceRows.push({ idx: ei, edge: "[" + a + "," + b + "]", ra, rb, result: "CYCLE → false" });
-          snap({
-            phase: "cycle", lines: [15, 25], edge: [a, b], a, b, ra, rb, status: "done",
-            narration: "<code>ra === rb (" + ra + ")</code> — nodes " + a + " and " + b + " are already connected, so this edge closes a cycle. <code>union</code> returns false → <code>validTree</code> returns <b style=\"color:#e24b4a\">false</b>."
-          });
-          break;
-        }
-        dsu.parent[ra] = rb;
-        traceRows.push({ idx: ei, edge: "[" + a + "," + b + "]", ra, rb, result: "union ok" });
-        snap({
-          phase: "merge", lines: [16, 17], edge: [a, b], a, b, ra, rb, changed: ra,
-          narration: "Different roots → attach <b>" + ra + "</b> under <b>" + rb + "</b>; <code>union</code> returns true. No cycle so far."
-        });
-      }
-
-      if (!cycle) {
-        ans = true;
-        snap({
-          phase: "done", lines: [27], status: "done",
-          narration: "✓ Finished. Exactly n − 1 edges and no cycle were found, so every node is connected into one tree — <b>return true</b>."
-        });
-      }
-
-      return built;
-    }
+    function buildSteps(n,edgList){
+  const dsu=new DSU(n),built=[],traceRows=[];let ans=null,context={edge:null,a:null,b:null,ra:null,rb:null};
+  function snap(line,phase,narration,extra={}){built.push({parent:cloneArr(dsu.parent),n,edgeCount:edgList.length,...context,changed:null,gatePass:null,status:'running',...extra,ans,phase,lines:line?[line]:[],executedLine:line||null,narration,traceLen:traceRows.length});}
+  function find(x){while(true){snap(6,'find-check','Check whether node '+x+' is its own parent.',{findX:x});if(dsu.parent[x]===x)break;
+    dsu.parent[x]=dsu.parent[dsu.parent[x]];snap(7,'find-compress','Compress the parent link for node '+x+'.',{findX:x,changed:x});
+    x=dsu.parent[x];snap(8,'find-advance','Move x to '+x+'.',{findX:x});}
+    snap(10,'find-return','Return root '+x+'.',{findX:x});return x;}
+  snap(null,'ready','Ready to check whether the graph is a tree.');const gatePass=edgList.length===n-1;
+  snap(22,'gate','Check edges.length === n - 1: '+gatePass+'.',{gatePass});
+  if(!gatePass){ans=false;snap(22,'done','The edge count is wrong. Return false.',{gatePass:false,status:'done'});return built;}
+  snap(23,'build','Create the disjoint sets.',{gatePass:true});
+  for(let ei=0;ei<edgList.length;ei++){
+    const[a,b]=edgList[ei];context={edge:[a,b],a,b,ra:null,rb:null};snap(24,'read','Read edge ['+a+', '+b+'].');
+    snap(25,'union-call','Call union('+a+', '+b+').');const ra=find(a);context.ra=ra;snap(13,'find-a','Store ra = '+ra+'.');
+    const rb=find(b);context.rb=rb;snap(14,'find','Store rb = '+rb+'.');snap(15,'compare-roots','Check ra === rb: '+(ra===rb)+'.');
+    if(ra===rb){snap(15,'union-false','Union returns false for an existing connection.');snap(25,'caller-check','The failed union makes the condition true.');ans=false;traceRows.push({idx:ei,edge:'['+a+','+b+']',ra,rb,result:'cycle'});snap(25,'cycle','Return false because this edge closes a cycle.',{status:'done'});return built;}
+    dsu.parent[ra]=rb;snap(16,'merge','Set parent['+ra+'] = '+rb+'.',{changed:ra});
+    snap(17,'union-true','Return true from union.');traceRows.push({idx:ei,edge:'['+a+','+b+']',ra,rb,result:'union ok'});snap(25,'caller-check','The union succeeded; continue to the next edge.');
+  }
+  ans=true;snap(27,'done','Return true: the graph has the correct edge count and no cycle.',{status:'done'});return built;
+}
 
     function buildTraceRows(n, edgList) {
       const rows = [];
@@ -1333,8 +1257,8 @@
       spec: {"number":261,"title":"Graph Valid Tree","topic":"Graphs","why":"A tree must connect every node while introducing no cycle.","meanings":{"n":"Number of nodes, labeled `0..n-1`. A tree on `n` nodes has exactly `n-1` edges.","edges":"Undirected edges `[a, b]`. The graph is a tree iff it has `n-1` edges and no cycle.","dsu":"The `DSU` (union-find) instance used to detect a cycle while joining edges.","parent":"`parent[x]` is `x`'s parent pointer; following it to a fixed point gives the set's root.","a":"First endpoint of the current edge.","b":"Second endpoint of the current edge.","ra":"`find(a)` — the root of `a`'s set.","rb":"`find(b)` — the root of `b`'s set. If `ra === rb`, the edge forms a cycle.","ans":"Boolean result: `true` only if the edge-count gate passes and every `union` succeeds (no cycle)."},"entityClasses":["hud-item","gate-chip","tree-nodes","node","arr-cells","arr-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({N, edges, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({N, edges, masterTrace, ...(steps[position] || {})}),
+      read: () => ({N, edges,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({N, edges,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

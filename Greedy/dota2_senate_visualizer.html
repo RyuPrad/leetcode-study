@@ -823,96 +823,16 @@
 
     // ---- PRECOMPUTED STEP ENGINE (immutable deep-copied snapshots) ----
     // Both queues are snapshotted as plain array copies.
-    function buildSteps(senateStr) {
-      const out = [];
-      let roundCounter = 0;
-
-      function record(s) {
-        out.push({
-          line: s.line.slice(),
-          radiant: s.radiant.slice(),
-          dire: s.dire.slice(),
-          r: (s.r === undefined ? null : s.r),
-          d: (s.d === undefined ? null : s.d),
-          ans: s.ans,
-          phase: s.phase,
-          narr: s.narr,
-          winner: (s.winner === undefined ? null : s.winner),
-          round: (s.round === undefined ? null : s.round),
-          buildIdx: (s.buildIdx === undefined ? null : s.buildIdx),
-          trace: s.trace ? s.trace.map(row => ({ ...row })) : []
-        });
-      }
-
-      const n = senateStr.length;
-      const radiant = [];
-      const dire = [];
-      const trace = [];
-
-      record({
-        line: [2, 3, 4], radiant, dire, ans: "pending", phase: "init",
-        narr: "n = <b>" + n + "</b>. Create two empty queues that hold the <b>indices</b> of each party's senators in voting order.",
-        trace
-      });
-
-      for (let i = 0; i < n; i++) {
-        if (senateStr[i] === "R") radiant.push(i);
-        else dire.push(i);
-        record({
-          line: [5, 6, 7], radiant, dire, ans: "pending", phase: "build", buildIdx: i,
-          narr: "senate[" + i + "] = <b>" + senateStr[i] + "</b> → push index <b>" + i + "</b> into the <b>" +
-                (senateStr[i] === "R" ? "Radiant" : "Dire") + "</b> queue.",
-          trace
-        });
-      }
-
-      record({
-        line: [9], radiant, dire, ans: "pending", phase: "prewhile",
-        narr: "Both queues are built. While <b>both</b> still have senators, the two front indices fight each round.",
-        trace
-      });
-
-      while (radiant.length > 0 && dire.length > 0) {
-        roundCounter++;
-        const r = radiant.shift();
-        const d = dire.shift();
-        record({
-          line: [10, 11], radiant, dire, r, d, ans: "pending", phase: "dequeue", round: roundCounter,
-          narr: "Round " + roundCounter + ": dequeue the fronts — Radiant <b>r = " + r + "</b> and Dire <b>d = " + d +
-                "</b>. The <b>smaller</b> index votes first and bans the other.",
-          trace
-        });
-
-        if (r < d) {
-          radiant.push(r + n);
-          trace.push({ round: roundCounter, r, d, winner: "Radiant", requeue: r + n, banned: "D@" + d });
-          record({
-            line: [12], radiant, dire, r, d, ans: "pending", phase: "radwin", round: roundCounter, winner: "R",
-            narr: "r = " + r + " &lt; d = " + d + ", so <b style=\"color:#e24b4a\">Radiant</b> bans Dire senator " + d +
-                  " and re-enqueues at index <b>" + r + " + " + n + " = " + (r + n) + "</b> (votes again next pass).",
-            trace
-          });
-        } else {
-          dire.push(d + n);
-          trace.push({ round: roundCounter, r, d, winner: "Dire", requeue: d + n, banned: "R@" + r });
-          record({
-            line: [13], radiant, dire, r, d, ans: "pending", phase: "dirwin", round: roundCounter, winner: "D",
-            narr: "r = " + r + " is <b>not</b> &lt; d = " + d + ", so <b style=\"color:#569cd6\">Dire</b> bans Radiant senator " + r +
-                  " and re-enqueues at index <b>" + d + " + " + n + " = " + (d + n) + "</b> (votes again next pass).",
-            trace
-          });
-        }
-      }
-
-      const ans = radiant.length > 0 ? "Radiant" : "Dire";
-      record({
-        line: [15], radiant, dire, ans, phase: "done", round: roundCounter,
-        narr: "One queue is empty. The party with senators remaining wins: <b style=\"color:" +
-              (ans === "Radiant" ? "#e24b4a" : "#569cd6") + "\">" + ans + "</b>.",
-        trace
-      });
-      return out;
-    }
+    function buildSteps(senateStr){
+ const out=[],n=senateStr.length,radiant=[],dire=[],trace=[];let round=0,r=null,d=null;
+ function snap(line,phase,narr,extra={}){out.push({radiant:[...radiant],dire:[...dire],r,d,ans:'pending',winner:null,round,buildIdx:null,trace:trace.map(row=>({...row})),...extra,line:line?[line]:[],executedLine:line||null,phase,narr});}
+ snap(null,'ready','Ready to initialize the queues.');snap(2,'length','Read senate.length = '+n+'.');snap(3,'init-radiant','Create the Radiant queue.');snap(4,'init','Create the Dire queue.');
+ for(let i=0;i<n;i++){snap(5,'read','Read senator index '+i+'.',{buildIdx:i});const isRadiant=senateStr[i]==='R';snap(6,'check-party','Check whether this senator is Radiant: '+isRadiant+'.',{buildIdx:i});if(isRadiant)radiant.push(i);else dire.push(i);snap(isRadiant?6:7,'build','Append index '+i+' to its party queue.',{buildIdx:i});}
+ while(true){snap(9,'prewhile','Check whether both parties still have senators: '+(radiant.length>0&&dire.length>0)+'.');if(!radiant.length||!dire.length)break;round++;r=radiant.shift();d=null;snap(10,'dequeue-radiant','Remove Radiant front index '+r+'.');d=dire.shift();snap(11,'dequeue','Remove Dire front index '+d+'.');
+  const radiantWins=r<d;snap(12,'compare','Check r < d: '+radiantWins+'.');if(radiantWins){radiant.push(r+n);trace.push({round,r,d,winner:'Radiant',requeue:r+n,banned:'D@'+d});snap(12,'radwin','Requeue Radiant at index '+(r+n)+'.',{winner:'R'});}else{dire.push(d+n);trace.push({round,r,d,winner:'Dire',requeue:d+n,banned:'R@'+r});snap(13,'dirwin','Requeue Dire at index '+(d+n)+'.',{winner:'D'});}
+ }
+ const ans=radiant.length?'Radiant':'Dire';snap(15,'done','Return '+ans+'.',{ans});return out;
+}
 
     function loadExample(exNum) {
       activeExample = exNum;
@@ -1242,7 +1162,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({senate, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({senate, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({senate, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

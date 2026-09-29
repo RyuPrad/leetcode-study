@@ -630,7 +630,7 @@
 <div id="line-3" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [from, to] <span class="kw">of</span> tickets) { <span class="kw">if</span> (!adj.<span class="fn">has</span>(from)) adj.<span class="fn">set</span>(from, []); adj.<span class="fn">get</span>(from).<span class="fn">push</span>(to); }</div>
 <div id="line-4" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [, dests] <span class="kw">of</span> adj) dests.<span class="fn">sort</span>();</div>
 <div id="line-5" class="code-line">  <span class="kw">const</span> res = [];</div>
-<div id="line-6" class="code-line">  <span class="kw">const</span> <span class="fn">visit</span> = (airport) => {</div>
+<div id="line-6" class="code-line">  <span class="kw">const</span> <span class="fn">visit</span> = (airport) =&gt; {</div>
 <div id="line-7" class="code-line">    <span class="kw">const</span> dests = adj.<span class="fn">get</span>(airport) || [];</div>
 <div id="line-8" class="code-line">    <span class="kw">while</span> (dests.length &gt; <span class="nm">0</span>) { <span class="kw">const</span> next = dests.<span class="fn">shift</span>(); <span class="fn">visit</span>(next); }</div>
 <div id="line-9" class="code-line">    res.<span class="fn">push</span>(airport);</div>
@@ -841,12 +841,7 @@
       // Build adjacency map exactly like the solution.
       const adj = new Map();
       const allAirports = new Set();
-      for (const [from, to] of tk) {
-        if (!adj.has(from)) adj.set(from, []);
-        adj.get(from).push(to);
-        allAirports.add(from);
-        allAirports.add(to);
-      }
+      for (const [from, to] of tk) { allAirports.add(from); allAirports.add(to); }
       // ensure every airport (even pure destinations) appears so the table is stable
       const airportOrder = Array.from(allAirports).sort();
 
@@ -866,6 +861,7 @@
           poppingFrame: (extra.poppingFrame === undefined) ? null : extra.poppingFrame,
           phase: extra.phase,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           ans: (extra.ans === undefined) ? "pending" : extra.ans,
           result: (extra.result === undefined) ? "pending" : extra.result,
@@ -873,13 +869,26 @@
         });
       }
 
+      snap({phase: "ready", lines: [], executedLine: null, narration: "Ready to build the itinerary graph."});
+      snap({phase: "build", lines: [2], narration: "Create the empty adjacency map."});
+      for (const [from, to] of tk) {
+        if (!adj.has(from)) {
+          adj.set(from, []);
+          snap({phase: "build", lines: [3], airport: from, narration: "Create this departure airport's empty destination list."});
+        }
+        adj.get(from).push(to);
+        snap({phase: "build", lines: [3], airport: from, next: to, narration: "Append this ticket's destination to the departure list."});
+      }
       snap({
-        phase: "build", lines: [2, 3],
+        phase: "build", lines: [3],
         narration: "Build <code>adj</code>: for each ticket <code>[from, to]</code> push <b>to</b> onto <code>adj.get(from)</code>."
       });
       // Sort every destination list lexically (exactly like the solution),
       // so the recursion and every later snapshot see lexical order.
-      for (const [, dests] of adj) dests.sort();
+      for (const [airport, dests] of adj) {
+        dests.sort();
+        snap({phase: "sort", airport, lines: [4], narration: "Sort this airport's destinations in lexical order."});
+      }
       snap({
         phase: "sort", lines: [4],
         narration: "Sort every destination list lexically. Visiting alphabetically smallest first yields the smallest itinerary."
@@ -897,11 +906,12 @@
       function visit(airport) {
         callStack.push(airport);
         snap({
-          phase: "enter", airport, lines: [6, 7],
+          phase: "enter", airport, lines: [6],
           narration: "<b>visit(\"" + airport + "\")</b> — push the frame. <code>dests = adj.get(\"" + airport + "\")</code> = [" + (adj.get(airport) || []).map(d => '"' + d + '"').join(", ") + "]."
         });
 
         const dests = adj.get(airport) || [];
+        snap({phase: "enter", airport, lines: [7], narration: "Read this airport's remaining destination list."});
         while (dests.length > 0) {
           snap({
             phase: "while", airport, lines: [8],
@@ -933,7 +943,8 @@
       visit("JFK");
 
       // final reverse
-      finalAnswer = res.slice().reverse();
+      res.reverse();
+      finalAnswer = res.slice();
       snap({
         phase: "reverse", lines: [12],
         narration: "DFS done. <code>res</code> holds airports in reverse-finish order. <code>res.reverse()</code> flips it into the correct Eulerian itinerary.",
@@ -1299,8 +1310,8 @@
       spec: {"number":332,"title":"Reconstruct Itinerary","topic":"Advanced Graphs","why":"Consume tickets while constructing a route that uses every edge; lexical choices resolve valid alternatives.","meanings":{"tickets":"List of `[from, to]` airport pairs. Each ticket is a directed edge that must be used **exactly once**.","adj":"`Map` from an airport to its list of destinations. Built from `tickets`, then each list is sorted lexically.","dests":"The destination list `adj.get(airport)` for the airport currently being visited. `shift()` removes (consumes) the smallest unused edge.","res":"The route collected in **post-order** — an airport is pushed only after all of its outgoing edges are used. Reversed at the end to give the itinerary.","visit":"Recursive Hierholzer DFS. Drains an airport's edges, recursing greedily into the lexically smallest first.","airport":"The airport whose frame is currently on the call stack (argument to `visit`).","next":"The destination just `shift()`-ed off `dests`; the recursion target `visit(next)`.","from":"Origin airport of a ticket while building `adj`.","to":"Destination airport of a ticket while building `adj`."},"entityClasses":["hud-item","dest-pill","stack-frame","res-pill","poppingFrame"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({tickets, finalAnswer, _origInit, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({tickets, finalAnswer, _origInit, ...(steps[position] || {})}),
+      read: () => ({tickets,  _origInit, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({tickets,  _origInit, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

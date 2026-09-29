@@ -839,7 +839,7 @@
     let activeExample = 1;
 
     // ---- Precompute the entire run into immutable deep-copied snapshots ----
-    function buildSteps(nVal, meetingsRaw) {
+    function originalInstructionBuilder(nVal, meetingsRaw) {
       const out = [];
       const mtgs = meetingsRaw.map(p => p.slice());
       mtgs.sort((a, b) => a[0] - b[0]);
@@ -1215,13 +1215,42 @@
     meetings = examples[1][1].map(p => p.slice());
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,19,20,21,22,23,26,27,28,30]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":2402,"title":"Meeting Rooms III","topic":"Intervals","why":"Use an available room when possible; otherwise delay the meeting until the earliest room release while preserving duration.","meanings":{"n":"Number of meeting rooms, indexed `0 .. n-1`.","meetings":"Array of `[start, end]` meetings, sorted ascending by start time.","count":"`count[r]` = how many meetings room `r` has hosted (the booking counter).","available":"Sorted list of free room indices; lowest index is taken first.","busy":"List of `[endTime, room]` for rooms in use, kept sorted by end time (ties by room).","room":"The room chosen for the current meeting (freed, assigned, or waited for).","freeTime":"When the earliest-freeing busy room becomes available (used when all rooms are busy).","best":"Index of the busiest room so far; the final answer (lowest index wins ties).","r":"Loop index over rooms (initial fill and final scan for the busiest room)."},"entityClasses":["hud-item","mtg-chip","room-lane","room-count","pill","busy-pill","assignedRoom"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({n, meetings, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({n, meetings, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({n, meetings, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

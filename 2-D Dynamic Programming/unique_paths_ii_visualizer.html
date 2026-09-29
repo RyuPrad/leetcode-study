@@ -832,6 +832,7 @@
 
       function snap(extra) {
         return Object.assign({
+          executedLine: extra.executedLine === undefined ? extra.highlight?.at(-1) : extra.executedLine,
           dp: dp.map(r => [...r]),
           computed: computed.map(r => [...r]),
           grid: grid.map(r => [...r]),
@@ -840,9 +841,11 @@
         }, extra);
       }
 
+      steps.push(snap({i:null,j:null,sources:[],highlight:[],executedLine:null,ans:null,narration:"Ready to count paths through the grid."}));
+      steps.push(snap({i:null,j:null,sources:[],highlight:[2],ans:null,narration:"Read the grid dimensions."}));
       steps.push(snap({
         i: null, j: null, sources: [],
-        highlight: [2, 3],
+        highlight: [3],
         narration: "Read the grid (" + m + "x" + n + ") and create a <b>dp</b> table of the same size filled with <span class='nm'>0</span>. A cell with <b>grid = 1</b> is an obstacle and can never be entered.",
         ans: null
       }));
@@ -896,16 +899,20 @@
           if (hasLeft) sources.push([i, j - 1]);
           steps.push(snap({
             i, j, sources,
-            highlight: hasTop && hasLeft ? [8, 9] : (hasTop ? [8] : [9]),
+            highlight: [9],
             narration: "Open cell <b>(" + i + ", " + j + ")</b>: sum reachable neighbours — top <b>dp[" + (i - 1) + "][" + j + "] = <span class='nm'>" + (hasTop ? topVal : 0) + "</span></b>" + (hasTop ? "" : " (none)") + " plus left <b>dp[" + i + "][" + (j - 1) + "] = <span class='nm'>" + (hasLeft ? leftVal : 0) + "</span></b>" + (hasLeft ? "" : " (none)") + ".",
             ans: null, pending: true
           }));
-          dp[i][j] = topVal + leftVal;
+          if (hasTop) {
+            dp[i][j] += topVal;
+            steps.push(snap({i,j,sources:[[i-1,j]],highlight:[8],ans:null,justWrote:true,narration:"Add the number of paths from the cell above. The left contribution has not been added yet."}));
+          }
+          if (hasLeft) dp[i][j] += leftVal;
           computed[i][j] = true;
           trace.push({ i, j, type: "open", top: hasTop ? topVal : 0, left: hasLeft ? leftVal : 0, val: dp[i][j] });
           steps.push(snap({
             i, j, sources,
-            highlight: hasTop && hasLeft ? [8, 9] : (hasTop ? [8] : [9]),
+            highlight: [9],
             narration: "Write <b>dp[" + i + "][" + j + "] = " + (hasTop ? topVal : 0) + " + " + (hasLeft ? leftVal : 0) + " = <span class='nm'>" + dp[i][j] + "</span></b>.",
             ans: null, justWrote: true
           }));
@@ -1143,7 +1150,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({grid, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({grid, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({grid, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

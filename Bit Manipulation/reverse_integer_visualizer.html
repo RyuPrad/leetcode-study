@@ -780,7 +780,7 @@
     const INT_MIN = -(2 ** 31);   // -2147483648
     const INT_MAX = 2 ** 31 - 1;  //  2147483647
 
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
       const original = xInput;
       let sign = 1;
@@ -1215,13 +1215,42 @@
     xInput = examples[1];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,9,10,11]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":7,"title":"Reverse Integer","topic":"Bit Manipulation","why":"Peel one decimal digit from the input and append it to the result; check the signed integer boundary.","meanings":{"x":"The working magnitude. Starts as `Math.abs(input)`, then each iteration its last digit is peeled with `x % 10` and removed with `Math.floor(x / 10)`.","sign":"The original sign, `-1` if the input was negative else `1`. Reapplied to `res` after the digits are reversed.","res":"The reversed value, built by `res = res * 10 + (x % 10)`. After sign is reapplied it is bounds-checked against the signed 32-bit range; out of range returns 0."},"entityClasses":["hud-item","digit-zone","digit-cell","digit"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({xInput, INT_MIN, INT_MAX, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({xInput, INT_MIN, INT_MAX, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({xInput, INT_MIN, INT_MAX, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

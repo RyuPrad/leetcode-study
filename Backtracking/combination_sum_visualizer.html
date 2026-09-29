@@ -960,139 +960,11 @@
 
     // ---- Precompute the full list of steps by simulating the recursion ----
     function buildSteps() {
-      const built = [];
-      const res = [];
-      const path = [];
-      const treeNodes = [];   // flat list: { id, depth, label, value, status, remainAfter }
-      const frames = [];      // active recursion frames: { start, remain, depth, nodeId }
-      let nodeSeq = 0;
-
-      function snap(line, extra) {
-        built.push(Object.assign({
-          line: Array.isArray(line) ? line : [line],
-          path: [...path],
-          res: res.map(c => [...c]),
-          treeNodes: treeNodes.map(n => ({ ...n })),
-          frames: frames.map(f => ({ ...f })),
-          start: extra && extra.start !== undefined ? extra.start : null,
-          remain: extra && extra.remain !== undefined ? extra.remain : null,
-          i: extra && extra.i !== undefined ? extra.i : null,
-          activeNode: extra && extra.activeNode !== undefined ? extra.activeNode : null,
-          phase: extra && extra.phase ? extra.phase : "",
-          justPushed: extra && extra.justPushed !== undefined ? extra.justPushed : null,
-          justPopped: extra && extra.justPopped !== undefined ? extra.justPopped : null,
-          justAddedRes: extra && extra.justAddedRes !== undefined ? extra.justAddedRes : false,
-          narr: extra && extra.narr ? extra.narr : ""
-        }));
-      }
-
-      // root snapshot: call dfs(0, target)
-      snap(16, {
-        start: 0, remain: target, phase: "call",
-        narr: "Call <code>dfs(start = 0, remain = " + target + ")</code>. We explore every combination that sums to <b>target = " + target + "</b>."
-      });
-
-      function dfs(start, remain, depth, parentLabel, nodeId) {
-        frames.push({ start, remain, depth, nodeId });
-        // entering node
-        snap(5, {
-          start, remain, activeNode: nodeId, phase: "enter",
-          narr: "Enter <code>dfs(" + start + ", " + remain + ")</code>. Check the base case: is <code>remain === 0</code>?"
-        });
-
-        if (remain === 0) {
-          // record solution
-          const idx = treeNodes.findIndex(n => n.id === nodeId);
-          if (idx >= 0) treeNodes[idx].status = "solution";
-          snap([5, 6], {
-            start, remain, activeNode: nodeId, phase: "found",
-            narr: "<code>remain === 0</code>. The current <b>path</b> sums to the target - record it into <b>res</b>."
-          });
-          res.push([...path]);
-          snap([6, 7], {
-            start, remain, activeNode: nodeId, phase: "recorded", justAddedRes: true,
-            narr: "Pushed <code>[" + path.join(", ") + "]</code> into <b>res</b>, then <code>return</code> to the previous frame."
-          });
-          frames.pop();
-          return;
-        }
-
-        if (remain < 0) {
-          const idx = treeNodes.findIndex(n => n.id === nodeId);
-          if (idx >= 0) treeNodes[idx].status = "pruned";
-          snap(9, {
-            start, remain, activeNode: nodeId, phase: "prune",
-            narr: "<code>remain &lt; 0</code> (" + remain + "). This branch overshot the target - <b style=\"color:#e24b4a\">prune</b> and <code>return</code>."
-          });
-          frames.pop();
-          return;
-        }
-
-        // loop
-        for (let i = start; i < candidates.length; i++) {
-          snap(10, {
-            start, remain, i, activeNode: nodeId, phase: "loop",
-            narr: "Loop with <b>i = " + i + "</b> (i starts at <b>start = " + start + "</b>). Try candidate <code>candidates[" + i + "] = " + candidates[i] + "</code>."
-          });
-
-          // push choice
-          path.push(candidates[i]);
-          const childId = ++nodeSeq;
-          const childLabel = candidates[i];
-          treeNodes.push({
-            id: childId,
-            depth: depth + 1,
-            label: String(candidates[i]),
-            value: candidates[i],
-            status: "active",
-            remainAfter: remain - candidates[i]
-          });
-          snap(11, {
-            start, remain, i, activeNode: childId, phase: "push", justPushed: candidates[i],
-            narr: "<code>path.push(" + candidates[i] + ")</code>. Add this choice to the partial candidate, then recurse <b>reusing index i</b>."
-          });
-
-          // recurse (reuse i)
-          snap(12, {
-            start, remain, i, activeNode: childId, phase: "recurse",
-            narr: "<code>dfs(" + i + ", " + (remain - candidates[i]) + ")</code> - same start <b>i = " + i + "</b> so values can repeat; remain drops to <b>" + (remain - candidates[i]) + "</b>."
-          });
-          // mark child inactive-ish before descending (it becomes a frame)
-          const ci = treeNodes.findIndex(n => n.id === childId);
-          if (ci >= 0) treeNodes[ci].status = "open";
-          dfs(i, remain - candidates[i], depth + 1, childLabel, childId);
-
-          // returned: undo
-          if (ci >= 0 && treeNodes[ci].status === "open") treeNodes[ci].status = "explored";
-          const popped = path[path.length - 1];
-          snap(13, {
-            start, remain, i, activeNode: nodeId, phase: "pop", justPopped: popped,
-            narr: "<code>path.pop()</code> removes <b>" + popped + "</b> - <b style=\"color:#ce9178\">undo</b> the choice before trying the next candidate."
-          });
-          path.pop();
-        }
-
-        // loop finished for this frame
-        snap([14, 15], {
-          start, remain, activeNode: nodeId, phase: "frameDone",
-          narr: "Tried every candidate from index <b>" + start + "</b> onward. This frame is done - <code>return</code>."
-        });
-        frames.pop();
-      }
-
-      const rootId = ++nodeSeq;
-      treeNodes.push({ id: rootId, depth: 0, label: "( )", value: null, status: "open", remainAfter: target });
-      dfs(0, target, 0, "( )", rootId);
-      const ri = treeNodes.findIndex(n => n.id === rootId);
-      if (ri >= 0) treeNodes[ri].status = "explored";
-
-      // final
-      snap(17, {
-        start: null, remain: null, phase: "done",
-        narr: "Finished. <code>return res</code> with <b>" + res.length + "</b> combination(s) that sum to <b>" + target + "</b>."
-      });
-
-      return built;
+      const built=[],res=[],path=[],treeNodes=[],frames=[],values=[...candidates];let nodeSeq=0;
+      const snap=(line,phase,narr,extra={})=>built.push({executedLine:line,line:line?[line]:[1],path:[...path],res:res.map(r=>[...r]),treeNodes:treeNodes.map(r=>({...r})),frames:frames.map(r=>({...r})),start:null,remain:null,i:null,activeNode:null,phase,justPushed:null,justPopped:null,justAddedRes:false,narr,...extra});
+      snap(null,"init","Ready to enumerate combinations.");snap(2,"init","Create the result list.");snap(3,"init","Create the current path.");snap(4,"init","Define dfs.");
+      const dfs=(start,remain,depth,nodeId,callLine)=>{frames.push({start,remain,depth,nodeId});const meta={start,remain,activeNode:nodeId};snap(callLine,"enter","Call dfs for the next choice.",meta);snap(5,"enter","Check whether the current combination is complete.",meta);if(remain===0){treeNodes.find(r=>r.id===nodeId).status='solution';res.push([...path]);snap(6,"recorded","Record the current combination.",{...meta,justAddedRes:true});snap(7,"frameDone","Return from this completed branch.",meta);frames.pop();return;}snap(9,"enter","Check whether this branch overshot the target.",meta);if(remain<0){treeNodes.find(r=>r.id===nodeId).status="pruned";frames.pop();return;}let idx=start;for(;idx<values.length;idx++){const value=values[idx],m={...meta,i:idx};snap(10,"loop","Read the next candidate.",m);path.push(value);const childId=++nodeSeq,child={id:childId,depth:depth+1,label:String(value),value,status:'active',remainAfter:remain-value,lenAfter:path.length};treeNodes.push(child);snap(11,"push","Append the candidate to the path.",{...m,activeNode:childId,justPushed:value});child.status='open';dfs(idx,remain-value,depth+1,childId,12);if(child.status==='open')child.status='explored';const popped=path.pop();snap(13,"pop","Remove the candidate from the path.",{...m,justPopped:popped});}snap(10,"frameDone","This frame has no more candidates.",{...meta,i:idx});frames.pop();};
+      const rootId=++nodeSeq;treeNodes.push({id:rootId,depth:0,label:'( )',value:null,status:'open',remainAfter:target,lenAfter:0});dfs(0,target,0,rootId,16);treeNodes[0].status='explored';snap(17,"done","Return all recorded combinations.");return built;
     }
 
     function init() {
@@ -1468,7 +1340,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({candidates, target, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({candidates, target, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({candidates, target, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

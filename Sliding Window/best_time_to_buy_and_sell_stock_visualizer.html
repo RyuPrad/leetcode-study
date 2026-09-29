@@ -554,6 +554,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -812,25 +813,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      if (raw === "") {
-        prices = [];
-      } else {
-        prices = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (prices.some(Number.isNaN)) {
-        alert("Please enter only numbers separated by commas. Example: 7, 1, 5, 3, 6, 4");
-        return;
-      }
-
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false, min:0, label:'Numbers'}); prices = parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       left = 0;
@@ -864,19 +852,34 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      prices = [...s.prices];
-      left = s.left;
-      right = s.right;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      lastBranch = s.lastBranch;
-      lastProfit = s.lastProfit;
-      improved = s.improved;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+prices = [...snapshot.prices];
+left = snapshot.left;
+right = snapshot.right;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastBranch = snapshot.lastBranch;
+lastProfit = snapshot.lastProfit;
+improved = snapshot.improved;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -887,11 +890,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          ans = 0;
-          right = 1;
-          execState = "LOOP_CHECK";
-          break;
+ left = 0;
+ right = 1;
+ lastAction = "Initialize left.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (right < prices.length) {
@@ -1144,6 +1153,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1162,11 +1174,15 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate("Start with <b>left = 0</b> (buy on day 0) and <b>ans = 0</b> (no profit yet).");
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (right < prices.length) {
             narrate("Loop continues: <b>right = " + right + "</b> is a valid sell day. The window spans buy day <b>" + left + "</b> to sell day <b>" + right + "</b>.");
           } else {
@@ -1174,7 +1190,7 @@
           }
           break;
         case "COMPARE":
-          highlightLines([5]);
+
           if (prices[right] < prices[left]) {
             narrate("<code>prices[" + right + "] = " + prices[right] + " &lt; prices[" + left + "] = " + prices[left] + "</code>. We found a cheaper buy day, so move <b>left</b> here.");
           } else {
@@ -1182,11 +1198,11 @@
           }
           break;
         case "MOVE_LEFT":
-          highlightLines([6]);
+
           narrate("<code>left = right = " + right + "</code>. Reset the buy day to this new low price <b>" + prices[right] + "</b>. The window collapses to a single day.");
           break;
         case "UPDATE_ANS":
-          highlightLines([8]);
+
           if (improved) {
             narrate("<code>ans = Math.max(" + (lastProfit) + ", ...)</code> improves to <b style=\"color:#6a9955\">" + ans + "</b>. A new best profit.");
           } else {
@@ -1194,15 +1210,15 @@
           }
           break;
         case "ADVANCE":
-          highlightLines([10, 4]);
+
           narrate("Advance the sell day: <b>right++</b>. The window's right edge slides forward.");
           break;
         case "RETURN":
-          highlightLines([11]);
+
           narrate("Return <b style=\"color:#6a9955\">ans = " + ans + "</b> - the maximum profit from a single buy/sell.");
           break;
         case "END":
-          highlightLines([11]);
+
           narrate("Done. The best achievable profit is <b>" + ans + "</b>.");
           break;
       }
@@ -1250,13 +1266,95 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "UPDATE_ANS":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 11,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     prices = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":121,"title":"Best Time to Buy and Sell Stock","topic":"Sliding Window","why":"The best purchase before today determines today's possible profit; the purchase must precede the sale.","meanings":{"prices":"input array where `prices[d]` is the stock price on day `d`","left":"buy day; the left edge of the window (the cheapest day seen so far)","right":"sell day; the right edge of the window that scans forward","ans":"best profit found so far, `max(ans, prices[right] - prices[left])`"},"entityClasses":["hud-item","bar","readout-chip"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({prices, left, right, ans, execState, lastBranch, lastProfit, improved, ...({})}),

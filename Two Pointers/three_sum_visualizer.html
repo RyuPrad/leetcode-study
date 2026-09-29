@@ -665,6 +665,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -939,22 +940,7 @@
       return "[" + t.join(", ") + "]";
     }
 
-    function parseNums(text) {
-      try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) throw new Error("Input must be an array.");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n))) {
-          throw new Error("Use only integers.");
-        }
-        return clean;
-      } catch (err) {
-        const fallback = text.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n));
-        if (fallback.length > 0) return fallback;
-        alert("Please enter a valid integer array like [-1,0,1,2,-1,-4]");
-        return null;
-      }
-    }
+    function parseNums(text) { try { return StudyNumericInput.list(text, {min: -Infinity, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -970,14 +956,15 @@
 
     function loadCustom() {
       const parsed = parseNums(document.getElementById("custom-input").value);
-      if (!parsed) return;
+      if (!parsed) return false;
       originalNums = parsed;
       activeExample = 0;
       init();
+      return true;
     }
 
     function init() {
-      nums = originalNums.slice().sort((a, b) => a - b);
+      nums = originalNums.slice();
       i = 0;
       left = 1;
       right = nums.length - 1;
@@ -1017,24 +1004,44 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      originalNums = prev.originalNums.slice();
-      nums = prev.nums.slice();
-      i = prev.i;
-      left = prev.left;
-      right = prev.right;
-      sum = prev.sum;
-      res = prev.res.map(t => t.slice());
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      foundIndices = new Set(prev.foundIndices);
-      skippedIndices = new Set(prev.skippedIndices);
-      lastTriplet = prev.lastTriplet ? prev.lastTriplet.slice() : null;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+originalNums = snapshot.originalNums.slice();
+nums = snapshot.nums.slice();
+i = snapshot.i;
+left = snapshot.left;
+right = snapshot.right;
+sum = snapshot.sum;
+res = snapshot.res.map(t => t.slice());
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+foundIndices = new Set(snapshot.foundIndices);
+skippedIndices = new Set(snapshot.skippedIndices);
+lastTriplet = snapshot.lastTriplet ? snapshot.lastTriplet.slice() : null;
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(action, reason) {
       trace.push({
@@ -1063,14 +1070,20 @@
 
       switch (execState) {
         case "INIT":
-          nums = originalNums.slice().sort((a, b) => a - b);
-          i = 0;
-          left = i + 1;
-          right = nums.length - 1;
-          sum = null;
-          lastAction = "Sorted nums so we can use two pointers and skip duplicates.";
-          execState = "FOR_CHECK";
-          break;
+ nums = originalNums.slice().sort((a, b) => a - b);
+ i = 0;
+left = i + 1;
+right = nums.length - 1;
+sum = null;
+ lastAction = "Initialize nums.";
+ execState = "INIT_RES";
+ break;
+case "INIT_RES":
+ res = [];
+
+ lastAction = "Initialize res.";
+ execState = "FOR_CHECK";
+ break;
 
         case "FOR_CHECK":
           if (i >= nums.length - 2) {
@@ -1090,20 +1103,21 @@
             nextI();
             execState = "FOR_CHECK";
           } else {
-            left = i + 1;
-            right = nums.length - 1;
-            sum = null;
-            lastAction = "Fixed nums[i]. Now place left after i and right at the end.";
-            execState = "SET_POINTERS";
+            execState = "SET_LEFT";
           }
           break;
 
-        case "SET_POINTERS":
+        case "SET_LEFT":
           left = i + 1;
+          lastAction = "Place left just after the fixed value at index " + i + ".";
+          execState = "SET_RIGHT";
+          break;
+
+        case "SET_RIGHT":
           right = nums.length - 1;
           sum = null;
           lastTriplet = null;
-          lastAction = "Initialized left and right for this fixed i.";
+          lastAction = "Place right at the end of the array for this fixed value.";
           execState = "WHILE_CHECK";
           break;
 
@@ -1128,6 +1142,18 @@
 
         case "COMPARE_SUM":
           if (sum === 0) {
+            lastAction = "The sum is zero, so save this triplet.";
+            execState = "SAVE_TRIPLET";
+          } else if (sum < 0) {
+            lastAction = "The sum is too small, so move left to increase it.";
+            execState = "MOVE_LEFT";
+          } else {
+            lastAction = "The sum is too large, so move right to decrease it.";
+            execState = "MOVE_RIGHT";
+          }
+          break;
+
+        case "SAVE_TRIPLET":
             res.push([nums[i], nums[left], nums[right]]);
             foundIndices.add(i);
             foundIndices.add(left);
@@ -1135,23 +1161,31 @@
             addTrace("found triplet", "sum is 0, save this triplet");
             lastAction = "Found a valid triplet. Save it, then move both pointers.";
             execState = "FOUND_MOVE";
-          } else if (sum < 0) {
+          break;
+
+        case "MOVE_LEFT":
             addTrace("sum < 0", "move left right to increase the sum");
             left++;
             lastAction = "Sum is too small, so move left right to make the sum bigger.";
             execState = "WHILE_CHECK";
-          } else {
+          break;
+
+        case "MOVE_RIGHT":
             addTrace("sum > 0", "move right left to decrease the sum");
             right--;
             lastAction = "Sum is too large, so move right left to make the sum smaller.";
             execState = "WHILE_CHECK";
-          }
           break;
 
         case "FOUND_MOVE":
           left++;
+          lastAction = "After saving the triplet, moved left to " + left + ".";
+          execState = "FOUND_MOVE_RIGHT";
+          break;
+
+        case "FOUND_MOVE_RIGHT":
           right--;
-          lastAction = "Moved left and right inward after saving the triplet.";
+          lastAction = "Moved right to " + right + " after saving the triplet.";
           execState = "SKIP_LEFT_DUP";
           break;
 
@@ -1454,61 +1488,187 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start by sorting <code>nums</code> and creating an empty <code>res</code> array.');
-          break;
+
+ narrate("Initialize nums from this line.");
+ break;
+case "INIT_RES":
+
+ narrate("Initialize res from this line.");
+ break;
         case "FOR_CHECK":
-          highlightLines([5]);
+
           narrate(i < nums.length - 2 ? 'Check if there are enough numbers left to form a triplet.' : 'There are not enough numbers left, so return res.');
           break;
         case "SKIP_I_CHECK":
-          highlightLines([6]);
+
           narrate(i > 0 && nums[i] === nums[i - 1] ? 'This fixed value is a duplicate, so skip it to avoid duplicate triplets.' : 'This fixed value is not a duplicate, so use it as the first number.');
           break;
-        case "SET_POINTERS":
-          highlightLines([8, 9]);
-          narrate('Set <code>left = i + 1</code> and <code>right = nums.length - 1</code>.');
+        case "SET_LEFT":
+
+          narrate('Place <code>left</code> just after the fixed value at index <b>' + i + '</b>.');
+          break;
+        case "SET_RIGHT":
+
+          narrate('Place <code>right</code> at the end of the array.');
           break;
         case "WHILE_CHECK":
-          highlightLines([11]);
+
           narrate(left < right ? 'Since <code>left &lt; right</code>, check the current sum.' : 'The pointers crossed, so this fixed <code>i</code> is done.');
           break;
         case "CALC_SUM":
-          highlightLines([12]);
+
           narrate('Calculate <code>sum = nums[i] + nums[left] + nums[right]</code>.');
           break;
         case "COMPARE_SUM":
-          highlightLines(sum === 0 ? [14, 15] : sum < 0 ? [21, 22] : [23, 24]);
+
           narrate(sum === 0
-            ? 'The sum is exactly 0, so save the triplet.'
+            ? 'The sum is exactly 0, so the triplet qualifies.'
             : sum < 0
-              ? 'The sum is too small. Move <code>left</code> right to increase the sum.'
-              : 'The sum is too large. Move <code>right</code> left to decrease the sum.');
+              ? 'The sum is too small, so the next step moves <code>left</code> right.'
+              : 'The sum is too large, so the next step moves <code>right</code> left.');
+          break;
+        case "SAVE_TRIPLET":
+
+          narrate('Save this zero-sum triplet in the result.');
+          break;
+        case "MOVE_LEFT":
+
+          narrate('Increase the sum by moving <code>left</code> one position right.');
+          break;
+        case "MOVE_RIGHT":
+
+          narrate('Decrease the sum by moving <code>right</code> one position left.');
           break;
         case "FOUND_MOVE":
-          highlightLines([16, 17]);
-          narrate('After saving a valid triplet, move both pointers inward.');
+
+          narrate('After saving a valid triplet, move <code>left</code> inward to ' + left + '.');
+          break;
+        case "FOUND_MOVE_RIGHT":
+
+          narrate('Now move <code>right</code> inward to ' + right + ' before checking duplicates.');
           break;
         case "SKIP_LEFT_DUP":
-          highlightLines([19]);
+
           narrate('Skip duplicate left values so the same triplet is not added again.');
           break;
         case "SKIP_RIGHT_DUP":
-          highlightLines([20]);
+
           narrate('Skip duplicate right values so the same triplet is not added again.');
           break;
         case "RETURN_RESULT":
-          highlightLines([29]);
+
           narrate('The scan is complete. Return all unique triplets.');
           break;
         case "END":
-          highlightLines([29]);
+
           narrate('✓ Done. res contains every unique triplet that sums to 0.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RES":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "FOR_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "SKIP_I_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "SET_LEFT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SET_RIGHT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "CALC_SUM":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "COMPARE_SUM":
+    return {
+      line: (sum === 0 ? [14] : sum < 0 ? [21] : [23])[0],
+      phase: execState
+    };
+  case "SAVE_TRIPLET":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 22,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 24,
+      phase: execState
+    };
+  case "FOUND_MOVE":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "FOUND_MOVE_RIGHT":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "SKIP_LEFT_DUP":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "SKIP_RIGHT_DUP":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "RETURN_RESULT":
+    return {
+      line: 29,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 29,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1537,8 +1697,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":15,"title":"3Sum","topic":"Two Pointers","why":"Fix one sorted value, then move the remaining two pointers according to whether their sum is too small or too large.","meanings":{"nums":"sorted input array","res":"unique triplets that sum to 0","i":"fixed outer index","left":"left pointer","right":"right pointer","sum":"nums[i] + nums[left] + nums[right]"},"entityClasses":["hud-item","num-box","triplet-pill","empty-pill","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({originalNums, nums, i, left, right, sum, res, execState, foundIndices, skippedIndices, lastTriplet, lastAction, ...({})}),

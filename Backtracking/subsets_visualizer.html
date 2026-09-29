@@ -924,29 +924,33 @@
       const branch = [];
 
       function snapshot(props) {
-        out.push(Object.assign({
-          lines: [],
-          narr: "",
-          i: props.i === undefined ? null : props.i,
-          path: [...path],
-          res: res.map(r => [...r]),
-          frames: frames.map(f => ({ i: f.i })),
-          branch: branch.map(b => Object.assign({}, b)),
-          justPushed: null,
-          justPopped: null,
-          justAddedRes: false,
-          phase: ""
-        }, props));
+        out.push((frame=>({...frame,executedLine:frame.lines.length===1?frame.lines[0]:null}))(Object.assign({
+  lines: [],
+  narr: "",
+  i: props.i === undefined ? null : props.i,
+  path: [...path],
+  res: res.map(r => [...r]),
+  frames: frames.map(f => ({
+    i: f.i
+  })),
+  branch: branch.map(b => Object.assign({}, b)),
+  justPushed: null,
+  justPopped: null,
+  justAddedRes: false,
+  phase: ""
+}, props)));
       }
 
+      snapshot({lines:[],phase:'READY',narr:'Ready to initialize the result and current path.'});
+      snapshot({lines:[2],phase:'init-result',narr:'Create the empty result array.'});
       snapshot({
-        lines: [2, 3],
+        lines: [3],
         narr: "Initialize <b>res = []</b> (the answer set) and <b>path = []</b> (the current partial subset). We will explore an include / exclude choice for every element.",
         i: null,
         phase: "init"
       });
 
-      function dfs(i) {
+      function dfs(i, callerLine = 14) {
         frames.push({ i });
         // enter call
         snapshot({
@@ -975,13 +979,13 @@
             justAddedRes: true,
             phase: "leaf"
           });
+          frames.pop();
           snapshot({
             lines: [7],
             narr: "<b>return</b> from dfs(" + i + ") - this branch is finished, climb back up.",
             i: i,
             phase: "return"
           });
-          frames.pop();
           return;
         }
 
@@ -1001,17 +1005,17 @@
           i: i,
           phase: "recurse-include"
         });
-        dfs(i + 1);
+        dfs(i + 1, 10);
         // returning to this frame after include subtree
+        path.pop();
+        branch.pop();
         snapshot({
           lines: [11],
-          narr: "Back in <b>dfs(" + i + ")</b>. <b>UNDO</b> the choice: <b>path.pop()</b> removes <b>" + nums[i] + "</b> -> [" + path.slice(0, -1).join(", ") + "]. This is the backtrack step.",
+          narr: "Back in <b>dfs(" + i + ")</b>. <b>UNDO</b> the choice: <b>path.pop()</b> removes <b>" + nums[i] + "</b> -> [" + path.join(", ") + "]. This is the backtrack step.",
           i: i,
           justPopped: nums[i],
           phase: "pop"
         });
-        path.pop();
-        branch.pop();
         // EXCLUDE branch
         branch.push({ i: i, val: nums[i], kind: "skip" });
         snapshot({
@@ -1020,17 +1024,17 @@
           i: i,
           phase: "recurse-exclude"
         });
-        dfs(i + 1);
+        dfs(i + 1, 12);
         branch.pop();
 
-        // both branches done -> return
+        // Return to the source callsite after both branches finish.
+        frames.pop();
         snapshot({
-          lines: [13],
+          lines: [callerLine],
           narr: "Both branches (take and skip) for index <b>" + i + "</b> are done. Return from <b>dfs(" + i + ")</b>.",
           i: i,
           phase: "return"
         });
-        frames.pop();
       }
 
       // call dfs(0)
@@ -1406,7 +1410,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({nums, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nums, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

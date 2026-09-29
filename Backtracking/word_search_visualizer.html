@@ -820,171 +820,11 @@
     // recording a snapshot at each meaningful beat. This makes Step Back
     // exactly reversible (it is just stepIndex - 1).
     function buildSteps() {
-      steps = [];
-      rows = board.length;
-      cols = rows > 0 ? board[0].length : 0;
-
-      // working copy that the recorded algorithm mutates
-      const work = board.map(row => row.slice());
-      const trace = [];
-      let finalAns = false;
-
-      function snap(extra) {
-        const s = {
-          gridChars: work.map(row => row.slice()),
-          path: extra.path ? extra.path.slice() : [],
-          stack: extra.stack ? extra.stack.slice() : [],
-          r: extra.r,
-          c: extra.c,
-          i: extra.i,
-          lines: extra.lines.slice(),
-          phase: extra.phase,
-          narration: extra.narration,
-          trace: trace.map(t => ({ ...t })),
-          ans: extra.ans,
-          startR: extra.startR,
-          startC: extra.startC
-        };
-        steps.push(s);
-      }
-
-      // path = array of {r,c}; stack = array of "dfs(r,c,i)" frame labels
-      const path = [];
-      const stack = [];
-
-      // recorded DFS returns boolean (mirrors the real solution)
-      function dfs(r, c, i, startR, startC) {
-        stack.push("dfs(" + r + "," + c + "," + i + ")");
-
-        // line 5 - base case check
-        snap({
-          path, stack, r, c, i, lines: [5], phase: "ENTER",
-          ans: "pending", startR, startC,
-          narration: "Enter <code>dfs(r=" + r + ", c=" + c + ", i=" + i + ")</code>. Check if <b>i === word.length</b> (" + i + " === " + word.length + ")."
-        });
-        if (i === word.length) {
-          snap({
-            path, stack, r, c, i, lines: [5], phase: "MATCH_ALL",
-            ans: "pending", startR, startC,
-            narration: "<b>i reached word.length</b> - every letter matched. Return <b style=\"color:#6a9955\">true</b> up the call stack."
-          });
-          stack.pop();
-          return true;
-        }
-
-        // line 6 - bounds + char check
-        const outOfBounds = (r < 0 || c < 0 || r >= rows || c >= cols);
-        const mismatch = outOfBounds ? true : (work[r][c] !== word[i]);
-        let reason = "";
-        if (outOfBounds) reason = "out of bounds";
-        else if (work[r][c] === '#') reason = "cell already on the path (marked '#')";
-        else if (mismatch) reason = "board['" + work[r][c] + "'] !== word['" + word[i] + "']";
-
-        if (mismatch) {
-          trace.push({
-            frame: "dfs(" + r + "," + c + "," + i + ")",
-            need: i < word.length ? word[i] : "-",
-            cell: outOfBounds ? "OOB" : work[r][c],
-            result: "fail",
-            note: reason
-          });
-          snap({
-            path, stack, r, c, i, lines: [6], phase: "FAIL",
-            ans: "pending", startR, startC,
-            narration: "Guard fails: <b style=\"color:#e24b4a\">" + reason + "</b>. Return <b>false</b> from this branch."
-          });
-          stack.pop();
-          return false;
-        }
-
-        // line 7-8 mark visited
-        const temp = work[r][c];
-        path.push({ r, c });
-        work[r][c] = '#';
-        trace.push({
-          frame: "dfs(" + r + "," + c + "," + i + ")",
-          need: word[i],
-          cell: temp,
-          result: "match",
-          note: "match - mark '#', recurse on neighbours"
-        });
-        snap({
-          path, stack, r, c, i, lines: [7, 8], phase: "MARK",
-          ans: "pending", startR, startC,
-          narration: "<b>board['" + temp + "'] === word['" + word[i] + "']</b>. Push (" + r + "," + c + ") onto the path and mark it <b>'#'</b> so we do not reuse it."
-        });
-
-        // line 9 - try the four neighbours in order
-        snap({
-          path, stack, r, c, i, lines: [9], phase: "RECURSE",
-          ans: "pending", startR, startC,
-          narration: "Try the four neighbours of (" + r + "," + c + ") for letter <b>word[" + (i + 1) + "]</b>: down, up, right, left."
-        });
-        const found =
-          dfs(r + 1, c, i + 1, startR, startC) ||
-          dfs(r - 1, c, i + 1, startR, startC) ||
-          dfs(r, c + 1, i + 1, startR, startC) ||
-          dfs(r, c - 1, i + 1, startR, startC);
-
-        // line 10 - undo
-        work[r][c] = temp;
-        path.pop();
-        snap({
-          path, stack, r, c, i, lines: [10, 11], phase: found ? "UNWIND_OK" : "UNDO",
-          ans: "pending", startR, startC,
-          narration: found
-            ? "A neighbour found the rest of the word. Restore <b>board[" + r + "][" + c + "] = '" + temp + "'</b> and return <b style=\"color:#6a9955\">true</b>."
-            : "All four neighbours failed. <b>Backtrack:</b> restore <b>board[" + r + "][" + c + "] = '" + temp + "'</b>, pop (" + r + "," + c + ") off the path, return <b>false</b>."
-        });
-
-        stack.pop();
-        return found;
-      }
-
-      // outer scan
-      let answered = false;
-      outer:
-      for (let r = 0; r < rows && !answered; r++) {
-        for (let c = 0; c < cols && !answered; c++) {
-          snap({
-            path, stack, r, c, i: 0, lines: [13, 14, 15], phase: "SCAN",
-            ans: "pending", startR: r, startC: c,
-            narration: "Outer scan: start a fresh DFS from cell (" + r + "," + c + ") = '" + work[r][c] + "' trying to match word[0] = '" + (word[0] || "") + "'."
-          });
-          const got = dfs(r, c, 0, r, c);
-          if (got) {
-            finalAns = true;
-            answered = true;
-            snap({
-              path, stack, r: -1, c: -1, i: 0, lines: [15], phase: "RETURN_TRUE",
-              ans: true, startR: r, startC: c,
-              narration: "<code>dfs(" + r + "," + c + ",0)</code> returned <b>true</b>, so <code>exist</code> returns <b style=\"color:#6a9955\">true</b>."
-            });
-          }
-        }
-      }
-
-      if (!finalAns) {
-        snap({
-          path, stack, r: -1, c: -1, i: 0, lines: [18], phase: "RETURN_FALSE",
-          ans: false, startR: -1, startC: -1,
-          narration: "Every starting cell was exhausted without spelling the word. Return <b style=\"color:#e24b4a\">false</b>."
-        });
-      }
-
-      // initial INIT step at the front
-      steps.unshift({
-        gridChars: board.map(row => row.slice()),
-        path: [],
-        stack: [],
-        r: -1, c: -1, i: 0,
-        lines: [2, 3],
-        phase: "INIT",
-        narration: "Read <b>rows = " + rows + "</b>, <b>cols = " + cols + "</b>. We will DFS from every cell until the word is spelled.",
-        trace: [],
-        ans: "pending",
-        startR: -1, startC: -1
-      });
+      steps=[];rows=board.length;cols=rows?board[0].length:0;const work=board.map(r=>[...r]),trace=[],path=[],stack=[];
+      const snap=(line,phase,narration,extra={})=>steps.push({gridChars:work.map(row=>[...row]),path:path.map(p=>({...p})),stack:[...stack],r:-1,c:-1,i:0,executedLine:line,lines:line?[line]:[1],phase,narration,trace:trace.map(t=>({...t})),ans:'pending',startR:-1,startC:-1,...extra});
+      snap(null,"INIT","Ready to search for the word.");snap(2,"INIT","Read the number of rows.");snap(3,"INIT","Read the number of columns.");snap(4,"INIT","Define dfs.");
+      const dfs=(r,c,i,startR,startC,callLine)=>{const meta={r,c,i,startR,startC};stack.push('dfs('+r+','+c+','+i+')');snap(callLine,"ENTER","Call dfs for the next letter.",meta);if(i===word.length){snap(5,"MATCH_ALL","All letters have matched. Return true.",meta);stack.pop();return true;}snap(5,"ENTER","Check whether all letters have matched.",meta);const out=r<0||c<0||r>=rows||c>=cols,mismatch=out||work[r][c]!==word[i];snap(6,mismatch?'FAIL':'ENTER',"Check the bounds and required character.",meta);if(mismatch){trace.push({frame:stack.at(-1),need:word[i],cell:out?'OOB':work[r][c],result:'fail',note:'guard failed'});stack.pop();return false;}const temp=work[r][c];snap(7,"MARK","Save the cell's original character.",{...meta,temp});work[r][c]='#';path.push({r,c});trace.push({frame:stack.at(-1),need:word[i],cell:temp,result:'match',note:"mark '#'"});snap(8,"MARK","Mark this cell visited.",{...meta,temp});const found=dfs(r+1,c,i+1,startR,startC,9)||dfs(r-1,c,i+1,startR,startC,9)||dfs(r,c+1,i+1,startR,startC,9)||dfs(r,c-1,i+1,startR,startC,9);snap(9,"RECURSE","Record whether a neighbor completed the word.",{...meta,temp,found});work[r][c]=temp;path.pop();snap(10,found?'UNWIND_OK':'UNDO',"Restore the original cell character.",{...meta,temp,found});snap(11,found?'UNWIND_OK':'UNDO',"Return this branch's result.",{...meta,found});stack.pop();return found;};
+      for(let r=0;r<rows;r++){snap(13,"SCAN","Visit the next starting row.",{r});for(let c=0;c<cols;c++){const meta={r,c,startR:r,startC:c};snap(14,"SCAN","Visit the next starting cell.",meta);const got=dfs(r,c,0,r,c,15);if(got){snap(15,"RETURN_TRUE","A starting cell completed the word. Return true.",{...meta,ans:true});return;}snap(15,"SCAN","This starting cell did not complete the word.",meta);}snap(14,"SCAN","The row has no more starting cells.",{r,c:cols});}snap(13,"SCAN","There are no more starting rows.",{r:rows});snap(18,"RETURN_FALSE","Return false.",{ans:false});
     }
 
     function loadExample(exNum) {
@@ -1303,7 +1143,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({board, word, rows, cols, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({board, word, rows, cols, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({board, word, rows, cols, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

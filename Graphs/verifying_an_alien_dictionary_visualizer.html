@@ -555,7 +555,7 @@
 <div id="line-9" class="code-line">      <span class="kw">if</span> (j === w1.length) <span class="kw">break</span>;</div>
 <div id="line-10" class="code-line">      <span class="kw">if</span> (j === w2.length) <span class="kw">return</span> <span class="kw">false</span>;</div>
 <div id="line-11" class="code-line">      <span class="kw">if</span> (w1[j] !== w2[j]) {</div>
-<div id="line-12" class="code-line">        <span class="kw">if</span> (rank[w1[j]] > rank[w2[j]]) <span class="kw">return</span> <span class="kw">false</span>;</div>
+<div id="line-12" class="code-line">        <span class="kw">if</span> (rank[w1[j]] &gt; rank[w2[j]]) <span class="kw">return</span> <span class="kw">false</span>;</div>
 <div id="line-13" class="code-line">        <span class="kw">break</span>;</div>
 <div id="line-14" class="code-line">      }</div>
 <div id="line-15" class="code-line">      j<span class="op">++</span>;</div>
@@ -746,132 +746,36 @@
     let activeExample = 1;
 
     // ----- Canonical solution instrumented to push snapshots -----
-    function buildSteps(wordsIn, orderIn) {
-      const built = [];
-      const traceRows = [];
-      const rank = {};
-      // line 3 of the canonical solution: map each letter to its order index.
-      for (let i = 0; i < orderIn.length; i++) rank[orderIn[i]] = i;
-
-      function snapshot(extra) {
-        built.push({
-          pairIdx: (extra.pairIdx === undefined) ? null : extra.pairIdx,
-          j: (extra.j === undefined) ? null : extra.j,
-          phase: extra.phase,
-          cmp: (extra.cmp === undefined) ? null : extra.cmp,
-          firstDiff: (extra.firstDiff === undefined) ? null : extra.firstDiff,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          pairVerdict: (extra.pairVerdict === undefined) ? null : extra.pairVerdict,
-          decision: (extra.decision === undefined) ? "" : extra.decision,
-          rankReady: (extra.rankReady === undefined) ? false : extra.rankReady,
-          lines: extra.lines,
-          narration: extra.narration,
-          trace: traceRows.map(r => ({ ...r }))
-        });
+    function buildSteps(wordsIn,orderIn){
+  const built=[],traceRows=[],rank={};let pairIdx=null,w1=null,w2=null,j=null,rankReady=false;
+  function snapshot(extra){built.push({pairIdx,w1,w2,j,phase:'compare',cmp:null,firstDiff:null,ans:'pending',pairVerdict:null,decision:'',rankReady,rank:{...rank},...extra,executedLine:extra.lines?.[0]??null,trace:traceRows.map(r=>({...r}))});}
+  snapshot({phase:'ready',lines:[],narration:'Ready to create the alien letter ranks.'});
+  rankReady=true;snapshot({phase:'rank-init',lines:[2],narration:'Create an empty rank object.'});
+  for(let i=0;i<orderIn.length;i++){rank[orderIn[i]]=i;snapshot({phase:'rank-write',lines:[3],narration:'Store rank['+orderIn[i]+'] = '+i+'.'});}
+  for(let i=0;i<wordsIn.length-1;i++){
+    pairIdx=i;w1=null;w2=null;j=null;snapshot({phase:'pair-header',lines:[4],narration:'Visit adjacent pair '+i+'.'});
+    w1=wordsIn[i];snapshot({phase:'read-first',lines:[5],narration:'Read w1 = '+w1+'.'});
+    w2=wordsIn[i+1];snapshot({phase:'read-second',lines:[6],narration:'Read w2 = '+w2+'.'});
+    j=0;snapshot({phase:'pair',lines:[7],narration:'Initialize j = 0.'});
+    while(true){
+      snapshot({phase:'loop',lines:[8],narration:'Continue comparing this pair.'});
+      snapshot({phase:'check-first-end',lines:[9],narration:'Check whether j === w1.length: '+(j===w1.length)+'.'});
+      if(j===w1.length){snapshot({phase:'w1-end',lines:[9],pairVerdict:'ok',narration:'The first word ended. Break; this prefix is in order.'});break;}
+      snapshot({phase:'check-second-end',lines:[10],narration:'Check whether j === w2.length: '+(j===w2.length)+'.'});
+      if(j===w2.length){snapshot({phase:'return-false',lines:[10],pairVerdict:'bad',ans:false,narration:'The second word ended first. Return false.'});built._rank={...rank};return built;}
+      const c1=w1[j],c2=w2[j],equal=c1===c2,cmp={c1,c2,equal,r1:rank[c1],r2:rank[c2]};
+      snapshot({phase:'compare',lines:[11],cmp,narration:'Check whether '+c1+' differs from '+c2+': '+!equal+'.'});
+      if(!equal){
+        const bad=rank[c1]>rank[c2];snapshot({phase:'decide',lines:[12],cmp,firstDiff:j,pairVerdict:bad?'bad':'ok',narration:'Check the ranks: '+rank[c1]+' > '+rank[c2]+' is '+bad+'.'});
+        traceRows.push({pair:w1+' | '+w2,j,c1,c2,verdict:bad?'FAIL':'ok'});
+        if(bad){snapshot({phase:'return-false',lines:[12],cmp,firstDiff:j,ans:false,pairVerdict:'bad',narration:'Return false for this reversed pair.'});built._rank={...rank};return built;}
+        snapshot({phase:'pair-break',lines:[13],cmp,firstDiff:j,pairVerdict:'ok',narration:'Break; this first difference puts the pair in order.'});break;
       }
-
-      // line 2-3: build rank
-      snapshot({
-        phase: "rank-init", lines: [2, 3], rankReady: true,
-        narration: "Build <code>rank</code>: map each letter of the alien <code>order</code> to its index. Smaller rank = comes first. Then compare each adjacent pair of words."
-      });
-
-      let ans = true;
-      let returned = false;
-
-      for (let i = 0; i < wordsIn.length - 1 && !returned; i++) {
-        const w1 = wordsIn[i];
-        const w2 = wordsIn[i + 1];
-        snapshot({
-          phase: "pair", pairIdx: i, j: 0, rankReady: true, lines: [4, 5, 6, 7],
-          narration: "Pair <b>" + (i + 1) + "</b>: compare <code>w1 = \"" + w1 + "\"</code> and <code>w2 = \"" + w2 + "\"</code>. Walk both with index <b>j</b> until they differ or one ends."
-        });
-
-        let j = 0;
-        let pairDone = false;
-        while (!pairDone) {
-          // if (j === w1.length) break  -> pair OK (w1 is a prefix of w2 or equal)
-          if (j === w1.length) {
-            snapshot({
-              phase: "w1-end", pairIdx: i, j, rankReady: true, lines: [9],
-              pairVerdict: "ok",
-              decision: "j (" + j + ") === w1.length (" + w1.length + ") → w1 is a prefix of (or equals) w2. This pair is correctly ordered.",
-              narration: "<code>j === w1.length</code> — <code>break</code>. \"" + w1 + "\" ran out first, so it is a prefix of \"" + w2 + "\". Order is fine for this pair."
-            });
-            traceRows.push({ pair: w1 + " | " + w2, j, c1: "∅", c2: w2[j] || "∅", verdict: "ok (w1 ended)" });
-            pairDone = true;
-            break;
-          }
-          // if (j === w2.length) return false (w2 shorter & is a prefix of w1)
-          if (j === w2.length) {
-            snapshot({
-              phase: "w2-end", pairIdx: i, j, rankReady: true, lines: [10],
-              pairVerdict: "bad", ans: false,
-              decision: "j (" + j + ") === w2.length (" + w2.length + ") but w1 still has letters → \"" + w2 + "\" is a prefix of \"" + w1 + "\" yet comes after it. NOT sorted.",
-              narration: "<code>j === w2.length</code> while w1 still has characters: \"" + w2 + "\" is a prefix of \"" + w1 + "\" but appears later. <code>return false</code>."
-            });
-            traceRows.push({ pair: w1 + " | " + w2, j, c1: w1[j], c2: "∅", verdict: "FAIL (w2 ended)" });
-            ans = false;
-            returned = true;
-            pairDone = true;
-            break;
-          }
-          const c1 = w1[j];
-          const c2 = w2[j];
-          const equal = c1 === c2;
-          snapshot({
-            phase: "compare", pairIdx: i, j, rankReady: true, lines: [11],
-            cmp: { c1, c2, equal, r1: rank[c1], r2: rank[c2] },
-            narration: "Compare <code>w1[" + j + "] = '" + c1 + "'</code> (rank " + rank[c1] + ") vs <code>w2[" + j + "] = '" + c2 + "'</code> (rank " + rank[c2] + "): " +
-              (equal ? "equal — move to the next character." : "different — the first difference decides this pair.")
-          });
-          if (!equal) {
-            const bad = rank[c1] > rank[c2];
-            snapshot({
-              phase: "decide", pairIdx: i, j, rankReady: true, lines: [12, 13],
-              cmp: { c1, c2, equal: false, r1: rank[c1], r2: rank[c2] },
-              firstDiff: j,
-              pairVerdict: bad ? "bad" : "ok",
-              ans: bad ? false : "pending",
-              decision: "rank['" + c1 + "'] (" + rank[c1] + ") " + (bad ? ">" : "≤") + " rank['" + c2 + "'] (" + rank[c2] + ") → " +
-                (bad ? "w1 should come AFTER w2. NOT sorted." : "w1 correctly comes before w2 at this position. Pair OK."),
-              narration: bad
-                ? "<code>rank['" + c1 + "'] (" + rank[c1] + ") > rank['" + c2 + "'] (" + rank[c2] + ")</code> — \"" + w1 + "\" should follow \"" + w2 + "\". <code>return false</code>."
-                : "<code>rank['" + c1 + "'] (" + rank[c1] + ") ≤ rank['" + c2 + "'] (" + rank[c2] + ")</code> — \"" + w1 + "\" correctly precedes \"" + w2 + "\". <code>break</code> and move on."
-            });
-            traceRows.push({ pair: w1 + " | " + w2, j, c1, c2, verdict: bad ? "FAIL ('" + c1 + "'>'" + c2 + "')" : "ok ('" + c1 + "'<'" + c2 + "')" });
-            if (bad) { ans = false; returned = true; }
-            pairDone = true;
-            break;
-          }
-          // j++
-          snapshot({
-            phase: "advance", pairIdx: i, j, rankReady: true, lines: [15],
-            cmp: { c1, c2, equal: true, r1: rank[c1], r2: rank[c2] },
-            narration: "'" + c1 + "' === '" + c2 + "' — <code>j++</code> to compare the next character."
-          });
-          j++;
-        }
-      }
-
-      if (!returned) {
-        snapshot({
-          phase: "return-true", ans: true, rankReady: true, lines: [18],
-          narration: "Every adjacent pair is correctly ordered. <code>return true</code> — the words are sorted in the alien dictionary."
-        });
-      } else {
-        snapshot({
-          phase: "return-false", ans: false, rankReady: true, lines: [10],
-          pairVerdict: "bad",
-          narration: "A pair was out of order, so the function already returned <b style=\"color:#e24b4a\">false</b>."
-        });
-      }
-
-      // also expose rank for rendering
-      built.forEach(s => { s.rank = rank; });
-      built._rank = rank;
-      return built;
+      j++;snapshot({phase:'advance',lines:[15],narration:'Increment j to '+j+'.'});
     }
+  }
+  snapshot({phase:'return-true',ans:true,lines:[18],narration:'All adjacent pairs are ordered. Return true.'});built._rank={...rank};return built;
+}
 
     function buildRank(orderIn) {
       const rank = {};
@@ -1186,7 +1090,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({words, order, RANK, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({words, order, RANK, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({words, order, RANK, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

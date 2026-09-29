@@ -617,11 +617,11 @@
       <h2>Live Debugger</h2>
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">var</span> isValidSudoku = <span class="kw">function</span>(board) {</div>
-<div id="line-2" class="code-line">  <span class="kw">const</span> rows = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () => <span class="kw">new</span> <span class="fn">Set</span>());</div>
-<div id="line-3" class="code-line">  <span class="kw">const</span> cols = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () => <span class="kw">new</span> <span class="fn">Set</span>());</div>
-<div id="line-4" class="code-line">  <span class="kw">const</span> boxes = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () => <span class="kw">new</span> <span class="fn">Set</span>());</div>
-<div id="line-5" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="nm">0</span>; r < <span class="nm">9</span>; r++) {</div>
-<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c < <span class="nm">9</span>; c++) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> rows = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () =&gt; <span class="kw">new</span> <span class="fn">Set</span>());</div>
+<div id="line-3" class="code-line">  <span class="kw">const</span> cols = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () =&gt; <span class="kw">new</span> <span class="fn">Set</span>());</div>
+<div id="line-4" class="code-line">  <span class="kw">const</span> boxes = <span class="fn">Array</span>.from({ length: <span class="nm">9</span> }, () =&gt; <span class="kw">new</span> <span class="fn">Set</span>());</div>
+<div id="line-5" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="nm">0</span>; r &lt; <span class="nm">9</span>; r++) {</div>
+<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c &lt; <span class="nm">9</span>; c++) {</div>
 <div id="line-7" class="code-line">      <span class="kw">const</span> val = board[r][c];</div>
 <div id="line-8" class="code-line">      <span class="kw">if</span> (val === <span class="str">'.'</span>) <span class="kw">continue</span>;</div>
 <div id="line-9" class="code-line">      <span class="kw">const</span> b = <span class="fn">Math</span>.floor(r / <span class="nm">3</span>) * <span class="nm">3</span> + <span class="fn">Math</span>.floor(c / <span class="nm">3</span>);</div>
@@ -886,164 +886,11 @@
 
     // Precompute the full list of reversible steps by instrumenting the real algorithm.
     function buildSteps() {
-      steps = [];
-      const rows = Array.from({ length: 9 }, () => new Set());
-      const cols = Array.from({ length: 9 }, () => new Set());
-      const boxes = Array.from({ length: 9 }, () => new Set());
-
-      const snapSets = () => ({
-        rows: rows.map(s => [...s]),
-        cols: cols.map(s => [...s]),
-        boxes: boxes.map(s => [...s])
-      });
-
-      // Step 0: INIT
-      steps.push({
-        phase: "INIT",
-        r: -1, c: -1, val: null, b: -1,
-        lines: [2, 3, 4],
-        sets: snapSets(),
-        ans: "pending",
-        conflictType: null,
-        conflictCells: [],
-        narration: "Create three arrays of nine empty <b>Set</b>s: one per <b>row</b>, one per <b>column</b>, and one per 3×3 <b>box</b>. A valid board never repeats a digit within any single row, column, or box."
-      });
-
-      let finished = false;
-      for (let r = 0; r < 9 && !finished; r++) {
-        for (let c = 0; c < 9 && !finished; c++) {
-          const val = board[r][c];
-
-          // READ cell
-          steps.push({
-            phase: "READ",
-            r, c, val, b: -1,
-            lines: [7],
-            sets: snapSets(),
-            ans: "pending",
-            conflictType: null,
-            conflictCells: [],
-            narration: "Read <code>val = board[" + r + "][" + c + "] = " + (val === "." ? "'.'" : "'" + val + "'") + "</code>."
-          });
-
-          if (val === ".") {
-            steps.push({
-              phase: "SKIP",
-              r, c, val, b: -1,
-              lines: [8],
-              sets: snapSets(),
-              ans: "pending",
-              conflictType: null,
-              conflictCells: [],
-              narration: "<code>val === '.'</code> so this cell is empty — <b>continue</b> to the next cell without touching any Set."
-            });
-            continue;
-          }
-
-          const b = Math.floor(r / 3) * 3 + Math.floor(c / 3);
-
-          // COMPUTE box index
-          steps.push({
-            phase: "BOX",
-            r, c, val, b,
-            lines: [9],
-            sets: snapSets(),
-            ans: "pending",
-            conflictType: null,
-            conflictCells: [],
-            narration: "Box index <code>b = Math.floor(" + r + "/3)*3 + Math.floor(" + c + "/3) = " + Math.floor(r/3) + "*3 + " + Math.floor(c/3) + " = " + b + "</code>. This maps each cell to one of the nine 3×3 boxes."
-          });
-
-          // CHECK constraints
-          const inRow = rows[r].has(val);
-          const inCol = cols[c].has(val);
-          const inBox = boxes[b].has(val);
-          const conflict = inRow || inCol || inBox;
-          let conflictType = null;
-          let conflictCells = [];
-
-          if (conflict) {
-            // Determine which constraint fired (prefer row, then col, then box for narration)
-            if (inRow) {
-              conflictType = "row";
-              for (let cc = 0; cc < c; cc++) if (board[r][cc] === val) conflictCells.push([r, cc]);
-            } else if (inCol) {
-              conflictType = "col";
-              for (let rr = 0; rr < r; rr++) if (board[rr][c] === val) conflictCells.push([rr, c]);
-            } else {
-              conflictType = "box";
-              const br = Math.floor(r / 3) * 3;
-              const bc = Math.floor(c / 3) * 3;
-              for (let rr = br; rr < br + 3; rr++) {
-                for (let cc = bc; cc < bc + 3; cc++) {
-                  if (rr === r && cc === c) continue;
-                  if ((rr < r || (rr === r && cc < c)) && board[rr][cc] === val) conflictCells.push([rr, cc]);
-                }
-              }
-            }
-            conflictCells.push([r, c]);
-          }
-
-          steps.push({
-            phase: "CHECK",
-            r, c, val, b,
-            lines: [10],
-            sets: snapSets(),
-            ans: "pending",
-            conflictType,
-            conflictCells: conflict ? conflictCells.slice() : [],
-            checkResult: { inRow, inCol, inBox },
-            narration: conflict
-              ? "Conflict! <code>val '" + val + "'</code> already exists in this " + conflictType + ". <code>rows[" + r + "].has || cols[" + c + "].has || boxes[" + b + "].has</code> is <b style=\"color:#e24b4a\">true</b>."
-              : "Check <code>rows[" + r + "].has('" + val + "') || cols[" + c + "].has('" + val + "') || boxes[" + b + "].has('" + val + "')</code> → all <b style=\"color:#6a9955\">false</b>. No conflict."
-          });
-
-          if (conflict) {
-            steps.push({
-              phase: "RETURN_FALSE",
-              r, c, val, b,
-              lines: [11],
-              sets: snapSets(),
-              ans: false,
-              conflictType,
-              conflictCells: conflictCells.slice(),
-              checkResult: { inRow, inCol, inBox },
-              narration: "Short-circuit: <code>return false</code>. As soon as any one of the three Sets already contains <b>" + val + "</b>, the board cannot be valid, so we stop scanning."
-            });
-            finished = true;
-            break;
-          }
-
-          // ADD to all three sets
-          rows[r].add(val);
-          cols[c].add(val);
-          boxes[b].add(val);
-
-          steps.push({
-            phase: "ADD",
-            r, c, val, b,
-            lines: [13, 14, 15],
-            sets: snapSets(),
-            ans: "pending",
-            conflictType: null,
-            conflictCells: [],
-            narration: "No conflict — record <b>" + val + "</b> in <code>rows[" + r + "]</code>, <code>cols[" + c + "]</code>, and <code>boxes[" + b + "]</code>, then move on."
-          });
-        }
-      }
-
-      if (!finished) {
-        steps.push({
-          phase: "RETURN_TRUE",
-          r: -1, c: -1, val: null, b: -1,
-          lines: [18],
-          sets: snapSets(),
-          ans: true,
-          conflictType: null,
-          conflictCells: [],
-          narration: "Every filled cell passed all three checks with no repeats. <code>return true</code> — the board is valid."
-        });
-      }
+      steps=[];const rows=Array.from({length:9},()=>new Set()),cols=Array.from({length:9},()=>new Set()),boxes=Array.from({length:9},()=>new Set());let r=-1,c=-1,val=null,b=-1;
+      const snap=(line,phase,narration,extra={})=>steps.push({phase,r,c,val,b,executedLine:line,lines:line?[line]:[1],sets:{rows:rows.map(s=>[...s]),cols:cols.map(s=>[...s]),boxes:boxes.map(s=>[...s])},ans:"pending",conflictType:null,conflictCells:[],narration,...extra});
+      snap(null,"INIT","Ready to validate the board.");snap(2,"INIT","Create the row sets.");snap(3,"INIT","Create the column sets.");snap(4,"INIT","Create the box sets.");
+      for(r=0;r<9;r++){c=-1;val=null;b=-1;snap(5,"READ","Visit the next row.");for(c=0;c<9;c++){val=null;b=-1;snap(6,"READ","Visit the next column.");val=board[r][c];snap(7,"READ","Read this cell's value.");snap(8,"SKIP","Check whether the cell is empty.");if(val==='.')continue;b=Math.floor(r/3)*3+Math.floor(c/3);snap(9,"BOX","Compute the box index.");const inRow=rows[r].has(val),inCol=cols[c].has(val),inBox=boxes[b].has(val),conflict=inRow||inCol||inBox;const conflictType=inRow?'row':inCol?'col':inBox?'box':null,conflictCells=[];if(conflict){for(let rr=0;rr<9;rr++)for(let cc=0;cc<9;cc++)if(board[rr][cc]===val&&(rr<r||rr===r&&cc<c)&&(conflictType==='row'?rr===r:conflictType==='col'?cc===c:Math.floor(rr/3)*3+Math.floor(cc/3)===b))conflictCells.push([rr,cc]);conflictCells.push([r,c]);}const meta={conflictType,conflictCells,checkResult:{inRow,inCol,inBox}};snap(10,"CHECK","Check the row, column and box for a duplicate.",meta);if(conflict){snap(11,"RETURN_FALSE","A duplicate exists. Return false.",{...meta,ans:false});return;}rows[r].add(val);snap(13,"ADD","Record the value in its row set.");cols[c].add(val);snap(14,"ADD","Record the value in its column set.");boxes[b].add(val);snap(15,"ADD","Record the value in its box set.");}c=-1;val=null;b=-1;snap(6,"READ","The row is complete.");}
+      r=c=b=-1;val=null;snap(5,"READ","All rows are complete.");snap(18,"RETURN_TRUE","Return true.",{ans:true});
     }
 
     function init() {
@@ -1361,7 +1208,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({validBoard, invalidColBoard, invalidBoxBoard, emptyBoard, board, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({validBoard, invalidColBoard, invalidBoxBoard, emptyBoard, board, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({validBoard, invalidColBoard, invalidBoxBoard, emptyBoard, board, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

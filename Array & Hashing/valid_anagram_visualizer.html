@@ -975,22 +975,40 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const state = historyStack.pop();
-      s = state.s;
-      t = state.t;
-      freq = [...state.freq];
-      i = state.i;
-      checkIndex = state.checkIndex;
-      currentSChar = state.currentSChar;
-      currentTChar = state.currentTChar;
-      ans = state.ans;
-      execState = state.execState;
-      trace = state.trace.map(row => ({ ...row }));
-      currentDelta = state.currentDelta;
-      failedCheckIndex = state.failedCheckIndex;
+      restoreState(state);
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+s = snapshot.s;
+t = snapshot.t;
+freq = [...snapshot.freq];
+i = snapshot.i;
+checkIndex = snapshot.checkIndex;
+currentSChar = snapshot.currentSChar;
+currentTChar = snapshot.currentTChar;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+currentDelta = snapshot.currentDelta;
+failedCheckIndex = snapshot.failedCheckIndex;
+}
 
     function nextStep() {
       if (execState === "END_TRUE" || execState === "END_FALSE") return;
@@ -1062,23 +1080,26 @@
           execState = "LOOP_CHECK";
           break;
 
-        case "VERIFY_ALL": {
+        case "VERIFY_ALL":
           failedCheckIndex = null;
-          for (let idx = 0; idx < 26; idx++) {
-            if (freq[idx] !== 0) {
-              failedCheckIndex = idx;
-              checkIndex = idx;
-              ans = false;
-              execState = "RETURN_FALSE_COUNT";
-              break;
-            }
-          }
-          if (execState !== "RETURN_FALSE_COUNT") {
+          if (checkIndex < freq.length) {
+            execState = "VERIFY_COUNT";
+          } else {
             ans = true;
             execState = "RETURN_TRUE";
           }
           break;
-        }
+
+        case "VERIFY_COUNT":
+          if (freq[checkIndex] !== 0) {
+            failedCheckIndex = checkIndex;
+            ans = false;
+            execState = "RETURN_FALSE_COUNT";
+          } else {
+            checkIndex++;
+            execState = "VERIFY_ALL";
+          }
+          break;
 
         case "RETURN_TRUE":
           execState = "END_TRUE";
@@ -1261,7 +1282,7 @@
         const tIdx = currentTChar ? charToIndex(currentTChar) : -1;
 
         if (idx === sIdx || idx === tIdx || idx === checkIndex) {
-          if (["INC_S", "DEC_T", "VERIFY_ALL"].includes(execState)) box.classList.add("checking");
+          if (["INC_S", "DEC_T", "VERIFY_ALL", "VERIFY_COUNT"].includes(execState)) box.classList.add("checking");
           if (freq[idx] === 0) box.classList.add("zero-active");
         }
 
@@ -1350,6 +1371,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1368,23 +1392,23 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([1]);
+
           narrate("Start the function with two strings: <b>s</b> and <b>t</b>. An anagram must have the same letters with the same frequencies.");
           break;
         case "LENGTH_CHECK":
-          highlightLines([2], s.length !== t.length ? [2] : []);
+
           narrate("First check the lengths. If the lengths are different, they cannot be anagrams.");
           break;
         case "CREATE_COUNT":
-          highlightLines([4]);
+
           narrate("Create a fixed <b>26-slot frequency array</b>. Each slot represents one lowercase English letter from <code>a</code> to <code>z</code>.");
           break;
         case "CREATE_BASE":
-          highlightLines([5]);
+
           narrate("Store the character code for <code>'a'</code>. This lets us convert letters into array indexes: <code>letter.charCodeAt(0) - base</code>.");
           break;
         case "LOOP_CHECK":
-          highlightLines([7]);
+
           if (i < s.length) {
             narrate("Loop through both strings at the same time. Current index is <b>i = " + i + "</b>.");
           } else {
@@ -1392,41 +1416,45 @@
           }
           break;
         case "INC_S":
-          highlightLines([8]);
+
           narrate("Increment the count for <b style='color:#b5cea8'>s[i] = '" + currentSChar + "'</b>. This says string <b>s</b> has one more of that letter.");
           break;
         case "DEC_T":
-          highlightLines([9]);
+
           narrate("Decrement the count for <b style='color:#9cdcfe'>t[i] = '" + currentTChar + "'</b>. Matching letters cancel each other out.");
           break;
         case "ADVANCE_LOOP":
-          highlightLines([10, 7]);
+
           narrate("One pair of characters is processed. Move to the next index.");
           break;
         case "VERIFY_ALL":
-          highlightLines([12, 13, 14]);
-          narrate("Scan the full frequency array. If every value is <code>0</code>, the strings are anagrams.");
+
+          narrate(checkIndex < 26
+            ? "Move to frequency slot <b>" + letterFromIndex(checkIndex) + "</b>."
+            : "Every frequency slot has been checked; all counts are zero.");
+          break;
+        case "VERIFY_COUNT":
+
+          narrate("Check the count for <b>" + letterFromIndex(checkIndex) + "</b>: it is <b>" + freq[checkIndex] + "</b>. A nonzero value means the strings differ.");
           break;
         case "RETURN_TRUE":
-          highlightLines([16]);
+
           narrate("All frequency counts are zero, so the strings contain the same letters. Return <b style='color:#6a9955'>true</b>.");
           break;
         case "RETURN_FALSE_LENGTH":
-          highlightLines([2], [2]);
+
           narrate("The string lengths are different: <b>s.length = " + s.length + "</b>, <b>t.length = " + t.length + "</b>. Return <b style='color:#e24b4a'>false</b>.");
           break;
         case "RETURN_FALSE_COUNT":
-          highlightLines([13], [13]);
+
           narrate("A count is not zero at letter <b>" + letterFromIndex(failedCheckIndex) + "</b>. That means one string has extra/missing letters. Return <b style='color:#e24b4a'>false</b>.");
           break;
         case "END_TRUE":
-          highlightLines([16]);
+
           narrate("✓ Done. The strings are valid anagrams.");
           break;
         case "END_FALSE":
-          if (s.length !== t.length) highlightLines([2], [2]);
-          else highlightLines([13], [13]);
-          narrate("✓ Done. The strings are not anagrams.");
+narrate("✓ Done. The strings are not anagrams.");
           break;
       }
 
@@ -1490,14 +1518,129 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 1,
+      phase: execState
+    };
+  case "LENGTH_CHECK":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "CREATE_COUNT":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CREATE_BASE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "INC_S":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "DEC_T":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "ADVANCE_LOOP":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "VERIFY_ALL":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "VERIFY_COUNT":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "RETURN_FALSE_LENGTH":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "RETURN_FALSE_COUNT":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "END_TRUE":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "END_FALSE":
+    if (s.length !== t.length) return {
+      line: 2,
+      phase: execState
+    };else return {
+      line: 13,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     s = examples[1].s;
     t = examples[1].t;
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":242,"title":"Valid Anagram","topic":"Array & Hashing","why":"Equal letter counts characterize anagrams even when the letters appear in different orders.","meanings":{"s":"first string","t":"second string","freq":"letter frequency array","i":"current index"},"entityClasses":["hud-item","chars","char-cell","s-cell","t-cell","charCodeAt","fromCharCode","currentSChar","currentTChar","sChar","tChar"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, t, freq, i, checkIndex, currentSChar, currentTChar, ans, execState, currentDelta, failedCheckIndex, ...({})}),

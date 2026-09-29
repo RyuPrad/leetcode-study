@@ -889,7 +889,8 @@
           highlight: highlight ? [...highlight] : [],
           phase,
           narration,
-          lines: lines ? [...lines] : phaseLines(phase),
+          executedLine: lines ? (lines[0] ?? null) : (this.activeLine ?? phaseLines(phase)[0] ?? null),
+          lines: lines ? [...lines] : [this.activeLine ?? phaseLines(phase)[0] ?? 1],
           op: this.op,
           val: this.val,
           k: this.k,
@@ -941,45 +942,14 @@
 
     // Build the full steps[] array by running the instrumented algorithm.
     function buildSteps() {
-      const rec = new Recorder();
-      const heap = new MinHeap(rec);
-      rec.heap = heap;
-      rec.k = k;
-
-      // constructor
-      rec.op = "constructor";
-      rec.val = undefined;
-      rec.snap("construct", [], "new KthLargest(k = " + k + ", nums = [" + initialNums.join(", ") + "]). Build a MinHeap and add() each initial number.");
-
-      for (const num of initialNums) {
-        runAdd(rec, heap, num, true);
-      }
-
-      // stream of add() calls
-      for (const v of streamAdds) {
-        runAdd(rec, heap, v, false);
-      }
-
-      rec.op = "done";
-      rec.snap("done", [0], "Finished! Every add() returned the current kth largest (the heap root).");
-
-      return rec.steps;
+      const rec=new Recorder(),heap=new MinHeap(rec);rec.heap=heap;rec.k=undefined;rec.op="constructor";rec.snap("construct",[],"Ready to construct the kth-largest tracker.",[]);rec.k=k;rec.snap("construct",[],"Assign k.",[3]);rec.snap("construct",[],"Create the empty min heap.",[4]);for(const num of initialNums)runAdd(rec,heap,num,true);rec.snap("loop",[],"The initial numbers have all been added.",[5]);for(const value of streamAdds)runAdd(rec,heap,value,false);return rec.steps;
     }
 
     function runAdd(rec, heap, value, isInit) {
-      rec.op = "add(" + value + ")";
-      rec.val = value;
-      const tag = isInit ? "constructor add" : "stream add";
-      rec.snap("loop", [], tag + ": add(" + value + ") -> push " + value + " onto the heap.");
-      heap.push(value);
-      rec.snap("checkSize", [], "Check heap.size() = " + heap.size() + (heap.size() > rec.k ? " > k, so pop the smallest." : " <= k, keep it."));
-      if (heap.size() > rec.k) {
-        heap.pop();
-      }
-      const ans = heap.peek();
-      // record trace row + peek step
-      rec.trace.push({ op: "add(" + value + ")", val: value, heap: "[" + heap.data.join(", ") + "]", kth: ans });
-      rec.snap("peek", [0], "return heap.peek() = " + ans + ". The root of a size-k min-heap is the kth largest seen so far.", [14], ans);
+      rec.op="add("+value+")";rec.val=undefined;
+      if(isInit){rec.snap("loop",[],"Read the next initial number.",[5]);rec.val=value;rec.snap("loop",[],"Call add for this number.",[6]);}else{rec.val=value;rec.snap("loop",[],"Call add for the stream value.",[9]);}
+      rec.activeLine=10;heap.push(value);rec.activeLine=null;rec.snap("checkSize",[],"Check whether the heap exceeds k.",[11]);if(heap.size()>rec.k){rec.activeLine=12;heap.pop();rec.activeLine=null;}
+      const ans=heap.peek();rec.trace.push({op:rec.op,val:value,heap:"["+heap.data.join(", ")+"]",kth:ans});rec.snap("peek",[0],"Return the heap root.",[14],ans);
     }
 
     function loadExample(exNum) {
@@ -1338,7 +1308,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({k, initialNums, streamAdds, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({k, initialNums, streamAdds, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({k, initialNums, streamAdds, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

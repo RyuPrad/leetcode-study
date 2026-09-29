@@ -1098,24 +1098,44 @@
       pauseAuto();
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      strs = [...s.strs];
-      i = s.i;
-      currentStr = s.currentStr;
-      charIndex = s.charIndex;
-      currentChar = s.currentChar;
-      currentLetterIndex = s.currentLetterIndex;
-      count = [...s.count];
-      key = s.key;
-      groups = cloneEntries(s.groups);
-      res = s.res === "pending" ? "pending" : s.res.map(group => [...group]);
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      lastAddedWord = s.lastAddedWord;
-      activeKey = s.activeKey;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+strs = [...snapshot.strs];
+i = snapshot.i;
+currentStr = snapshot.currentStr;
+charIndex = snapshot.charIndex;
+currentChar = snapshot.currentChar;
+currentLetterIndex = snapshot.currentLetterIndex;
+count = [...snapshot.count];
+key = snapshot.key;
+groups = cloneEntries(snapshot.groups);
+res = snapshot.res === "pending" ? "pending" : snapshot.res.map(group => [...group]);
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAddedWord = snapshot.lastAddedWord;
+activeKey = snapshot.activeKey;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -1148,12 +1168,25 @@
           break;
 
         case "COUNT_WORD":
-          for (; charIndex < currentStr.length; charIndex++) {
+          if (charIndex < currentStr.length) {
             currentChar = currentStr[charIndex];
-            currentLetterIndex = currentChar.charCodeAt(0) - 97;
-            count[currentLetterIndex]++;
+            execState = "COUNT_INDEX";
+          } else {
+            currentChar = undefined;
+            currentLetterIndex = undefined;
+            execState = "BUILD_KEY";
           }
-          execState = "BUILD_KEY";
+          break;
+
+        case "COUNT_INDEX":
+          currentLetterIndex = currentChar.charCodeAt(0) - 97;
+          execState = "COUNT_LETTER";
+          break;
+
+        case "COUNT_LETTER":
+          count[currentLetterIndex]++;
+          charIndex++;
+          execState = "COUNT_WORD";
           break;
 
         case "BUILD_KEY":
@@ -1310,7 +1343,7 @@
         const wrap = document.createElement("div");
         wrap.className = "word-wrap";
 
-        const shouldPoint = idx === i && ["LOOP_CHECK", "INIT_COUNT", "COUNT_WORD", "BUILD_KEY", "CHECK_MAP", "PUSH_WORD"].includes(execState);
+        const shouldPoint = idx === i && ["LOOP_CHECK", "INIT_COUNT", "COUNT_WORD", "COUNT_INDEX", "COUNT_LETTER", "BUILD_KEY", "CHECK_MAP", "PUSH_WORD"].includes(execState);
         if (shouldPoint) {
           const ptr = document.createElement("div");
           ptr.className = "pointer";
@@ -1509,55 +1542,133 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Create an empty <b>Map</b>. The key will be a 26-letter frequency signature, and the value will be a list of anagrams.");
           break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (i < strs.length) narrate("The outer loop selects the next string: <b>strs[" + i + "]</b>.");
           else narrate("All strings have been processed. Now return all groups from <code>groups.values()</code>.");
           break;
         case "INIT_COUNT":
-          highlightLines([5]);
+
           narrate("For <b>\"" + escapeHtml(currentStr) + "\"</b>, create a fresh <code>Array(26).fill(0)</code>. This array counts letters from <b>a</b> to <b>z</b>.");
           break;
         case "COUNT_WORD":
-          highlightLines([7, 8, 9, 10]);
-          if ((currentStr || "").length === 0) {
-            narrate("This word is empty, so the frequency array stays all zeros.");
-          } else {
-            narrate("Run the inner loop over every character in <b>\"" + escapeHtml(currentStr) + "\"</b> and increment <code>count[index]</code> for each letter.");
-          }
+
+          narrate(charIndex < (currentStr || "").length
+            ? "Read character <b>'" + escapeHtml(currentStr[charIndex]) + "'</b> at position " + charIndex + "."
+            : "The word has no more characters to count; continue to build its frequency key.");
+          break;
+        case "COUNT_INDEX":
+
+          narrate("Convert <b>'" + escapeHtml(currentChar) + "'</b> to alphabet index <b>" + currentLetterIndex + "</b>.");
+          break;
+        case "COUNT_LETTER":
+
+          narrate("Increment the count for <b>'" + escapeHtml(currentChar) + "'</b> to <b>" + (count[currentLetterIndex] + 1) + "</b>.");
           break;
         case "BUILD_KEY":
-          highlightLines([12]);
+
           narrate("Join the count array with <code>#</code>. Every anagram creates the same key because the letter counts match.");
           break;
         case "CHECK_MAP":
-          highlightLines([14]);
+
           if (groups.some(entry => entry.key === key)) narrate("This key already exists, so this word belongs inside an existing anagram group.");
           else narrate("This key does not exist yet, so create a new empty group for this anagram pattern.");
           break;
         case "PUSH_WORD":
-          highlightLines([15]);
+
           narrate("Push <b>\"" + escapeHtml(currentStr) + "\"</b> into the group for this key.");
           break;
         case "ADVANCE_WORD":
-          highlightLines([16, 4]);
+
           narrate("Move to the next word. The HashMap now stores every group found so far.");
           break;
         case "RETURN_RESULT":
-          highlightLines([18]);
+
           narrate("Convert the HashMap values into an array of groups using <code>Array.from(groups.values())</code>.");
           break;
         case "END":
-          highlightLines([18]);
+
           narrate("✓ Done. Each box in the final result contains words that share the same frequency-count key.");
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "INIT_COUNT":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COUNT_WORD":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "COUNT_INDEX":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "COUNT_LETTER":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "BUILD_KEY":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "CHECK_MAP":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "PUSH_WORD":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "ADVANCE_WORD":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN_RESULT":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 18,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1588,8 +1699,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":49,"title":"Group Anagrams","topic":"Array & Hashing","why":"Words with the same letter-frequency signature belong in the same group regardless of letter order.","meanings":{"strs":"input word list","groups":"map from frequency key → word group","key":"encoded letter-count signature","res":"array of grouped words"},"entityClasses":["hud-item","count-cell","count-char","group-pill","charIndex","currentChar","charCodeAt","fromCharCode"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({strs, i, currentStr, charIndex, currentChar, currentLetterIndex, count, key, groups, res, execState, lastAddedWord, activeKey, ...({})}),

@@ -855,137 +855,38 @@
       const built = [];
       const traceRows = [];
 
-      const total = inputNums.reduce((a, b) => a + b, 0);
-      const isOdd = (total % 2 !== 0);
-      const target = isOdd ? 0 : total / 2;
-
-      // dp only exists when total is even; for odd we short-circuit.
-      let dp = isOdd ? [] : new Array(target + 1).fill(false);
+      const computedTotal = inputNums.reduce((a, b) => a + b, 0);
+      const computedIsOdd = computedTotal % 2 !== 0;
+      let total = null, target = null, isOdd = null;
+      let dp = [];
 
       function snapshot(extra) {
-        built.push({
-          dp: dp.slice(),
-          total: total,
-          target: isOdd ? null : target,
-          isOdd: isOdd,
-          num: (extra.num === undefined) ? null : extra.num,
-          numIndex: (extra.numIndex === undefined) ? null : extra.numIndex,
-          i: (extra.i === undefined) ? null : extra.i,
-          srcIndex: (extra.srcIndex === undefined) ? null : extra.srcIndex,
-          setTrueIndex: (extra.setTrueIndex === undefined) ? null : extra.setTrueIndex,
-          lines: extra.lines,
-          narration: extra.narration,
-          phase: extra.phase,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          showAnswer: (extra.showAnswer === undefined) ? false : extra.showAnswer,
-          traceLen: traceRows.length
-        });
-      }
+ const frame = {
+  dp: dp.slice(),
+  total: total,
+  target: isOdd ? null : target,
+  isOdd: isOdd,
+  num: extra.num === undefined ? null : extra.num,
+  numIndex: extra.numIndex === undefined ? null : extra.numIndex,
+  i: extra.i === undefined ? null : extra.i,
+  srcIndex: extra.srcIndex === undefined ? null : extra.srcIndex,
+  setTrueIndex: extra.setTrueIndex === undefined ? null : extra.setTrueIndex,
+  lines: extra.lines,
+  narration: extra.narration,
+  phase: extra.phase,
+  ans: extra.ans === undefined ? "pending" : extra.ans,
+  showAnswer: extra.showAnswer === undefined ? false : extra.showAnswer,
+  traceLen: traceRows.length
+};
+ frame.executedLine = extra.lines.length === 1 ? extra.lines[0] : null;
+ if (!built.length) built.push({...frame,dp:[],total:null,target:null,isOdd:null,lines:[],executedLine:null,phase:'ready',narration:'Ready. Press Step Over to execute the first instruction.'});
+ built.push(frame);
+}
 
-      // Step 0: compute total.
-      snapshot({
-        lines: [2],
-        phase: "sum",
-        narration: "Sum all numbers: <code>total = " + inputNums.join(" + ") + " = <b>" + total + "</b></code>."
-      });
-
-      if (isOdd) {
-        // Odd total -> impossible to split into two equal halves.
-        traceRows.push({ stage: "parity", detail: "total = " + total + " is odd", result: "return false" });
-        snapshot({
-          lines: [3],
-          phase: "odd",
-          ans: false,
-          showAnswer: true,
-          narration: "<code>total % 2 !== 0</code> is <b style=\"color:#e24b4a\">true</b>. An odd total can never be split into two equal halves, so <code>return false</code>."
-        });
-        finalAns = false;
-        return built;
-      }
-
-      // Even total: set up the dp table.
-      snapshot({
-        lines: [3],
-        phase: "parity-ok",
-        narration: "<code>total % 2 !== 0</code> is <b>false</b> — total is even, so a 50/50 split might be possible."
-      });
-      snapshot({
-        lines: [4],
-        phase: "target",
-        narration: "Half of the total is the <b>target</b> subset sum: <code>target = " + total + " / 2 = <b>" + target + "</b></code>."
-      });
-      dp[0] = true;
-      snapshot({
-        lines: [5, 6],
-        phase: "build",
-        setTrueIndex: 0,
-        narration: "Create <code>dp[0..." + target + "]</code> all <b>false</b>, then set <code>dp[0] = true</code> (a sum of 0 is always reachable with the empty subset)."
-      });
-
-      // Main loop: for each num, sweep i DOWN from target to num.
-      inputNums.forEach((num, numIndex) => {
-        snapshot({
-          num, numIndex,
-          lines: [7],
-          phase: "pick-num",
-          narration: "Consider number <b>num = " + num + "</b>. We may add it to a subset. Sweep capacities <b>downward</b> so each <code>num</code> is used at most once."
-        });
-
-        if (num > target) {
-          // Inner loop never runs (i starts below num).
-          snapshot({
-            num, numIndex,
-            lines: [8],
-            phase: "skip-num",
-            narration: "<code>num (" + num + ") &gt; target (" + target + ")</code>, so the inner loop <code>i = target; i &gt;= num</code> never starts. This number is too big to fit; skip it."
-          });
-          traceRows.push({ stage: "num " + num, detail: "num &gt; target — skip", result: "no change" });
-        } else {
-          for (let i = target; i >= num; i--) {
-            const srcIndex = i - num;
-            const canReach = dp[srcIndex];
-            if (canReach && !dp[i]) {
-              dp[i] = true;
-              snapshot({
-                num, numIndex, i, srcIndex,
-                setTrueIndex: i,
-                lines: [9],
-                phase: "set-true",
-                narration: "i = " + i + ": <code>dp[" + srcIndex + "]</code> is <b style=\"color:#6a9955\">true</b>, so sum <b>" + i + "</b> is now reachable by adding <b>" + num + "</b> to a subset summing <b>" + srcIndex + "</b>. Set <code>dp[" + i + "] = true</code>."
-              });
-              traceRows.push({ stage: "num " + num, detail: "dp[" + i + " - " + num + "] = dp[" + srcIndex + "] true", result: "dp[" + i + "] = true" });
-            } else {
-              snapshot({
-                num, numIndex, i, srcIndex,
-                lines: [9],
-                phase: "check",
-                narration: "i = " + i + ": check <code>dp[" + i + " - " + num + "] = dp[" + srcIndex + "]</code> — " +
-                  (canReach
-                    ? "already <b>true</b>; <code>dp[" + i + "]</code> was set on a previous number, so nothing changes."
-                    : "<b style=\"color:#888\">false</b>; sum <b>" + srcIndex + "</b> is not reachable, so <code>dp[" + i + "]</code> stays as it is.")
-              });
-            }
-          }
-        }
-      });
-
-      // Final answer.
-      const answer = dp[target];
-      traceRows.push({ stage: "result", detail: "dp[target] = dp[" + target + "]", result: String(answer) });
-      snapshot({
-        lines: [12],
-        phase: "result",
-        ans: answer,
-        showAnswer: true,
-        setTrueIndex: answer ? target : null,
-        narration: "<code>return dp[" + target + "]</code> = <b style=\"color:" + (answer ? "#6a9955" : "#e24b4a") + "\">" + answer + "</b>. " +
-          (answer
-            ? "A subset sums to <b>" + target + "</b>, so the array can be partitioned into two equal halves."
-            : "No subset sums to <b>" + target + "</b>, so an equal partition is impossible.")
-      });
-
-      finalAns = answer;
-      return built;
+total=computedTotal;snapshot({lines:[2],phase:'sum',narration:'Compute the total sum.'});isOdd=computedIsOdd;if(isOdd){snapshot({lines:[3],phase:'odd',ans:false,showAnswer:true,narration:'An odd total cannot be split into equal halves.'});finalAns=false;return built;}
+ snapshot({lines:[3],phase:'parity-ok',narration:'The total is even.'});target=total/2;snapshot({lines:[4],phase:'target',narration:'Set the target to half the total.'});dp=new Array(target+1).fill(false);snapshot({lines:[5],phase:'build',narration:'Allocate the table filled with false.'});dp[0]=true;snapshot({lines:[6],phase:'base',setTrueIndex:0,narration:'The empty subset reaches sum zero.'});
+ inputNums.forEach((num,numIndex)=>{snapshot({num,numIndex,lines:[7],phase:'pick-num',narration:'Consider this number.'});for(let i=target;i>=num;i--){const srcIndex=i-num;snapshot({num,numIndex,i,srcIndex,lines:[8],phase:'inner-loop',narration:'Scan subset sums downward so each number is used once.'});const old=dp[i],canReach=dp[srcIndex];if(canReach)dp[i]=true;snapshot({num,numIndex,i,srcIndex,setTrueIndex:!old&&dp[i]?i:null,lines:[9],phase:!old&&dp[i]?'set-true':'check',narration:canReach?'This remaining sum is reachable; mark the current sum true.':'The remaining sum is not reachable.'});traceRows.push({stage:'num '+num,detail:'dp['+srcIndex+']',result:String(dp[i])});}});
+ const answer=dp[target];snapshot({lines:[12],phase:'result',ans:answer,showAnswer:true,setTrueIndex:answer?target:null,narration:'Return whether half the total is reachable.'});finalAns=answer;return built;
     }
 
     function loadExample(exNum) {
@@ -1362,8 +1263,8 @@
       spec: {"number":416,"title":"Partition Equal Subset Sum","topic":"1-D Dynamic Programming","why":"Equal partition is possible exactly when a subset reaches half the total sum.","meanings":{"nums":"The input array of positive integers we try to split into two equal-sum halves.","total":"Sum of every element in `nums`. If it is odd, an equal split is impossible.","target":"`total / 2` — the subset sum each half must reach.","dp":"Boolean array of length `target + 1`; `dp[c]` is `true` when some subset of `nums` sums to capacity `c`. Reused as the 1-D rolling row of the 0/1 knapsack.","num":"The current number from `nums` being considered for inclusion in a subset.","i":"Capacity index, swept **downward** from `target` to `num` so each `num` is used at most once. `dp[i]` becomes `true` whenever `dp[i - num]` is already `true`.","ans":"Final result `dp[target]` — `true` if the array can be partitioned into two equal-sum subsets, else `false`."},"entityClasses":["hud-item","num-chip","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nums, finalAns, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, finalAns, ...(steps[position] || {})}),
+      read: () => ({nums,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nums,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

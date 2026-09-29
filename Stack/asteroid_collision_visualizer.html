@@ -875,147 +875,20 @@
     // Build the full precomputed steps array. Each step is an immutable snapshot,
     // so prevStep/nextStep simply move the index — guaranteed reversible.
     function buildSteps() {
-      const out = [];
-      const stack = [];
-      const trace = [];
-
-      function snap(extra) {
-        const base = {
-          lines: [],
-          narr: "",
-          stack: [...stack],
-          a: null,
-          top: null,
-          ai: -1,
-          collisions: 0,
-          phase: "",
-          popValue: null,
-          boomIndex: null,
-          pushValue: null,
-          trace: trace.map(r => ({ ...r })),
-          done: false
-        };
-        out.push(Object.assign(base, extra));
-      }
-
-      // initial snapshot
-      snap({
-        lines: [2],
-        narr: "Create an empty <b>stack</b>. It holds the asteroids that have survived so far.",
-        phase: "INIT"
-      });
-
-      for (let ai = 0; ai < asteroids.length; ai++) {
-        const a = asteroids[ai];
-        let alive = true;
-        let collisions = 0;
-
-        // read current asteroid a
-        snap({
-          lines: [3, 4],
-          narr: "Take the next asteroid <b>a = asteroids[" + ai + "] = " + a + "</b> and assume <b>alive = true</b>.",
-          a: a,
-          ai: ai,
-          collisions: collisions,
-          phase: "READ"
-        });
-
-        // resolve collisions
-        while (alive && a < 0 && stack.length > 0 && stack[stack.length - 1] > 0) {
-          const top = stack[stack.length - 1];
-
-          snap({
-            lines: [5, 6],
-            narr: "<b>a = " + a + "</b> moves left and the top <b>" + top + "</b> moves right. They collide. Compare |a| = " + (-a) + " with top = " + top + ".",
-            a: a,
-            ai: ai,
-            top: top,
-            collisions: collisions,
-            phase: "COLLIDE"
-          });
-
-          if (top < -a) {
-            // top explodes, a survives and keeps going
-            collisions++;
-            const popped = stack.pop();
-            snap({
-              lines: [7, 8],
-              narr: "top (" + top + ") &lt; |a| (" + (-a) + "): the smaller top asteroid explodes. <code>stack.pop()</code> removes " + popped + "; a keeps moving.",
-              a: a,
-              ai: ai,
-              top: top,
-              collisions: collisions,
-              phase: "POP_TOP",
-              popValue: popped
-            });
-          } else if (top === -a) {
-            // both explode
-            collisions++;
-            const popped = stack.pop();
-            alive = false;
-            snap({
-              lines: [9, 10, 11],
-              narr: "top (" + top + ") === |a| (" + (-a) + "): equal sizes, both explode. <code>stack.pop()</code> removes " + popped + " and a is destroyed (alive = false).",
-              a: a,
-              ai: ai,
-              top: top,
-              collisions: collisions,
-              phase: "POP_BOTH",
-              popValue: popped,
-              boomIndex: ai
-            });
-          } else {
-            // a explodes, top survives
-            collisions++;
-            alive = false;
-            snap({
-              lines: [12, 13],
-              narr: "top (" + top + ") &gt; |a| (" + (-a) + "): the bigger top survives, the incoming asteroid a explodes (alive = false).",
-              a: a,
-              ai: ai,
-              top: top,
-              collisions: collisions,
-              phase: "A_DIES",
-              boomIndex: ai
-            });
-          }
+      const out=[],stack=[],trace=[];let a=null,ai=-1,top=null,alive=null,collisions=0;
+      const snap=(line,phase,narr,extra={})=>out.push({executedLine:line,lines:line?[line]:[1],narr,stack:[...stack],a,ai,top,alive,collisions,phase,popValue:null,boomIndex:null,pushValue:null,trace:trace.map(r=>({...r})),done:false,...extra});
+      snap(null,"INIT","Ready to resolve asteroid collisions.");snap(2,"INIT","Create the survivor stack.");
+      for(ai=0;ai<asteroids.length;ai++) {
+        a=asteroids[ai];alive=null;top=null;collisions=0;snap(3,"READ","Read the next asteroid.");alive=true;snap(4,"READ","Assume the incoming asteroid is alive.");
+        while(true) {
+          const collide=alive&&a<0&&stack.length>0&&stack[stack.length-1]>0;snap(5,"COLLIDE","Check whether another collision occurs.");if(!collide)break;
+          top=stack[stack.length-1];snap(6,"COLLIDE","Read the survivor at the top of the stack.");snap(7,"COLLIDE","Check whether the top asteroid is smaller.");
+          if(top < -a){collisions++;const popped=stack.pop();snap(8,"POP_TOP","Remove the smaller top asteroid.",{popValue:popped});}
+          else {snap(9,"COLLIDE","Check whether both asteroids have equal size.");if(top===-a){collisions++;const popped=stack.pop();snap(10,"POP_TOP","Remove the top asteroid.",{popValue:popped});alive=false;snap(11,"POP_BOTH","Destroy the incoming asteroid.",{boomIndex:ai});}else{collisions++;alive=false;snap(13,"A_DIES","Destroy the incoming asteroid.",{boomIndex:ai});}}
         }
-
-        // after while: push if survived
-        if (alive) {
-          stack.push(a);
-          trace.push({ ai, a, collisions, action: "push " + a, survived: true });
-          snap({
-            lines: [16, 17],
-            narr: "alive is still true, so <code>stack.push(" + a + ")</code> — this asteroid survives onto the stack.",
-            a: a,
-            ai: ai,
-            collisions: collisions,
-            phase: "PUSH",
-            pushValue: a
-          });
-        } else {
-          trace.push({ ai, a, collisions, action: "destroyed", survived: false });
-          snap({
-            lines: [16],
-            narr: "alive is false, so we skip the push. Asteroid <b>" + a + "</b> did not survive.",
-            a: a,
-            ai: ai,
-            collisions: collisions,
-            phase: "NO_PUSH"
-          });
-        }
+        snap(16,"NO_PUSH","Check whether the incoming asteroid survived.");if(alive){stack.push(a);trace.push({ai,a,collisions,action:"push "+a,survived:true});snap(17,"PUSH","Push the surviving asteroid.",{pushValue:a});}else{trace.push({ai,a,collisions,action:"destroyed",survived:false});}
       }
-
-      // final
-      snap({
-        lines: [20],
-        narr: "All asteroids processed. <code>return stack</code> = [" + stack.join(", ") + "] is the final state of the belt.",
-        phase: "DONE",
-        done: true
-      });
-
-      return out;
+      a=null;top=null;snap(3,"READ","There are no more asteroids.");snap(20,"DONE","Return the survivors.",{done:true});return out;
     }
 
     function init() {
@@ -1332,7 +1205,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({asteroids, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({asteroids, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({asteroids, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

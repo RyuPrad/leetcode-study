@@ -904,132 +904,11 @@
 
     // Build precomputed, index-reversible steps[].
     function buildSteps() {
-      const out = [];
-      // cars before/after sort for narration
-      const carsUnsorted = position.map((p, i) => [p, speed[i]]);
-      const cars = position.map((p, i) => [p, speed[i]]);
-      cars.sort((a, b) => b[0] - a[0]);
-
-      const stack = [];   // arrival times of fleet leads
-      const trace = [];
-
-      function snap(extra) {
-        const base = {
-          lines: [],
-          narr: "",
-          cars: cars.map(c => [...c]),
-          stack: [...stack],
-          ci: -1,            // current car index in sorted cars
-          p: null,
-          s: null,
-          time: null,
-          phase: "",
-          pushValue: null,
-          popValue: null,
-          absorbedCar: null, // [p,s] of car that just merged
-          leadTimes: [...stack],
-          trace: trace.map(r => ({ ...r })),
-          done: false
-        };
-        out.push(Object.assign(base, extra));
-      }
-
-      // init: build + sort
-      snap({
-        lines: [2, 3],
-        narr: "Pair each car as [position, speed], then <b>sort by position descending</b> so the car closest to the target (" + target + ") is processed first.",
-        phase: "SORT"
-      });
-
-      snap({
-        lines: [4],
-        narr: "Create an empty <b>stack</b> of fleet arrival times. Each surviving entry represents one fleet.",
-        phase: "INIT_STACK"
-      });
-
-      for (let ci = 0; ci < cars.length; ci++) {
-        const p = cars[ci][0];
-        const s = cars[ci][1];
-        const time = (target - p) / s;
-
-        // read car + compute time
-        snap({
-          lines: [5, 6],
-          narr: "Car at position <b>p = " + p + "</b>, speed <b>s = " + s + "</b>. Arrival time = (target - p) / s = (" + target + " - " + p + ") / " + s + " = <b>" + fmtTime(time) + "</b>.",
-          ci: ci,
-          p: p,
-          s: s,
-          time: time,
-          phase: "COMPUTE"
-        });
-
-        // push time
-        stack.push(time);
-        snap({
-          lines: [7],
-          narr: "<code>stack.push(" + fmtTime(time) + ")</code> — tentatively treat this car as the lead of a new fleet.",
-          ci: ci,
-          p: p,
-          s: s,
-          time: time,
-          phase: "PUSH",
-          pushValue: time
-        });
-
-        // check merge
-        if (stack.length >= 2 && stack[stack.length - 1] <= stack[stack.length - 2]) {
-          const aheadTime = stack[stack.length - 2];
-          snap({
-            lines: [8],
-            narr: "Top time " + fmtTime(time) + " &le; fleet-ahead time " + fmtTime(aheadTime) + ": this car catches the fleet ahead before the finish, so it merges in.",
-            ci: ci,
-            p: p,
-            s: s,
-            time: time,
-            phase: "CHECK_MERGE_YES"
-          });
-
-          const popped = stack.pop();
-          trace.push({ ci, p, s, time, action: "merge into fleet ahead", merged: true });
-          snap({
-            lines: [9],
-            narr: "<code>stack.pop()</code> removes this car's time (" + fmtTime(popped) + "). It is absorbed; the fleet count does not grow.",
-            ci: ci,
-            p: p,
-            s: s,
-            time: time,
-            phase: "POP",
-            popValue: popped,
-            absorbedCar: [p, s]
-          });
-        } else {
-          let reason;
-          if (stack.length < 2) {
-            reason = "It is the only fleet so far, so it stays as its own fleet.";
-          } else {
-            reason = "Top time " + fmtTime(time) + " &gt; fleet-ahead time " + fmtTime(stack[stack.length - 2]) + ": it never catches up, so it forms its own fleet.";
-          }
-          trace.push({ ci, p, s, time, action: "new fleet", merged: false });
-          snap({
-            lines: [8],
-            narr: reason + " The stack keeps this entry.",
-            ci: ci,
-            p: p,
-            s: s,
-            time: time,
-            phase: "NO_MERGE"
-          });
-        }
-      }
-
-      snap({
-        lines: [12],
-        narr: "Every car processed. <code>return stack.length</code> = <b>" + stack.length + "</b> — the number of distinct fleets that reach the target.",
-        phase: "DONE",
-        done: true
-      });
-
-      return out;
+      const out=[],cars=position.map((p,i)=>[p,speed[i]]),stack=[],trace=[];let ci=-1,p=null,s=null,time=null;
+      const snap=(line,phase,narr,extra={})=>out.push({executedLine:line,lines:line?[line]:[1],narr,cars:cars.map(c=>[...c]),stack:[...stack],ci,p,s,time,phase,pushValue:null,popValue:null,absorbedCar:null,leadTimes:[...stack],trace:trace.map(r=>({...r})),done:false,...extra});
+      snap(null,"SORT","Ready to count the fleets.");snap(2,"SORT","Pair each car's position and speed.");cars.sort((a,b)=>b[0]-a[0]);snap(3,"SORT","Sort cars from nearest to farthest from the target.");snap(4,"INIT_STACK","Create an empty fleet stack.");
+      for(ci=0;ci<cars.length;ci++){[p,s]=cars[ci];time=null;snap(5,"COMPUTE","Read the next car.");time=(target-p)/s;snap(6,"COMPUTE","Compute its arrival time.");stack.push(time);snap(7,"PUSH","Push the tentative fleet time.",{pushValue:time});const merge=stack.length>=2&&stack[stack.length-1]<=stack[stack.length-2];snap(8,merge?"CHECK_MERGE_YES":"NO_MERGE","Check whether this car catches the fleet ahead.");if(merge){const popped=stack.pop();trace.push({ci,p,s,time,action:"merge into fleet ahead",merged:true});snap(9,"POP","Merge with the fleet ahead.",{popValue:popped,absorbedCar:[p,s]});}else trace.push({ci,p,s,time,action:"new fleet",merged:false});}
+      p=s=time=null;snap(5,"COMPUTE","There are no more cars.");snap(12,"DONE","Return the fleet count.",{done:true});return out;
     }
 
     function init() {
@@ -1345,7 +1224,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({target, position, speed, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({target, position, speed, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({target, position, speed, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -842,96 +842,25 @@
 
     // Precompute every snapshot of the algorithm.
     function buildSteps() {
-      steps = [];
-      let stack = [];
-
-      steps.push({
-        i: -1, c: null, stack: [...stack], ans: "pending",
-        phase: "INIT", lines: [2, 3],
-        popped: null, expected: null, matched: null,
-        trace: []
-      });
-
-      const trace = [];
-      let failed = false;
-
-      for (let i = 0; i < s.length; i++) {
-        const c = s[i];
-        const isOpen = opens.includes(c);
-
-        // Read current char.
-        steps.push({
-          i, c, stack: [...stack], ans: "pending",
-          phase: "READ", isOpen, lines: [4, 5],
-          popped: null, expected: null, matched: null,
-          trace: trace.map(r => ({ ...r }))
-        });
-
-        if (isOpen) {
-          stack.push(c);
-          trace.push({ i, c, action: "push", stack: "[" + stack.join(" ") + "]", result: "-" });
-          steps.push({
-            i, c, stack: [...stack], ans: "pending",
-            phase: "PUSH", isOpen: true, lines: [6],
-            popped: null, expected: null, matched: null, justPushed: true,
-            trace: trace.map(r => ({ ...r }))
-          });
-        } else {
-          const popped = stack.length > 0 ? stack[stack.length - 1] : undefined;
-          const expected = map[c];
-          const matched = popped === expected;
-
-          // Show the pop + compare against map[c] (top still visible, flagged).
-          steps.push({
-            i, c, stack: [...stack], ans: "pending",
-            phase: "POPCHECK", isOpen: false, lines: [8],
-            popped, expected, matched,
-            trace: trace.map(r => ({ ...r }))
-          });
-
-          // Actually pop.
-          stack.pop();
-
-          if (!matched) {
-            trace.push({ i, c, action: "pop -> " + (popped === undefined ? "undefined" : popped) + " (need " + expected + ")", stack: "[" + stack.join(" ") + "]", result: "mismatch" });
-            steps.push({
-              i, c, stack: [...stack], ans: false,
-              phase: "RETURN_FALSE", isOpen: false, lines: [9],
-              popped, expected, matched: false,
-              trace: trace.map(r => ({ ...r }))
-            });
-            failed = true;
-            break;
-          } else {
-            trace.push({ i, c, action: "pop -> " + popped + " (need " + expected + ")", stack: "[" + stack.join(" ") + "]", result: "match" });
-            steps.push({
-              i, c, stack: [...stack], ans: "pending",
-              phase: "POPPED_OK", isOpen: false, lines: [8],
-              popped, expected, matched: true,
-              trace: trace.map(r => ({ ...r }))
-            });
-          }
+      steps = []; const stack = [], trace = []; let i=-1,c=null;
+      const snap=(line,phase,extra={})=>steps.push({i,c,stack:[...stack],ans:"pending",phase,executedLine:line,lines:line?[line]:[1],popped:null,expected:null,matched:null,trace:trace.map(r=>({...r})),...extra});
+      snap(null,"INIT",{narr:"Ready to validate the parentheses."});
+      snap(2,"INIT",{narr:"Create the empty stack."});
+      snap(3,"INIT",{narr:"Create the closing-to-opening bracket map."});
+      for(i=0;i<s.length;i++) {
+        c=s[i]; const isOpen=opens.includes(c);
+        snap(4,"READ",{isOpen,narr:"Read the next character: "+c+"."});
+        snap(5,"READ",{isOpen,narr:"Check whether this is an opening bracket."});
+        if(isOpen) { stack.push(c);trace.push({i,c,action:"push",stack:"["+stack.join(" ")+"]",result:"-"});snap(6,"PUSH",{isOpen:true,justPushed:true}); }
+        else {
+          const popped=stack.pop(),expected=map[c],matched=popped===expected;
+          trace.push({i,c,action:"pop -> "+popped+" (need "+expected+")",stack:"["+stack.join(" ")+"]",result:matched?"match":"mismatch"});
+          snap(8,matched?"POPPED_OK":"POPCHECK",{isOpen:false,popped,expected,matched,narr:"Pop "+popped+" and compare it with "+expected+"."});
+          if(!matched) {snap(9,"END",{ans:false,popped,expected,matched:false,narr:"The brackets do not match. Return false."});return;}
         }
       }
-
-      if (!failed) {
-        const finalAns = stack.length === 0;
-        steps.push({
-          i: s.length, c: null, stack: [...stack], ans: finalAns,
-          phase: "RETURN", lines: [13],
-          popped: null, expected: null, matched: null,
-          trace: trace.map(r => ({ ...r }))
-        });
-      }
-
-      // Terminal step.
-      const last = steps[steps.length - 1];
-      steps.push({
-        i: last.i, c: last.c, stack: [...last.stack], ans: last.ans,
-        phase: "END", lines: last.phase === "RETURN_FALSE" ? [9] : [13],
-        popped: last.popped, expected: last.expected, matched: last.matched,
-        trace: last.trace.map(r => ({ ...r }))
-      });
+      c=null;snap(4,"READ",{narr:"There are no more characters."});
+      snap(13,"END",{ans:stack.length===0,narr:"Return whether the stack is empty."});
     }
 
     function loadExample(exNum) {
@@ -1223,6 +1152,8 @@
           break;
       }
 
+      if (step.narr) narrate(step.narr);
+
       const visualUi = document.getElementById("visual-ui");
       visualUi.innerHTML = "";
       visualUi.appendChild(renderStrRow(step));
@@ -1276,7 +1207,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({map, opens, s, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({map, opens, s, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({map, opens, s, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

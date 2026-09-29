@@ -680,6 +680,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -953,22 +954,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseNums(text) {
-      try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) throw new Error("Input must be an array.");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n))) {
-          throw new Error("Use only integers.");
-        }
-        return clean;
-      } catch (err) {
-        const fallback = text.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && Number.isInteger(n));
-        if (fallback.length > 0) return fallback;
-        alert("Please enter a valid integer array like [-1,0,3,5,9,12]");
-        return null;
-      }
-    }
+    function parseNums(text) { try { return StudyNumericInput.list(text, {min: -Infinity, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function isSorted(arr) {
       for (let i = 1; i < arr.length; i++) {
@@ -993,24 +979,25 @@
 
     function loadCustom() {
       const parsed = parseNums(document.getElementById("custom-input").value);
-      if (!parsed) return;
+      if (!parsed) return false;
       if (parsed.length < 1) {
         alert("Search Insert Position needs at least 1 number.");
-        return;
+        return false;
       }
       if (!isSorted(parsed)) {
         alert("Search Insert Position needs nums to be sorted in ascending order.");
-        return;
+        return false;
       }
       const t = Number(document.getElementById("target-input").value);
-      if (!Number.isFinite(t) || !Number.isInteger(t)) {
+      if (!Number.isSafeInteger(t)) {
         alert("Please enter an integer target.");
-        return;
+        return false;
       }
       nums = parsed;
       target = t;
       activeExample = 0;
       init();
+      return true;
     }
 
     function init() {
@@ -1051,23 +1038,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      target = prev.target;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      currentValue = prev.currentValue;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
-      discardedLeftMax = prev.discardedLeftMax;
-      discardedRightMin = prev.discardedRightMin;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+target = snapshot.target;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+currentValue = snapshot.currentValue;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+discardedLeftMax = snapshot.discardedLeftMax;
+discardedRightMin = snapshot.discardedRightMin;
+}
 
     function addTrace(action, reason) {
       trace.push({
@@ -1089,23 +1095,27 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = nums.length - 1;
-          mid = null;
-          currentValue = null;
-          ans = null;
-          discardedLeftMax = -1;
-          discardedRightMin = nums.length;
-          lastAction = "Initialize left at 0 and right at nums.length - 1.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ mid = null;
+currentValue = null;
+ans = null;
+discardedLeftMax = -1;
+discardedRightMin = nums.length;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = nums.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
             lastAction = "left is less than or equal to right, so the search window still exists.";
             execState = "CALC_MID";
           } else {
-            ans = left;
             lastAction = "left passed right. The target is not found, so left is the insert position.";
             execState = "RETURN_INSERT";
           }
@@ -1120,7 +1130,6 @@
 
         case "COMPARE":
           if (currentValue === target) {
-            ans = mid;
             addTrace("found", `nums[mid] = ${currentValue} equals target = ${target}`);
             lastAction = "Target found. Return mid.";
             execState = "RETURN_FOUND";
@@ -1154,11 +1163,13 @@
           break;
 
         case "RETURN_FOUND":
+          ans = mid;
           lastAction = "Return the found index.";
           execState = "END";
           break;
 
         case "RETURN_INSERT":
+          ans = left;
           addTrace("insert position", "the search window is empty because left > right; left is where target belongs");
           lastAction = "Return left as the insert position.";
           execState = "END";
@@ -1441,53 +1452,131 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([7, 8]);
-          narrate('Start with <code>left = 0</code> and <code>right = nums.length - 1</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([9]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, the target could still be inside the search window.' : 'The search window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([10]);
+
           narrate('Calculate the middle index using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "COMPARE":
           if (currentValue === target) {
-            highlightLines([11, 12]);
+
             narrate('The middle value equals the target. Return <code>mid</code>.');
           } else if (currentValue < target) {
-            highlightLines([14, 15]);
+
             narrate('The middle value is too small. The insert position must be on the right side.');
           } else {
-            highlightLines([16, 17]);
+
             narrate('The middle value is too large. The insert position is at mid or on the left side.');
           }
           break;
         case "MOVE_LEFT":
-          highlightLines([15]);
+
           narrate('Move right by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([17]);
+
           narrate('Move left by setting <code>right = mid - 1</code>.');
           break;
         case "RETURN_FOUND":
-          highlightLines([12]);
+
           narrate('Return the index where the target was found.');
           break;
         case "RETURN_INSERT":
-          highlightLines([20]);
+
           narrate('The target does not exist in the array, so return <code>left</code> as the insert position.');
           break;
         case "END":
-          highlightLines([20]);
+
           narrate(nums[ans] === target ? '✓ Done. The target is at index <code>' + ans + '</code>.' : '✓ Done. Insert the target at index <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "COMPARE":
+    if (currentValue === target) {
+      return {
+        line: 11,
+        phase: execState
+      };
+    } else if (currentValue < target) {
+      return {
+        line: 14,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 16,
+        phase: execState
+      };
+    }
+  case "MOVE_LEFT":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "RETURN_FOUND":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "RETURN_INSERT":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 20,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1517,8 +1606,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":35,"title":"Search Insert Position","topic":"Binary Search","why":"The insertion position is the first place whose value is not smaller than the target.","meanings":{"nums":"sorted input array","target":"value to insert","left":"left search bound","right":"right search bound","mid":"middle index","ans":"insert position"},"entityClasses":["hud-item","cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, target, left, right, mid, currentValue, ans, execState, lastAction, discardedLeftMax, discardedRightMin, ...({})}),

@@ -958,27 +958,52 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      s = prev.s;
-      left = prev.left;
-      right = prev.right;
-      deletionsUsed = prev.deletionsUsed;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      branchActive = prev.branchActive;
-      branchSide = prev.branchSide;
-      subLeft = prev.subLeft;
-      subRight = prev.subRight;
-      mainMismatch = prev.mainMismatch ? { ...prev.mainMismatch } : null;
-      deletedIndex = prev.deletedIndex;
-      leftResult = prev.leftResult;
-      rightResult = prev.rightResult;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+s = snapshot.s;
+left = snapshot.left;
+right = snapshot.right;
+deletionsUsed = snapshot.deletionsUsed;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+branchActive = snapshot.branchActive;
+branchSide = snapshot.branchSide;
+subLeft = snapshot.subLeft;
+subRight = snapshot.subRight;
+mainMismatch = snapshot.mainMismatch ? {
+  ...snapshot.mainMismatch
+} : null;
+deletedIndex = snapshot.deletedIndex;
+leftResult = snapshot.leftResult;
+rightResult = snapshot.rightResult;
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(phase, l, r, chars, reason) {
       trace.push({
@@ -1008,12 +1033,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = s.length - 1;
-          deletionsUsed = 0;
-          lastAction = "Initialized left at 0 and right at s.length - 1.";
-          execState = "LOOP_CHECK";
-          break;
+ left = 0;
+ deletionsUsed = 0;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = s.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (left < right) {
@@ -1044,12 +1074,22 @@
 
         case "MOVE_INWARD":
           left++;
+          lastAction = "Moved left inward to " + left + ".";
+          execState = "MOVE_RIGHT_INWARD";
+          break;
+
+        case "MOVE_RIGHT_INWARD":
           right--;
-          lastAction = "Moved both pointers inward.";
+          lastAction = "Moved right inward to " + right + ".";
           execState = "LOOP_CHECK";
           break;
 
         case "BRANCH":
+          lastAction = "Mismatch branch: try skipping the left character first.";
+          execState = "CALL_SKIP_LEFT";
+          break;
+
+        case "CALL_SKIP_LEFT":
           // Begin the first sub-check: skip the LEFT character -> check [left+1, right]
           branchSide = "left";
           subLeft = mainMismatch.left + 1;
@@ -1090,8 +1130,13 @@
 
         case "SUB_LEFT_MOVE":
           subLeft++;
+          lastAction = "Sub-check A moved subLeft to " + subLeft + ".";
+          execState = "SUB_LEFT_MOVE_RIGHT";
+          break;
+
+        case "SUB_LEFT_MOVE_RIGHT":
           subRight--;
-          lastAction = "Sub-check A moved inward.";
+          lastAction = "Sub-check A moved subRight to " + subRight + ".";
           execState = "SUB_LEFT_CHECK";
           break;
 
@@ -1101,6 +1146,12 @@
             lastAction = "Branch A succeeded, so the whole answer is true (short-circuit on ||).";
             execState = "RETURN_BRANCH";
           } else {
+            lastAction = "Branch A failed. Try skipping the right character next.";
+            execState = "CALL_SKIP_RIGHT";
+          }
+          break;
+
+        case "CALL_SKIP_RIGHT":
             // Start the second sub-check: skip the RIGHT character -> check [left, right-1]
             branchSide = "right";
             subLeft = mainMismatch.left;
@@ -1109,7 +1160,6 @@
             deletedIndex = mainMismatch.right;
             lastAction = "Branch A failed. Try Branch B: delete s[" + mainMismatch.right + "]='" + displayChar(s[mainMismatch.right]) + "', then check isPalindrome(s, " + subLeft + ", " + subRight + ").";
             execState = "SUB_RIGHT_CHECK";
-          }
           break;
 
         case "SUB_RIGHT_CHECK":
@@ -1141,8 +1191,13 @@
 
         case "SUB_RIGHT_MOVE":
           subLeft++;
+          lastAction = "Sub-check B moved subLeft to " + subLeft + ".";
+          execState = "SUB_RIGHT_MOVE_RIGHT";
+          break;
+
+        case "SUB_RIGHT_MOVE_RIGHT":
           subRight--;
-          lastAction = "Sub-check B moved inward.";
+          lastAction = "Sub-check B moved subRight to " + subRight + ".";
           execState = "SUB_RIGHT_CHECK";
           break;
 
@@ -1251,13 +1306,14 @@
       const area = document.createElement("div");
       area.className = "compare-area";
       const showCompare = execState === "COMPARE" || execState === "MOVE_INWARD" ||
-        (mainMismatch && ["BRANCH"].includes(execState));
+        (mainMismatch && ["BRANCH", "CALL_SKIP_LEFT", "CALL_SKIP_RIGHT"].includes(execState));
       if (!showCompare) {
         area.innerHTML = '<div class="compare-pill">Outer comparison appears here while the main loop runs.</div>';
         return area;
       }
-      const li = mainMismatch && execState === "BRANCH" ? mainMismatch.left : left;
-      const ri = mainMismatch && execState === "BRANCH" ? mainMismatch.right : right;
+      const inMainBranch = mainMismatch && ["BRANCH", "CALL_SKIP_LEFT", "CALL_SKIP_RIGHT"].includes(execState);
+      const li = inMainBranch ? mainMismatch.left : left;
+      const ri = inMainBranch ? mainMismatch.right : right;
       const a = s[li] || "";
       const b = s[ri] || "";
       const same = a === b;
@@ -1457,73 +1513,219 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Place <code>left</code> at the first character and <code>right</code> at the last character.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           narrate(left < right ? 'Check <code>left &lt; right</code>. True, so compare the outer pair.' : 'Pointers met with no deletion needed, so it is already a palindrome.');
           break;
         case "COMPARE":
-          highlightLines([5]);
+
           narrate('Compare <code>s[left]</code> with <code>s[right]</code>.');
           break;
         case "MOVE_INWARD":
-          highlightLines([9, 10]);
-          narrate('They match, so move both pointers inward.');
+
+          narrate('They match, so move <code>left</code> inward to ' + left + '.');
+          break;
+        case "MOVE_RIGHT_INWARD":
+
+          narrate('Now move <code>right</code> inward to ' + right + '.');
           break;
         case "BRANCH":
-          highlightLines([5, 6, 7]);
-          narrate('Mismatch! Spend the one deletion. Try <code>isPalindrome(s, left+1, right)</code> OR <code>isPalindrome(s, left, right-1)</code>.');
+
+          narrate('Mismatch found. We can delete one character, so first try skipping the left side.');
+          break;
+        case "CALL_SKIP_LEFT":
+
+          narrate('Call <code>isPalindrome(s, left + 1, right)</code> to test the branch that skips the left character.');
+          break;
+        case "CALL_SKIP_RIGHT":
+
+          narrate('Branch A failed, so evaluate <code>isPalindrome(s, left, right - 1)</code> to skip the right character.');
           break;
         case "SUB_LEFT_CHECK":
-          highlightLines([16]);
+
           narrate('Branch A (skip left): while <code>left &lt; right</code> keep comparing.');
           break;
         case "SUB_LEFT_COMPARE":
-          highlightLines([17]);
+
           narrate('Branch A: compare <code>s[' + subLeft + ']</code> with <code>s[' + subRight + ']</code>.');
           break;
         case "SUB_LEFT_MOVE":
-          highlightLines([18, 19]);
-          narrate('Branch A: matched, move inward.');
+
+          narrate('Branch A: move <code>subLeft</code> inward to ' + subLeft + '.');
+          break;
+        case "SUB_LEFT_MOVE_RIGHT":
+
+          narrate('Branch A: move <code>subRight</code> inward to ' + subRight + '.');
           break;
         case "SUB_LEFT_DONE":
-          highlightLines(leftResult ? [21] : [17]);
+
           narrate(leftResult ? 'Branch A is a palindrome, so the whole answer is <code>true</code>.' : 'Branch A failed. Fall through to Branch B.');
           break;
         case "SUB_RIGHT_CHECK":
-          highlightLines([16]);
+
           narrate('Branch B (skip right): while <code>left &lt; right</code> keep comparing.');
           break;
         case "SUB_RIGHT_COMPARE":
-          highlightLines([17]);
+
           narrate('Branch B: compare <code>s[' + subLeft + ']</code> with <code>s[' + subRight + ']</code>.');
           break;
         case "SUB_RIGHT_MOVE":
-          highlightLines([18, 19]);
-          narrate('Branch B: matched, move inward.');
+
+          narrate('Branch B: move <code>subLeft</code> inward to ' + subLeft + '.');
+          break;
+        case "SUB_RIGHT_MOVE_RIGHT":
+
+          narrate('Branch B: move <code>subRight</code> inward to ' + subRight + '.');
           break;
         case "SUB_RIGHT_DONE":
-          highlightLines(rightResult ? [21] : [17]);
+
           narrate(rightResult ? 'Branch B is a palindrome, so the answer is <code>true</code>.' : 'Branch B also failed, so the answer is <code>false</code>.');
           break;
         case "RETURN_BRANCH":
-          highlightLines([6, 7]);
+
           narrate('Return the OR of the two branches: <code>' + ans + '</code>.');
           break;
         case "RETURN_TRUE":
-          highlightLines([12]);
+
           narrate('No mismatch occurred, so return <code>true</code>.');
           break;
         case "END":
-          highlightLines(ans ? (mainMismatch ? [6, 7] : [12]) : [6, 7]);
+
           narrate(ans ? 'Done. <code>s</code> can be a palindrome after at most one deletion.' : 'Done. Even with one deletion, <code>s</code> cannot be a palindrome.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "MOVE_INWARD":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "MOVE_RIGHT_INWARD":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "BRANCH":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALL_SKIP_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "CALL_SKIP_RIGHT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "SUB_LEFT_CHECK":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "SUB_LEFT_COMPARE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "SUB_LEFT_MOVE":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "SUB_LEFT_MOVE_RIGHT":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "SUB_LEFT_DONE":
+    return {
+      line: (leftResult ? [21] : [17])[0],
+      phase: execState
+    };
+  case "SUB_RIGHT_CHECK":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "SUB_RIGHT_COMPARE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "SUB_RIGHT_MOVE":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "SUB_RIGHT_MOVE_RIGHT":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "SUB_RIGHT_DONE":
+    return {
+      line: (rightResult ? [21] : [17])[0],
+      phase: execState
+    };
+  case "RETURN_BRANCH":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans ? mainMismatch ? [6] : [12] : [6])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1552,8 +1754,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":680,"title":"Valid Palindrome II","topic":"Two Pointers","why":"At the first mismatch, try deleting either endpoint; the remainder must be a palindrome.","meanings":{"s":"input string","left":"left pointer in the main scan","right":"right pointer in the main scan","left (sub-check)":"left pointer inside the isPalindrome helper","right (sub-check)":"right pointer inside the isPalindrome helper"},"entityClasses":["hud-item","char-col","char-index","char-box","compare-pill","legend-item","chars"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, left, right, deletionsUsed, ans, execState, branchActive, branchSide, subLeft, subRight, mainMismatch, deletedIndex, leftResult, rightResult, lastAction, ...({})}),

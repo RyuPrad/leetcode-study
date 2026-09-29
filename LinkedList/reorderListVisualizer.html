@@ -26,10 +26,147 @@
 const examples={1:[1,2,3,4],2:[1,2,3,4,5],3:[1,2],4:[1],5:[]};let ex=1,nodes=[],head=null,slow=null,fast=null,second=null,prev=null,curr=null,next=null,first=null,temp1=null,temp2=null,state='INIT',answer='pending',hist=[],objMode='memory',labelMode='learning',layoutMode='phase',lastWrite=null,lastRead=null,lastMove=null;
 const fl=document.getElementById('float'),dh=document.getElementById('drag');let ds=null;dh.addEventListener('pointerdown',e=>{ds={x:e.clientX,y:e.clientY,t:fl.offsetTop,l:fl.offsetLeft};dh.setPointerCapture(e.pointerId)});dh.addEventListener('pointermove',e=>{if(!ds)return;fl.style.left=ds.l+e.clientX-ds.x+'px';fl.style.top=ds.t+e.clientY-ds.y+'px';fl.style.right='auto'});dh.addEventListener('pointerup',()=>ds=null);dh.addEventListener('pointercancel',()=>ds=null);function dockLeft(){fl.style.left='22px';fl.style.right='auto';fl.style.top='22px'}function dockRight(){fl.style.right='22px';fl.style.left='auto';fl.style.top='22px'}
 function build(vals){return vals.map((val,id)=>({id,val,next:id<vals.length-1?id+1:null}))}function p(i){return i===null?'null':`node${i}(${nodes[i].val})`}function sp(i){return i===null?'null':`node${i}`}function nx(i){return i===null?null:nodes[i].next}function loadEx(i){ex=i;init()}function init(){nodes=build(examples[ex]);head=nodes.length?0:null;slow=fast=second=prev=curr=next=first=temp1=temp2=null;state='INIT';answer='pending';hist=[];lastWrite=lastRead=lastMove=null;render()}
-function save(){hist.push({nodes:nodes.map(n=>({...n})),head,slow,fast,second,prev,curr,next,first,temp1,temp2,state,answer,lastWrite:lastWrite&&{...lastWrite},lastRead:lastRead&&{...lastRead},lastMove:lastMove&&{...lastMove}})}function restore(s){nodes=s.nodes.map(n=>({...n}));head=s.head;slow=s.slow;fast=s.fast;second=s.second;prev=s.prev;curr=s.curr;next=s.next;first=s.first;temp1=s.temp1;temp2=s.temp2;state=s.state;answer=s.answer;lastWrite=s.lastWrite&&{...s.lastWrite};lastRead=s.lastRead&&{...s.lastRead};lastMove=s.lastMove&&{...s.lastMove}}function prevStep(){if(!hist.length)return;restore(hist.pop());render()}
-function nextStep(){if(state==='END')return;save();lastWrite=lastRead=lastMove=null;switch(state){case'INIT':state='CHECK_GUARD';break;case'CHECK_GUARD':if(head===null||nx(head)===null){answer='done';state='END'}else state='ASSIGN';break;case'ASSIGN':slow=head;fast=head;lastMove={from:null,to:head,label:'slow = head, fast = head'};state='FIND_CHECK';break;case'FIND_CHECK':lastRead={node:fast,field:'next2',hop1:nx(fast),hop2:nx(nx(fast))};state=(fast!==null&&nx(fast)!==null&&nx(nx(fast))!==null)?'MOVE_SLOW':'SET_SECOND';break;case'MOVE_SLOW':{let old=slow;lastRead={node:old,field:'next'};slow=nx(slow);lastMove={from:old,to:slow,label:'slow = slow.next'};state='MOVE_FAST';break}case'MOVE_FAST':{let old=fast,h1=nx(fast),h2=nx(h1);lastRead={node:old,field:'next2',hop1:h1,hop2:h2};fast=h2;lastMove={from:old,to:fast,label:'fast = fast.next.next'};state='FIND_CHECK';break}case'SET_SECOND':lastRead={node:slow,field:'next'};second=nx(slow);state='CUT';break;case'CUT':{let old=nodes[slow].next;lastWrite={node:slow,oldTarget:old,newTarget:null,label:'slow.next = null',cut:true};nodes[slow].next=null;state='SET_REVERSE';break}case'SET_REVERSE':prev=null;curr=second;next=null;state='REV_CHECK';break;case'REV_CHECK':state=curr!==null?'REV_SAVE':'MERGE_SETUP';break;case'REV_SAVE':lastRead={node:curr,field:'next'};next=nx(curr);state='REV_FLIP';break;case'REV_FLIP':{let old=nodes[curr].next;lastWrite={node:curr,oldTarget:old,newTarget:prev,label:'curr.next = prev'};nodes[curr].next=prev;state='REV_PREV';break}case'REV_PREV':lastMove={from:prev,to:curr,label:'prev = curr'};prev=curr;state='REV_CURR';break;case'REV_CURR':lastMove={from:curr,to:next,label:'curr = next'};curr=next;state='REV_CHECK';break;case'MERGE_SETUP':first=head;second=prev;temp1=temp2=null;state='MERGE_CHECK';break;case'MERGE_CHECK':if(second!==null)state='SAVE_T1';else{answer='done';state='END'}break;case'SAVE_T1':lastRead={node:first,field:'next'};temp1=nx(first);state='SAVE_T2';break;case'SAVE_T2':lastRead={node:second,field:'next'};temp2=nx(second);state='LINK1';break;case'LINK1':{let old=nodes[first].next;lastWrite={node:first,oldTarget:old,newTarget:second,label:'first.next = second'};nodes[first].next=second;state='LINK2';break}case'LINK2':{let old=nodes[second].next;lastWrite={node:second,oldTarget:old,newTarget:temp1,label:'second.next = temp1'};nodes[second].next=temp1;state='MOVE_FIRST';break}case'MOVE_FIRST':lastMove={from:first,to:temp1,label:'first = temp1'};first=temp1;state='MOVE_SECOND';break;case'MOVE_SECOND':lastMove={from:second,to:temp2,label:'second = temp2'};second=temp2;state='MERGE_CHECK';break}render()}
-function phase(){if(['INIT','CHECK_GUARD','ASSIGN','FIND_CHECK','MOVE_SLOW','MOVE_FAST'].includes(state))return'find';if(['SET_SECOND','CUT'].includes(state))return'split';if(['SET_REVERSE','REV_CHECK','REV_SAVE','REV_FLIP','REV_PREV','REV_CURR'].includes(state))return'reverse';return'merge'}function pi(){return{find:0,split:1,reverse:2,merge:3}[phase()]}function ptrs(){return{head,slow,fast,second,prev,curr,next,first,temp1,temp2}}function rel(){let ph=phase();if(state==='INIT'||state==='CHECK_GUARD')return['head'];if(ph==='find')return['head','slow','fast'];if(ph==='split')return['head','slow','second'];if(ph==='reverse')return['head','second','prev','curr','next'];return['head','first','second','temp1','temp2']}function toggleLabels(){labelMode=labelMode==='learning'?'all':'learning';document.getElementById('labBtn').textContent='Labels: '+(labelMode==='learning'?'Learning':'All');render()}function toggleLayout(){layoutMode=layoutMode==='phase'?'debugger':'phase';document.getElementById('layoutBtn').textContent='Layout: '+(layoutMode==='phase'?'Phase':'Debugger');render()}function toggleObj(){objMode=objMode==='memory'?'nested':'memory';document.getElementById('objBtn').textContent='Object: '+(objMode==='memory'?'Memory':'Nested');render()}
-function lines(a){document.querySelectorAll('.cl').forEach(e=>e.classList.remove('active'));a.forEach(n=>{let e=document.getElementById('l'+n);if(e)e.classList.add('active')})}function say(m){document.getElementById('narr').innerHTML=m}function codeNarr(){let m='',l=[];switch(state){case'INIT':m='Press <b>Step Over</b> to begin. The algorithm has not executed yet.';break;case'CHECK_GUARD':l=[2];m='Check the base case. If the list has 0 or 1 node, there is nothing to reorder.';break;case'ASSIGN':l=[3,4];m='Initialize <b>slow</b> and <b>fast</b> at <b>head</b>. They will find the middle.';break;case'FIND_CHECK':l=[5];m='Check whether <b>fast</b> can still move two steps.';break;case'MOVE_SLOW':l=[6];m='<code>slow = slow.next</code> — slow moves one step.';break;case'MOVE_FAST':l=[7];m='<code>fast = fast.next.next</code> — fast moves two steps.';break;case'SET_SECOND':l=[10];m='<code>second = slow.next</code> — mark the start of the second half.';break;case'CUT':l=[11];m='<code>slow.next = null</code> — split the list with a clear cut.';break;case'SET_REVERSE':l=[13,14];m='Prepare to reverse the second half: <code>prev = null</code>, <code>curr = second</code>.';break;case'REV_CHECK':l=[15];m=curr!==null?'There is still a node in the second half to reverse.':'The second half is fully reversed. <b>prev</b> is the reversed-half head.';break;case'REV_SAVE':l=[16];m='<code>next = curr.next</code> — save the next node before flipping the arrow.';break;case'REV_FLIP':l=[17];m='<code>curr.next = prev</code> — reverse this one arrow.';break;case'REV_PREV':l=[18];m='<code>prev = curr</code> — grow the reversed list.';break;case'REV_CURR':l=[19];m='<code>curr = next</code> — continue through the original second half.';break;case'MERGE_SETUP':l=[22,23];m='Set up weaving: <code>first</code> starts at head, and <code>second</code> starts at the reversed half.';break;case'MERGE_CHECK':l=[24];m=second!==null?'There are still second-half nodes to weave into the first half.':'No more second-half nodes remain. The list is reordered.';break;case'SAVE_T1':l=[25];m='<code>temp1 = first.next</code> — save the next first-half node before overwriting <code>first.next</code>.';break;case'SAVE_T2':l=[26];m='<code>temp2 = second.next</code> — save the next second-half node.';break;case'LINK1':l=[27];m='<code>first.next = second</code> — weave the second-half node after the first-half node.';break;case'LINK2':l=[28];m='<code>second.next = temp1</code> — connect back to the saved first-half node.';break;case'MOVE_FIRST':l=[29];m='<code>first = temp1</code> — move first forward.';break;case'MOVE_SECOND':l=[30];m='<code>second = temp2</code> — move second forward.';break;case'END':l=[32];m='Done. The original nodes were reordered in-place; no node values were changed.';break}lines(l);say(m)}
+function save(){hist.push({nodes:nodes.map(n=>({...n})),head,slow,fast,second,prev,curr,next,first,temp1,temp2,state,answer,lastWrite:lastWrite&&{...lastWrite},lastRead:lastRead&&{...lastRead},lastMove:lastMove&&{...lastMove}})}function restore(snapshot){nodes=snapshot.nodes.map(n=>({...n}));head=snapshot.head;slow=snapshot.slow;fast=snapshot.fast;second=snapshot.second;prev=snapshot.prev;curr=snapshot.curr;next=snapshot.next;first=snapshot.first;temp1=snapshot.temp1;temp2=snapshot.temp2;state=snapshot.state;answer=snapshot.answer;lastWrite=snapshot.lastWrite&&{...snapshot.lastWrite};lastRead=snapshot.lastRead&&{...snapshot.lastRead};lastMove=snapshot.lastMove&&{...snapshot.lastMove}}function prevStep(){if(!hist.length)return;restore(hist.pop());render()}
+function nextStep(){if(state==='END')return;save();lastWrite=lastRead=lastMove=null;switch(state){case'INIT':state='CHECK_GUARD';break;case'CHECK_GUARD':if(head===null||nx(head)===null){answer='done';state='END'}else state='ASSIGN';break;case'ASSIGN':slow=head;lastMove={from:null,to:head,label:'slow = head'};state='ASSIGN_FAST';break;case'ASSIGN_FAST':fast=head;lastMove={from:null,to:head,label:'fast = head'};state='FIND_CHECK';break;case'FIND_CHECK':lastRead={node:fast,field:'next2',hop1:nx(fast),hop2:nx(nx(fast))};state=(fast!==null&&nx(fast)!==null&&nx(nx(fast))!==null)?'MOVE_SLOW':'SET_SECOND';break;case'MOVE_SLOW':{let old=slow;lastRead={node:old,field:'next'};slow=nx(slow);lastMove={from:old,to:slow,label:'slow = slow.next'};state='MOVE_FAST';break}case'MOVE_FAST':{let old=fast,h1=nx(fast),h2=nx(h1);lastRead={node:old,field:'next2',hop1:h1,hop2:h2};fast=h2;lastMove={from:old,to:fast,label:'fast = fast.next.next'};state='FIND_CHECK';break}case'SET_SECOND':lastRead={node:slow,field:'next'};second=nx(slow);state='CUT';break;case'CUT':{let old=nodes[slow].next;lastWrite={node:slow,oldTarget:old,newTarget:null,label:'slow.next = null',cut:true};nodes[slow].next=null;state='SET_REVERSE';break}case'SET_REVERSE':prev=null;next=null;state='SET_CURR';break;case'SET_CURR':curr=second;state='REV_CHECK';break;case'REV_CHECK':state=curr!==null?'REV_SAVE':'MERGE_SETUP';break;case'REV_SAVE':lastRead={node:curr,field:'next'};next=nx(curr);state='REV_FLIP';break;case'REV_FLIP':{let old=nodes[curr].next;lastWrite={node:curr,oldTarget:old,newTarget:prev,label:'curr.next = prev'};nodes[curr].next=prev;state='REV_PREV';break}case'REV_PREV':lastMove={from:prev,to:curr,label:'prev = curr'};prev=curr;state='REV_CURR';break;case'REV_CURR':lastMove={from:curr,to:next,label:'curr = next'};curr=next;state='REV_CHECK';break;case'MERGE_SETUP':first=head;temp1=temp2=null;state='MERGE_SECOND';break;case'MERGE_SECOND':second=prev;state='MERGE_CHECK';break;case'MERGE_CHECK':if(second!==null)state='SAVE_T1';else{answer='done';state='END'}break;case'SAVE_T1':lastRead={node:first,field:'next'};temp1=nx(first);state='SAVE_T2';break;case'SAVE_T2':lastRead={node:second,field:'next'};temp2=nx(second);state='LINK1';break;case'LINK1':{let old=nodes[first].next;lastWrite={node:first,oldTarget:old,newTarget:second,label:'first.next = second'};nodes[first].next=second;state='LINK2';break}case'LINK2':{let old=nodes[second].next;lastWrite={node:second,oldTarget:old,newTarget:temp1,label:'second.next = temp1'};nodes[second].next=temp1;state='MOVE_FIRST';break}case'MOVE_FIRST':lastMove={from:first,to:temp1,label:'first = temp1'};first=temp1;state='MOVE_SECOND';break;case'MOVE_SECOND':lastMove={from:second,to:temp2,label:'second = temp2'};second=temp2;state='MERGE_CHECK';break}render()}
+function phase(){if(['INIT','CHECK_GUARD','ASSIGN','ASSIGN_FAST','FIND_CHECK','MOVE_SLOW','MOVE_FAST'].includes(state))return'find';if(['SET_SECOND','CUT'].includes(state))return'split';if(['SET_REVERSE','SET_CURR','REV_CHECK','REV_SAVE','REV_FLIP','REV_PREV','REV_CURR'].includes(state))return'reverse';return'merge'}function pi(){return{find:0,split:1,reverse:2,merge:3}[phase()]}function ptrs(){return{head,slow,fast,second,prev,curr,next,first,temp1,temp2}}function rel(){let ph=phase();if(state==='INIT'||state==='CHECK_GUARD')return['head'];if(ph==='find')return['head','slow','fast'];if(ph==='split')return['head','slow','second'];if(ph==='reverse')return['head','second','prev','curr','next'];return['head','first','second','temp1','temp2']}function toggleLabels(){labelMode=labelMode==='learning'?'all':'learning';document.getElementById('labBtn').textContent='Labels: '+(labelMode==='learning'?'Learning':'All');render()}function toggleLayout(){layoutMode=layoutMode==='phase'?'debugger':'phase';document.getElementById('layoutBtn').textContent='Layout: '+(layoutMode==='phase'?'Phase':'Debugger');render()}function toggleObj(){objMode=objMode==='memory'?'nested':'memory';document.getElementById('objBtn').textContent='Object: '+(objMode==='memory'?'Memory':'Nested');render()}
+function lines(a){document.querySelectorAll('.cl').forEach(e=>e.classList.remove('active'));a.forEach(n=>{let e=document.getElementById('l'+n);if(e)e.classList.add('active')})}function say(m){document.getElementById('narr').innerHTML=m}function codeNarr(){
+ const instruction = pendingInstruction();
+ lines(instruction ? [instruction.line] : []);
+let m='',l=[];switch(state){case'INIT':m='Press <b>Step Over</b> to begin. The algorithm has not executed yet.';break;case'CHECK_GUARD':l=[2];m='Check the base case. If the list has 0 or 1 node, there is nothing to reorder.';break;case'ASSIGN':l=[3];m='Initialize slow at head.';break;case'ASSIGN_FAST':l=[4];m='Initialize fast at head.';break;case'FIND_CHECK':l=[5];m='Check whether <b>fast</b> can still move two steps.';break;case'MOVE_SLOW':l=[6];m='<code>slow = slow.next</code> — slow moves one step.';break;case'MOVE_FAST':l=[7];m='<code>fast = fast.next.next</code> — fast moves two steps.';break;case'SET_SECOND':l=[10];m='<code>second = slow.next</code> — mark the start of the second half.';break;case'CUT':l=[11];m='<code>slow.next = null</code> — split the list with a clear cut.';break;case'SET_REVERSE':l=[13];m='Initialize prev = null.';break;case'SET_CURR':l=[14];m='Initialize curr at the second half.';break;case'REV_CHECK':l=[15];m=curr!==null?'There is still a node in the second half to reverse.':'The second half is fully reversed. <b>prev</b> is the reversed-half head.';break;case'REV_SAVE':l=[16];m='<code>next = curr.next</code> — save the next node before flipping the arrow.';break;case'REV_FLIP':l=[17];m='<code>curr.next = prev</code> — reverse this one arrow.';break;case'REV_PREV':l=[18];m='<code>prev = curr</code> — grow the reversed list.';break;case'REV_CURR':l=[19];m='<code>curr = next</code> — continue through the original second half.';break;case'MERGE_SETUP':l=[22];m='Initialize first at head.';break;case'MERGE_SECOND':l=[23];m='Initialize second at the reversed half.';break;case'MERGE_CHECK':l=[24];m=second!==null?'There are still second-half nodes to weave into the first half.':'No more second-half nodes remain. The list is reordered.';break;case'SAVE_T1':l=[25];m='<code>temp1 = first.next</code> — save the next first-half node before overwriting <code>first.next</code>.';break;case'SAVE_T2':l=[26];m='<code>temp2 = second.next</code> — save the next second-half node.';break;case'LINK1':l=[27];m='<code>first.next = second</code> — weave the second-half node after the first-half node.';break;case'LINK2':l=[28];m='<code>second.next = temp1</code> — connect back to the saved first-half node.';break;case'MOVE_FIRST':l=[29];m='<code>first = temp1</code> — move first forward.';break;case'MOVE_SECOND':l=[30];m='<code>second = temp2</code> — move second forward.';break;case'END':l=[32];m='Done. The original nodes were reordered in-place; no node values were changed.';break}say(m)}
+
+function pendingInstruction() {
+ if (state === 'END') return null;
+ if (state === 'INIT') return {line:1,phase:state};
+
+ switch (state) {
+  case 'CHECK_GUARD':
+    return {
+      line: 2,
+      phase: state
+    };
+  case 'ASSIGN':
+    return {
+      line: 3,
+      phase: state
+    };
+  case 'ASSIGN_FAST':
+    return {
+      line: 4,
+      phase: state
+    };
+  case 'FIND_CHECK':
+    return {
+      line: 5,
+      phase: state
+    };
+  case 'MOVE_SLOW':
+    return {
+      line: 6,
+      phase: state
+    };
+  case 'MOVE_FAST':
+    return {
+      line: 7,
+      phase: state
+    };
+  case 'SET_SECOND':
+    return {
+      line: 10,
+      phase: state
+    };
+  case 'CUT':
+    return {
+      line: 11,
+      phase: state
+    };
+  case 'SET_REVERSE':
+    return {
+      line: 13,
+      phase: state
+    };
+  case 'SET_CURR':
+    return {
+      line: 14,
+      phase: state
+    };
+  case 'REV_CHECK':
+    return {
+      line: 15,
+      phase: state
+    };
+  case 'REV_SAVE':
+    return {
+      line: 16,
+      phase: state
+    };
+  case 'REV_FLIP':
+    return {
+      line: 17,
+      phase: state
+    };
+  case 'REV_PREV':
+    return {
+      line: 18,
+      phase: state
+    };
+  case 'REV_CURR':
+    return {
+      line: 19,
+      phase: state
+    };
+  case 'MERGE_SETUP':
+    return {
+      line: 22,
+      phase: state
+    };
+  case 'MERGE_SECOND':
+    return {
+      line: 23,
+      phase: state
+    };
+  case 'MERGE_CHECK':
+    return {
+      line: 24,
+      phase: state
+    };
+  case 'SAVE_T1':
+    return {
+      line: 25,
+      phase: state
+    };
+  case 'SAVE_T2':
+    return {
+      line: 26,
+      phase: state
+    };
+  case 'LINK1':
+    return {
+      line: 27,
+      phase: state
+    };
+  case 'LINK2':
+    return {
+      line: 28,
+      phase: state
+    };
+  case 'MOVE_FIRST':
+    return {
+      line: 29,
+      phase: state
+    };
+  case 'MOVE_SECOND':
+    return {
+      line: 30,
+      phase: state
+    };
+  case 'END':
+    return {
+      line: 32,
+      phase: state
+    };
+}
+return null;
+}
 function renderPhase(){let labs=['1 Find middle','2 Split','3 Reverse 2nd','4 Weave merge'],i=pi();document.getElementById('phase').innerHTML=labs.map((x,k)=>`<div class="pill ${k===i?'active':k<i?'done':''}">${x}</div>`).join('')}
 function badges(id){let pm=ptrs(),allow=labelMode==='all'?Object.keys(pm):rel(),out=[];allow.forEach(name=>{if(pm[name]===id)out.push([name,name])});return out}function activeSet(){let s=new Set;if(lastRead&&lastRead.node!==null)s.add(lastRead.node);if(lastRead&&lastRead.hop1!=null)s.add(lastRead.hop1);if(lastRead&&lastRead.hop2!=null)s.add(lastRead.hop2);if(lastWrite&&lastWrite.node!==null)s.add(lastWrite.node);if(lastMove&&lastMove.to!==null)s.add(lastMove.to);if(state==='ASSIGN'&&head!==null)s.add(head);return s}function writeSet(){let s=new Set;if(lastWrite&&lastWrite.node!==null)s.add(lastWrite.node);return s}function cutSet(){let s=new Set;if(lastWrite&&lastWrite.cut&&lastWrite.node!==null)s.add(lastWrite.node);return s}function hiNext(id){return lastRead&&lastRead.node===id}function wrNext(id){return lastWrite&&lastWrite.node===id}
 function walk(st){let r=[],seen=new Set,cur=st;while(cur!==null&&!seen.has(cur)){seen.add(cur);r.push(cur);cur=nodes[cur].next}return{r,cycle:cur!==null?cur:null}}function row(label,cls,st){let row=document.createElement('div');row.className='row';let lab=document.createElement('div');lab.className='label '+(cls||'');lab.textContent=label;row.appendChild(lab);if(st===null){let n=document.createElement('div');n.className='null';n.textContent='null';row.appendChild(n);return row}let {r,cycle}=walk(st),as=activeSet(),ws=writeSet(),cs=cutSet();r.forEach(id=>{let nd=document.createElement('div');nd.className='node'+(as.has(id)?' active':'')+(ws.has(id)?' write':'')+(cs.has(id)?' cutnode':'');nd.textContent=nodes[id].val;badges(id).slice(0,4).forEach(([c,t],bi)=>{let b=document.createElement('div');b.className='badge '+c;b.textContent=t;b.style.top=(-25-17*bi)+'px';nd.appendChild(b)});let ix=document.createElement('div');ix.className='idx';ix.textContent='node'+id;nd.appendChild(ix);row.appendChild(nd);let ar=document.createElement('div');ar.className='arrow'+(hiNext(id)?' active':'')+(wrNext(id)?(lastWrite.cut?' cut':' write'):'');ar.textContent=wrNext(id)&&lastWrite.cut?'✂':'→';row.appendChild(ar)});let end=document.createElement('div');end.className='null';end.textContent=cycle!==null?'↩ node'+cycle:'null';if(cycle!==null)end.style.color='var(--red)';row.appendChild(end);return row}
@@ -39,8 +176,36 @@ function nested(st,seen=new Set,d=0){let ind='  '.repeat(d),inn='  '.repeat(d+1)
 function chain(st){let w=walk(st);if(st===null)return'null';return w.r.map(i=>nodes[i].val).join(' → ')+(w.cycle!==null?' → node'+w.cycle:' → null')}function con(){document.getElementById('console').innerHTML=`<span class="cm">// Input</span>\nconst input = [${examples[ex].join(', ')}];\n\n<span class="cm">// Pointers</span>\nhead:     ${p(head)}\nslow:     ${p(slow)}\nfast:     ${p(fast)}\nfirst:    ${p(first)}\nsecond:   ${p(second)}\nprev:     ${p(prev)}\ncurr:     ${p(curr)}\nnext:     ${p(next)}\ntemp1:    ${p(temp1)}\ntemp2:    ${p(temp2)}\n\n<span class="cm">// Current chain from head</span>\n${chain(head)}\n\n<span class="cm">// Answer</span>\n${answer}`}function renderHud(){let rows=[['head',p(head)],['slow',p(slow)],['fast',p(fast)],['second',p(second)],['prev',p(prev)],['curr',p(curr)],['next',p(next)]];document.getElementById('hud-ui').innerHTML=rows.map(([k,v])=>`<div class="hud-row"><span class="hk">${k}:</span><span class="hv">${v}</span></div>`).join('')}function render(){document.querySelectorAll('.ex').forEach(b=>b.classList.remove('active'));let b=document.getElementById('ex'+ex);if(b)b.classList.add('active');document.getElementById('btn-prev').disabled=!hist.length;document.getElementById('btn-next').disabled=state==='END';document.getElementById('btn-next').textContent=state==='END'?'Finished!':'Step Over';codeNarr();renderPhase();board();renderRows();renderObj();con();renderHud()}init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > hist.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line,.cl')].map(element => [element, element.className]);
+      save();
+      const live = hist.pop();
+      const snapshot = index === hist.length ? live : hist[index];
+      try {
+        restore(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restore(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":143,"title":"Reorder List","topic":"LinkedList","why":"Find the middle, reverse the second half, then weave the two halves without losing their next links.","meanings":{"head":"list head","slow":"slow pointer for midpoint","fast":"fast pointer for midpoint","prev":"previous node while reversing","curr":"current node while reversing","next":"saved next pointer","second":"start of second half"},"entityClasses":["pill","pnode","node","cutnode","nodes"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => hist.length,
       count: () => null,
       read: () => ({ex, nodes, head, slow, fast, second, prev, curr, next, first, temp1, temp2, state, answer, lastWrite, lastRead, lastMove, ...({})}),

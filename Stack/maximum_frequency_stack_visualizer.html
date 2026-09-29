@@ -865,153 +865,14 @@
     // Build precomputed, index-reversible steps[]. We model freq/group as plain objects
     // (keyed by string), mirroring the Map-based reference solution exactly.
     function buildSteps() {
-      const out = [];
-      const freq = {};        // val -> count
-      const group = {};       // count -> [vals]
-      let maxFreq = 0;
-      const trace = [];
-
-      function snap(extra) {
-        const base = {
-          lines: [],
-          narr: "",
-          freq: cloneFreq(freq),
-          group: cloneGroup(group),
-          maxFreq: maxFreq,
-          op: "",
-          arg: null,
-          ret: null,
-          val: null,
-          f: null,
-          phase: "",
-          pushTo: null,     // freq level a value was just pushed onto
-          pushVal: null,
-          popFrom: null,    // freq level a value was just popped from
-          popVal: null,
-          trace: trace.map(r => ({ ...r })),
-          done: false
-        };
-        out.push(Object.assign(base, extra));
-      }
-
-      snap({
-        lines: [3, 4, 5],
-        narr: "Initialize the structure: <b>freq</b> maps each value to its count, <b>group</b> maps a count to a stack of values, and <b>maxFreq = 0</b>.",
-        phase: "INIT"
-      });
-
-      for (let k = 0; k < ops.length; k++) {
-        const op = ops[k];
-
-        if (op.op === "push") {
-          const val = op.arg;
-          // line 8: compute f
-          const f = (freq[val] || 0) + 1;
-          snap({
-            lines: [7, 8],
-            narr: "<b>push(" + val + ")</b>: its new frequency is f = (freq[" + val + "] || 0) + 1 = <b>" + f + "</b>.",
-            op: "push", arg: val, val: val, f: f, phase: "PUSH_F"
-          });
-
-          // line 9: set freq
-          freq[val] = f;
-          snap({
-            lines: [9],
-            narr: "<code>freq.set(" + val + ", " + f + ")</code> records the updated count for " + val + ".",
-            op: "push", arg: val, val: val, f: f, phase: "PUSH_SETFREQ"
-          });
-
-          // lines 10-12: maxFreq
-          if (f > maxFreq) {
-            maxFreq = f;
-            snap({
-              lines: [10, 11],
-              narr: "f (" + f + ") &gt; maxFreq, so <b>maxFreq</b> becomes <b>" + f + "</b>.",
-              op: "push", arg: val, val: val, f: f, phase: "PUSH_MAX"
-            });
-          } else {
-            snap({
-              lines: [10],
-              narr: "f (" + f + ") is not greater than maxFreq (" + maxFreq + "), so maxFreq stays " + maxFreq + ".",
-              op: "push", arg: val, val: val, f: f, phase: "PUSH_NOMAX"
-            });
-          }
-
-          // lines 13-16: push into group[f]
-          if (!group[f]) group[f] = [];
-          group[f].push(val);
-          trace.push({ op: "push", arg: val, ret: "-", maxFreq: maxFreq, group: groupStr(group) });
-          snap({
-            lines: [13, 14, 16],
-            narr: "Append " + val + " to <b>group[" + f + "]</b> (creating that stack if needed). " + val + " now sits on top of the frequency-" + f + " stack.",
-            op: "push", arg: val, val: val, f: f, phase: "PUSH_GROUP",
-            pushTo: f, pushVal: val
-          });
-        } else {
-          // pop
-          // line 19: read stack = group[maxFreq]
-          if (maxFreq === 0 || !group[maxFreq] || group[maxFreq].length === 0) {
-            // Empty pop — guard so the visualization never crashes.
-            trace.push({ op: "pop", arg: "-", ret: "(empty)", maxFreq: maxFreq, group: groupStr(group) });
-            snap({
-              lines: [18, 19],
-              narr: "<b>pop()</b> called but the structure is empty. There is nothing to remove.",
-              op: "pop", arg: null, ret: null, phase: "POP_EMPTY"
-            });
-            continue;
-          }
-
-          snap({
-            lines: [18, 19],
-            narr: "<b>pop()</b>: look at <b>group[maxFreq]</b> = group[" + maxFreq + "] = [" + group[maxFreq].join(", ") + "] — the most-frequent values, most recent on top.",
-            op: "pop", arg: null, val: null, phase: "POP_READ"
-          });
-
-          // line 20: pop val
-          const val = group[maxFreq].pop();
-          snap({
-            lines: [20],
-            narr: "<code>stack.pop()</code> removes <b>" + val + "</b> from the top of group[" + maxFreq + "]. This is the answer for this pop (ties broken by most recent).",
-            op: "pop", arg: null, ret: val, val: val, phase: "POP_VAL",
-            popFrom: maxFreq, popVal: val
-          });
-
-          // line 21: decrement freq
-          freq[val] = maxFreq - 1;
-          snap({
-            lines: [21],
-            narr: "<code>freq.set(" + val + ", " + (maxFreq - 1) + ")</code> lowers " + val + "'s recorded count by one.",
-            op: "pop", arg: null, ret: val, val: val, phase: "POP_DECFREQ"
-          });
-
-          // lines 22-24: maybe lower maxFreq
-          if (group[maxFreq].length === 0) {
-            maxFreq--;
-            trace.push({ op: "pop", arg: "-", ret: val, maxFreq: maxFreq, group: groupStr(group) });
-            snap({
-              lines: [22, 23, 25],
-              narr: "group[" + (maxFreq + 1) + "] is now empty, so <b>maxFreq</b> drops to <b>" + maxFreq + "</b>. Return <b>" + val + "</b>.",
-              op: "pop", arg: null, ret: val, val: val, phase: "POP_LOWER"
-            });
-          } else {
-            trace.push({ op: "pop", arg: "-", ret: val, maxFreq: maxFreq, group: groupStr(group) });
-            snap({
-              lines: [22, 25],
-              narr: "group[" + maxFreq + "] still has values, so maxFreq stays " + maxFreq + ". Return <b>" + val + "</b>.",
-              op: "pop", arg: null, ret: val, val: val, phase: "POP_KEEP"
-            });
-          }
-        }
-      }
-
-      snap({
-        lines: [],
-        narr: "All operations in the sequence are complete.",
-        phase: "DONE",
-        done: true
-      });
-
-      return out;
+      const out=[],freq={},group={},trace=[];let maxFreq=0;
+      const snap=(line,phase,narr,extra={})=>out.push({executedLine:line,lines:line?[line]:[1],narr,freq:cloneFreq(freq),group:cloneGroup(group),maxFreq,op:"",arg:null,ret:null,val:null,f:null,phase,pushTo:null,pushVal:null,popFrom:null,popVal:null,trace:trace.map(r=>({...r})),done:false,...extra});
+      snap(null,"INIT","Ready to operate on the frequency stack.");snap(3,"INIT","Create the frequency map.");snap(4,"INIT","Create the frequency groups.");snap(5,"INIT","Initialize the maximum frequency.");
+      for(const op of ops){if(op.op==="push"){
+        const val=op.arg,meta={op:"push",arg:val,val};snap(7,"PUSH_F","Call push.",meta);const f=(freq[val]||0)+1;meta.f=f;snap(8,"PUSH_F","Compute the new frequency.",meta);freq[val]=f;snap(9,"PUSH_SETFREQ","Record the new frequency.",meta);snap(10,"PUSH_NOMAX","Check whether the maximum frequency grows.",meta);if(f>maxFreq){maxFreq=f;snap(11,"PUSH_MAX","Update the maximum frequency.",meta);}snap(13,"PUSH_GROUP","Check whether this frequency group exists.",meta);if(!group[f]){group[f]=[];snap(14,"PUSH_GROUP","Create this frequency group's stack.",meta);}group[f].push(val);trace.push({op:"push",arg:val,ret:"-",maxFreq,group:groupStr(group)});snap(16,"PUSH_GROUP","Push into the frequency group.",{...meta,pushTo:f,pushVal:val});
+      }else{
+        const meta={op:"pop",arg:null};snap(18,"POP_READ","Call pop.",meta);snap(19,"POP_READ","Read the group with maximum frequency.",meta);if(maxFreq===0||!group[maxFreq]?.length){trace.push({op:"pop",arg:"-",ret:"(empty)",maxFreq,group:groupStr(group)});continue;}const val=group[maxFreq].pop();meta.val=val;snap(20,"POP_VAL","Remove the most recent value in this group.",{...meta,popFrom:maxFreq,popVal:val});freq[val]=maxFreq-1;snap(21,"POP_DECFREQ","Decrease its frequency.",meta);snap(22,"POP_KEEP","Check whether this frequency group is now empty.",meta);if(group[maxFreq].length===0){maxFreq--;snap(23,"POP_LOWER","Decrease the maximum frequency.",meta);}trace.push({op:"pop",arg:"-",ret:val,maxFreq,group:groupStr(group)});snap(25,"POP_KEEP","Return the removed value.",{...meta,ret:val});}}
+      out[out.length-1].done=true;return out;
     }
 
     function init() {
@@ -1309,7 +1170,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({ops, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({ops, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

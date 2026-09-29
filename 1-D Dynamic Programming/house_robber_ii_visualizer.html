@@ -857,125 +857,44 @@
       const traceRows = [];
 
       function snapshot(extra) {
-        built.push({
-          pass: extra.pass,                       // 'pre' | 'A' | 'B' | 'final'
-          // slice info: startIdx/endIdx are inclusive bounds into the ORIGINAL nums; excluded house indices computed by renderer
-          sliceStart: (extra.sliceStart === undefined) ? null : extra.sliceStart,
-          sliceEnd: (extra.sliceEnd === undefined) ? null : extra.sliceEnd,
-          curIdx: (extra.curIdx === undefined) ? null : extra.curIdx,   // index into ORIGINAL nums of current house x
-          scannedUntil: (extra.scannedUntil === undefined) ? null : extra.scannedUntil, // original-index up to which loop has consumed
-          prev: (extra.prev === undefined) ? null : extra.prev,
-          curr: (extra.curr === undefined) ? null : extra.curr,
-          x: (extra.x === undefined) ? null : extra.x,
-          nextVal: (extra.nextVal === undefined) ? null : extra.nextVal,
-          ansA: (extra.ansA === undefined) ? null : extra.ansA,
-          ansB: (extra.ansB === undefined) ? null : extra.ansB,
-          finalAns: (extra.finalAns === undefined) ? null : extra.finalAns,
-          lines: extra.lines,
-          narration: extra.narration,
-          flashCurr: (extra.flashCurr === undefined) ? false : extra.flashCurr,
-          done: (extra.done === undefined) ? false : extra.done,
-          traceLen: traceRows.length
-        });
-      }
+ const frame = {
+  pass: extra.pass,
+  // 'pre' | 'A' | 'B' | 'final'
+  // slice info: startIdx/endIdx are inclusive bounds into the ORIGINAL nums; excluded house indices computed by renderer
+  sliceStart: extra.sliceStart === undefined ? null : extra.sliceStart,
+  sliceEnd: extra.sliceEnd === undefined ? null : extra.sliceEnd,
+  curIdx: extra.curIdx === undefined ? null : extra.curIdx,
+  // index into ORIGINAL nums of current house x
+  scannedUntil: extra.scannedUntil === undefined ? null : extra.scannedUntil,
+  // original-index up to which loop has consumed
+  prev: extra.prev === undefined ? null : extra.prev,
+  curr: extra.curr === undefined ? null : extra.curr,
+  x: extra.x === undefined ? null : extra.x,
+  nextVal: extra.nextVal === undefined ? null : extra.nextVal,
+  ansA: extra.ansA === undefined ? null : extra.ansA,
+  ansB: extra.ansB === undefined ? null : extra.ansB,
+  finalAns: extra.finalAns === undefined ? null : extra.finalAns,
+  lines: extra.lines,
+  narration: extra.narration,
+  flashCurr: extra.flashCurr === undefined ? false : extra.flashCurr,
+  done: extra.done === undefined ? false : extra.done,
+  traceLen: traceRows.length
+};
+ frame.executedLine = extra.lines.length === 1 ? extra.lines[0] : null;
+ if (!built.length) built.push({...frame,lines:[],executedLine:null,phase:'ready',narration:'Ready. Press Step Over to execute the first instruction.'});
+ built.push(frame);
+}
 
-      // Edge case n === 1.
-      if (n === 1) {
-        snapshot({
-          pass: "pre", lines: [2, 3], finalAns: arr[0], done: true,
-          sliceStart: 0, sliceEnd: 0,
-          narration: "Only one house, so the circular constraint is moot: <code>return nums[0] = <b>" + arr[0] + "</b></code>."
-        });
-        built._trace = traceRows;
-        return built;
-      }
-
-      // Intro snapshot.
-      snapshot({
-        pass: "pre", lines: [1, 2, 13],
-        sliceStart: null, sliceEnd: null,
-        narration: "House 0 and house " + (n - 1) + " are <b>adjacent</b> (circular). So we never rob both. Run the linear House-Robber twice: once excluding the <b>last</b> house, once excluding the <b>first</b>, and take the max."
-      });
-
-      // Helper to run a robLine pass with snapshots; passId 'A' or 'B'.
-      // sliceArr is the slice values; sliceStartIdx is the original index that slice[0] maps to.
-      function runPass(passId, sliceArr, sliceStartIdx, sliceEndIdx, headerNarr, getAns) {
-        snapshot({
-          pass: passId, lines: [13, 4, 5], prev: 0, curr: 0,
-          sliceStart: sliceStartIdx, sliceEnd: sliceEndIdx, scannedUntil: sliceStartIdx - 1,
-          ansA: getAns().ansA, ansB: getAns().ansB,
-          narration: headerNarr + " Initialize <code>prev = 0, curr = 0</code>."
-        });
-
-        let prev = 0, curr = 0;
-        for (let k = 0; k < sliceArr.length; k++) {
-          const x = sliceArr[k];
-          const origIdx = sliceStartIdx + k;
-
-          // read x
-          snapshot({
-            pass: passId, lines: [6, 7], prev, curr, x,
-            sliceStart: sliceStartIdx, sliceEnd: sliceEndIdx, curIdx: origIdx, scannedUntil: origIdx - 1,
-            ansA: getAns().ansA, ansB: getAns().ansB,
-            narration: "Visit house index <b>" + origIdx + "</b> (value x = <b>" + x + "</b>). " +
-              "<code>next = max(curr (" + curr + "), prev + x (" + (prev + x) + "))</code> — skip this house, or rob it and add to prev."
-          });
-
-          const nextVal = Math.max(curr, prev + x);
-          snapshot({
-            pass: passId, lines: [7], prev, curr, x, nextVal,
-            sliceStart: sliceStartIdx, sliceEnd: sliceEndIdx, curIdx: origIdx, scannedUntil: origIdx - 1,
-            ansA: getAns().ansA, ansB: getAns().ansB,
-            narration: "<code>next = max(" + curr + ", " + (prev + x) + ") = <b>" + nextVal + "</b></code>. " +
-              (prev + x >= curr ? "Robbing house " + origIdx + " (or tying) wins." : "Skipping house " + origIdx + " keeps more loot.")
-          });
-
-          // roll prev = curr, curr = next
-          prev = curr;
-          curr = nextVal;
-          traceRows.push({ pass: passId, idx: origIdx, x, prev, curr });
-          snapshot({
-            pass: passId, lines: [8, 9], prev, curr, x, nextVal,
-            sliceStart: sliceStartIdx, sliceEnd: sliceEndIdx, curIdx: origIdx, scannedUntil: origIdx,
-            ansA: getAns().ansA, ansB: getAns().ansB, flashCurr: true,
-            narration: "Roll the window: <code>prev = curr</code> then <code>curr = next</code>. Now <b>prev = " + prev + "</b>, <b>curr = " + curr + "</b>."
-          });
-        }
-
-        // return curr
-        snapshot({
-          pass: passId, lines: [11], prev, curr,
-          sliceStart: sliceStartIdx, sliceEnd: sliceEndIdx, scannedUntil: sliceEndIdx,
-          ansA: passId === "A" ? curr : getAns().ansA,
-          ansB: passId === "B" ? curr : getAns().ansB,
-          narration: "Pass " + passId + " finished. <code>robLine</code> returns <b>curr = " + curr + "</b> — the best loot for this slice."
-        });
-
-        return curr;
-      }
-
-      // Pass A: exclude last house -> nums.slice(0, n-1) -> original indices 0..n-2
-      let ansA = null, ansB = null;
-      const sliceA = arr.slice(0, n - 1);
-      ansA = runPass("A", sliceA, 0, n - 2,
-        "<b>Pass A</b>: <code>robLine(nums.slice(0, " + (n - 1) + "))</code> excludes house " + (n - 1) + ".",
-        () => ({ ansA, ansB }));
-
-      // Pass B: exclude first house -> nums.slice(1) -> original indices 1..n-1
-      const sliceB = arr.slice(1);
-      ansB = runPass("B", sliceB, 1, n - 1,
-        "<b>Pass B</b>: <code>robLine(nums.slice(1))</code> excludes house 0.",
-        () => ({ ansA, ansB }));
-
-      // Final: Math.max(ansA, ansB)
-      const finalAns = Math.max(ansA, ansB);
-      snapshot({
-        pass: "final", lines: [13], ansA, ansB, finalAns, done: true,
-        narration: "Return <code>Math.max(robLine A (" + ansA + "), robLine B (" + ansB + ")) = <b>" + finalAns + "</b></code> — the most money without robbing two adjacent (or the two wrap-around) houses."
-      });
-
-      built._trace = traceRows;
-      return built;
+snapshot({pass:'pre',lines:[2],narration:'Read the number of houses.'});
+ if(n===1){snapshot({pass:'pre',lines:[3],finalAns:arr[0],done:true,sliceStart:0,sliceEnd:0,narration:'Return the only house value.'});built._trace=traceRows;return built;}
+ snapshot({pass:'pre',lines:[3],narration:'There is more than one house.'});snapshot({pass:'pre',lines:[4],narration:'Define the linear robber helper.'});
+ let ansA=null,ansB=null;
+ function runPass(pass,sliceStart,sliceEnd){let prev=0,curr=0;const emit=(line,more={})=>snapshot({pass,sliceStart,sliceEnd,prev,curr,ansA,ansB,lines:[line],...more,narration:more.narration||'Execute this linear-robber line.'});
+  emit(13,{narration:'Call the linear helper for this allowed house range.'});emit(5,{scannedUntil:sliceStart-1,narration:'Initialize prev = 0 and curr = 0.'});
+  for(let curIdx=sliceStart;curIdx<=sliceEnd;curIdx++){const x=arr[curIdx];emit(6,{curIdx,x,scannedUntil:curIdx-1,narration:'Read the next house value.'});const nextVal=Math.max(curr,prev+x);emit(7,{curIdx,x,nextVal,scannedUntil:curIdx-1,narration:'Choose the better total from skipping or taking this house.'});prev=curr;emit(8,{curIdx,x,nextVal,scannedUntil:curIdx-1,narration:'Move the previous total to curr.'});curr=nextVal;traceRows.push({pass,idx:curIdx,x,prev,curr});emit(9,{curIdx,x,nextVal,scannedUntil:curIdx,flashCurr:true,narration:'Move curr to the chosen next total.'});}
+  emit(11,{scannedUntil:sliceEnd,narration:'Return the total for this linear range.'});return curr;
+ }
+ ansA=runPass('A',0,n-2);ansB=runPass('B',1,n-1);snapshot({pass:'final',lines:[13],ansA,ansB,finalAns:Math.max(ansA,ansB),done:true,narration:'Return the better result from the two allowed ranges.'});built._trace=traceRows;return built;
     }
 
     function loadExample(exNum) {
@@ -1379,8 +1298,8 @@
       spec: {"number":213,"title":"House Robber II","topic":"1-D Dynamic Programming","why":"The first and last houses are neighbors, so compare solutions excluding one endpoint at a time.","meanings":{"nums":"Money in each house, arranged in a **circle** (house `0` and house `n-1` are adjacent).","n":"Number of houses, `nums.length`.","robLine":"Helper that solves the **linear** House Robber on a sub-array via a rolling DP.","prev":"Best loot using houses up to two positions back (the `dp[i-2]` role).","curr":"Best loot using houses up to the previous position (the `dp[i-1]` role); ends as the slice answer.","next":"Candidate best for the current house: `max(curr, prev + x)` — skip it or rob it.","x":"Current house value being considered inside `robLine`.","ans":"Final answer: `max(robLine(exclude last), robLine(exclude first))`."},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nums, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, masterTrace, ...(steps[position] || {})}),
+      read: () => ({nums,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nums,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

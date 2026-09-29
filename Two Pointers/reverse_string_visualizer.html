@@ -817,16 +817,28 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      s = prev.s.slice();
-      left = prev.left;
-      right = prev.right;
-      execState = prev.execState;
-      trace = prev.trace.map(row => ({ ...row }));
-      swapIndices = prev.swapIndices ? prev.swapIndices.slice() : null;
+      restoreState(prev);
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+s = snapshot.s.slice();
+left = snapshot.left;
+right = snapshot.right;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+swapIndices = snapshot.swapIndices ? snapshot.swapIndices.slice() : null;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -835,10 +847,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = s.length - 1;
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = s.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left < right) {
@@ -866,6 +885,10 @@
 
         case "ADVANCE":
           left++;
+          execState = "ADVANCE_RIGHT";
+          break;
+
+        case "ADVANCE_RIGHT":
           right--;
           execState = "WHILE_CHECK";
           break;
@@ -924,7 +947,7 @@
         return row;
       }
 
-      const pointerActive = ["WHILE_CHECK", "SWAP", "ADVANCE"].includes(execState);
+      const pointerActive = ["WHILE_CHECK", "SWAP", "ADVANCE", "ADVANCE_RIGHT"].includes(execState);
 
       s.forEach((val, idx) => {
         const wrap = document.createElement("div");
@@ -1022,7 +1045,7 @@
       `;
 
       trace.forEach((row, idx) => {
-        const isActive = idx === trace.length - 1 && (execState === "ADVANCE" || execState === "SWAP");
+        const isActive = idx === trace.length - 1 && (execState === "ADVANCE" || execState === "ADVANCE_RIGHT" || execState === "SWAP");
         html += `
           <tr class="${isActive ? "active-trace" : ""}">
             <td><span class="nm">${row.left}</span></td>
@@ -1038,6 +1061,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1056,11 +1082,15 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate("Set <b>left = 0</b> and <b>right = s.length - 1</b>. The two pointers start at the two ends of the string.");
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           if (left < right) {
             narrate("<code>while (left &lt; right)</code> is <b>true</b> (left = " + left + ", right = " + right + "), so we still have a pair to swap.");
           } else if (left === right) {
@@ -1070,19 +1100,23 @@
           }
           break;
         case "SWAP":
-          highlightLines([5]);
+
           narrate("Swap <code>s[" + left + "]</code> and <code>s[" + right + "]</code> in place using array destructuring.");
           break;
         case "ADVANCE":
-          highlightLines([6, 7]);
-          narrate("Move the pointers inward: <code>left++</code> and <code>right--</code>. These two characters are now settled.");
+
+          narrate("Move the left pointer inward: <code>left++</code>.");
+          break;
+        case "ADVANCE_RIGHT":
+
+          narrate("Now move the right pointer inward: <code>right--</code>. The pair is settled.");
           break;
         case "RETURN":
-          highlightLines([8]);
+
           narrate("The pointers met or crossed. The string has been reversed in place - nothing is returned.");
           break;
         case "END":
-          highlightLines([9]);
+
           narrate("Done. <code>s</code> is reversed in place: <b>\"" + s.join("") + "\"</b>.");
           break;
       }
@@ -1127,13 +1161,90 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "SWAP":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ADVANCE_RIGHT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 9,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     s = examples[1].slice();
     init(true);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":344,"title":"Reverse String","topic":"Two Pointers","why":"Swap the two endpoint characters and move inward until every mirrored pair is settled.","meanings":{"s":"character array being reversed in place","left":"left pointer, starts at index 0","right":"right pointer, starts at index s.length - 1"},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, originalInput, left, right, execState, swapIndices, ...({})}),

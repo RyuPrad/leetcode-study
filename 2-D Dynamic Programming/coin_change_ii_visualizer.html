@@ -764,7 +764,7 @@
     let activeExample = 1;
 
     // ---- BUILD steps[] : run the algorithm once, snapshot after each logical step ----
-    function buildSteps(inputAmount, inputCoins) {
+    function originalInstructionBuilder(inputAmount, inputCoins) {
       const localSteps = [];
       amount = inputAmount;
       coins = [...inputCoins];
@@ -1146,13 +1146,42 @@
     coins = [...examples[1].coins];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8,11]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":518,"title":"Coin Change II","topic":"2-D Dynamic Programming","why":"Process coin types in a fixed order so arrangements of the same coins are counted only once.","meanings":{"amount":"Target amount we want to make change for.","coins":"Array of distinct coin denominations (unlimited supply of each).","n":"Number of coins, `coins.length`; the table has `n + 1` rows.","dp":"2-D table; `dp[i][a]` = number of combinations using the first `i` coins that sum to amount `a`. Row 0 = \"no coins\"; column 0 = 1 (empty combination).","i":"Outer-loop row index, 1..n; selects the coin `coins[i - 1]` now available.","a":"Inner-loop column index, 1..amount; the sub-amount currently being solved.","coin":"The denomination for row `i`, i.e. `coins[i - 1]`."},"entityClasses":["hud-item","cell","inputCoins","coins","coin"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({amount, coins, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({amount, coins, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({amount, coins, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

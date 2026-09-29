@@ -822,6 +822,7 @@
       const built = [];
       const traceRows = [];
 
+      let nextQueue = [];
       function snapshot(extra) {
         built.push({
           grid: cloneGrid(g),
@@ -837,7 +838,9 @@
           frontier: (extra.frontier === undefined) ? [] : extra.frontier.map(p => p.slice()),
           // justRotted = cells infected during the in-progress minute
           justRotted: (extra.justRotted === undefined) ? [] : extra.justRotted.map(p => p.slice()),
+          next: nextQueue.map(p=>p.slice()),
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           phase: extra.phase || "scan",
           ans: (extra.ans === undefined) ? "pending" : extra.ans,
@@ -847,9 +850,11 @@
 
       let minutes = 0;
 
+      snapshot({minutes, lines: [], executedLine: null, narration: "Ready to scan the input grid."});
+      snapshot({minutes, lines: [4], narration: "Create the empty BFS queue."});
       // --- Scan phase: find all rotten sources and count fresh. ---
       snapshot({
-        minutes, lines: [4, 5],
+        minutes, lines: [5],
         narration: "Start with an empty <code>queue</code> and <code>fresh = 0</code>. First scan the grid: every <b style=\"color:#ce9178\">rotten (2)</b> seeds the BFS, every <b style=\"color:#b5cea8\">fresh (1)</b> is counted."
       });
 
@@ -873,7 +878,7 @@
       }
 
       snapshot({
-        minutes, lines: [12, 13, 14], phase: "preLoop",
+        minutes, lines: [13], phase: "preLoop",
         narration: "Scan done: <b>" + queue.length + "</b> rotten source(s), <b>" + fresh + "</b> fresh. <code>minutes = 0</code>. BFS runs while there is a frontier AND fresh oranges remain."
       });
 
@@ -881,10 +886,11 @@
       while (queue.length > 0 && fresh > 0) {
         const frontier = queue.map(p => p.slice());
         const next = [];
+        nextQueue = next;
         const rottedThisMinute = [];
 
         snapshot({
-          minutes, lines: [14, 15], phase: "levelStart", frontier, justRotted: rottedThisMinute,
+          minutes, lines: [15], phase: "levelStart", frontier, justRotted: rottedThisMinute,
           narration: "Minute <b>" + (minutes + 1) + "</b> begins. Process the entire current frontier (<b>" + frontier.length + "</b> rotten cell" + (frontier.length === 1 ? "" : "s") + ") and collect newly-rotted cells into <code>next</code>."
         });
 
@@ -892,11 +898,13 @@
           const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
           for (const [dr, dc] of dirs) {
             const nr = r + dr;
+            snapshot({minutes, r, c, nr, lines: [18], phase: "probe", frontier, justRotted: rottedThisMinute.slice(), narration: "Calculate the neighbor row. The grid and queues stay unchanged."});
             const nc = c + dc;
+            snapshot({minutes, r, c, nr, nc, lines: [19], phase: "probe", frontier, justRotted: rottedThisMinute.slice(), narration: "Calculate the neighbor column. The grid and queues stay unchanged."});
             const inBounds = (nr >= 0 && nr < rows && nc >= 0 && nc < cols);
             const isFresh = inBounds && g[nr][nc] === 1;
             snapshot({
-              minutes, r, c, nr, nc, lines: [18, 19, 20], phase: "probe",
+              minutes, r, c, nr, nc, lines: [20], phase: "probe",
               frontier, justRotted: rottedThisMinute.slice(),
               narration: "From rotten (" + r + ", " + c + ") look at neighbor (" + nr + ", " + nc + "): " +
                 (!inBounds
@@ -907,11 +915,13 @@
             });
             if (isFresh) {
               g[nr][nc] = 2;
+              snapshot({minutes, r, c, nr, nc, lines: [21], phase: "infect", frontier, justRotted: [[nr,nc]], next: next.map(p=>p.slice()), narration: "Change this fresh orange to rotten. The fresh count and next queue are unchanged."});
               fresh--;
+              snapshot({minutes, r, c, nr, nc, lines: [22], phase: "infect", frontier, justRotted: [[nr,nc]], next: next.map(p=>p.slice()), narration: "Decrease the remaining fresh count. The next queue is unchanged."});
               next.push([nr, nc]);
               rottedThisMinute.push([nr, nc]);
               snapshot({
-                minutes, r, c, nr, nc, lines: [21, 22, 23], phase: "infect",
+                minutes, r, c, nr, nc, lines: [23], phase: "infect",
                 frontier, justRotted: rottedThisMinute.slice(),
                 narration: "<code>grid[" + nr + "][" + nc + "] = 2</code>, <code>fresh--</code> → <b>" + fresh + "</b>, push [<b>" + nr + "</b>, <b>" + nc + "</b>] into <code>next</code>."
               });
@@ -920,10 +930,11 @@
         }
 
         queue = next;
+        snapshot({minutes, lines: [27], phase: "levelEnd", frontier: [], justRotted: rottedThisMinute.slice(), narration: "Use the collected next frontier as queue. The minute count is unchanged."});
         minutes++;
         traceRows.push({ minute: minutes, rotted: rottedThisMinute.length, freshLeft: fresh, queueSize: queue.length });
         snapshot({
-          minutes, lines: [27, 28], phase: "levelEnd",
+          minutes, lines: [28], phase: "levelEnd",
           frontier: [], justRotted: rottedThisMinute.slice(),
           narration: "<code>queue = next</code> (<b>" + queue.length + "</b> cell" + (queue.length === 1 ? "" : "s") + " to spread from), <code>minutes++</code> → <b>" + minutes + "</b>. Fresh remaining: <b>" + fresh + "</b>."
         });
@@ -1281,7 +1292,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({grid, STATE_GLYPH, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({grid, STATE_GLYPH, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({grid, STATE_GLYPH, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -670,6 +670,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -936,21 +937,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parsePiles(text) {
-      const body = text.split("|")[0];
-      try {
-        const parsed = JSON.parse(body.trim());
-        if (!Array.isArray(parsed)) throw new Error("not array");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n) || n < 1)) throw new Error("bad");
-        return clean;
-      } catch (err) {
-        const fallback = body.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && Number.isInteger(n) && n >= 1);
-        if (fallback.length > 0) return fallback;
-        alert("Please enter positive integer piles like 3,6,7,11 (use the | to add h, e.g. 3,6,7,11 | 8)");
-        return null;
-      }
-    }
+    function parsePiles(text) { try { return StudyNumericInput.list(text.split("|")[0], {min: 1, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -967,28 +954,21 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parsed = parsePiles(raw);
-      if (!parsed) return;
-      if (parsed.length < 1) {
-        alert("Koko needs at least 1 pile.");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const [arrayText, parameterText] = parser.optionalParameter(document.getElementById("custom-input").value, document.getElementById("target-input").value, 'Piles and h');
+        const parsed = parser.list(arrayText, {min: 1, minLength: 1, label: 'Piles'});
+        const parsedH = parser.integer(parameterText, {min: parsed.length, label: 'h'});
+        piles = parsed;
+        h = parsedH;
+        document.getElementById("target-input").value = h;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      let hVal;
-      if (raw.includes("|")) {
-        hVal = Number(raw.split("|")[1].trim());
-      } else {
-        hVal = Number(document.getElementById("target-input").value);
-      }
-      if (!Number.isFinite(hVal) || !Number.isInteger(hVal) || hVal < parsed.length) {
-        alert("h must be an integer that is at least the number of piles (" + parsed.length + ").");
-        return;
-      }
-      piles = parsed;
-      h = hVal;
-      document.getElementById("target-input").value = h;
-      activeExample = 0;
-      init();
     }
 
     function computeHours(speed) {
@@ -1035,23 +1015,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      piles = prev.piles.slice();
-      h = prev.h;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      ans = prev.ans;
-      hours = prev.hours;
-      simIndex = prev.simIndex;
-      feasible = prev.feasible;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+piles = snapshot.piles.slice();
+h = snapshot.h;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+ans = snapshot.ans;
+hours = snapshot.hours;
+simIndex = snapshot.simIndex;
+feasible = snapshot.feasible;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace() {
       trace.push({
@@ -1071,16 +1070,26 @@
 
       switch (execState) {
         case "INIT":
-          left = 1;
-          right = Math.max(...piles);
-          ans = right;
-          mid = null;
-          hours = null;
-          simIndex = -1;
-          feasible = null;
-          lastAction = "Initialize left = 1 and right = max(piles) = " + right + ". ans = right for now.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 1;
+ mid = null;
+hours = null;
+simIndex = -1;
+feasible = null;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = Math.max(...piles);
+
+ lastAction = "Initialize right.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = right;
+
+ lastAction = "Initialize ans.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1094,26 +1103,34 @@
 
         case "CALC_MID":
           mid = Math.floor((left + right) / 2);
+          lastAction = "Candidate speed mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Reset hours = 0.";
+          execState = "INIT_HOURS";
+          break;
+
+        case "INIT_HOURS":
           hours = 0;
           simIndex = -1;
           feasible = null;
-          lastAction = "Candidate speed mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Reset hours = 0.";
           execState = "SIM_STEP";
           break;
 
         case "SIM_STEP":
           if (simIndex + 1 < piles.length) {
             simIndex++;
-            const add = Math.ceil(piles[simIndex] / mid);
-            hours += add;
-            lastAction = "Pile " + piles[simIndex] + ": ceil(" + piles[simIndex] + " / " + mid + ") = " + add + " hours. Running hours = " + hours + ".";
-            if (simIndex + 1 >= piles.length) {
-              execState = "SIM_DONE";
-            }
+            lastAction = "Inspect pile " + piles[simIndex] + " for the candidate speed " + mid + ".";
+            execState = "ADD_HOURS";
           } else {
             execState = "SIM_DONE";
           }
           break;
+
+        case "ADD_HOURS": {
+          const add = Math.ceil(piles[simIndex] / mid);
+          hours += add;
+          lastAction = "Pile " + piles[simIndex] + ": ceil(" + piles[simIndex] + " / " + mid + ") = " + add + " hours. Running hours = " + hours + ".";
+          execState = simIndex + 1 >= piles.length ? "SIM_DONE" : "SIM_STEP";
+          break;
+        }
 
         case "SIM_DONE":
           feasible = hours <= h;
@@ -1123,21 +1140,26 @@
           } else {
             lastAction = "Total hours = " + hours + " > h = " + h + ". Speed " + mid + " is TOO SLOW.";
           }
-          execState = "COMPARE";
+          execState = feasible ? "COMPARE_FEASIBLE" : "COMPARE_INFEASIBLE";
           break;
 
-        case "COMPARE":
-          if (feasible) {
-            lastAction = "Feasible: record ans = mid = " + mid + ", then try a slower speed with right = mid - 1.";
-            execState = "MOVE_RIGHT";
-          } else {
-            lastAction = "Infeasible: speed must increase, so left = mid + 1.";
-            execState = "MOVE_LEFT";
-          }
+        case "COMPARE_FEASIBLE":
+          lastAction = "Feasible: record ans = mid = " + mid + ", then try a slower speed with right = mid - 1.";
+          execState = "RECORD_ANS";
+          break;
+
+        case "COMPARE_INFEASIBLE":
+          lastAction = "Infeasible: speed must increase, so left = mid + 1.";
+          execState = "MOVE_LEFT";
+          break;
+
+        case "RECORD_ANS":
+          ans = mid;
+          lastAction = "Record " + mid + " as the best feasible speed so far.";
+          execState = "MOVE_RIGHT";
           break;
 
         case "MOVE_RIGHT":
-          ans = mid;
           right = mid - 1;
           mid = null;
           hours = null;
@@ -1459,54 +1481,167 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Set <code>left = 1</code>, <code>right = max(piles)</code>, and start <code>ans = right</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, there is still a speed to test.' : 'The speed window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([6, 7]);
-          narrate('Pick candidate speed <code>mid = floor((left + right) / 2)</code> and reset <code>hours = 0</code>.');
+
+          narrate('Pick candidate speed <code>mid = floor((left + right) / 2)</code>.');
+          break;
+        case "INIT_HOURS":
+
+          narrate('Start the feasibility check with <code>hours = 0</code>.');
           break;
         case "SIM_STEP":
-          highlightLines([8, 9]);
-          narrate('Add <code>ceil(' + piles[simIndex] + ' / ' + mid + ')</code> hours for this pile. Eating faster means fewer hours per pile.');
+
+          narrate(simIndex + 1 < piles.length
+            ? 'Read the next pile, <b>' + piles[simIndex + 1] + '</b>, for the feasibility check.'
+            : 'All piles have been checked; finish the loop.');
+          break;
+        case "ADD_HOURS":
+
+          narrate('Add <code>ceil(' + piles[simIndex] + ' / ' + mid + ') = ' + Math.ceil(piles[simIndex] / mid) + '</code> hours for this pile.');
           break;
         case "SIM_DONE":
-          highlightLines([11]);
+
           narrate('All piles counted: <code>hours = ' + hours + '</code>. Compare against <code>h = ' + h + '</code>.');
           break;
-        case "COMPARE":
-          if (feasible) {
-            highlightLines([11, 12, 13]);
-            narrate('<code>hours &lt;= h</code> is <b style="color:#73d66b">true</b>: speed ' + mid + ' works, so record it and search slower.');
-          } else {
-            highlightLines([14, 15]);
-            narrate('<code>hours &lt;= h</code> is <b style="color:#ff5c68">false</b>: this speed is too slow, search faster.');
-          }
+        case "COMPARE_FEASIBLE":
+
+          narrate('<code>hours &lt;= h</code> is <b style="color:#73d66b">true</b>: speed ' + mid + ' works, so record it and search slower.');
+          break;
+        case "COMPARE_INFEASIBLE":
+
+          narrate('<code>hours &lt;= h</code> is <b style="color:#ff5c68">false</b>: this speed is too slow, search faster.');
+          break;
+        case "RECORD_ANS":
+
+          narrate('Save this feasible speed as the current best answer.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([12, 13]);
-          narrate('Record <code>ans = mid</code> and discard faster speeds with <code>right = mid - 1</code>.');
+
+          narrate('Discard faster speeds with <code>right = mid - 1</code>.');
           break;
         case "MOVE_LEFT":
-          highlightLines([15]);
+
           narrate('Discard slower speeds with <code>left = mid + 1</code>.');
           break;
         case "RETURN_ANS":
-          highlightLines([18]);
+
           narrate('Return <code>ans</code>, the smallest feasible eating speed.');
           break;
         case "END":
-          highlightLines([18]);
+
           narrate('&#10003; Done. The minimum eating speed is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "INIT_HOURS":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "SIM_STEP":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADD_HOURS":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "SIM_DONE":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "COMPARE_FEASIBLE":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "COMPARE_INFEASIBLE":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "RECORD_ANS":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "RETURN_ANS":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 18,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1536,8 +1671,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":875,"title":"Koko Eating Bananas","topic":"Binary Search","why":"A candidate eating speed determines the required hours; find the smallest speed meeting the limit.","meanings":{"piles":"array of banana pile sizes","h":"total hours Koko is allowed to eat","left":"low end of the candidate eating-speed range (starts at 1)","right":"high end of the candidate eating-speed range (starts at max(piles))","mid":"candidate eating speed being tested = floor((left + right) / 2)","ans":"smallest feasible speed found so far (the answer)"},"entityClasses":["hud-item","sim-cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({piles, h, left, right, mid, ans, hours, simIndex, feasible, execState, lastAction, ...({})}),

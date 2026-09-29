@@ -994,201 +994,13 @@
     // buildSteps — runs the REAL algorithm and pushes an immutable
     // deep-copied snapshot per logical step.
     // ============================================================
-    function buildSteps(inputS, dict) {
-      const built = [];
-      const traceRows = [];
-
-      // ---- Phase 1: build the trie, snapshotting node creation. ----
-      const root = new TrieNode();
-      const idMap = new Map();
-      idMap.set(root, "R");
-
-      function snapshot(extra) {
-        built.push({
-          phase: extra.phase,
-          trie: extra.trie,
-          // string-walk state
-          i: (extra.i === undefined) ? null : extra.i,
-          j: (extra.j === undefined) ? null : extra.j,
-          ch: (extra.ch === undefined) ? null : extra.ch,
-          matchStart: (extra.matchStart === undefined) ? null : extra.matchStart, // i
-          matchEnd: (extra.matchEnd === undefined) ? null : extra.matchEnd,       // j inclusive while scanning
-          scanActive: (extra.scanActive === undefined) ? false : extra.scanActive,
-          // dp state
-          dp: extra.dp.slice(),
-          dpFilledFrom: extra.dpFilledFrom,   // indices >= this are finalised
-          dpCurrent: (extra.dpCurrent === undefined) ? null : extra.dpCurrent,
-          dpLookup: (extra.dpLookup === undefined) ? null : extra.dpLookup, // index being read in Math.min
-          dpUpdated: (extra.dpUpdated === undefined) ? false : extra.dpUpdated,
-          buildWord: (extra.buildWord === undefined) ? null : extra.buildWord,
-          buildPos: (extra.buildPos === undefined) ? null : extra.buildPos,
-          lines: extra.lines,
-          narration: extra.narration,
-          ans: (extra.ans === undefined) ? null : extra.ans,
-          traceLen: traceRows.length
-        });
-      }
-
-      const nFull = inputS.length;
-      const dpInit = new Array(nFull + 1).fill(0);
-
-      snapshot({
-        phase: "build",
-        trie: snapTrie(root, idMap, null, null),
-        dp: dpInit,
-        dpFilledFrom: nFull + 1,
-        lines: [9],
-        narration: "<b>Phase 1 — build the trie.</b> Start with an empty <code>root</code> = <code>new TrieNode()</code>."
-      });
-
-      for (const word of dict) {
-        let node = root;
-        snapshot({
-          phase: "build",
-          trie: snapTrie(root, idMap, new Set([idMap.get(node)]), null),
-          buildWord: word, buildPos: -1,
-          dp: dpInit, dpFilledFrom: nFull + 1,
-          lines: [10, 11],
-          narration: "Insert dictionary word <b>\"" + word + "\"</b>. Reset <code>node = root</code>."
-        });
-        for (let p = 0; p < word.length; p++) {
-          const ch = word[p];
-          let created = null;
-          if (!node.children[ch]) {
-            node.children[ch] = new TrieNode();
-            idMap.set(node.children[ch], idMap.get(node) + ">" + ch);
-            created = idMap.get(node.children[ch]);
-          }
-          node = node.children[ch];
-          const pathIds = new Set();
-          // collect ids along the current path from root
-          {
-            let t = root; pathIds.add(idMap.get(t));
-            for (let q = 0; q <= p; q++) { t = t.children[word[q]]; pathIds.add(idMap.get(t)); }
-          }
-          snapshot({
-            phase: "build",
-            trie: snapTrie(root, idMap, pathIds, created),
-            buildWord: word, buildPos: p,
-            dp: dpInit, dpFilledFrom: nFull + 1,
-            lines: created ? [13, 14] : [14],
-            narration: created
-              ? "Letter <b>'" + ch + "'</b> not present — create a new child node, then walk into it."
-              : "Letter <b>'" + ch + "'</b> already exists — reuse the existing child and walk into it."
-          });
-        }
-        node.isEnd = true;
-        const pathIds = new Set();
-        { let t = root; pathIds.add(idMap.get(t)); for (const cch of word) { t = t.children[cch]; pathIds.add(idMap.get(t)); } }
-        snapshot({
-          phase: "build",
-          trie: snapTrie(root, idMap, pathIds, null),
-          buildWord: word, buildPos: word.length - 1,
-          dp: dpInit, dpFilledFrom: nFull + 1,
-          lines: [16],
-          narration: "Mark the final node of <b>\"" + word + "\"</b> as a word end: <code>node.isEnd = true</code> (green ✓)."
-        });
-      }
-
-      // ---- Phase 2: DP fill right→left. ----
-      const n = inputS.length;
-      const dp = new Array(n + 1).fill(0);
-      snapshot({
-        phase: "dp",
-        trie: snapTrie(root, idMap, new Set(["R"]), null),
-        dp, dpFilledFrom: n,    // dp[n] = 0 is the base case (already finalised)
-        lines: [19, 20],
-        narration: "<b>Phase 2 — dynamic programming.</b> <code>n = " + n + "</code>. Allocate <code>dp</code> of length <b>" + (n + 1) + "</b>, all zeros. <code>dp[" + n + "] = 0</code> is the base case (empty suffix has 0 extras)."
-      });
-
-      for (let i = n - 1; i >= 0; i--) {
-        // dp[i] = dp[i+1] + 1
-        dp[i] = dp[i + 1] + 1;
-        snapshot({
-          phase: "dp",
-          trie: snapTrie(root, idMap, new Set(["R"]), null),
-          i, matchStart: i,
-          dp, dpFilledFrom: i + 1, dpCurrent: i, dpLookup: i + 1, dpUpdated: true,
-          lines: [21, 22],
-          narration: "<b>i = " + i + "</b> (char <b>'" + inputS[i] + "'</b>). Default: skip <code>s[" + i + "]</code> as an extra char → <code>dp[" + i + "] = dp[" + (i + 1) + "] + 1 = " + dp[i] + "</code>."
-        });
-
-        let node = root;
-        snapshot({
-          phase: "dp",
-          trie: snapTrie(root, idMap, new Set([idMap.get(node)]), null),
-          i, matchStart: i,
-          dp, dpFilledFrom: i + 1, dpCurrent: i,
-          lines: [23, 24],
-          narration: "Try to match dictionary words starting at index <b>" + i + "</b>. Reset <code>node = root</code> and walk <code>j</code> forward."
-        });
-
-        for (let j = i; j < n; j++) {
-          const ch = inputS[j];
-          const pathBefore = new Set();
-          { let t = node; /* node is current trie pos */ }
-          // does child exist?
-          if (!node.children[ch]) {
-            // build path ids for what we have matched so far (i..j-1)
-            const pathIds = new Set(); let t = root; pathIds.add("R");
-            for (let q = i; q < j; q++) { t = t.children[inputS[q]]; if (t) pathIds.add(idMap.get(t)); }
-            snapshot({
-              phase: "dp",
-              trie: snapTrie(root, idMap, pathIds, null),
-              i, j, ch, matchStart: i, matchEnd: j, scanActive: true,
-              dp, dpFilledFrom: i + 1, dpCurrent: i,
-              lines: [25, 26],
-              narration: "j = " + j + ": <code>s[" + j + "] = '" + ch + "'</code> has <b>no child</b> in the trie. <code>break</code> — no longer dictionary words start here."
-            });
-            break;
-          }
-          node = node.children[ch];
-          // path ids i..j
-          const pathIds = new Set(); let t = root; pathIds.add("R");
-          for (let q = i; q <= j; q++) { t = t.children[inputS[q]]; if (t) pathIds.add(idMap.get(t)); }
-          snapshot({
-            phase: "dp",
-            trie: snapTrie(root, idMap, pathIds, null),
-            i, j, ch, matchStart: i, matchEnd: j, scanActive: true,
-            dp, dpFilledFrom: i + 1, dpCurrent: i,
-            lines: [25, 26, 27],
-            narration: "j = " + j + ": <code>s[" + j + "] = '" + ch + "'</code> matches a child. Walk into it. Current matched substring: <b>\"" + inputS.slice(i, j + 1) + "\"</b>."
-          });
-
-          if (node.isEnd) {
-            const candidate = dp[j + 1];
-            const before = dp[i];
-            const took = candidate < before;
-            if (took) dp[i] = candidate;
-            traceRows.push({
-              i, j, word: inputS.slice(i, j + 1), cand: "dp[" + (j + 1) + "]=" + candidate,
-              before, after: dp[i], action: took ? "min ↓ " + dp[i] : "keep " + dp[i]
-            });
-            snapshot({
-              phase: "dp",
-              trie: snapTrie(root, idMap, pathIds, null),
-              i, j, ch, matchStart: i, matchEnd: j, scanActive: true,
-              dp, dpFilledFrom: i + 1, dpCurrent: i, dpLookup: j + 1, dpUpdated: took,
-              lines: [28],
-              narration: "<b>\"" + inputS.slice(i, j + 1) + "\"</b> is a dictionary word (isEnd ✓). " +
-                "<code>dp[" + i + "] = Math.min(" + before + ", dp[" + (j + 1) + "]=" + candidate + ") = " + dp[i] + "</code>." +
-                (took ? " Improved!" : " No improvement.")
-            });
-          }
-        }
-      }
-
-      const ans = dp[0];
-      snapshot({
-        phase: "done",
-        trie: snapTrie(root, idMap, new Set(["R"]), null),
-        dp, dpFilledFrom: 0, dpCurrent: 0,
-        lines: [31],
-        narration: "✓ Done. The minimum number of extra characters is <code>return dp[0] = <b>" + ans + "</b></code>.",
-        ans
-      });
-
-      return built;
+    function buildSteps(inputS,dict) {
+      const built=[],traceRows=[],root=new TrieNode(),idMap=new Map([[root,'R']]),n=inputS.length,dp=new Array(n+1).fill(0);let phase='build',i=null,j=null,ch=null,buildWord=null,buildPos=null,dpFilledFrom=n+1,active=new Set(['R']);
+      const snap=(line,narration,extra={})=>built.push({phase,trie:snapTrie(root,idMap,active,null),i,j,ch,matchStart:i,matchEnd:j,scanActive:phase==='dp'&&j!==null,dp:[...dp],dpFilledFrom,dpCurrent:i,dpLookup:null,dpUpdated:false,buildWord,buildPos,executedLine:line,lines:line?[line]:[1],narration,ans:null,traceLen:traceRows.length,...extra});
+      snap(null,"Ready to minimize extra characters.");snap(9,"Create the root trie node.");
+      for(const word of dict){buildWord=word;buildPos=-1;active=new Set(['R']);snap(10,"Read the next dictionary word.");let node=root;snap(11,"Set the current node to the root.");for(buildPos=0;buildPos<word.length;buildPos++){ch=word[buildPos];snap(12,"Read the next dictionary character.");let created=null;if(!node.children[ch]){node.children[ch]=new TrieNode();idMap.set(node.children[ch],idMap.get(node)+'>'+ch);created=idMap.get(node.children[ch]);}snap(13,created?'Create the missing child.':'The child already exists.',{trie:snapTrie(root,idMap,active,created)});node=node.children[ch];active.add(idMap.get(node));snap(14,"Move to this child.");}ch=null;snap(12,"The dictionary word is complete.");node.isEnd=true;snap(16,"Mark the end of this dictionary word.");}buildWord=buildPos=null;active=new Set(['R']);snap(10,"The dictionary is complete.");phase='dp';snap(19,"Read the string length.");dpFilledFrom=n;snap(20,"Create the dynamic programming array.");
+      for(i=n-1;i>=0;i--){j=ch=null;active=new Set(['R']);dpFilledFrom=i+1;snap(21,"Visit the next suffix from right to left.");dp[i]=dp[i+1]+1;snap(22,"Treat this character as extra by default.",{dpLookup:i+1,dpUpdated:true});let node=root;snap(23,"Set the trie pointer to the root.");for(j=i;j<n;j++){ch=null;snap(24,"Visit the next character in this suffix.");ch=inputS[j];snap(25,"Read the character.");const child=node.children[ch];snap(26,child?'The child exists.':'The child is absent; stop this suffix search.');if(!child)break;node=child;active.add(idMap.get(node));snap(27,"Move to the child trie node.");if(node.isEnd){const candidate=dp[j+1],before=dp[i];dp[i]=Math.min(dp[i],candidate);traceRows.push({i,j,word:inputS.slice(i,j+1),cand:'dp['+(j+1)+']='+candidate,before,after:dp[i],action:dp[i]<before?'min '+dp[i]:'keep '+dp[i]});snap(28,"Use this dictionary word to update the suffix cost.",{dpLookup:j+1,dpUpdated:dp[i]<before});}else snap(28,"This trie node is not a word end.");}if(j===n)snap(24,"The suffix walk is complete.");}
+      j=ch=null;snap(21,"All suffixes are complete.");phase='done';dpFilledFrom=0;active=new Set(['R']);snap(31,"Return the minimum extra-character count.",{ans:dp[0],dpCurrent:0});return built;
     }
 
     // ============================================================
@@ -1637,8 +1449,8 @@
       spec: {"number":2707,"title":"Extra Characters in a String","topic":"Tries","why":"At each string position, compare skipping an extra character with consuming a matching dictionary word.","meanings":{"s":"The input string we are trying to break into dictionary words.","dictionary":"The list of valid words; any substring of `s` matching one is \"covered\".","root":"Root `TrieNode` of the trie built from every word in `dictionary`.","node":"The current `TrieNode` while inserting a word or while walking `s[i..j]`.","ch":"The current character: `s[j]` during the DP scan (or a letter of a word during insert).","dp":"Suffix DP array of length `n + 1`; `dp[i]` = minimum extra chars for the suffix `s[i..]`. `dp[n] = 0`.","i":"Outer DP index, iterating right → left. `dp[i] = dp[i+1] + 1` is the \"skip `s[i]`\" default.","j":"Inner index walking forward from `i`; `s[i..j]` is the substring matched against the trie.","ans":"The final answer, `dp[0]` — the minimum number of leftover (extra) characters."},"entityClasses":["hud-item","trie-node","str-cell","dp-cell","node"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({s, dictionary, finalAns, _traceCache, _traceCacheKey, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({s, dictionary, finalAns, _traceCache, _traceCacheKey, ...(steps[position] || {})}),
+      read: () => ({s, dictionary,    ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({s, dictionary,    ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

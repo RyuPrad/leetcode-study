@@ -709,6 +709,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -988,42 +989,23 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const barParts = raw.split("|");
-      if (barParts.length < 2) {
-        alert("Please use the format: rows separated by ; values by , then | target.\nExample: 1,3,5,7; 10,11,16,20 | 3");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const [rowsText, targetText] = parser.parts(document.getElementById("custom-input").value, 2, 'Matrix and target');
+        const parsedTarget = parser.integer(targetText, {label: 'Target'});
+        const parsedMatrix = rowsText.split(';').map(row => parser.list(row, {json: false, minLength: 1, label: 'Matrix row'}));
+        const width = parsedMatrix[0].length;
+        if (parsedMatrix.some(row => row.length !== width)) throw Error('Every row must have the same number of columns.');
+        if (parsedMatrix.some(row => row.some((value, i) => i > 0 && value < row[i - 1])) || parsedMatrix.some((row, i) => i > 0 && row[0] <= parsedMatrix[i - 1].at(-1))) throw Error('Rows must be sorted; each row must start after the previous row ends.');
+        matrix = parsedMatrix;
+        target = parsedTarget;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      const rowsText = barParts[0];
-      const targetText = barParts[1];
-      const parsedTarget = Number(targetText.trim());
-      if (!Number.isInteger(parsedTarget)) {
-        alert("The target must be an integer.");
-        return;
-      }
-      const rows = rowsText.split(";").map(part => part.trim()).filter(part => part.length > 0);
-      if (rows.length === 0) {
-        alert("Please provide at least one row.");
-        return;
-      }
-      const parsedMatrix = [];
-      for (const rowText of rows) {
-        const vals = rowText.split(",").map(p => Number(p.trim())).filter(p => p === p);
-        if (vals.length === 0 || vals.some(v => !Number.isInteger(v))) {
-          alert("Each row must contain only integers separated by commas.");
-          return;
-        }
-        parsedMatrix.push(vals);
-      }
-      const width = parsedMatrix[0].length;
-      if (parsedMatrix.some(row => row.length !== width)) {
-        alert("Every row must have the same number of columns.");
-        return;
-      }
-      matrix = parsedMatrix;
-      target = parsedTarget;
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -1072,27 +1054,50 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      matrix = prev.matrix.map(row => row.slice());
-      target = prev.target;
-      m = prev.m;
-      n = prev.n;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      midRow = prev.midRow;
-      midCol = prev.midCol;
-      val = prev.val;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
-      discardedLeftMax = prev.discardedLeftMax;
-      discardedRightMin = prev.discardedRightMin;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+matrix = snapshot.matrix.map(row => row.slice());
+target = snapshot.target;
+m = snapshot.m;
+n = snapshot.n;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+midRow = snapshot.midRow;
+midCol = snapshot.midCol;
+val = snapshot.val;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+discardedLeftMax = snapshot.discardedLeftMax;
+discardedRightMin = snapshot.discardedRightMin;
+}
 
     function addTrace(action, reason) {
       trace.push({
@@ -1114,20 +1119,35 @@
 
       switch (execState) {
         case "INIT":
-          m = matrix.length;
-          n = matrix[0].length;
-          left = 0;
-          right = m * n - 1;
-          mid = null;
-          midRow = null;
-          midCol = null;
-          val = null;
-          ans = null;
-          discardedLeftMax = -1;
-          discardedRightMin = m * n;
-          lastAction = "Set m = " + m + ", n = " + n + ", left = 0, right = m*n - 1 = " + (m * n - 1) + ".";
-          execState = "WHILE_CHECK";
-          break;
+ m = matrix.length;
+ mid = null;
+midRow = null;
+midCol = null;
+val = null;
+ans = null;
+discardedLeftMax = -1;
+discardedRightMin = m * n;
+ lastAction = "Initialize m.";
+ execState = "INIT_N";
+ break;
+case "INIT_N":
+ n = matrix[0].length;
+
+ lastAction = "Initialize n.";
+ execState = "INIT_LEFT";
+ break;
+case "INIT_LEFT":
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = m * n - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1558,57 +1578,158 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4, 5]);
-          narrate('Read <code>m</code> and <code>n</code>, then set <code>left = 0</code> and <code>right = m * n - 1</code>.');
-          break;
+
+ narrate("Initialize m from this line.");
+ break;
+case "INIT_N":
+
+ narrate("Initialize n from this line.");
+ break;
+case "INIT_LEFT":
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([6]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, the target could still be inside the virtual array.' : 'The virtual array is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([7]);
+
           narrate('Calculate the middle index using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "MAP_CELL":
-          highlightLines([8]);
+
           narrate('Map the 1-D index to a cell: <code>row = floor(mid / n) = ' + midRow + '</code>, <code>col = mid % n = ' + midCol + '</code>.');
           break;
         case "COMPARE":
           if (val === target) {
-            highlightLines([9, 10]);
+
             narrate('The cell value equals the target. Return <code>true</code>.');
           } else if (val < target) {
-            highlightLines([11, 12]);
+
             narrate('The cell value is too small. The target must be later in the virtual array.');
           } else {
-            highlightLines([13, 14]);
+
             narrate('The cell value is too large. The target must be earlier in the virtual array.');
           }
           break;
         case "MOVE_LEFT":
-          highlightLines([12]);
+
           narrate('Discard the left half by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([14]);
+
           narrate('Discard the right half by setting <code>right = mid - 1</code>.');
           break;
         case "RETURN_TRUE":
-          highlightLines([10]);
+
           narrate('Return <code>true</code> because the target was found.');
           break;
         case "RETURN_FALSE":
-          highlightLines([17]);
+
           narrate('The target does not exist in the matrix, so return <code>false</code>.');
           break;
         case "END":
-          highlightLines(ans === true ? [10] : [17]);
+
           narrate(ans === true ? '&#10003; Done. The answer is <code>true</code>.' : '&#10003; Done. The answer is <code>false</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_N":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "MAP_CELL":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "COMPARE":
+    if (val === target) {
+      return {
+        line: 9,
+        phase: execState
+      };
+    } else if (val < target) {
+      return {
+        line: 11,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 13,
+        phase: execState
+      };
+    }
+  case "MOVE_LEFT":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans === true ? [10] : [17])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1637,8 +1758,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":74,"title":"Search a 2D Matrix","topic":"Binary Search","why":"Sorted row boundaries let the matrix act like one sorted sequence with row/column coordinates.","meanings":{"matrix":"The row-sorted 2D grid; row-major order makes it one sorted sequence","target":"The value we are searching for","m":"Number of rows, `matrix.length`","n":"Number of columns, `matrix[0].length`","left":"Lower bound of the virtual 1-D index range (starts at 0)","right":"Upper bound of the virtual 1-D index range (starts at m*n - 1)","mid":"Current virtual index; the cell is `matrix[Math.floor(mid / n)][mid % n]`"},"entityClasses":["hud-item","mcell","lin-cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({matrix, target, m, n, left, right, mid, midRow, midCol, val, ans, execState, lastAction, discardedLeftMax, discardedRightMin, ...({})}),

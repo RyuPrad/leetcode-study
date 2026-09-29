@@ -667,8 +667,8 @@
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">Twitter</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>() {</div>
 <div id="line-3" class="code-line">    <span class="kw">this</span>.time = <span class="nm">0</span>;</div>
-<div id="line-4" class="code-line">    <span class="kw">this</span>.tweets = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -> [[time, tweetId]]</span></div>
-<div id="line-5" class="code-line">    <span class="kw">this</span>.following = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -> Set</span></div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.tweets = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -&gt; [[time, tweetId]]</span></div>
+<div id="line-5" class="code-line">    <span class="kw">this</span>.following = <span class="kw">new</span> <span class="fn">Map</span>(); <span class="cm">// user -&gt; Set</span></div>
 <div id="line-6" class="code-line">  }</div>
 <div id="line-7" class="code-line">  <span class="fn">postTweet</span>(userId, tweetId) {</div>
 <div id="line-8" class="code-line">    <span class="kw">if</span> (!<span class="kw">this</span>.tweets.<span class="fn">has</span>(userId)) <span class="kw">this</span>.tweets.<span class="fn">set</span>(userId, []);</div>
@@ -684,7 +684,7 @@
 <div id="line-18" class="code-line">      }</div>
 <div id="line-19" class="code-line">    }</div>
 <div id="line-20" class="code-line">    <span class="kw">const</span> res = [];</div>
-<div id="line-21" class="code-line">    <span class="kw">while</span> (heap.<span class="fn">size</span>() && res.length < <span class="nm">10</span>) {</div>
+<div id="line-21" class="code-line">    <span class="kw">while</span> (heap.<span class="fn">size</span>() && res.length &lt; <span class="nm">10</span>) {</div>
 <div id="line-22" class="code-line">      res.<span class="fn">push</span>(heap.<span class="fn">pop</span>()[<span class="nm">1</span>]);</div>
 <div id="line-23" class="code-line">    }</div>
 <div id="line-24" class="code-line">    <span class="kw">return</span> res;</div>
@@ -1104,153 +1104,11 @@
 
     // ----- Precompute steps by running the real implementation -----
     function buildSteps(opList) {
-      let time = 0;
-      const tweets = new Map();
-      const following = new Map();
-      const built = [];
-      const traceRows = [];
-
-      function snap(extra) {
-        built.push({
-          time,
-          tweets: cloneTweets(tweets),
-          following: cloneFollowing(following),
-          method: extra.method,
-          a: (extra.a === undefined) ? null : extra.a,
-          b: (extra.b === undefined) ? null : extra.b,
-          heap: (extra.heap ? extra.heap.map(e => e.slice()) : []),
-          feedUsers: extra.feedUsers || null,
-          scanUser: (extra.scanUser === undefined) ? null : extra.scanUser,
-          pushedEntry: (extra.pushedEntry === undefined) ? null : extra.pushedEntry,
-          heapAdded: (extra.heapAdded === undefined) ? null : extra.heapAdded,
-          poppedTweet: (extra.poppedTweet === undefined) ? null : extra.poppedTweet,
-          feed: extra.feed ? extra.feed.slice() : [],
-          lines: extra.lines,
-          narration: extra.narration,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        });
-      }
-
-      snap({
-        method: "init", lines: [2, 3, 4, 5],
-        narration: "Constructor: a global clock <code>time = 0</code>, a <code>tweets</code> map (user -> list of [time, tweetId]), and a <code>following</code> map (user -> set of followees)."
-      });
-
-      opList.forEach((op) => {
-        if (op.method === "postTweet") {
-          const userId = op.a, tweetId = op.b;
-          snap({
-            method: "postTweet", a: userId, b: tweetId, lines: [7],
-            narration: "<b>postTweet(" + userId + ", " + tweetId + ")</b> - record a tweet for user <b>" + userId + "</b> with the current timestamp."
-          });
-          if (!tweets.has(userId)) tweets.set(userId, []);
-          snap({
-            method: "postTweet", a: userId, b: tweetId, lines: [8],
-            narration: "Make sure user <b>" + userId + "</b> has a tweet list (create an empty one if this is their first tweet)."
-          });
-          tweets.get(userId).push([time, tweetId]);
-          const stamped = time;
-          time++;
-          snap({
-            method: "postTweet", a: userId, b: tweetId, lines: [9],
-            narration: "Append <code>[time=" + stamped + ", tweetId=" + tweetId + "]</code> to user <b>" + userId + "</b>'s timeline, then increment the global clock to <b>" + time + "</b>."
-          });
-          traceRows.push({ op: "postTweet(" + userId + "," + tweetId + ")", result: "time " + stamped });
-
-        } else if (op.method === "follow") {
-          const a = op.a, b = op.b;
-          snap({
-            method: "follow", a, b, lines: [26],
-            narration: "<b>follow(" + a + ", " + b + ")</b> - user <b>" + a + "</b> starts following user <b>" + b + "</b>."
-          });
-          if (!following.has(a)) following.set(a, new Set());
-          following.get(a).add(b);
-          snap({
-            method: "follow", a, b, lines: [27, 28],
-            narration: "Add <b>" + b + "</b> to user <b>" + a + "</b>'s following set. Their feed will now merge <b>" + b + "</b>'s tweets too."
-          });
-          traceRows.push({ op: "follow(" + a + "," + b + ")", result: "ok" });
-
-        } else if (op.method === "unfollow") {
-          const a = op.a, b = op.b;
-          snap({
-            method: "unfollow", a, b, lines: [30],
-            narration: "<b>unfollow(" + a + ", " + b + ")</b> - user <b>" + a + "</b> stops following user <b>" + b + "</b>."
-          });
-          const had = following.has(a) && following.get(a).has(b);
-          if (following.has(a)) following.get(a).delete(b);
-          snap({
-            method: "unfollow", a, b, lines: [31],
-            narration: had
-              ? "Remove <b>" + b + "</b> from user <b>" + a + "</b>'s following set."
-              : "User <b>" + a + "</b> was not following <b>" + b + "</b>; nothing changes."
-          });
-          traceRows.push({ op: "unfollow(" + a + "," + b + ")", result: had ? "removed" : "noop" });
-
-        } else { // getNewsFeed
-          const userId = op.a;
-          const heap = new MaxHeap();
-          snap({
-            method: "getNewsFeed", a: userId, lines: [11, 12], heap: heap.data,
-            narration: "<b>getNewsFeed(" + userId + ")</b> - build a fresh max-heap keyed by tweet time to merge the newest tweets."
-          });
-          const users = new Set(following.get(userId) || []);
-          users.add(userId);
-          const userArr = [...users];
-          snap({
-            method: "getNewsFeed", a: userId, lines: [13, 14], heap: heap.data, feedUsers: userArr,
-            narration: "The feed merges tweets from everyone <b>" + userId + "</b> follows, plus <b>" + userId + "</b>: users { " + userArr.join(", ") + " }."
-          });
-
-          for (const u of userArr) {
-            snap({
-              method: "getNewsFeed", a: userId, lines: [15, 16], heap: heap.data.map(e => e.slice()),
-              feedUsers: userArr, scanUser: u,
-              narration: "Scan user <b>" + u + "</b>'s timeline and push each of their tweets into the heap."
-            });
-            const list = tweets.get(u) || [];
-            for (const entry of list) {
-              heap.push(entry.slice());
-              snap({
-                method: "getNewsFeed", a: userId, lines: [17], heap: heap.data.map(e => e.slice()),
-                feedUsers: userArr, scanUser: u, pushedEntry: entry.slice(), heapAdded: heap.data.length - 1,
-                narration: "Push <code>[time=" + entry[0] + ", tweetId=" + entry[1] + "]</code> from user <b>" + u + "</b> (sift-up keeps the newest tweet at the root)."
-              });
-            }
-          }
-
-          const res = [];
-          snap({
-            method: "getNewsFeed", a: userId, lines: [20, 21], heap: heap.data.map(e => e.slice()),
-            feedUsers: userArr, feed: res.slice(),
-            narration: "All tweets are in the heap. Pop the newest (largest time) up to 10 times to build the feed."
-          });
-          while (heap.size() && res.length < 10) {
-            const topTweet = heap.data[0][1];
-            snap({
-              method: "getNewsFeed", a: userId, lines: [21, 22], heap: heap.data.map(e => e.slice()),
-              feedUsers: userArr, feed: res.slice(), poppedTweet: topTweet,
-              narration: "Heap root is <code>[time=" + heap.data[0][0] + ", tweetId=" + topTweet + "]</code> - the most recent remaining tweet. Pop it and append tweetId <b>" + topTweet + "</b> to <code>res</code>."
-            });
-            res.push(heap.pop()[1]);
-            snap({
-              method: "getNewsFeed", a: userId, lines: [22], heap: heap.data.map(e => e.slice()),
-              feedUsers: userArr, feed: res.slice(),
-              narration: "Feed so far: [" + res.join(", ") + "]. The heap re-heapified, exposing the next-newest tweet."
-            });
-          }
-          traceRows.push({ op: "getNewsFeed(" + userId + ")", result: "[" + res.join(", ") + "]" });
-          snap({
-            method: "getNewsFeed", a: userId, lines: [24], heap: heap.data.map(e => e.slice()),
-            feedUsers: userArr, feed: res.slice(), result: "hit",
-            narration: "Return the merged feed <b>[" + res.join(", ") + "]</b> - the 10 most recent tweet IDs, newest first."
-          });
-        }
-      });
-
-      masterTrace = traceRows;
-      return built;
+      let time=0,method='init',a=null,b=null;const tweets=new Map(),following=new Map(),built=[],traceRows=[];
+      const snap=(line,narration,extra={})=>built.push({time,tweets:cloneTweets(tweets),following:cloneFollowing(following),method,a,b,heap:[],feedUsers:null,scanUser:null,pushedEntry:null,heapAdded:null,poppedTweet:null,feed:[],executedLine:line,lines:line?[line]:[1],narration,result:'void',traceLen:traceRows.length,...extra});
+      snap(null,"Ready to operate on the tweet service.");snap(3,"Initialize the global clock.");snap(4,"Create the tweet map.");snap(5,"Create the following map.");
+      for(const op of opList){method=op.method;a=op.a;b=op.b??null;if(method==='postTweet'){snap(7,"Call postTweet.");if(!tweets.has(a))tweets.set(a,[]);snap(8,"Create the user's timeline if needed.");const stamp=time;tweets.get(a).push([time++,b]);traceRows.push({op:'postTweet('+a+','+b+')',result:'time '+stamp});snap(9,"Append the stamped tweet and advance the clock.");}else if(method==='follow'){snap(26,"Call follow.");if(!following.has(a))following.set(a,new Set());snap(27,"Create the follower's set if needed.");following.get(a).add(b);traceRows.push({op:'follow('+a+','+b+')',result:'ok'});snap(28,"Add the followee to this set.");}else if(method==='unfollow'){snap(30,"Call unfollow.");const had=following.has(a)&&following.get(a).has(b);if(following.has(a))following.get(a).delete(b);traceRows.push({op:'unfollow('+a+','+b+')',result:had?'removed':'noop'});snap(31,"Remove the followee if the set exists.");}else{snap(11,"Call getNewsFeed.");const heap=new MaxHeap(),res=[];snap(12,"Create the newest-tweet heap.");const users=new Set(following.get(a)||[]);const emit=(line,narr,extra={})=>snap(line,narr,{heap:heap.data.map(e=>[...e]),feedUsers:[...users],feed:[...res],...extra});emit(13,"Read the user's followees.");users.add(a);emit(14,"Include the user's own tweets.");for(const u of users){emit(15,"Read the next feed user.",{scanUser:u});const list=tweets.get(u)||[];for(const entry of list){emit(16,"Read the next timeline entry.",{scanUser:u});heap.push([...entry]);emit(17,"Add this tweet to the heap.",{scanUser:u,pushedEntry:[...entry],heapAdded:heap.data.length-1});}emit(16,"This user's timeline is complete.",{scanUser:u});}emit(15,"All feed users are complete.");emit(20,"Create the result list.");while(true){emit(21,"Check whether another tweet can enter the feed.");if(!heap.size()||res.length>=10)break;const popped=heap.pop()[1];res.push(popped);emit(22,"Remove the newest tweet and append its ID to the feed.",{poppedTweet:popped});}traceRows.push({op:'getNewsFeed('+a+')',result:'['+res.join(', ')+']'});emit(24,"Return the news feed.",{result:'hit'});}}
+      masterTrace=traceRows;return built;
     }
 
     // ----- input handling -----
@@ -1654,8 +1512,8 @@
       spec: {"number":355,"title":"Design Twitter","topic":"Heap","why":"Merge the newest available posts from followed users, taking the next most recent post each time.","meanings":{"time":"Global clock; increments after every `postTweet` so newer tweets get larger timestamps.","tweets":"Map from userId to a list of `[time, tweetId]` entries (that user's timeline).","following":"Map from userId to a Set of the userIds they follow.","heap":"Per-feed max-heap keyed by `entry[0]` (time); merges the followed users' tweets so the newest sits on top.","res":"The news feed: up to the 10 most recent tweet IDs, newest first."},"entityClasses":["hud-item","hcell","hcell-idx","tree-node","pill"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({ops, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, masterTrace, ...(steps[position] || {})}),
+      read: () => ({ops,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({ops,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

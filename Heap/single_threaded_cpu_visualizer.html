@@ -665,13 +665,13 @@
       <h2>Live Debugger</h2>
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">var</span> getOrder = <span class="kw">function</span>(tasks) {</div>
-<div id="line-2" class="code-line">  <span class="kw">const</span> indexed = tasks.<span class="fn">map</span>((t, i) => [t[<span class="nm">0</span>], t[<span class="nm">1</span>], i]);</div>
-<div id="line-3" class="code-line">  indexed.<span class="fn">sort</span>((a, b) => a[<span class="nm">0</span>] - b[<span class="nm">0</span>]);</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> indexed = tasks.<span class="fn">map</span>((t, i) =&gt; [t[<span class="nm">0</span>], t[<span class="nm">1</span>], i]);</div>
+<div id="line-3" class="code-line">  indexed.<span class="fn">sort</span>((a, b) =&gt; a[<span class="nm">0</span>] - b[<span class="nm">0</span>]);</div>
 <div id="line-4" class="code-line">  <span class="kw">const</span> heap = <span class="kw">new</span> <span class="vr">MinHeap</span>(); <span class="cm">// by [proc, idx]</span></div>
 <div id="line-5" class="code-line">  <span class="kw">const</span> res = [];</div>
 <div id="line-6" class="code-line">  <span class="kw">let</span> time = <span class="nm">0</span>, i = <span class="nm">0</span>;</div>
-<div id="line-7" class="code-line">  <span class="kw">while</span> (res.length < tasks.length) {</div>
-<div id="line-8" class="code-line">    <span class="kw">while</span> (i < indexed.length && indexed[i][<span class="nm">0</span>] <= time) {</div>
+<div id="line-7" class="code-line">  <span class="kw">while</span> (res.length &lt; tasks.length) {</div>
+<div id="line-8" class="code-line">    <span class="kw">while</span> (i &lt; indexed.length && indexed[i][<span class="nm">0</span>] &lt;= time) {</div>
 <div id="line-9" class="code-line">      heap.<span class="fn">push</span>([indexed[i][<span class="nm">1</span>], indexed[i][<span class="nm">2</span>]]);</div>
 <div id="line-10" class="code-line">      i++;</div>
 <div id="line-11" class="code-line">    }</div>
@@ -1043,97 +1043,11 @@
 
     // ----- Precompute steps by running the real implementation -----
     function buildSteps(taskList) {
-      const built = [];
-      const traceRows = [];
-
-      const indexed = taskList.map((t, i) => [t[0], t[1], i]);
-      indexed.sort((a, b) => a[0] - b[0]);
-      const heap = new MinHeap();
-      const res = [];
-      let time = 0, i = 0;
-
-      function snap(extra) {
-        built.push({
-          heap: heap.data.map(e => e.slice()),
-          indexed: indexed.map(e => e.slice()),
-          res: res.slice(),
-          time, i,
-          admitted: (extra.admitted === undefined) ? null : extra.admitted,
-          pickedIdx: (extra.pickedIdx === undefined) ? null : extra.pickedIdx,
-          siftSet: extra.siftSet || [],
-          swapSet: extra.swapSet || [],
-          added: (extra.added === undefined) ? null : extra.added,
-          lines: extra.lines,
-          narration: extra.narration,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        });
-      }
-
-      snap({
-        lines: [2, 3],
-        narration: "Tag each task with its original index, then <b>sort by enqueueTime</b>. The min-heap and <code>res</code> start empty; <code>time = 0</code>, <code>i = 0</code>."
-      });
-
-      while (res.length < taskList.length) {
-        snap({
-          lines: [7],
-          narration: "<code>res.length (" + res.length + ") < tasks.length (" + taskList.length + ")</code> - the CPU still has work to schedule."
-        });
-
-        // admit all tasks with enqueueTime <= time
-        let admittedThis = [];
-        while (i < indexed.length && indexed[i][0] <= time) {
-          admittedThis.push(indexed[i][2]);
-          heap.push([indexed[i][1], indexed[i][2]]);
-          snap({
-            lines: [8, 9, 10],
-            admitted: indexed[i][2],
-            added: heap.data.length - 1,
-            narration: "Task <b>" + indexed[i][2] + "</b> has enqueueTime <b>" + indexed[i][0] + " &le; time (" + time + ")</b>, so push <code>[proc=" + indexed[i][1] + ", idx=" + indexed[i][2] + "]</code> into the heap (sift-up keeps the smallest on top)."
-          });
-          i++;
-        }
-
-        if (heap.size() === 0) {
-          const jumpTo = indexed[i][0];
-          snap({
-            lines: [12, 13, 14],
-            narration: "The heap is <b>empty</b> but tasks remain. The CPU is idle, so jump <code>time</code> forward to the next enqueueTime: <b>" + jumpTo + "</b>."
-          });
-          time = jumpTo;
-          continue;
-        }
-
-        // pop shortest available
-        snap({
-          lines: [16],
-          pickedIdx: heap.data[0][1],
-          siftSet: [0],
-          narration: "Heap top is <code>[proc=" + heap.data[0][0] + ", idx=" + heap.data[0][1] + "]</code> - the shortest available task (ties broken by smaller index). Pop it."
-        });
-        const popped = heap.pop();
-        const proc = popped[0], idx = popped[1];
-        const before = time;
-        time += proc;
-        res.push(idx);
-        traceRows.push({ time: before, admitted: admittedThis.length ? admittedThis.join(",") : "-", picked: idx, proc, after: time });
-        snap({
-          lines: [17, 18],
-          pickedIdx: idx,
-          result: "hit",
-          narration: "Run task <b>" + idx + "</b>: <code>time += " + proc + "</code> &rarr; <b>" + time + "</b>, and append <b>" + idx + "</b> to <code>res</code>. The heap re-heapified after the pop."
-        });
-      }
-
-      snap({
-        lines: [20],
-        result: "done",
-        narration: "<code>res.length === tasks.length</code>, so the loop ends. Return the execution order <b>[" + res.join(", ") + "]</b>."
-      });
-
-      masterTrace = traceRows;
-      return built;
+      const built=[],traceRows=[],indexed=taskList.map((t,i)=>[t[0],t[1],i]),heap=new MinHeap(),res=[];let time=null,i=null,proc=null,idx=null;
+      const snap=(line,narration,extra={})=>built.push({heap:heap.data.map(e=>[...e]),indexed:indexed.map(e=>[...e]),res:[...res],time,i,proc,idx,admitted:null,pickedIdx:null,siftSet:[],swapSet:[],added:null,executedLine:line,lines:line?[line]:[1],narration,result:"void",traceLen:traceRows.length,...extra});
+      snap(null,"Ready to schedule the CPU.");snap(2,"Tag tasks with their original index.");indexed.sort((a,b)=>a[0]-b[0]);snap(3,"Sort tasks by enqueue time.");snap(4,"Create the available-task heap.");snap(5,"Create the result list.");time=0;i=0;snap(6,"Initialize the clock and input cursor.");
+      while(true){proc=idx=null;snap(7,"Check whether any tasks remain.");if(res.length>=taskList.length)break;const admitted=[];while(true){snap(8,"Check whether the next task has arrived.");if(!(i<indexed.length&&indexed[i][0]<=time))break;const task=indexed[i];admitted.push(task[2]);heap.push([task[1],task[2]]);snap(9,"Add the available task to the heap.",{admitted:task[2],added:heap.data.length-1});i++;snap(10,"Advance to the next input task.");}snap(12,"Check whether the available-task heap is empty.");if(heap.size()===0){time=indexed[i][0];snap(13,"Jump the clock to the next arrival.");snap(14,"Continue the scheduling loop.");continue;}[proc,idx]=heap.pop();snap(16,"Remove the shortest available task.",{pickedIdx:idx});const before=time;time+=proc;snap(17,"Advance the clock by its processing time.",{pickedIdx:idx});res.push(idx);traceRows.push({time:before,admitted:admitted.length?admitted.join(','):'-',picked:idx,proc,after:time});snap(18,"Append its original index to the result.",{pickedIdx:idx,result:'hit'});}
+      snap(20,"Return the task execution order.",{result:"done"});masterTrace=traceRows;return built;
     }
 
     // ----- input handling -----
@@ -1432,8 +1346,8 @@
       spec: {"number":1834,"title":"Single-Threaded CPU","topic":"Heap","why":"Among arrived tasks, choose the shortest processing time and then the smallest index; jump time when none are available.","meanings":{"tasks":"Input array; `tasks[i] = [enqueueTime, processingTime]`.","indexed":"`tasks` tagged with original index `[enqueueTime, processingTime, i]`, then sorted by `enqueueTime`.","heap":"Min-heap of available tasks, keyed lexicographically by `[processingTime, index]`.","time":"The CPU clock; advances by a task's `processingTime`, or jumps to the next `enqueueTime` when idle.","i":"Pointer into `indexed`; admits every task with `enqueueTime <= time` into the heap.","res":"Output order: indices of tasks in the sequence the CPU runs them."},"entityClasses":["hud-item","hcell","hcell-idx","tree-node","pill"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({tasks, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({tasks, masterTrace, ...(steps[position] || {})}),
+      read: () => ({tasks,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({tasks,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

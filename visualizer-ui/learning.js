@@ -2,7 +2,7 @@
 (() => {
   const make=(tag,className,text)=>{const element=document.createElement(tag);if(className)element.className=className;if(text!==undefined)element.textContent=text;return element;};
   const readable=value=>value===undefined?'undefined':typeof value==='object'&&value!==null?'special'in value?value.special:'ref'in value?value.ref:JSON.stringify(value):typeof value==='string'?JSON.stringify(value):String(value);
-  const omitted=new Set(['line','lines','hl','narr','narration','phase','execState','state','traceLen','traceLength','kind','action','message','recurrence','formula','svgNS','NS']);
+  const omitted=new Set(['line','lines','hl','codeLines','highlight','highlightLines','executedLine','narr','narration','phase','execState','state','traceLen','traceLength','kind','action','message','recurrence','formula','svgNS','NS']);
   function capture(raw,index,phase,action,explanation,line){
     const objects=[],variables=[],flat=new Map(),visited=new WeakMap();let count=0;
     function value(input,path,depth){
@@ -28,12 +28,11 @@
     if(!source||!workspace)throw new Error('The lesson is missing its teaching adapter.');
     const spec=source.spec,diagram=document.querySelector('.study-diagram'),code=document.querySelector('.study-code'),visual=document.querySelector('#visual-ui,#lists-ui,#svg,#lists'),toolbar=document.querySelector('.study-controls');
     if(code?.querySelector('h2'))code.querySelector('h2').textContent='Reference code';
-    const learnedNames=new Set(Object.keys(spec.meanings).map(name=>name.replace(/`/g,'').split(/[.\[ (]/)[0]));
     const originalRender=window.render,originalNext=window.nextStep,originalPrevious=window.prevStep;
     let muted=false,seeking=false,epoch=0,total=source.count(),extent=0,phaseEntries=[],lastCapture=null,currentFrame=null,zoom=1,animations=true,lastIndex=-1;
-    const listeners=new Set(),positionCache=new Map(),recordedChanges=new Map();let lastAnimation=0,flowTask=0;const runningAnimations=[];
+    const listeners=new Set(),positionCache=new Map(),journal=new Map();let lastAnimation=0,flowTask=0,committingStep=0,loading=0,currentView=null;const runningAnimations=[];
     const scheduleFlows=()=>{if(!flowTask)flowTask=requestAnimationFrame(()=>{flowTask=0;drawFlows();});};
-    const phase=raw=>{const label=[raw.phase,raw.execState,raw.state,raw.kind,raw.action,raw.stage,raw.type].find(value=>typeof value==='string'&&value.length>0);const line=raw.line||(raw.lines||raw.hl||raw.highlight||raw.highlightLines||[])[0];return String(label||(line?`Line ${line}`:'Ready')).replace(/[_-]+/g,' ');};
+    const phase=raw=>{const label=[raw.phase,raw.execState,raw.state,raw.kind,raw.action,raw.stage,raw.type].find(value=>typeof value==='string'&&value.length>0);const candidate=raw.executedLine??raw.line??raw.lines??raw.hl??raw.codeLines??raw.highlight??raw.highlightLines;const line=Array.isArray(candidate)?candidate[0]:candidate;return String(label||(Number.isInteger(line)&&line>0?`Line ${line}`:'Ready')).replace(/[_-]+/g,' ');};
     const pause=()=>{const button=document.getElementById('study-play');if(button?.getAttribute('aria-pressed')==='true')button.click();};
     const coach=make('section','study-coach');coach.setAttribute('aria-label','Step explanation');
     const coachTitle=make('div','viz-eyebrow','WHAT HAPPENED');coach.append(coachTitle);
@@ -101,16 +100,86 @@
       if(total!==null&&total>1&&!phaseEntries.some(p=>p.index===total-1))phaseEntries.push({index:total-1,phase:'Result'});
       updateChapters();
     }
+    function pendingInstruction(){
+      if(source.pendingInstruction)return source.pendingInstruction();
+      if(spec.mode==='precomputed'){
+        if(source.index()+1>=source.count())return null;
+        const raw=source.readAt(source.index()+1),line=raw.executedLine;
+        return Number.isInteger(line)?{line,phase:String(raw.execState||raw.phase||raw.state||phase(raw))}:null;
+      }
+      throw Error('A history lesson must identify its pending instruction.');
+    }
+    function inputsOf(state){
+      const objects=new Map(state.frame.objects.map(object=>[object.id,object]));
+      const text=value=>value&&typeof value==='object'&&'ref'in value?(()=>{const object=objects.get(value.ref);return object?`${object.kind} [${object.entries.slice(0,5).map(entry=>`${entry.key}: ${readable(entry.value)}`).join(', ')}${object.entries.length>5?', …':''}]`:value.ref;})():readable(value);
+      return Object.fromEntries(state.frame.stack[0].variables.map(variable=>[variable.name,text(variable.value)]));
+    }
+    function contextOf(raw){
+      const context=Object.fromEntries(Object.entries(raw).filter(([,value])=>value===null||['boolean','number','string'].includes(typeof value)));
+      if(Array.isArray(raw.nums)){context.numsLength=raw.nums.length;context.currentNum=raw.nums[raw.i]??null;}
+      return context;
+    }
+    function observedChanges(before,after){
+      const changes=[];
+      for(const name of new Set([...before.flat.keys(),...after.flat.keys()])){
+        if(/^(?:history|historyStack|trace|steps|snapshots|masterTrace)(?:[.\[]|$)/.test(name)||omitted.has(name))continue;
+        const old=before.flat.get(name),value=after.flat.get(name);
+        if(JSON.stringify(old)!==JSON.stringify(value))changes.push({name,before:old,after:value});
+      }
+      return changes.slice(0,100);
+    }
+    function captureState(raw,index,instruction){
+      return capture(raw,index,phase(raw),String(raw.lastAction||raw.action||raw.narration||raw.narr||phase(raw)),spec.why,instruction?.line||1);
+    }
+    function recordTransition(fromIndex,toIndex,instruction,beforeRaw,before,afterRaw,after){
+      const entry={fromIndex,toIndex,instruction,beforeInputs:inputsOf(before),afterInputs:inputsOf(after),context:contextOf(beforeRaw),changes:observedChanges(before,after),action:after.frame.action};
+      const caption=source.resultCaption?.(instruction,entry.context,afterRaw);if(caption)entry.resultCaption=String(caption);
+      journal.set(toIndex,entry);return entry;
+    }
+    function currentTransition(){
+      const index=source.index();if(index===0)return null;
+      if(journal.has(index))return journal.get(index);
+      if(spec.mode!=='precomputed'||!source.readAt)return null;
+      const beforeRaw=source.readAt(index-1),raw=source.readAt(index),line=raw.executedLine;
+      if(!Number.isInteger(line))return null;
+      const instruction={line,phase:String(raw.execState||raw.phase||raw.state||phase(raw))};
+      return recordTransition(index-1,index,instruction,beforeRaw,captureState(beforeRaw,index-1,instruction),raw,captureState(raw,index,instruction));
+    }
+    let previewing=false;
+    function beforeView(){
+      const index=source.index();if(currentView?.index===index)return currentView.before;
+      if(index===0)return null;
+      let clone=null;
+      if(source.preview){previewing=true;try{clone=source.preview(index-1);}finally{previewing=false;}}
+      else if(source.jump){
+        previewing=true;
+        try{source.jump(index-1);clone=visual.cloneNode(true);}finally{source.jump(index);previewing=false;}
+      }
+      if(clone)currentView={index,before:clone};return clone;
+    }
+    function trackedNext(...args){
+      const fromIndex=source.index(),beforeRaw=source.read(),instruction=pendingInstruction();
+      const before=captureState(beforeRaw,fromIndex,instruction),clone=muted?null:visual.cloneNode(true);
+      committingStep++;let result;
+      try{result=originalNext.apply(this,args);}finally{committingStep--;}
+      const toIndex=source.index();
+      if(toIndex!==fromIndex){
+        if(toIndex!==fromIndex+1)throw Error('An instruction must advance exactly one timeline step.');
+        if(!instruction)throw Error('The executed reference instruction is missing its location.');
+        const afterRaw=source.read(),after=captureState(afterRaw,toIndex,instruction);
+        recordTransition(fromIndex,toIndex,instruction,beforeRaw,before,afterRaw,after);
+        currentView=clone?{index:toIndex,before:clone}:null;
+      }
+      if(!muted&&!loading)update();return result;
+    }
     function update(){
+      if(committingStep||loading)return;
       const raw=source.read(),index=source.index(),next=document.getElementById('btn-next');extent=Math.max(extent,index);
       if(next.disabled)total=index+1;
       if(spec.mode==='history'&&!phaseEntries.some(entry=>entry.phase===phase(raw))){phaseEntries.push({index,phase:phase(raw)});updateChapters();}
-      const active=[...document.querySelectorAll('.code-line.active,.cl.active')],line=Number(active[0]?.id.match(/\d+/)?.[0]||1),action=narration?.textContent.trim()||phase(raw);
+      const instruction=pendingInstruction(),line=instruction?.line||currentTransition()?.instruction.line||1,action=narration?.textContent.trim()||phase(raw);
       const state=capture(raw,index,phase(raw),action,spec.why,line);
-      const previous=index>0?(lastIndex===index-1?lastCapture:source.readAt?capture(source.readAt(index-1),index-1,'','','',line):null):null;
-      if(recordedChanges.has(index))state.frame.changes=recordedChanges.get(index);
-      else if(previous){for(const name of new Set([...previous.flat.keys(),...state.flat.keys()])){const value=state.flat.get(name);if(!learnedNames.has(name.split(/[.[]/)[0]))continue;const before=previous.flat.get(name);if(JSON.stringify(before)!==JSON.stringify(value))state.frame.changes.push({name,before,after:value});}state.frame.changes=state.frame.changes.slice(0,100);}
-      recordedChanges.set(index,state.frame.changes);if(recordedChanges.size>5000)recordedChanges.delete(recordedChanges.keys().next().value);
+      state.frame.changes=currentTransition()?.changes||[];
       changes.replaceChildren();for(const change of state.frame.changes.slice(0,8)){const chip=make('button','viz-change',`${change.name}: ${readable(change.before)} → ${readable(change.after)}`);const root=change.name.split(/[.[]/)[0];chip.title=spec.meanings[root]||root;chip.onclick=()=>{document.getElementById('inspector-variables-tab')?.click();const panel=document.getElementById('inspector-variables');panel?.scrollIntoView({block:'nearest'});};changes.append(chip);}
       coachTitle.textContent=`WHAT HAPPENED · ${phase(raw).toUpperCase()}`;
       progress.value=total===null?`Step ${index+1} · ${extent+1} recorded`:`Step ${index+1} of ${total}`;range.max=String(total===null?extent:Math.max(0,total-1));range.value=String(index);range.setAttribute('aria-valuetext',progress.value);
@@ -118,23 +187,32 @@
       for(const listener of listeners)listener(currentFrame);
       workspace.dataset.lessonReady='true';
     }
-    window.render=function(...args){if(muted)return;window.studyWalkthrough?.restoreLiveView();remember();const result=originalRender.apply(this,args);update();return result;};
+    window.render=function(...args){if(previewing)return originalRender.apply(this,args);if(muted)return;window.studyWalkthrough?.restoreLiveView();remember();const result=originalRender.apply(this,args);update();return result;};
+    window.nextStep=trackedNext;
     async function seek(index){
       if(seeking)return;pause();seeking=true;const version=epoch;range.disabled=chapters.disabled=true;
       try{
         const target=Math.max(0,Math.min(total===null?50000:total-1,Math.floor(index)));
         if(source.jump){source.jump(target);return;}
-        while(source.index()!==target&&version===epoch){let count=0;muted=true;try{while(source.index()!==target&&count++<150){const before=source.index();if(before<target)originalNext();else originalPrevious();if(before===source.index())break;}}finally{muted=false;window.render();}if(count<150)break;await new Promise(resolve=>setTimeout(resolve,0));}
+        while(source.index()!==target&&version===epoch){let count=0;muted=true;try{while(source.index()!==target&&count++<150){const before=source.index();if(before<target)trackedNext();else originalPrevious();if(before===source.index())break;}}finally{muted=false;window.render();}if(count<150)break;await new Promise(resolve=>setTimeout(resolve,0));}
       }finally{seeking=false;range.disabled=chapters.disabled=false;}
     }
     range.oninput=()=>{void seek(Number(range.value));};chapters.onchange=()=>{if(chapters.value!=='')void seek(Number(chapters.value));};
-    for(const name of ['init','loadExample','loadCustom'])if(typeof window[name]==='function'){const original=window[name];window[name]=function(...args){epoch++;lastCapture=null;lastIndex=-1;extent=0;recordedChanges.clear();total=null;try{return original.apply(this,args);}finally{prepare();update();}};}
+    function resetRun(){epoch++;lastCapture=null;lastIndex=-1;extent=0;journal.clear();currentView=null;total=null;}
+    if(typeof window.init==='function'){const original=window.init;window.init=function(...args){resetRun();loading++;let result;try{result=original.apply(this,args);}finally{loading--;if(!loading){prepare();update();}}return result;};}
+    for(const name of ['loadExample','loadEx','loadCustom'])if(typeof window[name]==='function'){
+      const original=window[name];window[name]=function(...args){const version=epoch;loading++;let result;try{result=original.apply(this,args);}finally{loading--;}
+        if(result===false)return false;
+        if(epoch===version&&source.index()===0)resetRun();
+        if(!loading){prepare();update();}return result;
+      };
+    }
     /** @type {import('../shared/visualization').LessonAdapter} */
-    const adapter={snapshot:()=>currentFrame,next:()=>{pause();originalNext();},previous:()=>{pause();originalPrevious();},reset:()=>document.getElementById('btn-reset').click(),seek,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);}};
+    const adapter={snapshot:()=>currentFrame,currentTransition,next:()=>{pause();trackedNext();},previous:()=>{pause();originalPrevious();},reset:()=>document.getElementById('btn-reset').click(),seek,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);}};
     window.studyLessonAdapter=adapter;
     new ResizeObserver(()=>scheduleFlows()).observe(viewport);
     prepare();update();
-    window.studyWalkthrough=window.StudyOperations.create({source,adapter,diagram,visual,onChange:scheduleFlows});
+    window.studyWalkthrough=window.StudyOperations.create({source,adapter,diagram,visual,onChange:scheduleFlows,getPendingInstruction:pendingInstruction,getCurrentTransition:currentTransition,getBeforeView:beforeView});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })();

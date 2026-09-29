@@ -8,6 +8,7 @@ const browser=await chromium.launch({headless:true}),page=await browser.newPage(
 const file=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).find(l=>l.number===1).path;
 async function fresh(){await page.goto(pathToFileURL(path.join(ROOT,file)).href+'?guided=1&walkthrough=compact');await page.waitForFunction(()=>window.studyGuidedController?.progress&&!window.studyGuidedController.busy);}
 try{
+  await page.clock.install();await page.clock.pauseAt(Date.now()+1000);
   await fresh();const index=await page.evaluate(()=>window.studyLessonSource.index());
   const splitter=page.getByRole('separator',{name:'Resize lesson diagram'});await splitter.focus();await page.keyboard.press('ArrowRight');assert.equal(await splitter.getAttribute('aria-valuenow'),'62');assert.equal(await page.evaluate(()=>window.studyLessonSource.index()),index);
   assert.equal(await page.getByRole('button',{name:'Focus diagram',exact:true}).count(),0);assert.ok(await page.locator('.study-code').isVisible());
@@ -16,7 +17,7 @@ try{
     await fresh();const lesson=await page.evaluate(()=>window.studyGuidedController.lesson);
     for(const cp of lesson.checkpoints){await page.getByRole('button',{name:'Next prediction',exact:true}).click();await page.waitForFunction(()=>!window.studyGuidedController.busy);await page.locator(`.guided-choice[data-option-id="${cp.correctOptionId}"]`).click();
       if(cp===lesson.checkpoints.at(-1)){if(finish==='timeline')await page.getByRole('slider',{name:'Guided lesson timeline'}).fill(String(cp.afterIndex));else await page.getByRole('button',{name:'Next prediction',exact:true}).click();}
-      else {await page.getByRole('button',{name:'Watch the change',exact:true}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();}}
+      else {await page.getByRole('button',{name:'Watch the change',exact:true}).click();await page.clock.runFor(1000*(cp.afterIndex-cp.beforeIndex+1));await page.getByRole('button',{name:'Continue',exact:true}).click();}}
     await page.getByRole('heading',{name:'Lesson explored',exact:true}).waitFor();assert.ok(await page.evaluate(()=>window.studyGuidedController.progress.completedAt));
   }
   await fresh();await page.evaluate(()=>{const cp=window.studyGuidedController.lesson.checkpoints[0];window.originalGuidedAssertions=structuredClone(cp.before);cp.before=[{path:'phase',value:'intentionally mismatched test fixture'}];});

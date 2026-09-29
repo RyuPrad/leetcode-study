@@ -648,7 +648,7 @@
 <div id="line-13" class="code-line">  <span class="fn">put</span>(key, value) {</div>
 <div id="line-14" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.cache.<span class="fn">has</span>(key)) {</div>
 <div id="line-15" class="code-line">      <span class="kw">this</span>.cache.<span class="fn">delete</span>(key);</div>
-<div id="line-16" class="code-line">    } <span class="kw">else if</span> (<span class="kw">this</span>.cache.size >= <span class="kw">this</span>.capacity) {</div>
+<div id="line-16" class="code-line">    } <span class="kw">else if</span> (<span class="kw">this</span>.cache.size &gt;= <span class="kw">this</span>.capacity) {</div>
 <div id="line-17" class="code-line">      <span class="kw">const</span> lru = <span class="kw">this</span>.cache.<span class="fn">keys</span>().<span class="fn">next</span>().value;</div>
 <div id="line-18" class="code-line">      <span class="kw">this</span>.cache.<span class="fn">delete</span>(lru);</div>
 <div id="line-19" class="code-line">    }</div>
@@ -894,128 +894,9 @@
 
     // ----- Precompute steps by running the real implementation -----
     function buildSteps(opList) {
-      let cache = [];   // ordered [key,value] pairs, front = LRU
-      let capacity = 0;
-      const built = [];
-      const traceRows = [];
-
-      function snapshot(extra) {
-        built.push({
-          cache: cloneCache(cache),
-          capacity: capacity,
-          key: (extra.key === undefined) ? null : extra.key,
-          value: (extra.value === undefined) ? null : extra.value,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          method: extra.method,
-          opNum: extra.opNum,
-          lines: extra.lines,
-          narration: extra.narration,
-          scanKey: (extra.scanKey === undefined) ? null : extra.scanKey,
-          movedKey: (extra.movedKey === undefined) ? null : extra.movedKey,
-          updatedKey: (extra.updatedKey === undefined) ? null : extra.updatedKey,
-          justAddedKey: (extra.justAddedKey === undefined) ? null : extra.justAddedKey,
-          evictingKey: (extra.evictingKey === undefined) ? null : extra.evictingKey,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        });
-      }
-
-      opList.forEach((op, opNum) => {
-        if (op.method === "new") {
-          capacity = op.capacity;
-          cache = [];
-          snapshot({
-            method: "new", opNum, lines: [2, 3, 4],
-            narration: "<b>new LRUCache(" + op.capacity + ")</b> -- set <code>capacity = " + op.capacity + "</code> and create an empty <code>Map</code>. Map insertion order tracks recency."
-          });
-          traceRows.push({ op: "new(" + op.capacity + ")", key: "-", value: "-", ret: "-", cache: cacheToString(cache) });
-          return;
-        }
-
-        if (op.method === "get") {
-          const key = op.key;
-          const pos = findPos(cache, key);
-          snapshot({
-            method: "get", opNum, key, lines: [6, 7], scanKey: key,
-            narration: "<b>get(" + key + ")</b> -- check <code>cache.has(" + key + ")</code>: " + (pos >= 0 ? "<b style=\"color:#6a9955\">present</b>." : "<b style=\"color:#e24b4a\">absent</b>.")
-          });
-          if (pos < 0) {
-            snapshot({
-              method: "get", opNum, key, ans: -1, lines: [7], result: "miss",
-              narration: "Key <b>" + key + "</b> is not in the cache, so <code>get</code> returns <b style=\"color:#e24b4a\">-1</b>."
-            });
-            traceRows.push({ op: "get(" + key + ")", key, value: "-", ret: "-1", cache: cacheToString(cache) });
-          } else {
-            const value = cache[pos][1];
-            snapshot({
-              method: "get", opNum, key, value, lines: [8], scanKey: key,
-              narration: "<code>value = cache.get(" + key + ") = <b>" + value + "</b></code>. Now refresh recency: delete then re-insert."
-            });
-            cache.splice(pos, 1);
-            snapshot({
-              method: "get", opNum, key, value, lines: [9],
-              narration: "<code>cache.delete(" + key + ")</code> removes the entry from its current position."
-            });
-            cache.push([key, value]);
-            snapshot({
-              method: "get", opNum, key, value, lines: [10], movedKey: key,
-              narration: "<code>cache.set(" + key + ", " + value + ")</code> re-inserts it at the back -- now the most-recently-used entry."
-            });
-            snapshot({
-              method: "get", opNum, key, value, ans: value, lines: [11], movedKey: key, result: "hit",
-              narration: "<code>get(" + key + ")</code> returns <b style=\"color:#6a9955\">" + value + "</b>."
-            });
-            traceRows.push({ op: "get(" + key + ")", key, value: "-", ret: String(value), cache: cacheToString(cache) });
-          }
-          return;
-        }
-
-        if (op.method === "put") {
-          const key = op.key;
-          const value = op.value;
-          const pos = findPos(cache, key);
-          snapshot({
-            method: "put", opNum, key, value, lines: [13, 14], scanKey: key,
-            narration: "<b>put(" + key + ", " + value + ")</b> -- does <code>cache.has(" + key + ")</code>? " + (pos >= 0 ? "<b style=\"color:#569cd6\">Yes</b> -- update & refresh." : "<b>No</b> -- maybe evict, then insert.")
-          });
-          if (pos >= 0) {
-            cache.splice(pos, 1);
-            snapshot({
-              method: "put", opNum, key, value, lines: [15],
-              narration: "Key exists, so <code>cache.delete(" + key + ")</code> drops the old entry; it will be re-added at the back with the new value."
-            });
-          } else if (cache.length >= capacity) {
-            const lru = cache[0][0];
-            snapshot({
-              method: "put", opNum, key, value, lines: [16, 17], evictingKey: lru,
-              narration: "Cache is full (<code>size " + cache.length + " >= capacity " + capacity + "</code>). The LRU key is <code>cache.keys().next().value = <b>" + lru + "</b></code> (front)."
-            });
-            cache.splice(0, 1);
-            snapshot({
-              method: "put", opNum, key, value, lines: [18],
-              narration: "<code>cache.delete(" + lru + ")</code> evicts the least-recently-used entry from the front."
-            });
-          } else {
-            snapshot({
-              method: "put", opNum, key, value, lines: [16],
-              narration: "Key is new and there is room (<code>size " + cache.length + " < capacity " + capacity + "</code>), so no eviction is needed."
-            });
-          }
-          cache.push([key, value]);
-          snapshot({
-            method: "put", opNum, key, value, lines: [20], justAddedKey: key, updatedKey: pos >= 0 ? key : null,
-            narration: "<code>cache.set(" + key + ", " + value + ")</code> inserts at the back as the most-recently-used entry."
-          });
-          snapshot({
-            method: "put", opNum, key, value, lines: [21], result: "void",
-            narration: "put(" + key + ", " + value + ") completes. Cache now holds " + cache.length + " of " + capacity + " entries."
-          });
-          traceRows.push({ op: "put(" + key + "," + value + ")", key, value, ret: "void", cache: cacheToString(cache) });
-          return;
-        }
-      });
-
-      return built;
+      let cache=[],capacity=0,method='init',opNum=-1,key=null,value=null;const built=[],traceRows=[];
+      const snap=(line,narration,extra={})=>built.push({cache:cloneCache(cache),capacity,key,value,ans:'pending',method,opNum,executedLine:line,lines:line?[line]:[1],narration,scanKey:null,movedKey:null,updatedKey:null,justAddedKey:null,evictingKey:null,result:'void',traceLen:traceRows.length,...extra});
+      snap(null,"Ready to operate on the LRU cache.");opList.forEach((op,num)=>{opNum=num;method=op.method;key=op.key??null;value=op.value??null;if(method==='new'){snap(2,"Call the cache constructor.");capacity=op.capacity;snap(3,"Assign the cache capacity.");cache=[];traceRows.push({op:'new('+capacity+')',key:'-',value:'-',ret:'-',cache:cacheToString(cache)});snap(4,"Create the empty cache map.");return;}const pos=findPos(cache,key);if(method==='get'){snap(6,"Call get.");if(pos<0){traceRows.push({op:'get('+key+')',key,value:'-',ret:'-1',cache:cacheToString(cache)});snap(7,"The key is absent. Return -1.",{ans:-1,result:'miss'});return;}snap(7,"The key is present.",{scanKey:key});value=cache[pos][1];snap(8,"Read the stored value.",{scanKey:key});cache.splice(pos,1);snap(9,"Remove the old cache position.");cache.push([key,value]);snap(10,"Reinsert the entry as most recently used.",{movedKey:key});traceRows.push({op:'get('+key+')',key,value:'-',ret:String(value),cache:cacheToString(cache)});snap(11,"Return the value.",{ans:value,movedKey:key,result:'hit'});}else{snap(13,"Call put.");snap(14,"Check whether the key exists.",{scanKey:key});if(pos>=0){cache.splice(pos,1);snap(15,"Remove its old cache entry.");}else{snap(16,"Check whether the cache is full.");if(cache.length>=capacity){const lru=cache[0]?.[0];snap(17,"Read the least recently used key.",{evictingKey:lru??null,lru});cache.splice(0,1);snap(18,"Evict the least recently used entry.");}}cache.push([key,value]);traceRows.push({op:'put('+key+','+value+')',key,value,ret:'void',cache:cacheToString(cache)});snap(20,"Insert the value as most recently used.",{justAddedKey:key,updatedKey:pos>=0?key:null});}});return built;
     }
 
     // Independent recompute of the operation-level trace rows (final state per op).
@@ -1428,8 +1309,8 @@
       spec: {"number":146,"title":"LRU Cache","topic":"LinkedList","why":"Access updates recency; when capacity is exceeded, remove the least recently used entry.","meanings":{"capacity":"maximum number of entries the cache holds","cache":"`Map` of key to value; insertion order = recency (front = LRU, back = MRU)","key":"key being read or written","value":"value read from or written to the cache"},"entityClasses":["hud-item","entry-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({ops, masterTrace, cacheCapacity, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, masterTrace, cacheCapacity, ...(steps[position] || {})}),
+      read: () => ({ops,  cacheCapacity, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({ops,  cacheCapacity, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -722,6 +722,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -991,20 +992,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parsed = Number(raw);
-      if (!Number.isInteger(parsed) || parsed < 0) {
-        alert("Please enter a single non-negative integer, example: 50");
-        return;
-      }
-      if (parsed > 100000) {
-        alert("Please keep x at most 100000 so the visualization stays readable.");
-        return;
-      }
-      x = parsed;
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed=parser.integer(document.getElementById('custom-input').value,{min:0,max:100000,label:'x'}); x=parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       left = 0;
@@ -1043,22 +1036,40 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      x = prev.x;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      midSq = prev.midSq;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
-      discardedLeftMax = prev.discardedLeftMax;
-      discardedRightMin = prev.discardedRightMin;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+x = snapshot.x;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+midSq = snapshot.midSq;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+discardedLeftMax = snapshot.discardedLeftMax;
+discardedRightMin = snapshot.discardedRightMin;
+}
 
     function addTrace(action, reason) {
       trace.push({
@@ -1080,16 +1091,26 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = x;
-          mid = null;
-          midSq = null;
-          ans = 0;
-          discardedLeftMax = -1;
-          discardedRightMin = x + 1;
-          lastAction = "Initialize left at 0, right at x, and ans at 0.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ mid = null;
+midSq = null;
+discardedLeftMax = -1;
+discardedRightMin = x + 1;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = x;
+
+ lastAction = "Initialize right.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1491,50 +1512,132 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Start with <code>left = 0</code>, <code>right = x</code>, and <code>ans = 0</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, there are still candidate roots to test.' : 'The range is empty because <code>left &gt; right</code>. The loop ends.');
           break;
         case "CALC_MID":
-          highlightLines([6]);
+
           narrate('Calculate the middle candidate using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "COMPARE":
           if (midSq <= x) {
-            highlightLines([7]);
+
             narrate('<code>mid * mid = ' + midSq + '</code> is <b style="color:#73d66b">&lt;= x</b>. mid is a valid root candidate.');
           } else {
-            highlightLines([7, 10, 11]);
+
             narrate('<code>mid * mid = ' + midSq + '</code> is <b style="color:#ff5c68">&gt; x</b>. mid overshoots the square root.');
           }
           break;
         case "RECORD_ANS":
-          highlightLines([8]);
+
           narrate('Record <code>ans = mid = ' + mid + '</code> because mid is the best root found so far.');
           break;
         case "MOVE_LEFT":
-          highlightLines([9]);
+
           narrate('Look for a larger root by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([11]);
+
           narrate('Discard the upper half by setting <code>right = mid - 1</code>.');
           break;
         case "RETURN_ANS":
-          highlightLines([14]);
+
           narrate('Return <code>ans</code>, the largest value whose square did not exceed x.');
           break;
         case "END":
-          highlightLines([14]);
+
           narrate('&#10003; Done. <code>floor(sqrt(' + x + ')) = ' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "COMPARE":
+    if (midSq <= x) {
+      return {
+        line: 7,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 7,
+        phase: execState
+      };
+    }
+  case "RECORD_ANS":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "RETURN_ANS":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 14,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1563,8 +1666,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":69,"title":"Sqrt(x)","topic":"Binary Search","why":"Compare a candidate square with x to narrow the range containing the integer square root.","meanings":{"x":"The non-negative integer whose integer square root (floor) we want","left":"Lower bound of the candidate range (starts at 0)","right":"Upper bound of the candidate range (starts at x)","mid":"Current candidate root, `Math.floor((left + right) / 2)`","ans":"Largest candidate found so far whose square is `<= x`; the final answer"},"entityClasses":["hud-item","cell","num-bar","bar-range","bar-tick","bar-flag","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({CELL_LIMIT, x, left, right, mid, midSq, ans, execState, lastAction, discardedLeftMax, discardedRightMin, ...({})}),

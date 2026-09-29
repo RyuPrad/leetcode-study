@@ -661,7 +661,7 @@
 <div id="line-3" class="code-line">  <span class="kw">const</span> cols = <span class="kw">new</span> <span class="fn">Set</span>(); <span class="kw">const</span> diag = <span class="kw">new</span> <span class="fn">Set</span>(); <span class="kw">const</span> antiDiag = <span class="kw">new</span> <span class="fn">Set</span>();</div>
 <div id="line-4" class="code-line">  <span class="kw">function</span> <span class="fn">dfs</span>(r) {</div>
 <div id="line-5" class="code-line">    <span class="kw">if</span> (r === n) { count++; <span class="kw">return</span>; }</div>
-<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c < n; c++) {</div>
+<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="nm">0</span>; c &lt; n; c++) {</div>
 <div id="line-7" class="code-line">      <span class="kw">if</span> (cols.has(c) || diag.has(r - c) || antiDiag.has(r + c)) <span class="kw">continue</span>;</div>
 <div id="line-8" class="code-line">      cols.add(c); diag.add(r - c); antiDiag.add(r + c);</div>
 <div id="line-9" class="code-line">      <span class="fn">dfs</span>(r + <span class="nm">1</span>);</div>
@@ -855,144 +855,11 @@
     // Build the full precomputed step list by running the real algorithm,
     // emitting an immutable lightweight snapshot at each meaningful beat.
     function buildSteps(nInput) {
-      const out = [];
-      let count = 0;
-      const board = Array.from({ length: nInput }, () => new Array(nInput).fill('.'));
-      const cols = new Set();
-      const diag = new Set();
-      const antiDiag = new Set();
-      traceLog = [];
-
-      function boardStr() {
-        return board.map(row => row.join('')).join('|');
-      }
-
-      function snap(extra) {
-        const base = {
-          line: [],
-          r: null,
-          c: null,
-          count,
-          cols: [...cols].sort((a, b) => a - b),
-          diag: [...diag].sort((a, b) => a - b),
-          antiDiag: [...antiDiag].sort((a, b) => a - b),
-          board: boardStr(),
-          traceLen: traceLog.length,
-          phase: "",
-          narr: "",
-          bump: false,
-          tryCell: null,
-          placedCell: null,
-          removeCell: null
-        };
-        return Object.assign(base, extra);
-      }
-
-      out.push(snap({
-        line: [2, 3],
-        phase: "INIT",
-        narr: "Initialize <b>count = 0</b> and three guard Sets: <b>cols</b>, <b>diag</b> (r - c), <b>antiDiag</b> (r + c). This version only counts boards, never stores them."
-      }));
-
-      function dfs(r) {
-        out.push(snap({
-          line: [4, 5],
-          r,
-          phase: "ENTER",
-          narr: "<code>dfs(" + r + ")</code> begins. Check whether <b>r === n</b> (" + r + " === " + nInput + ")."
-        }));
-
-        if (r === nInput) {
-          count++;
-          traceLog.push({ r, c: "-", event: "count", note: "r === n -> count++ (= " + count + ")" });
-          out.push(snap({
-            line: [5],
-            r,
-            phase: "COUNT",
-            count,
-            narr: "<b>r === n</b>: a full valid placement was reached. Increment <b>count</b> to <b>" + count + "</b> (no board is stored).",
-            bump: true
-          }));
-          return;
-        }
-
-        for (let c = 0; c < nInput; c++) {
-          out.push(snap({
-            line: [6, 7],
-            r,
-            c,
-            phase: "TRY",
-            tryCell: [r, c],
-            narr: "Row " + r + ": try column <b>c = " + c + "</b>. Test the guards <code>cols.has(" + c + ") || diag.has(" + (r - c) + ") || antiDiag.has(" + (r + c) + ")</code>."
-          }));
-
-          if (cols.has(c) || diag.has(r - c) || antiDiag.has(r + c)) {
-            traceLog.push({ r, c, event: "skip", note: "attacked -> continue" });
-            out.push(snap({
-              line: [7],
-              r,
-              c,
-              phase: "SKIP",
-              tryCell: [r, c],
-              narr: "Cell (" + r + ", " + c + ") is <b style=\"color:#e24b4a\">attacked</b> by an existing queen. <code>continue</code> to the next column."
-            }));
-            continue;
-          }
-
-          cols.add(c); diag.add(r - c); antiDiag.add(r + c);
-          board[r][c] = 'Q';
-          traceLog.push({ r, c, event: "place", note: "place Q -> dfs(" + (r + 1) + ")" });
-          out.push(snap({
-            line: [8],
-            r,
-            c,
-            phase: "PLACE",
-            placedCell: [r, c],
-            narr: "Safe! Place a <b>queen</b> at (" + r + ", " + c + "). Add " + c + " to <b>cols</b>, " + (r - c) + " to <b>diag</b>, " + (r + c) + " to <b>antiDiag</b>."
-          }));
-
-          out.push(snap({
-            line: [9],
-            r,
-            c,
-            phase: "RECURSE",
-            placedCell: [r, c],
-            narr: "Recurse deeper: <code>dfs(" + (r + 1) + ")</code> to place a queen on the next row."
-          }));
-
-          dfs(r + 1);
-
-          cols.delete(c); diag.delete(r - c); antiDiag.delete(r + c);
-          board[r][c] = '.';
-          traceLog.push({ r, c, event: "undo", note: "backtrack -> remove Q" });
-          out.push(snap({
-            line: [10],
-            r,
-            c,
-            phase: "UNDO",
-            removeCell: [r, c],
-            narr: "<b>Backtrack</b>: returned from <code>dfs(" + (r + 1) + ")</code>. Remove the queen at (" + r + ", " + c + ") and clear " + c + " / " + (r - c) + " / " + (r + c) + " from the guard Sets."
-          }));
-        }
-
-        out.push(snap({
-          line: [11, 12],
-          r,
-          phase: "RETURN",
-          narr: "Row " + r + " exhausted all columns. <code>return</code> from <code>dfs(" + r + ")</code> back to the caller."
-        }));
-      }
-
-      dfs(0);
-
-      out.push(snap({
-        line: [14],
-        phase: "DONE",
-        narr: "Done. <code>dfs(0)</code> finished. There are <b>" + count + "</b> distinct ways to place " + nInput + " non-attacking queens on a " + nInput + " x " + nInput + " board.",
-        count
-      }));
-
-      return out;
+      const out=[],board=Array.from({length:nInput},()=>new Array(nInput).fill('.')),cols=new Set(),diag=new Set(),antiDiag=new Set();let count=0;traceLog=[];
+      const snap=(line,phase,narr,extra={})=>out.push({executedLine:line,line:line?[line]:[1],r:null,c:null,count,cols:[...cols].sort((a,b)=>a-b),diag:[...diag].sort((a,b)=>a-b),antiDiag:[...antiDiag].sort((a,b)=>a-b),board:board.map(row=>row.join('')).join('|'),traceLen:traceLog.length,phase,narr,bump:false,tryCell:null,placedCell:null,removeCell:null,...extra});
+      snap(null,"INIT","Ready to place non-attacking queens.");snap(2,"INIT","Initialize the solution count.");snap(3,"INIT","Create the attack guard sets.");snap(4,"INIT","Define dfs.");
+      const dfs=(r,callLine)=>{snap(callLine,"ENTER","Call dfs for the next row.",{r});if(r===nInput){count++;traceLog.push({r,c:'-',event:'solution',note:'complete board'});snap(5,"COUNT","Record a complete solution and return.",{r,bump:true});return;}snap(5,"ENTER","This row still needs a queen.",{r});let c=0;for(;c<nInput;c++){snap(6,"TRY","Read the next column.",{r,c,tryCell:[r,c]});const attacked=cols.has(c)||diag.has(r-c)||antiDiag.has(r+c);snap(7,attacked?'SKIP':'TRY',"Check whether this cell is attacked.",{r,c,tryCell:[r,c]});if(attacked){traceLog.push({r,c,event:'skip',note:'attacked'});continue;}cols.add(c);snap(8,"PLACE","Reserve this column.",{r,c});diag.add(r-c);snap(8,"PLACE","Reserve this diagonal.",{r,c});antiDiag.add(r+c);snap(8,"PLACE","Reserve this anti-diagonal.",{r,c});board[r][c]='Q';out.at(-1).board=board.map(row=>row.join("")).join("|");traceLog.push({r,c,event:'place',note:'recurse'});dfs(r+1,9);cols.delete(c);snap(10,"UNDO","Release this column.",{r,c});diag.delete(r-c);snap(10,"UNDO","Release this diagonal.",{r,c});antiDiag.delete(r+c);snap(10,"UNDO","Release this anti-diagonal.",{r,c});board[r][c]='.';out.at(-1).board=board.map(row=>row.join("")).join("|");traceLog.push({r,c,event:'undo',note:'backtrack'});}snap(6,"RETURN","This row has no more columns to try.",{r,c});};
+      dfs(0,13);snap(14,"DONE","Return the solutions.");return out;
     }
 
     function loadExample(exNum) {
@@ -1300,11 +1167,11 @@
 
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
-      spec: {"number":52,"title":"N-Queens II","topic":"Backtracking","why":"A complete conflict-free placement adds one solution; backtracking restores the board for the next placement.","meanings":{"n":"board size (n x n) and number of queens to place","count":"running counter of valid full placements (the answer)","cols":"Set of columns already occupied by a queen","diag":"Set of occupied `r - c` (top-left to bottom-right) diagonals","antiDiag":"Set of occupied `r + c` (top-right to bottom-left) diagonals","r":"current row being filled by `dfs`","c":"column being tried in the current row"},"entityClasses":["hud-item","set-pill","tryCell","placedCell","removeCell"],"entitySelectors":[],"mode":"precomputed"},
+      spec: {"number":52,"title":"N-Queens II","topic":"Backtracking","why":"A complete conflict-free placement adds one solution; backtracking restores the board for the next placement.","meanings":{"n":"board size (n x n) and number of queens to place","count":"running counter of valid full placements (the answer)","cols":"Set of columns already occupied by a queen","diag":"Set of occupied `r - c` (top-left to bottom-right) diagonals","antiDiag":"Set of occupied `r + c` (top-right to bottom-left) diagonals","r":"current row being filled by `dfs`","c":"column being tried in the current row"},"entityClasses":["hud-item","set-pill","sq"],"entitySelectors":[],"mode":"precomputed"},
       index: () => idx,
       count: () => steps.length,
       read: () => ({n, ...(steps[idx] || {})}),
-      readAt: (position) => ({n, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({n, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { idx = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

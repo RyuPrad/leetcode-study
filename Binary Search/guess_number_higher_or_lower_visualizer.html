@@ -677,6 +677,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -952,27 +953,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parts = raw.split("|").map(part => part.trim());
-      if (parts.length < 2) {
-        alert("Please use the format: n | pick   (example: 10 | 6)");
-        return;
-      }
-      const parsedN = Number(parts[0]);
-      const parsedPick = Number(parts[1]);
-      if (!Number.isInteger(parsedN) || parsedN < 1) {
-        alert("n must be an integer that is at least 1.");
-        return;
-      }
-      if (!Number.isInteger(parsedPick) || parsedPick < 1 || parsedPick > parsedN) {
-        alert("pick must be an integer between 1 and n.");
-        return;
-      }
-      n = parsedN;
-      pick = parsedPick;
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const [nText,pickText]=parser.parts(document.getElementById('custom-input').value,2,'n and pick'); const pn=parser.integer(nText,{min:1,label:'n'}), pp=parser.integer(pickText,{min:1,max:pn,label:'pick'}); n=pn; pick=pp;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       left = 1;
@@ -1012,23 +998,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      n = prev.n;
-      pick = prev.pick;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      res = prev.res;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
-      discardedLeftMax = prev.discardedLeftMax;
-      discardedRightMin = prev.discardedRightMin;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+n = snapshot.n;
+pick = snapshot.pick;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+res = snapshot.res;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+discardedLeftMax = snapshot.discardedLeftMax;
+discardedRightMin = snapshot.discardedRightMin;
+}
 
     function resultWord(value) {
       if (value === 0) return "0 (correct)";
@@ -1055,16 +1060,21 @@
 
       switch (execState) {
         case "INIT":
-          left = 1;
-          right = n;
-          mid = null;
-          res = null;
-          ans = null;
-          discardedLeftMax = 0;
-          discardedRightMin = n + 1;
-          lastAction = "Initialize left at 1 and right at n.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 1;
+ mid = null;
+res = null;
+ans = null;
+discardedLeftMax = 0;
+discardedRightMin = n + 1;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = n;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1421,57 +1431,140 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start with <code>left = 1</code> and <code>right = n</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, the pick could still be inside the range.' : 'The range is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([5]);
+
           narrate('Calculate the middle number using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "CALL_GUESS":
-          highlightLines([6]);
+
           narrate('Call <code>guess(mid)</code> to learn whether mid is correct, too high, or too low.');
           break;
         case "COMPARE":
           if (res === 0) {
-            highlightLines([7, 8]);
+
             narrate('<code>guess(mid)</code> is <b style="color:#73d66b">0</b>. mid is the pick, so return it.');
           } else if (res < 0) {
-            highlightLines([9, 10]);
+
             narrate('<code>guess(mid)</code> is <b style="color:#ff5c68">-1</b> (too high). The pick must be lower.');
           } else {
-            highlightLines([11, 12]);
+
             narrate('<code>guess(mid)</code> is <b style="color:#ffd866">1</b> (too low). The pick must be higher.');
           }
           break;
         case "MOVE_RIGHT":
-          highlightLines([10]);
+
           narrate('Discard the upper half by setting <code>right = mid - 1</code>.');
           break;
         case "MOVE_LEFT":
-          highlightLines([12]);
+
           narrate('Discard the lower half by setting <code>left = mid + 1</code>.');
           break;
         case "RETURN_FOUND":
-          highlightLines([8]);
+
           narrate('Return the number that matched the pick.');
           break;
         case "RETURN_NOT_FOUND":
-          highlightLines([15]);
+
           narrate('The range is empty, so return <code>-1</code>.');
           break;
         case "END":
-          highlightLines(ans === -1 ? [15] : [8]);
+
           narrate(ans === -1 ? '&#10003; Done. The answer is <code>-1</code>.' : '&#10003; Done. The pick is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALL_GUESS":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "COMPARE":
+    if (res === 0) {
+      return {
+        line: 7,
+        phase: execState
+      };
+    } else if (res < 0) {
+      return {
+        line: 9,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 11,
+        phase: execState
+      };
+    }
+  case "MOVE_RIGHT":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "RETURN_FOUND":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "RETURN_NOT_FOUND":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans === -1 ? [15] : [8])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1500,8 +1593,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":374,"title":"Guess Number Higher or Lower","topic":"Binary Search","why":"The feedback eliminates every candidate on one side of the guess.","meanings":{"n":"Upper bound of the guessing range; we search the integers 1..n","left":"Lower bound of the current search range (starts at 1)","right":"Upper bound of the current search range (starts at n)","mid":"Current guess, `Math.floor((left + right) / 2)`","pick":"The hidden target number; only the `guess()` API can see it","res":"Result of `guess(mid)`: 0 if correct, -1 if mid is too high, 1 if mid is too low"},"entityClasses":["hud-item","cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({n, pick, left, right, mid, res, ans, execState, lastAction, discardedLeftMax, discardedRightMin, ...({})}),

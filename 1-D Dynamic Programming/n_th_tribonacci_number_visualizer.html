@@ -804,7 +804,7 @@
     // ----- Precompute steps by running the real algorithm -----
     // Deep-copies dp per step. Handles the n===0 and n<=2 early
     // returns (no dp array). The final step always carries the answer.
-    function buildSteps(nVal) {
+    function originalInstructionBuilder(nVal) {
       const built = [];
       const traceRows = [];
       // dp may stay empty if an early return fires.
@@ -1237,13 +1237,42 @@
     document.getElementById("custom-input").value = String(n);
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8,9,11]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":1137,"title":"N-th Tribonacci Number","topic":"1-D Dynamic Programming","why":"Every new term combines the previous three terms; those three dependencies move forward together.","meanings":{"n":"The index of the Tribonacci number to return. Base cases: `T(0) = 0`, `T(1) = 1`, `T(2) = 1`.","dp":"Array of length `n + 1` where `dp[i]` is the i-th Tribonacci number. Built only when `n > 2`; otherwise the function returns the base case directly.","i":"Loop index, from `3` to `n`, marking the term currently being computed via `dp[i] = dp[i-1] + dp[i-2] + dp[i-3]` (the sum of the previous three terms)."},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({n, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({n, masterTrace, ...(steps[position] || {})}),
+      read: () => ({n,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({n,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

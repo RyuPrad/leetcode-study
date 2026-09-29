@@ -837,99 +837,22 @@
 
     // Precompute every snapshot.
     function buildSteps() {
-      steps = [];
-      let stack = [];
-
-      steps.push({
-        i: -1, token: null, a: null, b: null, result: null,
-        stack: [...stack], phase: "INIT", lines: [2],
-        justPushed: false, trace: []
-      });
-
-      const trace = [];
-
-      for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        const op = isOperator(token);
-
-        // Read token.
-        steps.push({
-          i, token, a: null, b: null, result: null,
-          stack: [...stack], phase: "READ", isOp: op,
-          lines: op ? [3, 4] : [3, 4, 11],
-          justPushed: false, trace: trace.map(r => ({ ...r }))
-        });
-
-        if (op) {
-          // Pop b (top), then a (next).
-          const b = stack[stack.length - 1];
-          const a = stack[stack.length - 2];
-
-          // Highlight the two operands before popping.
-          steps.push({
-            i, token, a, b, result: null,
-            stack: [...stack], phase: "POPTWO", isOp: true, lines: [5, 6],
-            justPushed: false, trace: trace.map(r => ({ ...r }))
-          });
-
-          stack.pop(); // b
-          stack.pop(); // a
-
-          let result;
-          let line;
-          if (token === "+") { result = a + b; line = 7; }
-          else if (token === "-") { result = a - b; line = 8; }
-          else if (token === "*") { result = a * b; line = 9; }
-          else { result = Math.trunc(a / b); line = 10; }
-
-          // Show the computation (operands gone, result not yet pushed).
-          steps.push({
-            i, token, a, b, result,
-            stack: [...stack], phase: "COMPUTE", isOp: true, lines: [line],
-            justPushed: false, trace: trace.map(r => ({ ...r }))
-          });
-
-          stack.push(result);
-          trace.push({
-            i, token,
-            a: a === undefined ? "-" : a,
-            b: b === undefined ? "-" : b,
-            pushed: result,
-            stack: "[" + stack.join(", ") + "]"
-          });
-
-          steps.push({
-            i, token, a, b, result,
-            stack: [...stack], phase: "PUSH_RESULT", isOp: true, lines: [line],
-            justPushed: true, trace: trace.map(r => ({ ...r }))
-          });
-        } else {
-          const val = Number(token);
-          stack.push(val);
-          trace.push({
-            i, token, a: "-", b: "-", pushed: val,
-            stack: "[" + stack.join(", ") + "]"
-          });
-          steps.push({
-            i, token, a: null, b: null, result: val,
-            stack: [...stack], phase: "PUSH_NUM", isOp: false, lines: [12],
-            justPushed: true, trace: trace.map(r => ({ ...r }))
-          });
-        }
+      steps=[];const stack=[],trace=[];let i=-1,token=null,a=null,b=null,result=null;
+      const snap=(line,phase,narr,extra={})=>steps.push({i,token,a,b,result,stack:[...stack],phase,executedLine:line,lines:line?[line]:[1],justPushed:false,trace:trace.map(r=>({...r})),narr,...extra});
+      snap(null,"INIT","Ready to evaluate the expression.");snap(2,"INIT","Create an empty stack.");
+      for(i=0;i<tokens.length;i++) {
+        token=tokens[i];a=b=result=null;const op=isOperator(token);
+        snap(3,"READ","Read the next token.",{isOp:op});snap(4,"READ","Check whether the token is an operator.",{isOp:op});
+        if(op) {
+          b=stack.pop();snap(5,"POPTWO","Pop the right operand b.",{isOp:true});
+          a=stack.pop();snap(6,"POPTWO","Pop the left operand a.",{isOp:true});
+          const line=token==="+"?7:token==="-"?8:token==="*"?9:10;
+          for(let guard=7;guard<line&&guard<10;guard++)snap(guard,"READ","Check the next operator branch.",{isOp:true});
+          result=token==="+"?a+b:token==="-"?a-b:token==="*"?a*b:Math.trunc(a/b);stack.push(result);
+          trace.push({i,token,a,b,pushed:result,stack:"["+stack.join(", ")+"]"});snap(line,"PUSH_RESULT","Compute and push "+result+".",{isOp:true,justPushed:true});
+        }else{result=Number(token);stack.push(result);trace.push({i,token,a:"-",b:"-",pushed:result,stack:"["+stack.join(", ")+"]"});snap(12,"PUSH_NUM","Push the numeric token.",{isOp:false,justPushed:true});}
       }
-
-      const finalRes = stack[0];
-      steps.push({
-        i: tokens.length, token: null, a: null, b: null, result: finalRes,
-        stack: [...stack], phase: "RETURN", lines: [15],
-        justPushed: false, trace: trace.map(r => ({ ...r }))
-      });
-
-      steps.push({
-        i: tokens.length, token: null, a: null, b: null, result: finalRes,
-        stack: [...stack], phase: "END", lines: [15],
-        justPushed: false, trace: trace.map(r => ({ ...r }))
-      });
+      token=null;snap(3,"READ","There are no more tokens.");result=stack[0];snap(15,"END","Return the remaining value.");
     }
 
     function loadExample(exNum) {
@@ -1239,6 +1162,8 @@
           break;
       }
 
+      if (step.narr) narrate(step.narr);
+
       const visualUi = document.getElementById("visual-ui");
       visualUi.innerHTML = "";
       visualUi.appendChild(renderTokensRow(step));
@@ -1291,7 +1216,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({operators, tokens, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({operators, tokens, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({operators, tokens, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -911,11 +911,21 @@
     // ===== BUILD the tree AND precomputed steps via recursion =====
     // We carry index windows into the ORIGINAL arrays so we can highlight subarrays.
     // preorder window [preL..preR], inorder window [inL..inR].
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
+      let algorithmRoot = null;
+      const algorithmNodes = [];
       const builtIds = new Set();   // ids of nodes already created
       const stackFrames = [];       // textual frames
 
+      function snapshotLayout() {
+        if (!layout) return null;
+        const current=algorithmNodes.filter(node=>builtIds.has(node._id));
+        const projected=current.map(node=>{const positioned=layout.nodes.find(original=>original._id===node._id);return {...JSON.parse(JSON.stringify(node)),_px:positioned?._px,_py:positioned?._py,_x:positioned?._x,_depth:positioned?._depth};});
+        const edges=[];
+        for(const node of current)for(const key of ["left","right"])if(node[key])edges.push({from:node._id,to:node[key]._id,label:key});
+        return {...layout,nodes:projected,edges,posById:Object.fromEntries(projected.map(node=>[node._id,{x:node._px,y:node._py,val:node.val}]))};
+      }
       function snap(extra) {
         steps.push(Object.assign({
           built: Array.from(builtIds),
@@ -924,7 +934,9 @@
           preWin: null, inWin: null,
           midAbs: null, leftPre: null, rightPre: null, leftIn: null, rightIn: null,
           rootVal: null, mid: null,
-          ansPreorder: rootNode ? preorderVals(rootNode) : [],
+          ansPreorder: algorithmRoot ? preorderVals(algorithmRoot) : [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
           phase: "run"
         }, extra));
       }
@@ -945,12 +957,14 @@
         const rootVal = preorder[preL];
         const node = new TreeNode(rootVal);
         node._id = nodeFactoryId++;
+        algorithmNodes.push(node);
 
         snap({ lines: [3], phase: "rootval", preWin: [preL, preR], inWin: [inL, inR],
           rootVal, rootNowId: node._id,
           note: "<code>rootVal = preorder[" + preL + "] = " + rootVal + "</code>. The first value of any preorder slice is the subtree root." });
 
         builtIds.add(node._id);
+        if(node._id===0) algorithmRoot=node;
         snap({ lines: [4], phase: "newnode", preWin: [preL, preR], inWin: [inL, inR],
           rootVal, rootNowId: node._id,
           note: "Create <code>new TreeNode(" + rootVal + ")</code> and place it in the tree." });
@@ -999,7 +1013,9 @@
         inWin: inorder.length ? [0, inorder.length - 1] : null,
         midAbs: null, leftPre: null, rightPre: null, leftIn: null, rightIn: null,
         rootVal: null, mid: null,
-        ansPreorder: rootNode ? preorderVals(rootNode) : [],
+        ansPreorder: algorithmRoot ? preorderVals(algorithmRoot) : [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
         phase: "init", lines: [1],
         note: "Start with the full <b>preorder</b> and <b>inorder</b> arrays. We recursively split them to rebuild the tree."
       });
@@ -1014,7 +1030,9 @@
         inWin: inorder.length ? [0, inorder.length - 1] : null,
         midAbs: null, leftPre: null, rightPre: null, leftIn: null, rightIn: null,
         rootVal: null, mid: null,
-        ansPreorder: rootNode ? preorderVals(rootNode) : [],
+        ansPreorder: algorithmRoot ? preorderVals(algorithmRoot) : [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
         phase: "done", lines: [8],
         note: "Done. The tree is fully reconstructed from preorder + inorder. Its preorder traversal matches the input."
       });
@@ -1100,7 +1118,7 @@
 
       const builtSet = new Set(state.built);
 
-      layout.edges.forEach(e => {
+      (state.layout?.edges || []).forEach(e => {
         const a = layout.posById[e.from];
         const b = layout.posById[e.to];
         const line = document.createElementNS(svgNS, "line");
@@ -1329,13 +1347,42 @@
     inorder = [...examples[1].inorder];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":105,"title":"Construct Binary Tree from Preorder and Inorder Traversal","topic":"Trees","why":"Preorder identifies the root; its inorder position divides the values belonging to the left and right subtrees.","meanings":{"preorder":"preorder traversal array; its first element is always the current subtree's root","inorder":"inorder traversal array; the root splits it into left and right subtrees","root":"the `TreeNode` being constructed for the current call","rootVal":"`preorder[0]`, the value of the current subtree root","mid":"index of `rootVal` inside `inorder`; everything left of it is the left subtree, right of it the right subtree"},"entityClasses":["hud-item","tree-node","arr-cell","frame-pill","nodes","frames"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({preorder, inorder, rootNode, layout, realFactoryId, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({preorder, inorder, rootNode, layout, realFactoryId, ...(steps[position] || {})}),
+      read: () => ({preorder, inorder, rootNode, layout, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({preorder, inorder, rootNode, layout, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -974,10 +974,20 @@
     // ===== Build precomputed steps =====
     function buildSteps() {
       steps = [];
+      let algorithmRoot = null;
+      const algorithmNodes = [];
       const builtIds = new Set();
       const frames = [];
       let factory = 0;
 
+      function snapshotLayout() {
+        if (!layout) return null;
+        const current=algorithmNodes.filter(node=>builtIds.has(node._id));
+        const projected=current.map(node=>{const positioned=layout.nodes.find(original=>original._id===node._id);return {...JSON.parse(JSON.stringify(node)),_px:positioned?._px,_py:positioned?._py,_x:positioned?._x,_depth:positioned?._depth};});
+        const edges=[];
+        for(const node of current)for(const key of ["topLeft","topRight","bottomLeft","bottomRight"])if(node[key])edges.push({from:node._id,to:node[key]._id,label:({topLeft:'TL',topRight:'TR',bottomLeft:'BL',bottomRight:'BR'})[key]});
+        return {...layout,nodes:projected,edges,posById:Object.fromEntries(projected.map(node=>[node._id,{x:node._px,y:node._py,val:node.val}]))};
+      }
       function snap(extra) {
         steps.push(Object.assign({
           built: Array.from(builtIds),
@@ -987,8 +997,10 @@
           checkCell: null,        // {i,j}
           same: null,
           r: null, c: null, n: null,
-          serialized: rootNode ? serializeQuad(rootNode) : [],
-          phase: "run"
+          serialized: [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
+          phase: "run", executedLine: extra.lines?.[0] ?? null
         }, extra));
       }
 
@@ -999,6 +1011,7 @@
       function build(r, c, n) {
         const node = new Node(null, null);
         node._id = factory++;
+        algorithmNodes.push(node);
 
         frames.push("build(r=" + r + ", c=" + c + ", n=" + n + ")");
         snap({ lines: [2], phase: "enter", region: { r, c, n }, r, c, n,
@@ -1010,7 +1023,9 @@
           note: "Assume the block is uniform: <code>same = true</code>. Compare every cell to the top-left cell <code>grid[" + r + "][" + c + "] = " + grid[r][c] + "</code>." });
 
         for (let i = r; i < r + n; i++) {
+          snap({lines: [4], phase: "row", region: {r,c,n}, r,c,n, same, checkCell: {i,j:c}, note: "Scan the next row."});
           for (let j = c; j < c + n; j++) {
+            snap({lines: [5], phase: "column", region: {r,c,n}, r,c,n, same, checkCell: {i,j}, note: "Scan the next cell."});
             const equal = grid[i][j] === grid[r][c];
             if (!equal) same = false;
             snap({ lines: [6], phase: "scan", region: { r, c, n }, checkCell: { i, j }, r, c, n, same, curId: node._id,
@@ -1023,6 +1038,7 @@
           node.val = (grid[r][c] === 1);
           node.isLeaf = true;
           builtIds.add(node._id);
+          if (node._id === 0) algorithmRoot = node;
           snap({ lines: [9], phase: "leaf", region: { r, c, n }, r, c, n, same: true, curId: node._id,
             note: "The whole block is uniform. Create a LEAF node <code>new Node(" + (node.val ? "true" : "false") + ", true)</code> (val = " + (grid[r][c]) + "). Return it." });
           frames.pop();
@@ -1037,6 +1053,7 @@
         node.val = true;
         node.isLeaf = false;
         builtIds.add(node._id);
+        if(node._id===0) algorithmRoot=node;
         snap({ lines: [11], phase: "internal", region: { r, c, n }, r, c, n, same: false, curId: node._id,
           note: "Create an INTERNAL node (<code>isLeaf = false</code>) and recurse into the four quadrants in order: topLeft, topRight, bottomLeft, bottomRight." });
 
@@ -1062,25 +1079,31 @@
         return node;
       }
 
-      // step 0
+      // Ready state precedes the actual call.
       const n0 = grid.length;
       steps.push({
         built: [], frames: [], curId: null,
         region: { r: 0, c: 0, n: n0 }, checkCell: null, same: null,
         r: null, c: null, n: null,
-        serialized: rootNode ? serializeQuad(rootNode) : [],
-        phase: "init", lines: [1, 17],
+        serialized: [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
+        phase: "init", lines: [], executedLine: null,
         note: "Call <code>build(0, 0, " + n0 + ")</code> on the whole " + n0 + "x" + n0 + " grid. A block becomes a leaf if all cells are equal, otherwise it splits into 4 quadrants."
       });
 
+      snap({lines: [2], phase: "define", note: "Define the recursive region builder."});
+      snap({lines: [17], phase: "call", note: "Call build on the complete grid."});
       build(0, 0, grid.length);
 
       steps.push({
         built: rootNode ? layout.nodes.map(n => n._id) : [],
         frames: [], curId: null, region: null, checkCell: null, same: null,
         r: null, c: null, n: null,
-        serialized: rootNode ? serializeQuad(rootNode) : [],
-        phase: "done", lines: [17],
+        serialized: algorithmRoot ? serializeQuad(algorithmRoot) : [],
+          rootNode: JSON.parse(JSON.stringify(algorithmRoot)),
+          layout: snapshotLayout(),
+        phase: "done", lines: [17], executedLine: 17,
         note: "Done. The quad tree is fully built. Level-order serialization (each node = [isLeaf, val]) is shown in the trace."
       });
     }
@@ -1217,7 +1240,7 @@
 
       const builtSet = new Set(state.built);
 
-      layout.edges.forEach(e => {
+      (state.layout?.edges || []).forEach(e => {
         const a = layout.posById[e.from];
         const b = layout.posById[e.to];
         const line = document.createElementNS(svgNS, "line");
@@ -1393,8 +1416,8 @@
       spec: {"number":427,"title":"Construct Quad Tree","topic":"Trees","why":"A uniform region becomes one leaf; a mixed region splits into four smaller regions.","meanings":{"grid":"the n x n grid of 0s and 1s (n is a power of 2) being encoded","r":"top row of the current block under consideration","c":"left column of the current block under consideration","n":"side length of the current block","same":"whether every cell in the block equals the top-left cell; if true the block is a leaf, otherwise it splits into four `half x half` quadrants"},"entityClasses":["hud-item","grid-cell","tree-node","frame-pill","serial-pill","node","nodes","checkCell","frames"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({grid, rootNode, layout, realFactory, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({grid, rootNode, layout, realFactory, ...(steps[position] || {})}),
+      read: () => ({grid, rootNode, layout, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({grid, rootNode, layout, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

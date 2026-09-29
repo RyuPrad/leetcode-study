@@ -588,27 +588,46 @@
         function prevStep() {
             if (historyStack.length === 0) return;
             const s = historyStack.pop();
-            nextMap = [...s.nextMap];
-            headIdx = s.headIdx;
-            prevIdx = s.prevIdx;
-            currIdx = s.currIdx;
-            nextIdx = s.nextIdx;
-            execState = s.execState;
-            lastChangedNode = s.lastChangedNode;
+      restoreState(s);
+
+
+
+
+
+
+
             document.getElementById('btn-next').disabled = false;
             document.getElementById('btn-next').textContent = 'Step Over';
             render();
         }
+
+function restoreState(snapshot) {
+nextMap = [...snapshot.nextMap];
+headIdx = snapshot.headIdx;
+prevIdx = snapshot.prevIdx;
+currIdx = snapshot.currIdx;
+nextIdx = snapshot.nextIdx;
+execState = snapshot.execState;
+lastChangedNode = snapshot.lastChangedNode;
+}
 
         function nextStep() {
             if (execState === 'END') return;
             saveState();
 
             switch (execState) {
-                case 'INIT':
-                    execState = 'WHILE_CHECK';
-                    lastChangedNode = null;
-                    break;
+                case "INIT":
+ prevIdx = null;
+ lastChangedNode = null;
+
+ execState = "INIT_CURR";
+ break;
+case "INIT_CURR":
+ currIdx = headIdx;
+
+
+ execState = "WHILE_CHECK";
+ break;
 
                 case 'WHILE_CHECK':
                     lastChangedNode = null;
@@ -889,18 +908,24 @@
         }
 
         function renderDebuggerState() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
             const currVal = currIdx === null ? 'null' : values[currIdx];
             const prevVal = prevIdx === null ? 'null' : values[prevIdx];
             const nextVal = nextIdx === undefined ? 'undefined' : nextIdx === null ? 'null' : values[nextIdx];
 
             switch (execState) {
-                case 'INIT':
-                    highlightLines([2, 3]);
-                    narrate('Initialize <b>prev</b> to null and <b>curr</b> to head. <b>prev</b> represents the reversed side. <b>curr</b> walks through the original list.');
-                    setOperation('let prev = null;\nlet curr = head;');
-                    break;
+                case "INIT":
+
+ narrate("Initialize prev from this line.");
+ break;
+case "INIT_CURR":
+
+ narrate("Initialize curr from this line.");
+ break;
                 case 'WHILE_CHECK':
-                    highlightLines([5]);
+
                     if (currIdx !== null) {
                         narrate(`<b>curr</b> is node ${currVal}, so the loop continues.`);
                         setOperation(`while (curr !== null)\n// curr is node(${currVal}), keep reversing`);
@@ -910,37 +935,91 @@
                     }
                     break;
                 case 'SAVE_NEXT':
-                    highlightLines([6]);
+
                     narrate(`<code>next = curr.next</code> saves node ${nextVal}. This prevents losing the rest of the list before we change <code>curr.next</code>.`);
                     setOperation(`let next = curr.next;\n// save ${nextVal === 'null' ? 'null' : 'node(' + nextVal + ')'}`);
                     break;
                 case 'REVERSE_LINK':
-                    highlightLines([7]);
+
                     narrate(`<code>curr.next = prev</code> flips the arrow from current node ${currVal} back toward ${prevVal === 'null' ? 'null' : 'node ' + prevVal}.`);
                     setOperation(`curr.next = prev;\n// node(${currVal}).next now points to ${prevVal === 'null' ? 'null' : 'node(' + prevVal + ')'}`);
                     break;
                 case 'MOVE_PREV':
-                    highlightLines([8]);
+
                     narrate(`<code>prev = curr</code> moves <b>prev</b> forward. The reversed side now starts at node ${currVal}.`);
                     setOperation(`prev = curr;\n// prev becomes node(${currVal})`);
                     break;
                 case 'MOVE_CURR':
-                    highlightLines([9]);
+
                     narrate(`<code>curr = next</code> moves <b>curr</b> to the saved next node ${nextVal}. Now we can process the next original node.`);
                     setOperation(`curr = next;\n// curr becomes ${nextVal === 'null' ? 'null' : 'node(' + nextVal + ')'}`);
                     break;
                 case 'RETURN':
-                    highlightLines([12]);
+
                     narrate(`<b>prev</b> is the new head of the fully reversed list. Return <code>prev</code>.`);
                     setOperation('return prev;');
                     break;
                 case 'END':
-                    highlightLines([12]);
+
                     narrate(`✓ Done. The reversed linked list is <b>${formatListFrom(prevIdx).replaceAll('<span class="nm">','').replaceAll('</span>','').replaceAll('<span class="kw">null</span>','null')}</b>.`);
                     setOperation('Finished.');
                     break;
             }
         }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_CURR":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case 'WHILE_CHECK':
+    return {
+      line: 5,
+      phase: execState
+    };
+  case 'SAVE_NEXT':
+    return {
+      line: 6,
+      phase: execState
+    };
+  case 'REVERSE_LINK':
+    return {
+      line: 7,
+      phase: execState
+    };
+  case 'MOVE_PREV':
+    return {
+      line: 8,
+      phase: execState
+    };
+  case 'MOVE_CURR':
+    return {
+      line: 9,
+      phase: execState
+    };
+  case 'RETURN':
+    return {
+      line: 12,
+      phase: execState
+    };
+  case 'END':
+    return {
+      line: 12,
+      phase: execState
+    };
+}
+ return null;
+}
 
         function render() {
             document.getElementById('btn-prev').disabled = historyStack.length === 0;
@@ -1006,8 +1085,36 @@
         init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":206,"title":"Reverse linked list","topic":"LinkedList","why":"Save the next node before reversing the current link, then move the previous and current pointers forward.","meanings":{"head":"list head","prev":"previous node in reversed list","curr":"node being reversed","next":"saved original next pointer"},"entityClasses":["hud-item","node","obj-node","hl-node","lastChangedNode"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({values, nextMap, headIdx, prevIdx, currIdx, nextIdx, execState, lastChangedNode, showMemoryLabels, ...({})}),

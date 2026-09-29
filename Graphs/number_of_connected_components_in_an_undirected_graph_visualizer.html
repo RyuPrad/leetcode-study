@@ -597,7 +597,7 @@
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">DSU</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>(n) {</div>
-<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) => i);</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) =&gt; i);</div>
 <div id="line-4" class="code-line">    <span class="kw">this</span>.count = n;</div>
 <div id="line-5" class="code-line">  }</div>
 <div id="line-6" class="code-line">  <span class="fn">find</span>(x) {</div>
@@ -838,73 +838,28 @@
 
     function cloneArr(a) { return a.slice(); }
 
-    function buildSteps(n, edgList) {
-      const dsu = new DSU(n);
-      const built = [];
-      const traceRows = [];
-
-      function snap(extra) {
-        built.push({
-          parent: cloneArr(dsu.parent),
-          count: dsu.count,
-          n,
-          edge: extra.edge === undefined ? null : extra.edge,
-          a: extra.a === undefined ? null : extra.a,
-          b: extra.b === undefined ? null : extra.b,
-          ra: extra.ra === undefined ? null : extra.ra,
-          rb: extra.rb === undefined ? null : extra.rb,
-          changed: extra.changed === undefined ? null : extra.changed,
-          dropped: extra.dropped === undefined ? false : extra.dropped,
-          phase: extra.phase,
-          lines: extra.lines,
-          narration: extra.narration,
-          status: extra.status === undefined ? "running" : extra.status,
-          traceLen: traceRows.length
-        });
-      }
-
-      snap({
-        phase: "init", lines: [23, 24],
-        narration: "Build a <code>DSU</code> with <b>" + n + "</b> nodes. Each node is its own component, so <code>count = " + n + "</code>. Every edge that links two <i>different</i> components will decrement the count."
-      });
-
-      for (let ei = 0; ei < edgList.length; ei++) {
-        const [a, b] = edgList[ei];
-        snap({
-          phase: "read", lines: [25, 13], edge: [a, b], a, b,
-          narration: "Edge <b>[" + a + ", " + b + "]</b> → <code>union(" + a + ", " + b + ")</code>."
-        });
-        const ra = dsu.find(a);
-        const rb = dsu.find(b);
-        snap({
-          phase: "find", lines: [14, 15], edge: [a, b], a, b, ra, rb,
-          narration: "<code>ra = find(" + a + ") = " + ra + "</code>, <code>rb = find(" + b + ") = " + rb + "</code>."
-        });
-        if (ra !== rb) {
-          dsu.parent[ra] = rb;
-          dsu.count--;
-          traceRows.push({ idx: ei, edge: "[" + a + "," + b + "]", ra, rb, result: "merge → count=" + dsu.count });
-          snap({
-            phase: "merge", lines: [16, 17, 18], edge: [a, b], a, b, ra, rb,
-            changed: ra, dropped: true,
-            narration: "<code>ra !== rb</code> → attach <b>" + ra + "</b> under <b>" + rb + "</b> and <code>count--</code>. Two components became one: <b>count = " + dsu.count + "</b>."
-          });
-        } else {
-          traceRows.push({ idx: ei, edge: "[" + a + "," + b + "]", ra, rb, result: "same set (no change)" });
-          snap({
-            phase: "same", lines: [16], edge: [a, b], a, b, ra, rb,
-            narration: "<code>ra === rb (" + ra + ")</code> — already in the same component. This edge is redundant; <b>count stays " + dsu.count + "</b>."
-          });
-        }
-      }
-
-      snap({
-        phase: "done", lines: [26], status: "done",
-        narration: "✓ Finished. The graph has <b>" + dsu.count + "</b> connected component" + (dsu.count === 1 ? "" : "s") + "."
-      });
-
-      return built;
-    }
+    function buildSteps(n,edgList){
+  const dsu=new DSU(n),built=[],traceRows=[];let context={edge:null,a:null,b:null,ra:null,rb:null};
+  function snap(line,phase,narration,extra={}){built.push({parent:cloneArr(dsu.parent),count:dsu.count,n,...context,changed:null,dropped:false,status:'running',...extra,phase,lines:line?[line]:[],executedLine:line||null,narration,traceLen:traceRows.length});}
+  function find(x){
+    while(true){snap(7,'find-check','Check whether parent['+x+'] differs from '+x+'.',{findX:x});if(dsu.parent[x]===x)break;
+      dsu.parent[x]=dsu.parent[dsu.parent[x]];snap(8,'find-compress','Compress parent['+x+'] to '+dsu.parent[x]+'.',{findX:x,changed:x});
+      x=dsu.parent[x];snap(9,'find-advance','Move x to '+x+'.',{findX:x});}
+    snap(11,'find-return','Return root '+x+'.',{findX:x});return x;
+  }
+  snap(null,'ready','Ready to initialize the disjoint sets.');snap(24,'init','Create a DSU with '+n+' components.');
+  for(let ei=0;ei<edgList.length;ei++){
+    const[a,b]=edgList[ei];context={edge:[a,b],a,b,ra:null,rb:null};snap(25,'read','Read edge ['+a+', '+b+'] and call union.');
+    const ra=find(a);context.ra=ra;snap(14,'find-a','Store ra = '+ra+'.');
+    const rb=find(b);context.rb=rb;snap(15,'find','Store rb = '+rb+'.');
+    snap(16,'compare-roots','Check ra !== rb: '+(ra!==rb)+'.');
+    if(ra!==rb){dsu.parent[ra]=rb;snap(17,'attach','Attach root '+ra+' under '+rb+'.',{changed:ra});
+      dsu.count--;traceRows.push({idx:ei,edge:'['+a+','+b+']',ra,rb,result:'merge; count='+dsu.count});
+      snap(18,'merge','Decrease the component count to '+dsu.count+'.',{dropped:true});
+    }else snap(16,'same','The roots match; the component count is unchanged.');
+  }
+  snap(26,'done','Return the component count '+dsu.count+'.',{status:'done',ans:dsu.count});return built;
+}
 
     function buildTraceRows(n, edgList) {
       const dsu = new DSU(n);
@@ -1272,8 +1227,8 @@
       spec: {"number":323,"title":"Number of Connected Components in an Undirected Graph","topic":"Graphs","why":"Connecting two previously separate components reduces the component count by one.","meanings":{"n":"Number of nodes, labeled `0..n-1`.","edges":"Undirected edges `[a, b]`; each may or may not connect two separate components.","dsu":"The `DSU` (union-find) instance; its `count` field tracks the live component total.","parent":"`parent[x]` is `x`'s parent pointer; following it to a fixed point yields the component root.","count":"Number of connected components. Starts at `n`, and `count--` each time `union` joins two different sets. This is the answer.","a":"First endpoint of the current edge.","b":"Second endpoint of the current edge.","ra":"`find(a)` — the root of `a`'s component.","rb":"`find(b)` — the root of `b`'s component."},"entityClasses":["hud-item","tree-nodes","node","arr-cells","arr-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({N, edges, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({N, edges, masterTrace, ...(steps[position] || {})}),
+      read: () => ({N, edges,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({N, edges,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

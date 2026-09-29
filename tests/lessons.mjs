@@ -18,7 +18,13 @@ async function worker(){const page=await browser.newPage({viewport:{width:1360,h
     if(source.spec.mode==='precomputed')await adapter.seek(source.count()-1);
     const complete=source.spec.mode!=='precomputed'||document.getElementById('btn-next').disabled;
     await adapter.seek(index);
-    return {sameInitial:initial===restarted,sameForward:forward===sought,index,complete,changes,notes:document.querySelector('.study-why p')?.textContent,entities:document.querySelectorAll('[data-study-key]').length,overflow:document.documentElement.scrollWidth>innerWidth+1};
+    let entities=document.querySelectorAll('[data-study-key]').length;
+    // Empty caches have no entries until their first put commits.
+    if(!entities&&[146,460].includes(source.spec.number)){
+      for(let i=0;i<100&&!document.getElementById('btn-next').disabled&&!entities;i++){adapter.next();entities=document.querySelectorAll('[data-study-key]').length;}
+      await adapter.seek(index);
+    }
+    return {sameInitial:initial===restarted,sameForward:forward===sought,index,complete,changes,notes:document.querySelector('.study-why p')?.textContent,entities,overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert.ok(result.sameInitial,'seeking to the beginning restores actual state');assert.ok(result.sameForward,'seeking forward restores the same state');assert.ok(result.complete,'final seek reaches completion');assert.equal(result.notes,lesson.why);assert.equal(result.overflow,false,'workspace fits viewport');assert.ok(result.entities>0||lesson.number===2013,'diagram entities are identified');assert.deepEqual(errors,[]);
   if(screenshots.has(lesson.number)){await page.locator('.study-view-tools').getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:path.join(ROOT,`test-results/lesson-${lesson.number}.png`)});await page.getByRole('button',{name:'Focus diagram',exact:true}).click();assert.ok(await page.locator('.study-code').isHidden());await page.getByRole('button',{name:'Show code',exact:true}).click();}

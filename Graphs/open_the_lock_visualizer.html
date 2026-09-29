@@ -630,7 +630,7 @@
 <div id="line-5" class="code-line">  <span class="kw">const</span> visited = <span class="kw">new</span> <span class="fn">Set</span>([<span class="str">"0000"</span>]);</div>
 <div id="line-6" class="code-line">  <span class="kw">let</span> queue = [<span class="str">"0000"</span>];</div>
 <div id="line-7" class="code-line">  <span class="kw">let</span> turns = <span class="nm">0</span>;</div>
-<div id="line-8" class="code-line">  <span class="kw">while</span> (queue.length > <span class="nm">0</span>) {</div>
+<div id="line-8" class="code-line">  <span class="kw">while</span> (queue.length &gt; <span class="nm">0</span>) {</div>
 <div id="line-9" class="code-line">    <span class="kw">const</span> next = [];</div>
 <div id="line-10" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> state <span class="kw">of</span> queue) {</div>
 <div id="line-11" class="code-line">      <span class="kw">if</span> (state === target) <span class="kw">return</span> turns;</div>
@@ -848,14 +848,6 @@
     // levelIdx (frontier = levels[levelIdx]). render() reconstructs the arrays
     // by slicing these shared logs, so reading a step is pure + reversible.
     //
-    // DETAIL BUDGET: examples like the "boxed-in" target explore almost the
-    // entire 10000-state space. Showing one snapshot per neighbour would be
-    // ~80k steps. So within a level we emit full per-pop / per-neighbour
-    // detail until DETAIL_BUDGET pops, then collapse the rest of that level
-    // into ONE fast-forward snapshot. The algorithm still runs fully, so the
-    // final answer and the visited/frontier sizes are always exact.
-    const DETAIL_BUDGET = 24;
-
     function buildSteps(deadList, tgt) {
       const built = [];
       const traceRows = [];
@@ -881,6 +873,7 @@
           target: tgt,
           ans: (extra.ans === undefined) ? answer : extra.ans,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           currentState: (extra.currentState === undefined) ? null : extra.currentState,
           candidate: (extra.candidate === undefined) ? null : extra.candidate,
@@ -893,6 +886,7 @@
         });
       }
 
+      snap({lines: [], executedLine: null, narration: "Ready to search the lock states."});
       // Line 2: build dead set
       snap({
         lines: [2],
@@ -969,7 +963,7 @@
         const queue = levels[turns];
         // Line 8 + 9: enter while, new level
         snap({
-          lines: [8, 10],
+          lines: [8],
           levelIdx: turns,
           narration: "Level <b>" + turns + "</b>: the frontier has <b>" + queue.length + "</b> state" + (queue.length === 1 ? "" : "s") + ". Expand each one to discover the next level."
         });
@@ -993,44 +987,6 @@
               foundTarget: true
             });
             done = true;
-            break;
-          }
-
-          // Detail budget: once we have shown enough pops in this level, run
-          // the remaining pops silently (algorithm still exact) and emit a
-          // single collapse snapshot afterwards.
-          if (popCount >= DETAIL_BUDGET) {
-            for (let qj = qi; qj < queue.length; qj++) {
-              const st2 = queue[qj];
-              if (st2 === tgt) { answer = turns; done = true; break; }
-              for (let i = 0; i < 4; i++) {
-                for (const d of [1, -1]) {
-                  const digit = (Number(st2[i]) + d + 10) % 10;
-                  const ns = st2.slice(0, i) + digit + st2.slice(i + 1);
-                  if (!visitedSet.has(ns) && !dead.has(ns)) { addVisited(ns); next.push(ns); }
-                }
-              }
-            }
-            if (done) {
-              traceRows.push({ level: turns, action: "popped TARGET " + tgt, frontier: frontierLabel(levelStart), visited: visitedSet.size });
-              snap({
-                lines: [11],
-                levelIdx: turns,
-                narration: "Among the remaining states in level " + turns + ", <code>" + tgt + "</code> appears — it equals the target! Return <code>turns = " + turns + "</code>.",
-                currentState: tgt,
-                ans: turns,
-                foundTarget: true
-              });
-            } else {
-              snap({
-                lines: [12, 16, 17, 18],
-                levelIdx: turns,
-                nextLen: next.length,
-                narration: "Fast-forward: the remaining <b>" + (queue.length - qi) + "</b> states in level " + turns + " are expanded the same way. The next frontier now holds <b>" + next.length + "</b> new state" + (next.length === 1 ? "" : "s") + ".",
-                currentState: null
-              });
-            }
-            collapsed = true;
             break;
           }
 
@@ -1071,10 +1027,12 @@
                   spinIndex: i
                 });
               } else {
+                snap({lines: [16], levelIdx: turns, nextLen: next.length, currentState: state, candidate: nextState, candStatus: "new", spinIndex: i, narration: "This candidate is unvisited and is not a deadend."});
                 addVisited(nextState);
+                snap({lines: [17], levelIdx: turns, nextLen: next.length, currentState: state, candidate: nextState, candStatus: "new", spinIndex: i, justAdded: nextState, narration: "Mark this state visited. The next frontier stays unchanged."});
                 next.push(nextState);
                 snap({
-                  lines: [16, 17, 18],
+                  lines: [18],
                   levelIdx: turns,
                   nextLen: next.length,
                   narration: "Turn wheel " + i + " by " + (d === 1 ? "+1" : "-1") + " → <code>" + nextState + "</code>. New & safe — add to <code>visited</code> and the next frontier.",
@@ -1094,10 +1052,11 @@
         // Lines 23-24: advance level
         levels.push(next);
         const fromLevel = turns;
+        snap({lines: [23], levelIdx: fromLevel+1, currentState: null, narration: "Use the newly collected frontier as queue. The turn count stays unchanged."});
         turns++;
         traceRows.push({ level: fromLevel, action: (collapsed ? "expanded (incl. fast-fwd) → " : "expanded " + levelStart.length + " → ") + next.length + " new", frontier: frontierLabel(levelStart), visited: visitedSet.size });
         snap({
-          lines: [23, 24],
+          lines: [24],
           levelIdx: turns,
           narration: "Level " + fromLevel + " fully expanded. <code>queue = next</code> (" + next.length + " state" + (next.length === 1 ? "" : "s") + "), <code>turns++ → " + turns + "</code>.",
           currentState: null
@@ -1224,6 +1183,8 @@
         target: raw.target,
         ans: raw.ans,
         lines: raw.lines,
+        executedLine: raw.executedLine,
+        nextLen: raw.nextLen,
         narration: raw.narration,
         currentState: raw.currentState,
         candidate: raw.candidate,
@@ -1587,8 +1548,8 @@
       spec: {"number":752,"title":"Open the Lock","topic":"Graphs","why":"Each wheel change is one edge; breadth-first layers find the fewest moves while excluding dead ends.","meanings":{"deadends":"List of forbidden 4-digit states the lock can never display.","target":"The 4-digit combination we are trying to reach from `\"0000\"`.","dead":"A `Set` of the deadends for O(1) membership tests.","visited":"A `Set` of every state already enqueued, so BFS never revisits one.","queue":"The current BFS frontier: all states reachable in exactly `turns` moves.","turns":"BFS level counter = number of single-wheel moves so far (the answer).","state":"The 4-digit string popped from the frontier and expanded this step.","digit":"A neighbouring wheel value, computed as `(Number(state[i]) + d + 10) % 10`.","nextState":"A neighbour string formed by turning one wheel of `state` up or down."},"entityClasses":["hud-item","digit"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({deadends, target, DETAIL_BUDGET, ...(currentStep())}),
-      readAt: (position) => ({deadends, target, DETAIL_BUDGET, ...(viewOf(steps[position]))}),
+      read: () => ({deadends, target, ...(currentStep())}),
+      readAt: (studySnapshotIndex) => ({deadends, target, ...(viewOf(steps[studySnapshotIndex]))}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

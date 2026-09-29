@@ -633,13 +633,13 @@
 <div id="line-9" class="code-line">    }</div>
 <div id="line-10" class="code-line">  }</div>
 <div id="line-11" class="code-line">  <span class="kw">const</span> dirs = [[<span class="nm">1</span>, <span class="nm">0</span>], [-<span class="nm">1</span>, <span class="nm">0</span>], [<span class="nm">0</span>, <span class="nm">1</span>], [<span class="nm">0</span>, -<span class="nm">1</span>]];</div>
-<div id="line-12" class="code-line">  <span class="kw">while</span> (queue.length > <span class="nm">0</span>) {</div>
+<div id="line-12" class="code-line">  <span class="kw">while</span> (queue.length &gt; <span class="nm">0</span>) {</div>
 <div id="line-13" class="code-line">    <span class="kw">const</span> next = [];</div>
 <div id="line-14" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> [r, c] <span class="kw">of</span> queue) {</div>
 <div id="line-15" class="code-line">      <span class="kw">for</span> (<span class="kw">const</span> [dr, dc] <span class="kw">of</span> dirs) {</div>
 <div id="line-16" class="code-line">        <span class="kw">const</span> nr = r + dr;</div>
 <div id="line-17" class="code-line">        <span class="kw">const</span> nc = c + dc;</div>
-<div id="line-18" class="code-line">        <span class="kw">if</span> (nr >= <span class="nm">0</span> &amp;&amp; nr &lt; rows &amp;&amp; nc >= <span class="nm">0</span> &amp;&amp; nc &lt; cols &amp;&amp; rooms[nr][nc] === INF) {</div>
+<div id="line-18" class="code-line">        <span class="kw">if</span> (nr &gt;= <span class="nm">0</span> &amp;&amp; nr &lt; rows &amp;&amp; nc &gt;= <span class="nm">0</span> &amp;&amp; nc &lt; cols &amp;&amp; rooms[nr][nc] === INF) {</div>
 <div id="line-19" class="code-line">          rooms[nr][nc] = rooms[r][c] + <span class="nm">1</span>;</div>
 <div id="line-20" class="code-line">          next.<span class="fn">push</span>([nr, nc]);</div>
 <div id="line-21" class="code-line">        }</div>
@@ -852,9 +852,11 @@
         return n;
       }
 
+      let nextQueue = [];
       function snapshot(extra) {
         built.push({
           grid: cloneGrid(grid),
+          next: nextQueue.map(p=>p.slice()),
           rows, cols,
           phase: extra.phase,
           level: extra.level === undefined ? 0 : extra.level,
@@ -862,6 +864,7 @@
           cur: extra.cur === undefined ? null : extra.cur.slice(),
           justFilled: extra.justFilled === undefined ? null : extra.justFilled.slice(),
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           filled: extra.filled === undefined ? 0 : extra.filled,
           remaining: countInf(),
@@ -871,10 +874,13 @@
 
       // Phase 1: scan for all gates.
       let queue = [];
+      snapshot({phase: "init", queue, lines: [], executedLine: null, narration: "Ready to find each gate."});
+      snapshot({phase: "init", queue, lines: [5], narration: "Create the empty BFS queue."});
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           if (grid[r][c] === 0) {
             queue.push([r, c]);
+            snapshot({phase: "init", queue, cur: [r,c], lines: [8], narration: "Add this gate to the initial frontier."});
           }
         }
       }
@@ -882,7 +888,7 @@
         phase: "init",
         queue,
         level: 0,
-        lines: [4, 5, 6, 7, 8],
+        lines: [11],
         narration: "Scan the whole grid and push every <b>gate</b> (value <b>0</b>) into the BFS <code>queue</code>. Found <b>" + queue.length + "</b> gate(s). All gates start the wave at distance 0 simultaneously (multi-source BFS)."
       });
 
@@ -890,11 +896,12 @@
       let level = 0;
       while (queue.length > 0) {
         const next = [];
+        nextQueue = next;
         snapshot({
           phase: "level-start",
           queue,
           level,
-          lines: [12, 13],
+          lines: [13],
           filled,
           narration: "Process BFS level <b>" + level + "</b>: <b>" + queue.length + "</b> cell(s) in the frontier. Their not-yet-visited empty neighbors will receive distance <b>" + (level + 1) + "</b>."
         });
@@ -903,8 +910,10 @@
             const nr = r + dr;
             const nc = c + dc;
             if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === INF) {
+              snapshot({phase: "level-start", queue, level, cur: [r,c], lines: [18], filled, narration: "This neighbor is in bounds and still empty."});
               grid[nr][nc] = grid[r][c] + 1;
               filled++;
+              snapshot({phase: "fill", queue, level, cur: [r,c], justFilled: [nr,nc], lines: [19], filled, narration: "Store this room's distance. The next frontier is unchanged."});
               next.push([nr, nc]);
               traceRows.push({ level: level + 1, from: "(" + r + "," + c + ")", to: "(" + nr + "," + nc + ")", dist: grid[nr][nc] });
               snapshot({
@@ -913,7 +922,7 @@
                 level,
                 cur: [r, c],
                 justFilled: [nr, nc],
-                lines: [18, 19, 20],
+                lines: [20],
                 filled,
                 narration: "From frontier cell <b>(" + r + "," + c + ")</b> (dist " + grid[r][c] + "), neighbor <b>(" + nr + "," + nc + ")</b> is still ∞ &rarr; set it to <code>" + grid[r][c] + " + 1 = " + grid[nr][nc] + "</code> and enqueue it for the next level."
               });
@@ -1271,8 +1280,8 @@
       spec: {"number":286,"title":"Walls and Gates","topic":"Graphs","why":"Starting breadth-first search at every gate finds each room's nearest gate in expanding distance layers.","meanings":{"rooms":"The `rows x cols` grid; mutated in place so each empty room holds its distance to the nearest gate.","rows":"Number of rows, `rooms.length`.","cols":"Number of columns, `rooms[0].length`.","INF":"The empty-room sentinel `2147483647`; a cell is fillable only while it still equals `INF`.","queue":"The BFS frontier of `[r, c]` cells for the current level; reassigned to `next` after each level (level-by-level multi-source BFS).","dirs":"The four 4-directional moves `[[1,0],[-1,0],[0,1],[0,-1]]`.","nr":"Neighbor row `r + dr` being considered for filling.","nc":"Neighbor column `c + dc` being considered for filling."},"entityClasses":["hud-item","legend-item","gcell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({INF, rooms, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({INF, rooms, masterTrace, ...(steps[position] || {})}),
+      read: () => ({INF, rooms,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({INF, rooms,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

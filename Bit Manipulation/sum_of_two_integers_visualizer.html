@@ -737,7 +737,7 @@
     }
 
     // BUILD precomputed, deep-copyable snapshots.
-    function buildSteps(a0, b0) {
+    function originalInstructionBuilder(a0, b0) {
       const out = [];
 
       function snap(extra) {
@@ -1084,13 +1084,42 @@
     inputB = examples[1][1];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,7]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":371,"title":"Sum of Two Integers","topic":"Bit Manipulation","why":"XOR adds without carry; shifted AND identifies the carry that still needs to be added.","meanings":{"a":"First integer; also accumulates the running carry-less sum (`a ^ b`). Becomes the final answer.","b":"Second integer; reused each iteration to hold the carry that still needs to be added. Loop ends when `b` is 0.","carry":"The carry bits for this step, computed as `(a & b) << 1`. Columns where both `a` and `b` are 1 produce a carry into the next-higher bit."},"entityClasses":["hud-item","bit-reg","bit-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({inputA, inputB, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({inputA, inputB, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({inputA, inputB, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

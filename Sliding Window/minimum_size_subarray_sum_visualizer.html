@@ -600,6 +600,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -863,30 +864,20 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parts = raw.split("|");
-      if (parts.length !== 2) {
-        alert("Enter as:  target | nums   Example:  7 | 2,3,1,2,4,3");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const [targetText, arrayText] = parser.parts(document.getElementById("custom-input").value, 2, 'Target and numbers');
+        const parsedTarget = parser.integer(targetText, {min: 1, label: 'Target'});
+        const parsed = parser.list(arrayText, {json: false, min: 1, label: 'Numbers'});
+        target = parsedTarget;
+        nums = parsed;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      const newTarget = Number(parts[0].trim());
-      const numsRaw = parts[1].trim();
-      let newNums = [];
-      if (numsRaw !== "") {
-        newNums = numsRaw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-      if (Number.isNaN(newTarget) || newNums.some(Number.isNaN)) {
-        alert("target and nums must be numbers. Example: 7 | 2,3,1,2,4,3");
-        return;
-      }
-      target = newTarget;
-      nums = newNums;
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -918,17 +909,30 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const st = historyStack.pop();
-      left = st.left;
-      right = st.right;
-      sum = st.sum;
-      ans = st.ans;
-      execState = st.execState;
-      trace = st.trace.map(row => ({ ...row }));
-      leavingIndex = st.leavingIndex;
+      restoreState(st);
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+left = snapshot.left;
+right = snapshot.right;
+sum = snapshot.sum;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+leavingIndex = snapshot.leavingIndex;
+}
 
     function windowSize() {
       if (right < left) return 0;
@@ -946,12 +950,23 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          sum = 0;
-          ans = INF;
-          right = -1;
-          execState = "LOOP_CHECK";
-          break;
+ left = 0;
+ right = -1;
+ lastAction = "Initialize left.";
+ execState = "INIT_SUM";
+ break;
+case "INIT_SUM":
+ sum = 0;
+
+ lastAction = "Initialize sum.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = INF;
+
+ lastAction = "Initialize ans.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (right + 1 < nums.length) {
@@ -998,9 +1013,13 @@
         case "SHRINK":
           sum -= nums[left];
           leavingIndex = left;
+          if (trace.length > 0) trace[trace.length - 1].sum = sum;
+          execState = "ADVANCE_LEFT";
+          break;
+
+        case "ADVANCE_LEFT":
           left++;
           if (trace.length > 0) {
-            trace[trace.length - 1].sum = sum;
             trace[trace.length - 1].len = windowSize();
           }
           execState = "WHILE_CHECK";
@@ -1051,7 +1070,7 @@
       }
 
       const windowActive = right >= 0 && right >= left &&
-        ["ADD_RIGHT", "WHILE_CHECK", "UPDATE_ANS", "SHRINK", "RETURN", "END"].includes(execState);
+        ["ADD_RIGHT", "WHILE_CHECK", "UPDATE_ANS", "SHRINK", "ADVANCE_LEFT", "RETURN", "END"].includes(execState);
       const reached = sum >= target && windowActive;
 
       const cellW = 58;
@@ -1102,7 +1121,7 @@
         if (inWindow) cell.classList.add("in-window");
         if (inWindow && reached) cell.classList.add("reached");
         if (isRight && execState === "ADD_RIGHT") cell.classList.add("current");
-        if (idx === leavingIndex && (execState === "WHILE_CHECK" || execState === "SHRINK")) cell.classList.add("leaving");
+        if (idx === leavingIndex && (execState === "WHILE_CHECK" || execState === "SHRINK" || execState === "ADVANCE_LEFT")) cell.classList.add("leaving");
 
         const idxLabel = document.createElement("div");
         idxLabel.className = "index-label";
@@ -1121,7 +1140,7 @@
       card.className = "gauge-card";
 
       const reached = sum >= target;
-      const showState = right >= 0 && ["ADD_RIGHT", "WHILE_CHECK", "UPDATE_ANS", "SHRINK"].includes(execState);
+      const showState = right >= 0 && ["ADD_RIGHT", "WHILE_CHECK", "UPDATE_ANS", "SHRINK", "ADVANCE_LEFT"].includes(execState);
 
       const head = document.createElement("div");
       head.className = "gauge-head";
@@ -1226,6 +1245,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1244,11 +1266,19 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate("Initialize <b>left = 0</b>, <b>sum = 0</b>, and <b>ans = Infinity</b> (no qualifying window yet).");
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_SUM":
+
+ narrate("Initialize sum from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([5]);
+
           if (right + 1 < nums.length) {
             narrate("Loop continues: grow the window by moving <b>right</b> to index <b>" + (right + 1) + "</b>.");
           } else {
@@ -1256,11 +1286,11 @@
           }
           break;
         case "ADD_RIGHT":
-          highlightLines([6]);
+
           narrate("Grow right: <b>sum += nums[" + right + "] = " + nums[right] + "</b>, so <b>sum = " + sum + "</b>.");
           break;
         case "WHILE_CHECK":
-          highlightLines([7]);
+
           if (sum >= target) {
             narrate("<code>sum (" + sum + ") &gt;= target (" + target + ")</code> is <b style=\"color:#6a9955\">true</b>. Record the length and shrink from the left.");
           } else {
@@ -1268,15 +1298,19 @@
           }
           break;
         case "UPDATE_ANS":
-          highlightLines([8]);
+
           narrate("Window qualifies: <b>ans = min(ans, " + windowSize() + ") = " + ansDisplay() + "</b>.");
           break;
         case "SHRINK":
-          highlightLines([9, 10]);
-          narrate("Shrink: <b>sum -= nums[" + leavingIndex + "] = " + nums[leavingIndex] + "</b> and advance <b>left</b> to <b>" + left + "</b> to look for a shorter window.");
+
+          narrate("Remove the left value from the running sum: <b>sum = " + sum + "</b>.");
+          break;
+        case "ADVANCE_LEFT":
+
+          narrate("Now move the left edge to " + (left + 1) + " to check a shorter window.");
           break;
         case "RETURN":
-          highlightLines([13]);
+
           if (ans === INF) {
             narrate("<b>ans</b> is still <b>Infinity</b> &mdash; no subarray reached the target. Return <b>0</b>.");
           } else {
@@ -1284,7 +1318,7 @@
           }
           break;
         case "END":
-          highlightLines([13]);
+
           if (ans === INF) {
             narrate("Done. No subarray summed to at least <b>" + target + "</b>, so the answer is <b>0</b>.");
           } else {
@@ -1337,14 +1371,106 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_SUM":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "ADD_RIGHT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "UPDATE_ANS":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SHRINK":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "ADVANCE_LEFT":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 13,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     target = examples[1][0];
     nums = [...examples[1][1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":209,"title":"Minimum Size Subarray Sum","topic":"Sliding Window","why":"With positive values, expanding increases the sum and shrinking decreases it, allowing a minimal valid window.","meanings":{"target":"sum the subarray must reach or exceed","nums":"input array of positive numbers","left":"left bound of the window","right":"right bound of the window","sum":"running sum of the current window","ans":"shortest qualifying window length so far (Infinity until one is found, 0 if none)"},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({INF, target, nums, left, right, sum, ans, execState, leavingIndex, ...({})}),

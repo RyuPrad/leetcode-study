@@ -887,6 +887,7 @@
 
       function snap(extra) {
         return Object.assign({
+          executedLine: extra.executedLine === undefined ? extra.highlight?.at(-1) : extra.executedLine,
           matrix: matrix.map(r => [...r]),
           memo: memo.map(r => [...r]),
           trace: trace.map(row => ({ ...row })),
@@ -897,12 +898,13 @@
 
       function dfs(r, c) {
         stack.push([r, c]);
+        steps.push(snap({cur:[r,c],highlight:[6],narration:"Enter a new DFS call for this cell."}));
 
         // enter event
         steps.push(snap({
           cur: [r, c], probe: null, memoWrite: null, memoHit: null,
           best: null, dr: null, dc: null,
-          highlight: [6, 7],
+          highlight: [7],
           narration: "Enter <b>dfs(" + r + ", " + c + ")</b> &mdash; cell value <span class='nm'>" + matrix[r][c] + "</span>. First check the memo: is <b>memo[" + r + "][" + c + "]</b> already non-zero?"
         }));
 
@@ -930,6 +932,7 @@
         for (let d = 0; d < DIRS.length; d++) {
           const dr = DIRS[d][0], dc = DIRS[d][1];
           const nr = r + dr, nc = c + dc;
+          steps.push(snap({cur:[r,c],probe:{from:[r,c],to:[nr,nc],dir:DIR_NAME[d]},best,dr,dc,highlight:[10],narration:"Compute the neighboring row and column."}));
           const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
           const greater = inBounds && matrix[nr][nc] > matrix[r][c];
 
@@ -938,7 +941,7 @@
             steps.push(snap({
               cur: [r, c], probe: { from: [r, c], to: [nr, nc], dir: DIR_NAME[d], valid: true },
               memoWrite: null, memoHit: null, best, dr, dc,
-              highlight: [10, 11],
+              highlight: [11],
               narration: "Probe <b>" + DIR_NAME[d] + "</b> &rarr; neighbor (" + nr + ", " + nc + ") = <span class='nm'>" + matrix[nr][nc] + "</span> is in bounds <b>and</b> strictly greater than <span class='nm'>" + matrix[r][c] + "</span>. Valid &mdash; recurse into it."
             }));
             const sub = dfs(nr, nc);
@@ -958,7 +961,7 @@
             steps.push(snap({
               cur: [r, c], probe: { from: [r, c], to: [nr, nc], dir: DIR_NAME[d], valid: false, inBounds },
               memoWrite: null, memoHit: null, best, dr, dc,
-              highlight: [10, 11],
+              highlight: [11],
               narration: "Probe <b>" + DIR_NAME[d] + "</b> &rarr; neighbor (" + nr + ", " + nc + ") " + reason + ". Skip it (the guard is false)."
             }));
           }
@@ -969,18 +972,23 @@
         steps.push(snap({
           cur: [r, c], probe: null, memoWrite: [r, c], memoHit: null,
           best, dr: null, dc: null,
-          highlight: [15, 16],
+          highlight: [15],
           narration: "All neighbors probed. Cache the result: <b>memo[" + r + "][" + c + "] = <span class='nm'>" + best + "</span></b> and return it. This cell is now resolved."
         }));
+        steps.push(snap({cur:[r,c],best,highlight:[16],narration:"Return the longest path length starting at this cell."}));
         stack.pop();
         return best;
       }
 
+      steps.push(snap({cur:null,highlight:[],executedLine:null,narration:"Ready to find the longest increasing path."}));
+      steps.push(snap({cur:null,highlight:[2],narration:"Read the matrix dimensions."}));
+      steps.push(snap({cur:null,highlight:[3],narration:"Create an empty memo table."}));
+      steps.push(snap({cur:null,highlight:[4],narration:"Create the four neighbor directions."}));
       // intro step
       steps.push(snap({
         cur: null, probe: null, memoWrite: null, memoHit: null,
         best: null, dr: null, dc: null,
-        highlight: [2, 3, 4, 5],
+        highlight: [5],
         narration: "Set up a <b>" + rows + "x" + cols + "</b> <b>memo</b> grid (all zeros = not computed). <b>memo[r][c]</b> will hold the length of the longest strictly-increasing path that <i>starts</i> at (r, c). We then run <b>dfs</b> from every cell and keep the largest result in <b>ans</b>."
       }));
 
@@ -990,7 +998,7 @@
           steps.push(snap({
             cur: null, probe: null, memoWrite: null, memoHit: null,
             best: null, dr: null, dc: null,
-            highlight: [18, 19, 20],
+            highlight: [20],
             narration: "Outer loop reaches cell <b>(" + r + ", " + c + ")</b>. Call <b>dfs(" + r + ", " + c + ")</b> and fold its result into <b>ans</b>.",
             outer: [r, c]
           }));
@@ -1270,7 +1278,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({matrix, DIRS, DIR_NAME, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({matrix, DIRS, DIR_NAME, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({matrix, DIRS, DIR_NAME, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

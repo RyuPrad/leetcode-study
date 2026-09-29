@@ -685,6 +685,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -964,25 +965,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      if (raw === "") {
-        nums = [];
-      } else {
-        nums = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (nums.some(Number.isNaN)) {
-        alert("Please enter only numbers separated by commas. Example: 3, 2, 3");
-        return;
-      }
-
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false,  label:'Numbers'}); nums = parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       phase = 1;
@@ -1019,29 +1007,58 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      phase = s.phase;
-      i = s.i;
-      num = s.num;
-      cand1 = s.cand1;
-      cand2 = s.cand2;
-      count1 = s.count1;
-      count2 = s.count2;
-      res = s.res === null ? null : [...s.res];
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      branch = s.branch;
-      threshold = s.threshold;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
 
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+phase = snapshot.phase;
+i = snapshot.i;
+num = snapshot.num;
+cand1 = snapshot.cand1;
+cand2 = snapshot.cand2;
+count1 = snapshot.count1;
+count2 = snapshot.count2;
+res = snapshot.res === null ? null : [...snapshot.res];
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+branch = snapshot.branch;
+threshold = snapshot.threshold;
+}
+
+    function recordVotingBranch() {
+      trace.push({
+        phase: 1,
+        i, num,
+        branch,
+        cand1, count1, cand2, count2
+      });
+      execState = "ADVANCE1";
+    }
+
     function nextStep() {
       if (execState === "END") return;
       saveState();
-      branch = null;
 
       switch (execState) {
         case "INIT":
@@ -1058,50 +1075,98 @@
         case "LOOP1_CHECK":
           if (i < nums.length) {
             num = nums[i];
-            execState = "BRANCH1";
+            branch = num === cand1 ? "c1"
+              : num === cand2 ? "c2"
+                : count1 === 0 ? "fill1"
+                  : count2 === 0 ? "fill2"
+                    : "dec";
+            execState = ({
+              c1: "CHECK_CAND1",
+              c2: "CHECK_CAND2",
+              fill1: "CHECK_COUNT1",
+              fill2: "CHECK_COUNT2",
+              dec: "CHECK_OTHER"
+            })[branch] || "CHECK_CAND1";
           } else {
-            execState = "RESET_COUNTS";
+            execState = "RESET_COUNT1";
           }
           break;
 
-        case "BRANCH1": {
-          // Decide and APPLY the branch in one logical step (mirrors the if/else chain).
-          let chosen, c1b = count1, c2b = count2;
-          if (num === cand1) {
-            count1++;
-            chosen = "c1";
-          } else if (num === cand2) {
-            count2++;
-            chosen = "c2";
-          } else if (count1 === 0) {
-            cand1 = num; count1 = 1;
-            chosen = "fill1";
-          } else if (count2 === 0) {
-            cand2 = num; count2 = 1;
-            chosen = "fill2";
-          } else {
-            count1--; count2--;
-            chosen = "dec";
-          }
-          branch = chosen;
-          trace.push({
-            phase: 1,
-            i, num,
-            branch: chosen,
-            cand1, count1, cand2, count2
-          });
-          execState = "ADVANCE1";
+        case "CHECK_CAND1":
+          execState = "INCREMENT_COUNT1";
           break;
-        }
+
+        case "CHECK_CAND2":
+          execState = "INCREMENT_COUNT2";
+          break;
+
+        case "CHECK_COUNT1":
+          execState = "SET_CAND1";
+          break;
+
+        case "CHECK_COUNT2":
+          execState = "SET_CAND2";
+          break;
+
+        case "CHECK_OTHER":
+          execState = "DECREMENT_COUNT1";
+          break;
+
+        case "INCREMENT_COUNT1":
+          count1++;
+          recordVotingBranch();
+          break;
+
+        case "INCREMENT_COUNT2":
+          count2++;
+          recordVotingBranch();
+          break;
+
+        case "SET_CAND1":
+          cand1 = num;
+          execState = "SET_COUNT1";
+          break;
+
+        case "SET_COUNT1":
+          count1 = 1;
+          recordVotingBranch();
+          break;
+
+        case "SET_CAND2":
+          cand2 = num;
+          execState = "SET_COUNT2";
+          break;
+
+        case "SET_COUNT2":
+          count2 = 1;
+          recordVotingBranch();
+          break;
+
+        case "DECREMENT_COUNT1":
+          count1--;
+          execState = "DECREMENT_COUNT2";
+          break;
+
+        case "DECREMENT_COUNT2":
+          count2--;
+          recordVotingBranch();
+          break;
 
         case "ADVANCE1":
           i++;
           num = undefined;
+          branch = null;
           execState = "LOOP1_CHECK";
           break;
 
-        case "RESET_COUNTS":
-          count1 = 0; count2 = 0;
+        case "RESET_COUNT1":
+          count1 = 0;
+          branch = null;
+          execState = "RESET_COUNT2";
+          break;
+
+        case "RESET_COUNT2":
+          count2 = 0;
           phase = 2;
           i = 0;
           execState = "LOOP2_CHECK";
@@ -1110,28 +1175,36 @@
         case "LOOP2_CHECK":
           if (i < nums.length) {
             num = nums[i];
-            execState = "VERIFY_COUNT";
+            execState = "VERIFY_CAND1";
           } else {
             execState = "BUILD_RES";
           }
           break;
 
-        case "VERIFY_COUNT": {
-          let chosen, matched = null;
+        case "VERIFY_CAND1": {
           if (num === cand1) {
             count1++;
-            chosen = "v1"; matched = "cand1";
-          } else if (num === cand2) {
-            count2++;
-            chosen = "v2"; matched = "cand2";
+            branch = "v1";
+            trace.push({ phase: 2, i, num, branch, cand1, count1, cand2, count2 });
+            execState = "ADVANCE2";
           } else {
-            chosen = "vnone";
+            branch = null;
+            execState = "VERIFY_CAND2";
           }
-          branch = chosen;
+          break;
+        }
+
+        case "VERIFY_CAND2": {
+          if (num === cand2) {
+            count2++;
+            branch = "v2";
+          } else {
+            branch = "vnone";
+          }
           trace.push({
             phase: 2,
             i, num,
-            branch: chosen,
+            branch,
             cand1, count1, cand2, count2
           });
           execState = "ADVANCE2";
@@ -1452,6 +1525,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1470,69 +1546,111 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Set both candidate slots empty: <b>cand1 = null, cand2 = null</b>. At most two values can appear more than ⌊n/3⌋ times, so we track two candidates.");
           break;
         case "INIT_COUNTS":
-          highlightLines([3]);
+
           narrate("Set both vote counters to 0: <b>count1 = 0, count2 = 0</b>.");
           break;
         case "LOOP1_CHECK":
-          highlightLines([4]);
+
           if (i < nums.length) {
             narrate("Phase 1 voting loop reads the next element at index <b>" + i + "</b>.");
           } else {
             narrate("Phase 1 is done. <b>cand1</b> and <b>cand2</b> are the only possible answers — but their counts are unreliable, so we must verify.");
           }
           break;
-        case "BRANCH1": {
-          let lines = [];
-          let msg = "";
-          if (branch === "c1") { lines = [5, 6]; msg = "<code>num === cand1</code> (" + num + " === " + formatCand(cand1) + "): increment <b>count1</b>."; }
-          else if (branch === "c2") { lines = [7, 8]; msg = "<code>num === cand2</code> (" + num + " === " + formatCand(cand2) + "): increment <b>count2</b>."; }
-          else if (branch === "fill1") { lines = [9, 10, 11]; msg = "<code>count1 === 0</code>: slot 1 is free, so <b>cand1 = " + num + "</b> with count1 = 1."; }
-          else if (branch === "fill2") { lines = [12, 13, 14]; msg = "<code>count2 === 0</code>: slot 2 is free, so <b>cand2 = " + num + "</b> with count2 = 1."; }
-          else if (branch === "dec") { lines = [15, 16, 17]; msg = "<code>num</code> matches neither candidate and both slots are occupied: <b>decrement both</b> counts (this num pairs off against the two candidates)."; }
-          highlightLines(lines);
-          narrate(msg);
+        case "CHECK_CAND1":
+
+          narrate("Compare the value with candidate 1. A match will add one vote to candidate 1.");
           break;
-        }
+        case "CHECK_CAND2":
+
+          narrate("Candidate 1 did not match, so compare the value with candidate 2.");
+          break;
+        case "CHECK_COUNT1":
+
+          narrate("Neither candidate matched. Check whether candidate 1 has no votes yet.");
+          break;
+        case "CHECK_COUNT2":
+
+          narrate("Candidate 1 already has votes, so check whether candidate 2 is empty.");
+          break;
+        case "CHECK_OTHER":
+
+          narrate("Neither candidate matched and both slots are occupied, so cancel one vote from each.");
+          break;
+        case "INCREMENT_COUNT1":
+
+          narrate("Give candidate 1 one more vote.");
+          break;
+        case "INCREMENT_COUNT2":
+
+          narrate("Give candidate 2 one more vote.");
+          break;
+        case "SET_CAND1":
+
+          narrate("Put this value into the open first candidate slot.");
+          break;
+        case "SET_COUNT1":
+
+          narrate("The new first candidate starts with one vote.");
+          break;
+        case "SET_CAND2":
+
+          narrate("Put this value into the open second candidate slot.");
+          break;
+        case "SET_COUNT2":
+
+          narrate("The new second candidate starts with one vote.");
+          break;
+        case "DECREMENT_COUNT1":
+
+          narrate("Cancel one vote from candidate 1.");
+          break;
+        case "DECREMENT_COUNT2":
+
+          narrate("Cancel one vote from candidate 2.");
+          break;
         case "ADVANCE1":
-          highlightLines([19, 4]);
+
           narrate("Move to the next element in the voting pass.");
           break;
-        case "RESET_COUNTS":
-          highlightLines([20, 21]);
-          narrate("Phase 2 begins. The candidates are fixed, but their phase-1 counts are meaningless for the threshold test, so reset <b>count1 = 0, count2 = 0</b> and recount from scratch.");
+        case "RESET_COUNT1":
+
+          narrate("Phase 1 is complete. Reset <b>count1</b> before verifying the candidates.");
+          break;
+        case "RESET_COUNT2":
+
+          narrate("Reset <b>count2</b> too; the verification pass starts with fresh counts.");
           break;
         case "LOOP2_CHECK":
-          highlightLines([22]);
+
           if (i < nums.length) {
             narrate("Phase 2 verification loop reads the next element at index <b>" + i + "</b> to recount exact occurrences.");
           } else {
             narrate("Recount finished. Now compare each candidate's true count against the threshold ⌊n/3⌋ = " + threshold + ".");
           }
           break;
-        case "VERIFY_COUNT": {
-          let lines = [];
-          let msg = "";
-          if (branch === "v1") { lines = [23]; msg = "<code>num === cand1</code>: increment the true count <b>count1</b>."; }
-          else if (branch === "v2") { lines = [24]; msg = "<code>num === cand2</code>: increment the true count <b>count2</b>."; }
-          else { lines = [23, 24]; msg = "<code>num</code> equals neither candidate, so neither count changes."; }
-          highlightLines(lines);
-          narrate(msg);
+        case "VERIFY_CAND1":
+
+          narrate("Check whether <b>" + num + "</b> matches candidate 1; if it does, this line adds one to its true count.");
           break;
-        }
+        case "VERIFY_CAND2":
+
+          narrate("Candidate 1 did not match. Check candidate 2 and count it if it matches.");
+          break;
         case "ADVANCE2":
-          highlightLines([25, 22]);
+
           narrate("Move to the next element in the verification pass.");
           break;
         case "BUILD_RES":
-          highlightLines([26]);
+
           narrate("Create the result array <b>res = []</b>. We push only candidates whose true count exceeds ⌊n/3⌋.");
           break;
         case "CHECK1":
-          highlightLines([27]);
+
           if (count1 > threshold) {
             narrate("<code>count1 (" + count1 + ") &gt; " + threshold + "</code> is <b style=\"color:#6a9955\">true</b> → push <b>cand1 = " + formatCand(cand1) + "</b> into res.");
           } else {
@@ -1540,7 +1658,7 @@
           }
           break;
         case "CHECK2":
-          highlightLines([28]);
+
           if (count2 > threshold) {
             narrate("<code>count2 (" + count2 + ") &gt; " + threshold + "</code> is <b style=\"color:#6a9955\">true</b> → push <b>cand2 = " + formatCand(cand2) + "</b> into res.");
           } else {
@@ -1548,11 +1666,11 @@
           }
           break;
         case "RETURN":
-          highlightLines([29]);
+
           narrate("Return <b>res = " + formatArray(res) + "</b>. The verification pass is required because a candidate slot can hold a value that does not actually exceed ⌊n/3⌋.");
           break;
         case "END":
-          highlightLines([29]);
+
           narrate("✓ Done. Elements appearing more than ⌊n/3⌋ times: <b>" + formatArray(res) + "</b>.");
           break;
       }
@@ -1602,13 +1720,190 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_COUNTS":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "LOOP1_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CHECK_CAND1":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CHECK_CAND2":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "CHECK_COUNT1":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "CHECK_COUNT2":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "CHECK_OTHER":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "INCREMENT_COUNT1":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "INCREMENT_COUNT2":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SET_CAND1":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "SET_COUNT1":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "SET_CAND2":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "SET_COUNT2":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "DECREMENT_COUNT1":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "DECREMENT_COUNT2":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "ADVANCE1":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RESET_COUNT1":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "RESET_COUNT2":
+    return {
+      line: 21,
+      phase: execState
+    };
+  case "LOOP2_CHECK":
+    return {
+      line: 22,
+      phase: execState
+    };
+  case "VERIFY_CAND1":
+    return {
+      line: 23,
+      phase: execState
+    };
+  case "VERIFY_CAND2":
+    return {
+      line: 24,
+      phase: execState
+    };
+  case "ADVANCE2":
+    return {
+      line: 22,
+      phase: execState
+    };
+  case "BUILD_RES":
+    return {
+      line: 26,
+      phase: execState
+    };
+  case "CHECK1":
+    return {
+      line: 27,
+      phase: execState
+    };
+  case "CHECK2":
+    return {
+      line: 28,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 29,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 29,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":229,"title":"Majority Element II","topic":"Array & Hashing","why":"At most two values can occur more than one-third of the time; verify the surviving candidates after cancellation.","meanings":{"nums":"input array","num":"current value being read in each pass","cand1":"first candidate value (Boyer-Moore slot 1)","cand2":"second candidate value (Boyer-Moore slot 2)","count1":"vote counter for cand1 (reused as a true recount in the verification pass)","count2":"vote counter for cand2 (reused as a true recount in the verification pass)","res":"output array of values appearing more than ⌊n/3⌋ times"},"entityClasses":["hud-item","cell","slot1","slot2","count-box","verify-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, phase, i, num, cand1, cand2, count1, count2, res, ans, execState, branch, threshold, ...({})}),

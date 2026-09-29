@@ -16,5 +16,14 @@ test('notes-only problems and both reference guides remain accessible', () => {
 test('asset protocol only resolves catalogued content and shared presentation assets', () => {
   const root = path.join(ROOT, 'dist');
   assert.equal(assetPath('study://content/Array%20%26%20Hashing/two_sum_visualizer.html', root, catalog), path.join(root, 'content/Array & Hashing/two_sum_visualizer.html'));
+  const assets = new Set<string>();
+  for (const file of catalog.visualizers) {
+    const html = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    for (const match of html.matchAll(/(?:src|href)=["']\.\.\/(visualizer-ui\/[^"']+)["']/g)) assets.add(match[1]);
+  }
+  for (const asset of assets) {
+    assert.ok(fs.existsSync(path.join(ROOT, asset)), `${asset} exists in the source bundle`);
+    assert.equal(assetPath(`study://content/${asset}`, root, catalog), path.join(root, 'content', asset), `${asset} can load in the desktop visualizer`);
+  }
   for (const url of ['file:///C:/Windows/system.ini', 'study://content/%2e%2e%2fdesktop/main.cjs', 'study://content/%5cWindows%5csystem.ini', 'study://content/catalog.json', 'study://app/desktop/main.cjs', 'study://other/index.html', 'study://content/%E0%A4%A']) assert.equal(assetPath(url, root, catalog), null, url);
 });

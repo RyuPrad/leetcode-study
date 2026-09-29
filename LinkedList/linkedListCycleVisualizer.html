@@ -315,6 +315,11 @@
     const State = {
       INIT: 'INIT',
       ASSIGN: 'ASSIGN',
+      ASSIGN_FAST: 'ASSIGN_FAST',
+      WHILE_CHECK: 'WHILE_CHECK',
+      COMPARE_CHECK: 'COMPARE_CHECK',
+      END_TRUE: 'END_TRUE',
+      END_FALSE: 'END_FALSE',
       CHECK: 'CHECK',
       MOVE_SLOW: 'MOVE_SLOW',
       MOVE_FAST: 'MOVE_FAST',
@@ -422,13 +427,13 @@
       });
     }
 
-    function restoreState(s) {
-      state = s.state;
-      slowId = s.slowId;
-      fastId = s.fastId;
-      ans = s.ans;
-      condition = s.condition;
-      lastAction = s.lastAction || {};
+    function restoreState(snapshot) {
+      state = snapshot.state;
+      slowId = snapshot.slowId;
+      fastId = snapshot.fastId;
+      ans = snapshot.ans;
+      condition = snapshot.condition;
+      lastAction = snapshot.lastAction || {};
     }
 
     function prevStep() {
@@ -438,53 +443,29 @@
     }
 
     function nextStep() {
-      if (state === State.RETURN_TRUE || state === State.RETURN_FALSE) return;
+      if (state === State.END_TRUE || state === State.END_FALSE) return;
       saveState();
-
-      if (state === State.INIT) {
-        slowId = headId;
-        fastId = headId;
-        ans = 'pending';
-        condition = 'not checked';
-        lastAction = { type: 'assign', nodeId: headId };
-        state = State.ASSIGN;
-      } else if (state === State.ASSIGN || state === State.COMPARE) {
-        const fastExists = fastId !== null;
-        const fastNext = nextOf(fastId);
-        const canContinue = fastExists && fastNext !== null;
-        condition = canContinue ? 'true: fast and fast.next exist' : 'false: fast cannot move 2 steps';
-        lastAction = { type: 'check', fastId, fastNextId: fastNext, result: canContinue };
-        state = State.CHECK;
-        if (!canContinue) {
-          ans = 'false';
-          state = State.RETURN_FALSE;
-          lastAction = { type: 'returnFalse', fastId, fastNextId: fastNext };
+      switch (state) {
+        case State.INIT: slowId = headId; lastAction = {type:'assign',nodeId:headId}; state=State.ASSIGN_FAST; break;
+        case State.ASSIGN_FAST: fastId = headId; lastAction={type:'assign',nodeId:headId}; state=State.WHILE_CHECK; break;
+        case State.WHILE_CHECK: {
+          const fastNext = nextOf(fastId), canContinue = fastId !== null && fastNext !== null;
+          condition = canContinue ? 'true: fast and fast.next exist' : 'false: fast cannot move 2 steps';
+          lastAction = {type:'check',fastId,fastNextId:fastNext,result:canContinue};
+          state = canContinue ? State.CHECK : State.RETURN_FALSE; break;
         }
-      } else if (state === State.CHECK) {
-        const oldSlow = slowId;
-        const newSlow = nextOf(slowId);
-        slowId = newSlow;
-        lastAction = { type: 'moveSlow', fromId: oldSlow, toId: newSlow };
-        state = State.MOVE_SLOW;
-      } else if (state === State.MOVE_SLOW) {
-        const oldFast = fastId;
-        const hop1 = nextOf(fastId);
-        const hop2 = nextOf(hop1);
-        fastId = hop2;
-        lastAction = { type: 'moveFast', fromId: oldFast, hop1Id: hop1, toId: hop2 };
-        state = State.MOVE_FAST;
-      } else if (state === State.MOVE_FAST) {
-        const same = slowId !== null && slowId === fastId;
-        lastAction = { type: 'compare', slowId, fastId, same };
-        condition = 'checked slow === fast';
-        state = State.COMPARE;
-        if (same) {
-          ans = 'true';
-          state = State.RETURN_TRUE;
-          lastAction = { type: 'returnTrue', meetingId: slowId };
+        case State.CHECK: {
+          const oldSlow=slowId; slowId=nextOf(slowId); lastAction={type:'moveSlow',fromId:oldSlow,toId:slowId}; state=State.MOVE_SLOW; break;
         }
+        case State.MOVE_SLOW: {
+          const oldFast=fastId,hop1=nextOf(fastId); fastId=nextOf(hop1); lastAction={type:'moveFast',fromId:oldFast,hop1Id:hop1,toId:fastId}; state=State.COMPARE_CHECK; break;
+        }
+        case State.COMPARE_CHECK: {
+          const same=slowId !== null && slowId===fastId; condition='checked slow === fast'; lastAction={type:'compare',slowId,fastId,same}; state=same?State.RETURN_TRUE:State.WHILE_CHECK; break;
+        }
+        case State.RETURN_TRUE: ans='true'; lastAction={type:'returnTrue',meetingId:slowId}; state=State.END_TRUE; break;
+        case State.RETURN_FALSE: ans='false'; lastAction={type:'returnFalse',fastId,fastNextId:nextOf(fastId)}; state=State.END_FALSE; break;
       }
-
       render();
     }
 
@@ -614,7 +595,7 @@
 
     function renderButtons() {
       document.getElementById('btn-prev').disabled = history.length === 0;
-      const done = state === State.RETURN_TRUE || state === State.RETURN_FALSE;
+      const done = state === State.END_TRUE || state === State.END_FALSE;
       document.getElementById('btn-next').disabled = done;
       document.getElementById('btn-next').textContent = done ? 'Finished!' : 'Step Over';
       document.querySelectorAll('.btn-ex').forEach(b => b.classList.remove('active'));
@@ -647,14 +628,12 @@
       });
     }
     function renderCode() {
-      if (state === State.INIT) highlightLines([]);
-      else if (state === State.ASSIGN) highlightLines([2,3]);
-      else if (state === State.CHECK) highlightLines([5]);
-      else if (state === State.MOVE_SLOW) highlightLines([6]);
-      else if (state === State.MOVE_FAST) highlightLines([7]);
-      else if (state === State.COMPARE) highlightLines([9]);
-      else if (state === State.RETURN_TRUE) highlightLines([10]);
-      else if (state === State.RETURN_FALSE) highlightLines([14]);
+      const instruction = pendingInstruction();
+      highlightLines(instruction ? [instruction.line] : []);
+    }
+    function pendingInstruction() {
+      const lines = {INIT:2,ASSIGN_FAST:3,WHILE_CHECK:5,CHECK:6,MOVE_SLOW:7,COMPARE_CHECK:9,RETURN_TRUE:10,RETURN_FALSE:14};
+      const line = lines[state]; return line === undefined ? null : {line,phase:state};
     }
 
     function renderConsole() {
@@ -965,8 +944,36 @@ ${indent}}</span>`;
     loadExample(1);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > history.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = history.pop();
+      const snapshot = index === history.length ? live : history[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":141,"title":"Linked List Cycle","topic":"LinkedList","why":"The fast pointer gains on the slow pointer inside a cycle; reaching null proves there is no cycle.","meanings":{"head":"list head","slow":"slow pointer","fast":"fast pointer"},"entityClasses":["pill","node-circle","head-node","obj-toolbar","obj-node","obj-node-head","active-node","assignment-node","meet-node","badgesByNodeId","nodeId","assignmentNodeIds","activeNodeIds","nextFieldNodeIds","meetNodeIds"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => history.length,
       count: () => null,
       read: () => ({nodes, headId, state, slowId, fastId, ans, condition, lastAction, ...({})}),

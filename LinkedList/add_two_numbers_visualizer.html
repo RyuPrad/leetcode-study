@@ -562,6 +562,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -805,6 +806,8 @@
     let inputL2 = [];
     let i1 = 0;            // pointer index into l1
     let i2 = 0;            // pointer index into l2
+    let currInitialized = false;
+    let currIdx = -1;
     let carry = 0;
     let sum = null;        // current iteration sum
     let digit = null;      // current digit appended
@@ -825,38 +828,18 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      if (parts.length < 2) {
-        alert("Format: l1 | l2   Example: 2,4,3 | 5,6,4");
-        return;
-      }
-      const parse = (str) => {
-        const t = str.trim();
-        if (t === "") return [];
-        return t.split(",").map(p => p.trim()).filter(p => p.length > 0).map(p => Number(p));
-      };
-      const a = parse(parts[0]);
-      const b = parse(parts[1]);
-
-      if (a.some(Number.isNaN) || b.some(Number.isNaN)) {
-        alert("Please enter only numbers. Example: 2,4,3 | 5,6,4");
-        return;
-      }
-      if (a.length === 0 || b.length === 0) {
-        alert("Both lists must have at least one digit.");
-        return;
-      }
-
-      inputL1 = a;
-      inputL2 = b;
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const [aText,bText] = parser.parts(document.getElementById('custom-input').value,2,'Two digit lists'); const a=parser.list(aText,{json:false,min:0,max:9,minLength:1,label:'First digit list'}), b=parser.list(bText,{json:false,min:0,max:9,minLength:1,label:'Second digit list'}); inputL1=a; inputL2=b;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       i1 = 0;
       i2 = 0;
+      currInitialized = false;
+      currIdx = -1;
       carry = 0;
       sum = null;
       digit = null;
@@ -873,7 +856,7 @@
 
     function saveState() {
       historyStack.push({
-        i1, i2, carry, sum, digit,
+        i1, i2, currIdx, currInitialized, carry, sum, digit,
         result: [...result],
         justAddedIdx,
         ans,
@@ -885,20 +868,39 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      i1 = s.i1;
-      i2 = s.i2;
-      carry = s.carry;
-      sum = s.sum;
-      digit = s.digit;
-      result = [...s.result];
-      justAddedIdx = s.justAddedIdx;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+i1 = snapshot.i1;
+i2 = snapshot.i2;
+currIdx = snapshot.currIdx;
+      currInitialized = snapshot.currInitialized;
+carry = snapshot.carry;
+sum = snapshot.sum;
+digit = snapshot.digit;
+result = [...snapshot.result];
+justAddedIdx = snapshot.justAddedIdx;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+}
 
     function l1HasNode() { return i1 < inputL1.length; }
     function l2HasNode() { return i2 < inputL2.length; }
@@ -914,12 +916,10 @@
           execState = "SETUP";
           break;
 
-        case "SETUP":
-          // dummy + curr + carry established
-          execState = "WHILE_CHECK";
-          break;
-
-        case "WHILE_CHECK":
+        case "SETUP": result = []; execState = "SETUP_CURR"; break;
+ case "SETUP_CURR": currInitialized = true; currIdx = -1; execState = "SETUP_CARRY"; break;
+ case "SETUP_CARRY": carry = 0; execState = "WHILE_CHECK"; break;
+ case "WHILE_CHECK":
           if (loopContinues()) {
             execState = "COMPUTE_SUM";
           } else {
@@ -959,7 +959,7 @@
           break;
 
         case "ADVANCE_CURR":
-          // curr = curr.next (curr now points at the node just appended)
+          currIdx = result.length - 1;
           execState = "ADVANCE_L1";
           break;
 
@@ -1090,7 +1090,7 @@
       // dummy node first
       const dwrap = document.createElement("div");
       dwrap.className = "node-wrap";
-      const showCurrOnDummy = result.length === 0 && ["SETUP", "WHILE_CHECK", "COMPUTE_SUM", "SET_CARRY"].includes(execState);
+      const showCurrOnDummy = currInitialized && currIdx < 0;
       if (showCurrOnDummy) {
         const ptr = document.createElement("div");
         ptr.className = "pointer ptr-curr";
@@ -1115,8 +1115,8 @@
       row.appendChild(darrow);
 
       // currIdx is the last appended node (curr points there after ADVANCE_CURR)
-      const currIdx = result.length - 1;
-      const currOnNode = result.length > 0 && !["RETURN", "END"].includes(execState);
+      // currIdx records the executed curr = curr.next assignment.
+      const currOnNode = currInitialized && currIdx >= 0;
 
       result.forEach((v, idx) => {
         const wrap = document.createElement("div");
@@ -1239,6 +1239,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1260,15 +1263,14 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([1]);
+
           narrate("Add two numbers stored as linked lists in <b>reverse</b> order (least-significant digit first). Press <b>Step Over</b>.");
           break;
-        case "SETUP":
-          highlightLines([2, 3, 4]);
-          narrate("Create a <b>dummy</b> head, set <b>curr = dummy</b>, and <b>carry = 0</b>.");
-          break;
-        case "WHILE_CHECK":
-          highlightLines([5]);
+        case "SETUP":  narrate('Create the dummy head for the result list.'); break;
+ case "SETUP_CURR":  narrate('Point curr at the dummy head.'); break;
+ case "SETUP_CARRY":  narrate('Initialize carry = 0.'); break;
+ case "WHILE_CHECK":
+
           if (loopContinues()) {
             narrate("<code>while (l1 || l2 || carry)</code> is <b>true</b> - there is still a digit or carry to process.");
           } else {
@@ -1276,35 +1278,35 @@
           }
           break;
         case "COMPUTE_SUM":
-          highlightLines([6]);
+
           narrate("<code>sum = " + a + " + " + b + " + " + carry + " = <b>" + (a + b + carry) + "</b></code>.");
           break;
         case "SET_CARRY":
-          highlightLines([7]);
+
           narrate("<code>carry = Math.floor(" + sum + " / 10) = <b>" + Math.floor(sum / 10) + "</b></code>. The digit will be <code>" + sum + " % 10 = " + (sum % 10) + "</code>.");
           break;
         case "APPEND":
-          highlightLines([8]);
+
           narrate("<code>curr.next = new ListNode(" + digit + ")</code> - append digit <b style=\"color:#b5cea8\">" + digit + "</b> to the result list.");
           break;
         case "ADVANCE_CURR":
-          highlightLines([9]);
+
           narrate("<code>curr = curr.next</code> - move curr to the node just appended.");
           break;
         case "ADVANCE_L1":
-          highlightLines([10]);
+
           narrate("<code>if (l1) l1 = l1.next</code> - advance the l1 pointer" + (l1HasNode() ? "." : " (already null, skip)."));
           break;
         case "ADVANCE_L2":
-          highlightLines([11]);
+
           narrate("<code>if (l2) l2 = l2.next</code> - advance the l2 pointer" + (l2HasNode() ? "." : " (already null, skip)."));
           break;
         case "RETURN":
-          highlightLines([13]);
+
           narrate("<code>return dummy.next</code> - skip the dummy and return the head of the summed list.");
           break;
         case "END":
-          highlightLines([13]);
+
           narrate("Done. Sum list = <b>" + JSON.stringify(ans) + "</b>.");
           break;
       }
@@ -1327,7 +1329,7 @@
       const carryDisplay = '<span class="nm">' + carry + '</span>';
       const l1Display = l1HasNode() ? '<span class="nm">' + inputL1[i1] + '</span>' : '<span class="kw">null</span>';
       const l2Display = l2HasNode() ? '<span class="nm">' + inputL2[i2] + '</span>' : '<span class="kw">null</span>';
-      const currDisplay = result.length === 0 ? '<span class="kw">dummy</span>' : '<span class="nm">' + result[result.length - 1] + '</span>';
+      const currDisplay = !currInitialized ? '<span class="kw">not initialized</span>' : currIdx < 0 ? '<span class="kw">dummy</span>' : '<span class="nm">' + result[currIdx] + '</span>';
       const ansDisplay = ans === "pending" ? '<span class="kw">pending</span>' : formatListHtml(ans);
 
       document.getElementById("console-ui").innerHTML =
@@ -1347,8 +1349,9 @@
       hudUi.innerHTML = "";
       const hudMap = {
         sum: sum === null ? "null" : sum,
+        currIdx: currIdx,
         carry: carry,
-        curr: result.length === 0 ? "dummy" : result[result.length - 1],
+        curr: currIdx < 0 ? "dummy" : result[currIdx],
         ans: ans === "pending" ? "pending" : "[" + ans.join(",") + "]"
       };
       for (const [key, isPinnedValue] of Object.entries(pinned)) {
@@ -1361,17 +1364,119 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 1,
+      phase: execState
+    };
+  case "SETUP":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "SETUP_CURR":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "SETUP_CARRY":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COMPUTE_SUM":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "SET_CARRY":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "APPEND":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADVANCE_CURR":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "ADVANCE_L1":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "ADVANCE_L2":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 13,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     inputL1 = [...examples[1].l1];
     inputL2 = [...examples[1].l2];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":2,"title":"Add Two Numbers","topic":"LinkedList","why":"Each column contributes one output digit; the carry becomes part of the next column's sum.","meanings":{"l1":"first input list, digits stored least-significant-first","l2":"second input list, digits stored least-significant-first","dummy":"sentinel node before the result list head","curr":"builder pointer; appends each new result digit node","carry":"carry into the next digit (0 or 1)","sum":"`l1.val + l2.val + carry` for the current position"},"entityClasses":["hud-item","node","dummy-node","digit"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
-      read: () => ({inputL1, inputL2, i1, i2, carry, sum, digit, result, justAddedIdx, ans, execState, ...({})}),
+      read: () => ({inputL1, inputL2, i1, i2, currIdx, currInitialized, curr:currInitialized?{id:currIdx<0?"dummy":"r"+currIdx,value:currIdx<0?0:result[currIdx]}:undefined, carry, sum, digit, result, justAddedIdx, ans, execState, ...({})}),
       
       phases: () => [],
       

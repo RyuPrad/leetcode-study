@@ -6,7 +6,11 @@ import { pathToFileURL } from 'node:url';
 import { ROOT, collectCatalog } from '../scripts/content.mjs';
 
 const catalog = collectCatalog();
-const selected = process.env.VISUALIZER_FILTER ? catalog.visualizers.filter(file => file.includes(process.env.VISUALIZER_FILTER)) : catalog.visualizers;
+const filters = (process.env.VISUALIZER_FILTER || '').split(',').map(value => value.trim()).filter(Boolean);
+const selected = filters.length ? catalog.visualizers.filter(file => filters.some(filter => /^\d+$/.test(filter)
+  ? catalog.entries.find(entry => entry.visualizerPath === file)?.number === Number(filter)
+  : file.includes(filter))) : catalog.visualizers;
+assert.ok(selected.length, 'The playback filter must select at least one visualizer.');
 const browser = await chromium.launch();
 const failures = [], results = [];
 let cursor = 0;
@@ -27,7 +31,8 @@ const speed = (page, value) => page.locator('#study-speed').evaluate((select, va
 const paused = async page => assert.equal(await page.locator('#study-play').getAttribute('aria-pressed'), 'false');
 
 async function sweep() {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  // Compare algorithm state independently of animation; lesson/native checks exercise motion.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' });
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'));
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -46,10 +51,10 @@ async function sweep() {
         await click(page, '#btn-reset');
         const steps = await page.evaluate(() => {
           const next = document.getElementById('btn-next'); let count = 0;
-          while (!next.disabled && !/finished/i.test(next.textContent) && count < 2000) { next.click(); count++; }
+          while (!next.disabled && !/finished/i.test(next.textContent) && count < 50000) { next.click(); count++; }
           return count;
         });
-        assert.ok(steps < 2000);
+        assert.ok(steps < 50000, `${file}: playback reached the explicit 50,000-step safety limit`);
         const final = await page.evaluate(snapshot);
         await click(page, '#btn-reset');
         await click(page, '#study-play'); await page.clock.runFor(4000);
@@ -146,9 +151,9 @@ async function mutatedInputs() {
       const initial = await page.evaluate(snapshot);
       const steps = await page.evaluate(() => {
         const next = document.getElementById('btn-next'); let count = 0;
-        while (!next.disabled && count < 2000) { next.click(); count++; } return count;
+        while (!next.disabled && count < 50000) { next.click(); count++; } return count;
       });
-      assert.ok(steps < 2000);
+      assert.ok(steps < 50000, `${file}: custom input reached the explicit 50,000-step safety limit`);
       assert.match(await page.locator(selector).textContent(), expected, file);
       const final = await page.evaluate(snapshot);
       // An unsubmitted draft must not replace the loaded input on replay.
@@ -173,6 +178,6 @@ try {
 } catch (error) { failures.push(error.stack); }
 finally { await browser.close(); }
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'test-results/playback.json'), JSON.stringify({ count: results.length, failures, results }, null, 2));
+fs.writeFileSync(path.join(ROOT, filters.length ? 'test-results/playback-selected.json' : 'test-results/playback.json'), JSON.stringify({ count: results.length, filters, failures, results }, null, 2));
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }
 else console.log(`PASS playback, completion and replay for all ${results.length} visualizers.`);

@@ -600,6 +600,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -859,25 +860,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      if (raw === "") {
-        nums = [];
-      } else {
-        nums = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (nums.some(Number.isNaN)) {
-        alert("Please enter only numbers separated by commas. Example: 1, 2, 3, 1");
-        return;
-      }
-
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false,  label:'Numbers'}); nums = parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       seen = [];
@@ -913,20 +901,36 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      seen = [...s.seen];
-      i = s.i;
-      num = s.num;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      justAdded = s.justAdded;
-      duplicateValue = s.duplicateValue;
-      lastCheckHit = s.lastCheckHit;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+seen = [...snapshot.seen];
+i = snapshot.i;
+num = snapshot.num;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+justAdded = snapshot.justAdded;
+duplicateValue = snapshot.duplicateValue;
+lastCheckHit = snapshot.lastCheckHit;
+}
 
     function nextStep() {
       if (execState === "END_TRUE" || execState === "END_FALSE") return;
@@ -1192,6 +1196,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1210,11 +1217,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Create an empty <b>Set</b>. This stores every number we have already seen.");
           break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (i < nums.length) {
             narrate("<code>for (... of nums)</code> continues because <b>i = " + i + "</b> is still inside the array.");
           } else {
@@ -1222,11 +1229,11 @@
           }
           break;
         case "READ_NUM":
-          highlightLines([4]);
+
           narrate("Read the current value: <b>num = nums[" + i + "] = " + num + "</b>.");
           break;
         case "CHECK_SET":
-          highlightLines([5]);
+
           if (seen.includes(num)) {
             narrate("<code>seen.has(" + num + ")</code> is <b style=\"color:#e24b4a\">true</b>. We found the same value twice, so this is a duplicate.");
           } else {
@@ -1234,27 +1241,27 @@
           }
           break;
         case "ADD_SET":
-          highlightLines([6]);
+
           narrate("<code>seen.add(" + num + ")</code> — store this value so future iterations can detect it.");
           break;
         case "ADVANCE_LOOP":
-          highlightLines([7, 4]);
+
           narrate("Move to the next array element. The Set now contains everything seen so far.");
           break;
         case "RETURN_TRUE":
-          highlightLines([5]);
+
           narrate("Return <b style=\"color:#e24b4a\">true</b> immediately. The algorithm short-circuits as soon as a duplicate is found.");
           break;
         case "RETURN_FALSE":
-          highlightLines([9]);
+
           narrate("No duplicates were found after scanning the entire array. Return <b style=\"color:#6a9955\">false</b>.");
           break;
         case "END_TRUE":
-          highlightLines([5]);
+
           narrate("✓ Done. The array contains a duplicate: <b>" + (duplicateValue ?? num) + "</b>.");
           break;
         case "END_FALSE":
-          highlightLines([9]);
+
           narrate("✓ Done. No values repeated, so the array does not contain duplicates.");
           break;
       }
@@ -1300,13 +1307,100 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "READ_NUM":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CHECK_SET":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "ADD_SET":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ADVANCE_LOOP":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END_TRUE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "END_FALSE":
+    return {
+      line: 9,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":217,"title":"Contains Duplicate","topic":"Array & Hashing","why":"A value already present in the seen set proves a duplicate; otherwise remember it for later comparisons.","meanings":{"nums":"input array","seen":"set of values already visited","num":"value at nums[i]","i":"current index"},"entityClasses":["hud-item","cell","set-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, seen, i, num, ans, execState, justAdded, duplicateValue, lastCheckHit, ...({})}),

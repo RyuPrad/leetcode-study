@@ -662,6 +662,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -925,22 +926,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseHeights(text) {
-      try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) throw new Error("Input must be an array.");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n) || n < 0)) {
-          throw new Error("Use only non-negative integers.");
-        }
-        return clean;
-      } catch (err) {
-        const fallback = text.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && n >= 0);
-        if (fallback.length > 0) return fallback;
-        alert("Please enter a valid non-negative integer array like [1,8,6,2,5,4,8,3,7]");
-        return null;
-      }
-    }
+    function parseHeights(text) { try { return StudyNumericInput.list(text, {min: 0, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -955,15 +941,17 @@
     }
 
     function loadCustom() {
-      const parsed = parseHeights(document.getElementById("custom-input").value);
-      if (!parsed) return;
-      if (parsed.length < 2) {
-        alert("Container With Most Water needs at least 2 heights.");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const parsed = parser.list(document.getElementById("custom-input").value, {min: 0, minLength: 2, label: 'Heights'});
+        height = parsed;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      height = parsed;
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -1005,23 +993,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      height = prev.height.slice();
-      left = prev.left;
-      right = prev.right;
-      width = prev.width;
-      currentHeight = prev.currentHeight;
-      area = prev.area;
-      ans = prev.ans;
-      bestLeft = prev.bestLeft;
-      bestRight = prev.bestRight;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+height = snapshot.height.slice();
+left = snapshot.left;
+right = snapshot.right;
+width = snapshot.width;
+currentHeight = snapshot.currentHeight;
+area = snapshot.area;
+ans = snapshot.ans;
+bestLeft = snapshot.bestLeft;
+bestRight = snapshot.bestRight;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(action, reason) {
       trace.push({
@@ -1044,31 +1051,49 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = height.length - 1;
-          ans = 0;
-          width = null;
-          currentHeight = null;
-          area = null;
-          bestLeft = null;
-          bestRight = null;
-          lastAction = "Initialize left at the start, right at the end, and ans at 0.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ width = null;
+currentHeight = null;
+area = null;
+bestLeft = null;
+bestRight = null;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = height.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left < right) {
             lastAction = "left is less than right, so calculate this container's width and height.";
-            execState = "CALC_AREA";
+            execState = "CALC_WIDTH";
           } else {
             lastAction = "left and right have met, so there are no more containers to check.";
             execState = "RETURN_RESULT";
           }
           break;
 
-        case "CALC_AREA":
+        case "CALC_WIDTH":
           width = right - left;
+          execState = "CALC_HEIGHT";
+          break;
+
+        case "CALC_HEIGHT":
           currentHeight = Math.min(height[left], height[right]);
+          execState = "CALC_AREA";
+          break;
+
+        case "CALC_AREA":
           area = width * currentHeight;
           lastAction = `Area = (${right} - ${left}) × min(${height[left]}, ${height[right]}) = ${area}.`;
           execState = "UPDATE_MAX";
@@ -1085,19 +1110,31 @@
             addTrace("keep max", "current area does not beat ans");
             lastAction = "Current area is not better, so keep the existing ans.";
           }
-          execState = "MOVE_POINTER";
+          execState = "COMPARE_HEIGHT";
           break;
 
-        case "MOVE_POINTER":
+        case "COMPARE_HEIGHT":
           if (height[left] < height[right]) {
-            addTrace("move left", `height[left] = ${height[left]} is shorter than height[right] = ${height[right]}`);
-            left++;
-            lastAction = "Move left because the left wall is shorter.";
+            execState = "MOVE_LEFT";
           } else {
-            addTrace("move right", `height[right] = ${height[right]} is shorter or tied, so move right`);
-            right--;
-            lastAction = "Move right because the right wall is shorter or tied.";
+            execState = "MOVE_RIGHT";
           }
+          break;
+
+        case "MOVE_LEFT":
+          addTrace("move left", `height[left] = ${height[left]} is shorter than height[right] = ${height[right]}`);
+          left++;
+          lastAction = "Move left because the left wall is shorter.";
+          width = null;
+          currentHeight = null;
+          area = null;
+          execState = "WHILE_CHECK";
+          break;
+
+        case "MOVE_RIGHT":
+          addTrace("move right", `height[right] = ${height[right]} is shorter or tied, so move right`);
+          right--;
+          lastAction = "Move right because the right wall is shorter or tied.";
           width = null;
           currentHeight = null;
           area = null;
@@ -1379,39 +1416,140 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Start with <code>left = 0</code>, <code>right = height.length - 1</code>, and <code>ans = 0</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([6]);
+
           narrate(left < right ? 'Since <code>left &lt; right</code>, calculate the current area.' : 'The pointers met, so the scan is complete.');
           break;
+        case "CALC_WIDTH":
+
+          narrate('Calculate the distance between the pointers: <code>width = right - left</code>.');
+          break;
+        case "CALC_HEIGHT":
+
+          narrate('Choose the shorter wall: <code>currentHeight = min(height[left], height[right])</code>.');
+          break;
         case "CALC_AREA":
-          highlightLines([7, 8, 9]);
-          narrate('Calculate <code>width</code>, the shorter wall as <code>currentHeight</code>, and then <code>area</code>.');
+
+          narrate('Multiply the width by the shorter wall to get this container\'s area.');
           break;
         case "UPDATE_MAX":
-          highlightLines([11]);
+
           narrate(area > ans ? 'This area beats the current max, so update <code>ans</code>.' : 'This area does not beat the current max, so keep <code>ans</code>.');
           break;
-        case "MOVE_POINTER":
-          highlightLines(height[left] < height[right] ? [13, 14] : [15, 16]);
+        case "COMPARE_HEIGHT":
+
           narrate(height[left] < height[right]
-            ? 'The left wall is shorter, so move <code>left</code> right and search for a taller wall.'
-            : 'The right wall is shorter or tied, so move <code>right</code> left and search for a taller wall.');
+            ? 'The left wall is shorter. Move <code>left</code> in the next step.'
+            : 'The right wall is shorter or tied. Move <code>right</code> in the next step.');
+          break;
+        case "MOVE_LEFT":
+
+          narrate('Move <code>left</code> right to look for a taller wall.');
+          break;
+        case "MOVE_RIGHT":
+
+          narrate('Move <code>right</code> left to look for a taller wall.');
           break;
         case "RETURN_RESULT":
-          highlightLines([20]);
+
           narrate('Return the maximum water area found.');
           break;
         case "END":
-          highlightLines([20]);
+
           narrate('✓ Done. The answer is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "CALC_WIDTH":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "CALC_HEIGHT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "CALC_AREA":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "UPDATE_MAX":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "COMPARE_HEIGHT":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "RETURN_RESULT":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 20,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1440,8 +1578,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":11,"title":"Container With Most Water","topic":"Two Pointers","why":"The shorter wall limits the area. Moving the taller wall inward cannot improve the area with that shorter wall fixed.","meanings":{"height":"wall heights","left":"left pointer","right":"right pointer","area":"water area at current pointers","ans":"maximum area seen"},"entityClasses":["hud-item","bar-col","bar-val","bar","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({height, left, right, width, currentHeight, area, ans, bestLeft, bestRight, execState, lastAction, ...({})}),

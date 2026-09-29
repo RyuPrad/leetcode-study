@@ -835,7 +835,7 @@
     // For each i (2..n), inner j (1..i-1) computes the candidates
     // j*(i-j) and j*dp[i-j]; dp[i] takes the running max. Each
     // snapshot deep-copies dp.
-    function buildSteps(N) {
+    function originalInstructionBuilder(N) {
       const built = [];
       const traceRows = [];
       const dp = new Array(N + 1).fill(0);
@@ -1272,13 +1272,42 @@
     document.getElementById("custom-input").value = String(n);
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,9]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":343,"title":"Integer Break","topic":"1-D Dynamic Programming","why":"Compare every split, allowing each remaining part to stay whole or be split further.","meanings":{"n":"The input integer to break into the sum of at least two positive integers, maximizing their product.","dp":"Array of length `n + 1`; `dp[i]` is the maximum product obtainable by breaking `i` into two or more positive parts. `dp[1] = 1` is the base case.","i":"Outer-loop value 2..n — the number whose best break (`dp[i]`) is currently being computed.","j":"Inner-loop split point 1..i-1. For each `j` we compare `j * (i - j)` (leave `i - j` whole) and `j * dp[i - j]` (break `i - j` further), taking the running max into `dp[i]`."},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({n, finalAns, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({n, finalAns, ...(steps[position] || {})}),
+      read: () => ({n,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({n,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

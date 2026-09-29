@@ -641,7 +641,7 @@
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">MyHashMap</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>() {</div>
 <div id="line-3" class="code-line">    <span class="kw">this</span>.size = <span class="nm">8</span>;</div>
-<div id="line-4" class="code-line">    <span class="kw">this</span>.buckets = <span class="vr">Array</span>.<span class="fn">from</span>({ length: <span class="kw">this</span>.size }, () => []);</div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.buckets = <span class="vr">Array</span>.<span class="fn">from</span>({ length: <span class="kw">this</span>.size }, () =&gt; []);</div>
 <div id="line-5" class="code-line">  }</div>
 <div id="line-6" class="code-line">  <span class="fn">hash</span>(key) {</div>
 <div id="line-7" class="code-line">    <span class="kw">return</span> key % <span class="kw">this</span>.size;</div>
@@ -665,7 +665,7 @@
 <div id="line-25" class="code-line">  }</div>
 <div id="line-26" class="code-line">  <span class="fn">remove</span>(key) {</div>
 <div id="line-27" class="code-line">    <span class="kw">const</span> idx = <span class="kw">this</span>.<span class="fn">hash</span>(key);</div>
-<div id="line-28" class="code-line">    <span class="kw">this</span>.buckets[idx] = <span class="kw">this</span>.buckets[idx].<span class="fn">filter</span>(pair => pair[<span class="nm">0</span>] !== key);</div>
+<div id="line-28" class="code-line">    <span class="kw">this</span>.buckets[idx] = <span class="kw">this</span>.buckets[idx].<span class="fn">filter</span>(pair =&gt; pair[<span class="nm">0</span>] !== key);</div>
 <div id="line-29" class="code-line">  }</div>
 <div id="line-30" class="code-line">}</div>
       </div>
@@ -896,178 +896,10 @@
     }
 
     function buildSteps(opList) {
-      const buckets = Array.from({ length: SIZE }, () => []);
-      const built = [];
-      const traceRows = [];
-
-      function snapshot(extra) {
-        const base = {
-          buckets: cloneBuckets(buckets),
-          key: (extra.key === undefined) ? null : extra.key,
-          value: (extra.value === undefined) ? null : extra.value,
-          idx: (extra.idx === undefined) ? null : extra.idx,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          method: extra.method,
-          opNum: extra.opNum,
-          lines: extra.lines,
-          narration: extra.narration,
-          targetIdx: (extra.targetIdx === undefined) ? null : extra.targetIdx,
-          scanPos: (extra.scanPos === undefined) ? null : extra.scanPos,
-          matchPos: (extra.matchPos === undefined) ? null : extra.matchPos,
-          updatedPos: (extra.updatedPos === undefined) ? null : extra.updatedPos,
-          justAdded: (extra.justAdded === undefined) ? false : extra.justAdded,
-          removingKey: (extra.removingKey === undefined) ? null : extra.removingKey,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        };
-        built.push(base);
-      }
-
-      opList.forEach((op, opNum) => {
-        const key = op.key;
-
-        if (op.method === "put") {
-          const value = op.value;
-          snapshot({
-            method: "put", opNum, key, value, lines: [9],
-            narration: "<b>put(" + key + ", " + value + ")</b> — insert key <b>" + key + "</b> or update its value to <b>" + value + "</b>."
-          });
-          const idx = key % SIZE;
-          snapshot({
-            method: "put", opNum, key, value, idx, lines: [10, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. This selects bucket <b>" + idx + "</b>."
-          });
-          const chain = buckets[idx];
-          let foundPos = -1;
-          if (chain.length === 0) {
-            snapshot({
-              method: "put", opNum, key, value, idx, lines: [11], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty, so the <code>for…of</code> loop body never runs."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p][0] === key;
-              snapshot({
-                method: "put", opNum, key, value, idx, lines: [11, 12], targetIdx: idx, scanPos: p,
-                matchPos: isMatch ? p : null,
-                narration: "Scan pair <code>[" + chain[p][0] + ", " + chain[p][1] + "]</code>: is <b>pair[0] (" + chain[p][0] + ") === key (" + key + ")</b>? " +
-                  (isMatch ? "<b style=\"color:#6a9955\">Yes</b> — update this pair in place." : "No — keep scanning.")
-              });
-              if (isMatch) { foundPos = p; break; }
-            }
-          }
-          if (foundPos >= 0) {
-            chain[foundPos][1] = value;
-            snapshot({
-              method: "put", opNum, key, value, idx, lines: [13, 14], targetIdx: idx, updatedPos: foundPos,
-              narration: "<code>pair[1] = " + value + "</code> then <code>return</code>. The existing key keeps its slot; only its value changed."
-            });
-            traceRows.push({ op: "put(" + key + "," + value + ")", key, value, idx, result: "updated" });
-          } else {
-            chain.push([key, value]);
-            snapshot({
-              method: "put", opNum, key, value, idx, lines: [17], targetIdx: idx, justAdded: true,
-              narration: "Key was not found, so <code>buckets[" + idx + "].push([" + key + ", " + value + "])</code> appends a new pair."
-            });
-            traceRows.push({ op: "put(" + key + "," + value + ")", key, value, idx, result: "inserted" });
-          }
-          snapshot({
-            method: "put", opNum, key, value, idx, lines: [18], targetIdx: idx,
-            narration: "put(" + key + ", " + value + ") returns. Bucket <b>" + idx + "</b> now holds key <b>" + key + "</b> → <b>" + value + "</b>."
-          });
-
-        } else if (op.method === "get") {
-          snapshot({
-            method: "get", opNum, key, lines: [19],
-            narration: "<b>get(" + key + ")</b> — return the value stored for key <b>" + key + "</b>, or <b>-1</b> if absent."
-          });
-          const idx = key % SIZE;
-          snapshot({
-            method: "get", opNum, key, idx, lines: [20, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. Search bucket <b>" + idx + "</b>."
-          });
-          const chain = buckets[idx];
-          let foundPos = -1;
-          if (chain.length === 0) {
-            snapshot({
-              method: "get", opNum, key, idx, lines: [21], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty — the loop never runs, so we fall through to <code>return -1</code>."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p][0] === key;
-              snapshot({
-                method: "get", opNum, key, idx, lines: [21, 22], targetIdx: idx, scanPos: p,
-                matchPos: isMatch ? p : null,
-                narration: "Scan pair <code>[" + chain[p][0] + ", " + chain[p][1] + "]</code>: is <b>pair[0] (" + chain[p][0] + ") === key (" + key + ")</b>? " +
-                  (isMatch ? "<b style=\"color:#6a9955\">Yes</b> — return its value <b>" + chain[p][1] + "</b>." : "No — keep scanning.")
-              });
-              if (isMatch) { foundPos = p; break; }
-            }
-          }
-          if (foundPos >= 0) {
-            const val = chain[foundPos][1];
-            traceRows.push({ op: "get(" + key + ")", key, value: "—", idx, result: String(val) });
-            snapshot({
-              method: "get", opNum, key, idx, ans: val, lines: [22], targetIdx: idx, matchPos: foundPos,
-              result: "hit",
-              narration: "<code>get(" + key + ")</code> returns <b style=\"color:#6a9955\">" + val + "</b>."
-            });
-          } else {
-            traceRows.push({ op: "get(" + key + ")", key, value: "—", idx, result: "-1" });
-            snapshot({
-              method: "get", opNum, key, idx, ans: -1, lines: [24], targetIdx: idx,
-              result: "miss",
-              narration: "Key <b>" + key + "</b> is not in bucket <b>" + idx + "</b>. <code>get(" + key + ")</code> returns <b style=\"color:#e24b4a\">-1</b>."
-            });
-          }
-
-        } else { // remove
-          snapshot({
-            method: "remove", opNum, key, lines: [26],
-            narration: "<b>remove(" + key + ")</b> — delete the pair whose key is <b>" + key + "</b>, if present."
-          });
-          const idx = key % SIZE;
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [27, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. Look in bucket <b>" + idx + "</b>."
-          });
-          const chain = buckets[idx];
-          const existed = chain.some(pair => pair[0] === key);
-          if (chain.length === 0) {
-            snapshot({
-              method: "remove", opNum, key, idx, lines: [28], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty. <code>filter</code> keeps it empty — nothing to remove."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p][0] === key;
-              snapshot({
-                method: "remove", opNum, key, idx, lines: [28], targetIdx: idx, scanPos: p,
-                matchPos: isMatch ? p : null, removingKey: isMatch ? key : null,
-                narration: "<code>filter(pair => pair[0] !== " + key + ")</code>: keep <code>[" + chain[p][0] + ", " + chain[p][1] + "]</code>? " +
-                  (isMatch
-                    ? "<b style=\"color:#e24b4a\">No</b> — pair[0] === " + key + ", so it is dropped."
-                    : "Yes — pair[0] !== " + key + ", so it stays.")
-              });
-            }
-          }
-          buckets[idx] = chain.filter(pair => pair[0] !== key);
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [28], targetIdx: idx,
-            narration: existed
-              ? "Bucket <b>" + idx + "</b> is rebuilt without key <b>" + key + "</b>."
-              : "Key <b>" + key + "</b> was not present; bucket <b>" + idx + "</b> is unchanged."
-          });
-          traceRows.push({ op: "remove(" + key + ")", key, value: "—", idx, result: existed ? "removed" : "absent" });
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [29], targetIdx: idx,
-            narration: "remove(" + key + ") returns. " + (existed ? "The pair is gone." : "Nothing changed.")
-          });
-        }
-      });
-
-      return built;
+      const buckets=Array.from({length:SIZE},()=>[]),built=[],traceRows=[];let method="init",opNum=-1,key=null,value=null,idx=null;
+      const snap=(line,narration,extra={})=>built.push({buckets:cloneBuckets(buckets),key,value,idx,ans:"pending",method,opNum,executedLine:line,lines:line?[line]:[1],narration,targetIdx:idx,scanPos:null,matchPos:null,updatedPos:null,justAdded:false,removingKey:null,result:"void",traceLen:traceRows.length,...extra});
+      snap(null,"Ready to operate on the hash map.");snap(3,"Set the bucket count.");snap(4,"Create the empty buckets.");
+      opList.forEach((op,num)=>{opNum=num;method=op.method;key=op.key;value=op.value??null;idx=null;const callLine=method==='put'?9:method==='get'?19:26,assignLine=method==='put'?10:method==='get'?20:27;snap(callLine,"Call "+method+".");snap(6,"Call hash.");const hash=key%SIZE;snap(7,"Return the bucket index.",{hash});idx=hash;snap(assignLine,"Assign the bucket index.");const chain=buckets[idx];if(method==='put'){let found=-1;for(let p=0;p<chain.length;p++){snap(11,"Read the next pair.",{scanPos:p});const match=chain[p][0]===key;snap(12,"Compare the pair's key.",{scanPos:p,matchPos:match?p:null});if(match){found=p;chain[p][1]=value;snap(13,"Update this pair's value.",{updatedPos:p});traceRows.push({op:'put('+key+','+value+')',key,value,idx,result:'updated'});snap(14,"Return from put.");break;}}if(found<0){snap(11,"The bucket scan is complete.");chain.push([key,value]);traceRows.push({op:'put('+key+','+value+')',key,value,idx,result:'inserted'});snap(17,"Append the new pair.",{justAdded:true});}}else if(method==='get'){let found=-1;for(let p=0;p<chain.length;p++){snap(21,"Read the next pair.",{scanPos:p});const match=chain[p][0]===key;if(match){found=p;const ans=chain[p][1];traceRows.push({op:'get('+key+')',key,value:'�',idx,result:String(ans)});snap(22,"The key matches. Return its value.",{scanPos:p,matchPos:p,ans,result:'hit'});break;}snap(22,"The pair's key does not match.",{scanPos:p});}if(found<0){snap(21,"The bucket scan is complete.");traceRows.push({op:'get('+key+')',key,value:'�',idx,result:'-1'});snap(24,"Return -1.",{ans:-1,result:'miss'});}}else{const existed=chain.some(pair=>pair[0]===key);buckets[idx]=chain.filter(pair=>pair[0]!==key);traceRows.push({op:'remove('+key+')',key,value:'�',idx,result:existed?'removed':'absent'});snap(28,"Filter out the matching key.",{removingKey:existed?key:null});}});return built;
     }
 
     function buildMasterTrace(opList) {
@@ -1431,8 +1263,8 @@
       spec: {"number":706,"title":"Design HashMap","topic":"Array & Hashing","why":"A key identifies one stored value; updating that key replaces its previous value.","meanings":{"size":"number of buckets (fixed at 8)","buckets":"array of `size` chains; each chain is a list of `[key, value]` pairs (separate chaining)","key":"the key being put, gotten, or removed","value":"the value stored for a key on `put`","idx":"bucket index for a key, computed as `key % size`"},"entityClasses":["hud-item","bucket-index","bucket-chain","pill","buckets"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({SIZE, ops, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({SIZE, ops, masterTrace, ...(steps[position] || {})}),
+      read: () => ({SIZE, ops,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({SIZE, ops,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

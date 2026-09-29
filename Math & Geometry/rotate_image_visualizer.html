@@ -772,7 +772,7 @@
     }
 
     // Build precomputed immutable steps[] (DEEP-COPIED snapshots).
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
       const work = deepCopy(matrix);
       const n = work.length;
@@ -1112,13 +1112,42 @@
     matrix = deepCopy(examples[1]);
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,10,11,13]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":48,"title":"Rotate Image","topic":"Math & Geometry","why":"A quarter turn moves each cell to its rotated coordinates while preserving every original value.","meanings":{"matrix":"The input `n x n` matrix, rotated 90&deg; clockwise in place.","n":"The side length of the square matrix (`matrix.length`).","i":"Row index. In phase 1 it is the outer transpose index; in phase 2 it selects the row to reverse.","j":"Column index in phase 1, starting at `i + 1` so each pair across the diagonal is swapped exactly once.","temp":"Temporary holder used to swap `matrix[i][j]` with `matrix[j][i]` during the transpose."},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({matrix, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({matrix, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({matrix, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

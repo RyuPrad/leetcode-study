@@ -910,25 +910,35 @@
       const trace = [];
 
       function snap(extra) {
-        steps.push(Object.assign({
-          stack: stack.slice(),
-          visited: visited.slice(),
-          nodeId: node ? node._id : null,
-          nodeVal: node ? node.val : null,
-          k,
-          ans: "pending",
-          trace: trace.map(r => ({ ...r })),
-          phase: "run"
-        }, extra));
+        steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))(Object.assign({
+  stack: stack.slice(),
+  visited: visited.slice(),
+  nodeId: node ? node._id : null,
+  nodeVal: node ? node.val : null,
+  k,
+  ans: "pending",
+  trace: trace.map(r => ({
+    ...r
+  })),
+  phase: "run"
+}, extra)));
       }
 
+      snap({lines:[], executedLine:null, phase:'ready', nodeId:null,nodeVal:null,note:'Ready. Press Step Over to execute the first instruction.'});
+      snap({lines:[2], phase:'init-stack',nodeId:null,nodeVal:null,note:'Create the empty traversal stack.'});
       // Step 0: init
-      steps.push({
-        stack: [], visited: [], nodeId: node ? node._id : null,
-        nodeVal: node ? node.val : null, k, ans: "pending",
-        trace: [], phase: "init", lines: [2, 3],
-        note: "Create an empty <b>stack</b> and set <b>node = root</b>. We do an iterative inorder traversal, which visits BST values in ascending order."
-      });
+      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
+  stack: [],
+  visited: [],
+  nodeId: node ? node._id : null,
+  nodeVal: node ? node.val : null,
+  k,
+  ans: "pending",
+  trace: [],
+  phase: "init",
+  lines: [3],
+  note: "Create an empty <b>stack</b> and set <b>node = root</b>. We do an iterative inorder traversal, which visits BST values in ascending order."
+}));
 
       let guard = 0;
       while ((node || stack.length) && guard < 5000) {
@@ -939,15 +949,18 @@
 
         // inner while: push all left nodes
         while (node) {
-          snap({ lines: [5, 6], phase: "push",
+          snap({ lines: [5], phase: "inner-check",
             note: "Push <b>node = " + node.val + "</b> onto the stack, then dive left to find the smallest value." });
           stack.push(node._id);
+          snap({lines:[6],phase:"push",note:"Push the current node onto the traversal stack."});
           node = node.left;
           snap({ lines: [7], phase: "goleft",
             note: node
               ? "Move to the left child: <b>node = " + node.val + "</b>. Keep going left."
               : "Left child is <b>null</b>. Stop pushing and pop the smallest remaining node." });
         }
+
+        snap({lines:[5],phase:"inner-check",note:"node is null; leave the inner traversal loop."});
 
         // pop
         const poppedId = stack.pop();
@@ -962,13 +975,21 @@
           note: "This is visit #" + visited.length + " in ascending order. Decrement <b>k</b> &rarr; k = " + k + "." });
 
         if (k === 0) {
-          steps.push({
-            stack: stack.slice(), visited: visited.slice(),
-            nodeId: poppedId, nodeVal: node.val, k, ans: node.val,
-            trace: trace.map(r => ({ ...r })), phase: "found", justPopped: poppedId,
-            lines: [11],
-            note: "<b>k === 0</b>. The current node is the kth smallest. Return <b style=\"color:#e24b4a\">" + node.val + "</b>."
-          });
+          steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
+  stack: stack.slice(),
+  visited: visited.slice(),
+  nodeId: poppedId,
+  nodeVal: node.val,
+  k,
+  ans: node.val,
+  trace: trace.map(r => ({
+    ...r
+  })),
+  phase: "found",
+  justPopped: poppedId,
+  lines: [11],
+  note: "<b>k === 0</b>. The current node is the kth smallest. Return <b style=\"color:#e24b4a\">" + node.val + "</b>."
+}));
           return;
         }
         snap({ lines: [11], phase: "checkk", justPopped: poppedId,
@@ -982,12 +1003,20 @@
       }
 
       // exhausted without finding (k > size)
-      steps.push({
-        stack: [], visited: visited.slice(), nodeId: null, nodeVal: null,
-        k, ans: -1, trace: trace.map(r => ({ ...r })), phase: "none",
-        lines: [14],
-        note: "The traversal finished without reaching the kth node (k is larger than the number of nodes). Return <b>-1</b>."
-      });
+      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
+  stack: [],
+  visited: visited.slice(),
+  nodeId: null,
+  nodeVal: null,
+  k,
+  ans: -1,
+  trace: trace.map(r => ({
+    ...r
+  })),
+  phase: "none",
+  lines: [14],
+  note: "The traversal finished without reaching the kth node (k is larger than the number of nodes). Return <b>-1</b>."
+}));
     }
 
     // map of id -> node object (filled during layout build)
@@ -1276,7 +1305,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({treeArr, kInput, rootNode, layout, idToNode, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({treeArr, kInput, rootNode, layout, idToNode, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({treeArr, kInput, rootNode, layout, idToNode, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

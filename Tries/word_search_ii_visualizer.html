@@ -967,171 +967,13 @@
     //   enter cell, trie mismatch, found word, mark visited, recurse,
     //   backtrack/restore. Each snapshot deep-copies board + trie + res.
     // ============================================================
-    function buildSteps(inputBoard, wordList) {
-      const built = [];
-      const traceRows = [];
-
-      const work = cloneBoard(inputBoard);
-      const rows = work.length;
-      const cols = work[0].length;
-      const res = [];
-
-      const root = buildTrie(wordList);
-      const idMap = buildIdMap(root);
-      const wordCleared = new Set();      // ids collected (word nulled)
-
-      // pathStack: array of {r,c} on the active DFS path; trieIds: ids on path.
-      const pathStack = [];
-
-      function pathIdsSet() {
-        // ids from root through each matched child on the current path
-        const ids = new Set(["R"]);
-        let node = root;
-        let lbl = "R";
-        for (const cell of pathStack) {
-          const ch = inputBoard[cell.r][cell.c]; // original letter (board may be '#')
-          lbl = lbl + ">" + ch;
-          ids.add(lbl);
-        }
-        return ids;
-      }
-
-      function snapshot(extra) {
-        built.push({
-          board: cloneBoard(work),
-          trie: snapTrie(root, idMap, extra.pathIds || null, new Set(wordCleared)),
-          res: res.slice(),
-          r: (extra.r === undefined) ? null : extra.r,
-          c: (extra.c === undefined) ? null : extra.c,
-          ch: (extra.ch === undefined) ? null : extra.ch,
-          path: pathStack.map(p => ({ r: p.r, c: p.c, ch: inputBoard[p.r][p.c] })),
-          pathWord: pathStack.map(p => inputBoard[p.r][p.c]).join(""),
-          event: extra.event,
-          justFound: (extra.justFound === undefined) ? null : extra.justFound,
-          lines: extra.lines,
-          narration: extra.narration,
-          traceLen: traceRows.length
-        });
-      }
-
-      // Recursive DFS that emits snapshots. nodeId tracks current trie id.
-      function dfs(r, c, node, nodeId) {
-        const ch = work[r][c];
-        // enter cell — read board[r][c]
-        const childId = nodeId + ">" + ch;
-        const child = node.children[ch];
-
-        // build pathIds INCLUDING this cell's child (if it matches)
-        const enterIds = new Set();
-        { let id = "R"; enterIds.add(id); for (const cell of pathStack) { id = id + ">" + inputBoard[cell.r][cell.c]; enterIds.add(id); } }
-
-        snapshot({
-          r, c, ch, event: "enter",
-          pathIds: enterIds,
-          lines: [24, 25],
-          narration: "Enter cell <b>(" + r + "," + c + ")</b> = '<b>" + ch + "</b>'. Look up <code>child = node.children['" + ch + "']</code> in the trie."
-        });
-
-        if (!child) {
-          traceRows.push({ event: "mismatch", cell: "(" + r + "," + c + ")", ch, detail: "no trie child", res: res.length });
-          snapshot({
-            r, c, ch, event: "mismatch",
-            pathIds: enterIds,
-            lines: [26],
-            narration: "No trie child for '<b>" + ch + "</b>' — this prefix is not in any word. <code>return</code> (dead end)."
-          });
-          return;
-        }
-
-        // child exists — extend path
-        pathStack.push({ r, c });
-        const pathPlus = new Set();
-        { let id = "R"; pathPlus.add(id); for (const cell of pathStack) { id = id + ">" + inputBoard[cell.r][cell.c]; pathPlus.add(id); } }
-
-        snapshot({
-          r, c, ch, event: "match",
-          pathIds: pathPlus,
-          lines: [25, 27],
-          narration: "Trie child for '<b>" + ch + "</b>' exists — extend the path. Current path spells <b>\"" + pathStack.map(p => inputBoard[p.r][p.c]).join("") + "\"</b>."
-        });
-
-        // found a complete word?
-        if (child.word !== null) {
-          const foundWord = child.word;
-          res.push(foundWord);
-          child.word = null;
-          wordCleared.add(childId);
-          traceRows.push({ event: "found", cell: "(" + r + "," + c + ")", ch, detail: 'res.push("' + foundWord + '")', res: res.length });
-          snapshot({
-            r, c, ch, event: "found",
-            pathIds: pathPlus, justFound: foundWord,
-            lines: [27, 28, 29],
-            narration: "★ <code>child.word = \"" + foundWord + "\"</code> is a complete word! <code>res.push(\"" + foundWord + "\")</code>, then null it (<code>child.word = null</code>) to avoid duplicates."
-          });
-        }
-
-        // mark visited
-        work[r][c] = "#";
-        snapshot({
-          r, c, ch, event: "mark",
-          pathIds: pathPlus,
-          lines: [31],
-          narration: "Mark <b>(" + r + "," + c + ")</b> visited: <code>board[" + r + "][" + c + "] = \"#\"</code> so this DFS path can't reuse it."
-        });
-
-        const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        for (const [dr, dc] of dirs) {
-          const nr = r + dr;
-          const nc = c + dc;
-          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && work[nr][nc] !== "#") {
-            dfs(nr, nc, child, childId);
-          }
-        }
-
-        // backtrack / restore
-        work[r][c] = ch;
-        pathStack.pop();
-        const restoreIds = new Set();
-        { let id = "R"; restoreIds.add(id); for (const cell of pathStack) { id = id + ">" + inputBoard[cell.r][cell.c]; restoreIds.add(id); } }
-        traceRows.push({ event: "backtrack", cell: "(" + r + "," + c + ")", ch, detail: "restore '" + ch + "'", res: res.length });
-        snapshot({
-          r, c, ch, event: "backtrack",
-          pathIds: restoreIds,
-          lines: [40],
-          narration: "Backtrack from <b>(" + r + "," + c + ")</b>: restore <code>board[" + r + "][" + c + "] = \"" + ch + "\"</code> and pop it from the path."
-        });
-      }
-
-      // intro snapshot — trie built, before any DFS
-      snapshot({
-        event: "init",
-        pathIds: new Set(["R"]),
-        lines: [9, 21],
-        narration: "Trie built from <b>" + wordList.length + "</b> word(s). <code>res = []</code>. Now scan every cell as a DFS start (<code>dfs(r, c, root)</code>)."
-      });
-
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          // start-of-cell announcement (only meaningful when the root has a child)
-          snapshot({
-            r, c, ch: work[r][c], event: "start",
-            pathIds: new Set(["R"]),
-            lines: [43, 44, 45],
-            narration: "Outer loops: try starting a DFS at cell <b>(" + r + "," + c + ")</b> = '<b>" + work[r][c] + "</b>' from the trie root."
-          });
-          dfs(r, c, root, "R");
-        }
-      }
-
-      // done
-      snapshot({
-        event: "done",
-        pathIds: new Set(["R"]),
-        lines: [48],
-        narration: "✓ Done. Every cell was tried as a start. <code>return res = [" + res.map(w => '"' + w + '"').join(", ") + "]</code>."
-      });
-
-      return built;
+    function buildSteps(inputBoard,wordList) {
+      const built=[],traceRows=[],work=cloneBoard(inputBoard),rows=work.length,cols=work[0]?.length??0,res=[],root=new TrieNode(),idMap=new Map([[root,'R']]),wordCleared=new Set(),pathStack=[];
+      const pathIds=()=>{const ids=new Set(['R']);let id='R';for(const p of pathStack){id+='>'+inputBoard[p.r][p.c];ids.add(id);}return ids;};
+      const snap=(line,event,narration,extra={})=>built.push({board:cloneBoard(work),trie:snapTrie(root,idMap,extra.pathIds??pathIds(),new Set(wordCleared)),res:[...res],r:null,c:null,ch:null,path:pathStack.map(p=>({...p,ch:inputBoard[p.r][p.c]})),pathWord:pathStack.map(p=>inputBoard[p.r][p.c]).join(''),event,justFound:null,executedLine:line,lines:line?[line]:[1],narration,traceLen:traceRows.length,...extra});
+      snap(null,"init","Ready to find dictionary words on the board.");snap(9,"init","Create the root trie node.");for(const word of wordList){let active=new Set(['R']);snap(10,"init","Read the next dictionary word.",{buildWord:word,pathIds:active});let node=root;snap(11,"init","Set the trie pointer to the root.",{buildWord:word,pathIds:active});for(const ch of word){snap(12,"init","Read the next dictionary character.",{buildWord:word,ch,pathIds:active});if(!node.children[ch]){node.children[ch]=new TrieNode();idMap.set(node.children[ch],idMap.get(node)+'>'+ch);}snap(13,"init","Create or reuse this character's child.",{buildWord:word,ch,pathIds:active});node=node.children[ch];active.add(idMap.get(node));snap(14,"init","Move to the child trie node.",{buildWord:word,ch,pathIds:active});}snap(12,"init","The dictionary word is complete.",{buildWord:word,pathIds:active});node.word=word;snap(16,"init","Store the word at its final trie node.",{buildWord:word,pathIds:active});}snap(10,"init","The dictionary is complete.");snap(19,"init","Read the number of board rows.");snap(20,"init","Read the number of board columns.");snap(21,"init","Create the result list.");snap(23,"init","Define dfs.");
+      const dfs=(r,c,node,nodeId,callLine)=>{const meta={r,c};snap(callLine,"enter","Call dfs for this cell.",meta);const ch=work[r][c];meta.ch=ch;snap(24,"enter","Read the cell's character.",meta);const child=node.children[ch],childId=nodeId+'>'+ch;snap(25,"enter","Look up this character in the trie.",{...meta,childId:child?childId:null});snap(26,child?'match':'mismatch',child?'The trie child exists.':'The trie child is absent. Return.',meta);if(!child){traceRows.push({event:'mismatch',cell:'('+r+','+c+')',ch,detail:'no trie child',res:res.length});return;}pathStack.push({r,c});snap(27,"match","Check whether this trie node stores a complete word.",meta);if(child.word!==null){const found=child.word;res.push(found);traceRows.push({event:'found',cell:'('+r+','+c+')',ch,detail:'res.push("'+found+'")',res:res.length});snap(28,"found","Append the complete word to the result.",{...meta,justFound:found});child.word=null;wordCleared.add(childId);snap(29,"found","Clear this word to prevent duplicate results.",meta);}work[r][c]='#';snap(31,"mark","Mark this cell visited.",meta);const dirs=[[1,0],[-1,0],[0,1],[0,-1]];snap(32,"mark","Create the four directions.",meta);for(const [dr,dc]of dirs){snap(33,"mark","Read the next direction.",{...meta,dr,dc});const nr=r+dr;snap(34,"mark","Compute the neighbor row.",{...meta,dr,dc,nr});const nc=c+dc;snap(35,"mark","Compute the neighbor column.",{...meta,dr,dc,nr,nc});const valid=nr>=0&&nr<rows&&nc>=0&&nc<cols&&work[nr][nc]!=='#';snap(36,"mark","Check whether this neighbor can be visited.",{...meta,dr,dc,nr,nc});if(valid)dfs(nr,nc,child,childId,37);}snap(33,"mark","All directions have been tried.",meta);work[r][c]=ch;pathStack.pop();traceRows.push({event:'backtrack',cell:'('+r+','+c+')',ch,detail:'restore',res:res.length});snap(40,"backtrack","Restore the original cell character.",meta);};
+      for(let r=0;r<rows;r++){snap(43,"start","Visit the next starting row.",{r});for(let c=0;c<cols;c++){snap(44,"start","Visit the next starting cell.",{r,c});dfs(r,c,root,'R',45);}snap(44,"start","This row's starting cells are complete.",{r,c:cols});}snap(43,"start","All starting rows are complete.",{r:rows});snap(48,"done","Return the found words.");return built;
     }
 
     // Compute final res (for the trace cache + final-answer assertion).
@@ -1568,8 +1410,8 @@
       spec: {"number":212,"title":"Word Search II","topic":"Tries","why":"The trie shares prefix work across words while board traversal prevents reusing cells in the current path.","meanings":{"board":"The `m × n` grid of letters. Cells are temporarily set to `\"#\"` to mark them visited on the current DFS path.","words":"The list of target words; each is stored in the trie so the grid is scanned only once.","root":"Root `TrieNode` of the trie built from `words`.","node":"The current `TrieNode` (the DFS parameter) before descending to a child.","child":"`node.children[ch]` — the trie node for the current cell's letter; if absent, the path is a dead end.","ch":"The letter at the current cell, `board[r][c]`.","rows":"Number of board rows, `board.length`.","cols":"Number of board columns, `board[0].length`.","res":"The result array of found words. A word is pushed once, then `child.word` is nulled to dedupe.","dirs":"The four movement deltas `[[1,0],[-1,0],[0,1],[0,-1]]` (down, up, right, left)."},"entityClasses":["hud-item","grid-cell","trie-node","res-pill","node","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({board, words, finalRes, _traceCache, _traceCacheKey, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({board, words, finalRes, _traceCache, _traceCacheKey, ...(steps[position] || {})}),
+      read: () => ({board, words,    ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({board, words,    ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

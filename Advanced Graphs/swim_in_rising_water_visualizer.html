@@ -922,7 +922,7 @@
 
       const n = grid.length;
       const time = Array.from({ length: n }, () => new Array(n).fill(INF));
-      time[0][0] = grid[0][0];
+
       const heap = new MinHeap();
       const settled = Array.from({ length: n }, () => new Array(n).fill(false));
 
@@ -938,6 +938,7 @@
           nt: (extra.nt === undefined) ? null : extra.nt,
           ans: (extra.ans === undefined) ? "pending" : extra.ans,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           phase: (extra.phase === undefined) ? "run" : extra.phase,
           justPushed: (extra.justPushed === undefined) ? null : extra.justPushed,
@@ -949,13 +950,18 @@
 
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
+      snapshot({lines: [], executedLine: null, narration: "Ready to find the best path through the grid."});
+      snapshot({lines: [35], narration: "Read the grid dimensions."});
+      snapshot({lines: [36], narration: "Initialize every cell's best cost to infinity."});
+      time[0][0] = grid[0][0];
       snapshot({
-        lines: [35, 36, 37],
+        lines: [37],
         narration: "Grid is <b>" + n + "×" + n + "</b>. Cell value = elevation; water rises 1 unit per time step. Set <code>time[0][0] = grid[0][0] = " + grid[0][0] + "</code> — you must wait for the water to reach the start cell's height."
       });
+      snapshot({lines: [38], narration: "Create the empty min-heap."});
       heap.push([grid[0][0], 0, 0]);
       snapshot({
-        lines: [38, 39, 40], heapMode: "pushing", justPushed: [0, 0],
+        lines: [39], heapMode: "pushing", justPushed: [0, 0],
         narration: "Push <code>[t=" + grid[0][0] + ", r=0, c=0]</code>. <b>time</b> at a cell = the minimum moment water is high enough to have swum there = the maximum cell value along the best path."
       });
 
@@ -993,23 +999,26 @@
           narration: "<code>t (" + t + ") &gt; time[" + r + "][" + c + "]</code>? No — this is the earliest we can stand on (" + r + "," + c + "). Finalize it and relax its neighbors."
         });
         for (const [dr, dc] of dirs) {
+          snapshot({lines: [45], cell: [r,c], t, narration: "Read the next direction."});
           const nr = r + dr, nc = c + dc;
+          snapshot({lines: [46], cell: [r,c], t, neighbor: [nr,nc], narration: "Calculate the neighbor coordinates."});
           const inBounds = nr >= 0 && nr < n && nc >= 0 && nc < n;
           if (!inBounds) {
             snapshot({
-              lines: [45, 46, 47], cell: [r, c], t,
+              lines: [47], cell: [r, c], t,
               narration: "Neighbor (" + nr + "," + nc + ") via [" + dr + "," + dc + "] is <b>out of bounds</b> — skip it."
             });
             continue;
           }
           const nt = Math.max(t, grid[nr][nc]);
           snapshot({
-            lines: [47, 48], cell: [r, c], t, neighbor: [nr, nc], nt,
+            lines: [48], cell: [r, c], t, neighbor: [nr, nc], nt,
             narration: "Neighbor (" + nr + "," + nc + "): <code>nt = max(t, grid[" + nr + "][" + nc + "]) = max(" + t + ", " + grid[nr][nc] + ") = " + nt + "</code>. To step there you must wait until the water covers its elevation."
           });
           if (nt < time[nr][nc]) {
             const old = time[nr][nc];
             time[nr][nc] = nt;
+            snapshot({lines: [49], cell: [r,c], t, neighbor: [nr,nc], nt, narration: "Store the improved cost for this neighbor. The heap stays unchanged."});
             heap.push([nt, nr, nc]);
             snapshot({
               lines: [49], cell: [r, c], t, neighbor: [nr, nc], nt, heapMode: "pushing", justPushed: [nr, nc],
@@ -1103,17 +1112,7 @@
           phase: "run", justPushed: null, topCell: null, heapMode: null, traceLen: 0
         };
       }
-      if (stepIndex === 0) {
-        const tm = Array.from({ length: n }, () => new Array(n).fill(INF));
-        if (n > 0) tm[0][0] = input.grid[0][0];
-        return {
-          time: tm, heap: [], settled: Array.from({ length: n }, () => new Array(n).fill(false)),
-          n, cell: null, t: null, neighbor: null, nt: null,
-          ans: "pending", lines: [34, 35],
-          narration: "<code>swimInWater(grid)</code> on a <b>" + n + "×" + n + "</b> grid. Swim from (0,0) to the bottom-right as early as possible; the path's cost is its largest cell value. Press <b>Step Over</b>.",
-          phase: "run", justPushed: null, topCell: null, heapMode: null, traceLen: 0
-        };
-      }
+
       return steps[stepIndex];
     }
 
@@ -1403,8 +1402,8 @@
       spec: {"number":778,"title":"Swim in Rising Water","topic":"Advanced Graphs","why":"A route's cost is its highest elevation; expand the smallest available route cost first.","meanings":{"grid":"Input `n × n` grid; `grid[r][c]` is the elevation of cell `(r, c)`. Water level rises by 1 each time unit.","n":"Side length of the square grid = `grid.length`.","time":"`time[r][c]` = earliest moment you can be standing on `(r, c)` = the smallest possible \"max cell value\" along a path from `(0,0)`; starts at `Infinity`, with `time[0][0] = grid[0][0]`.","heap":"Min-heap of `[t, r, c]` ordered by time `t` (a `class MinHeap`); pops the cell reachable at the earliest time.","dirs":"The four orthogonal moves `[[1,0],[-1,0],[0,1],[0,-1]]`.","t":"Time popped off the heap for the current cell `(r, c)`.","nt":"Candidate time to reach `(nr, nc)`: `max(t, grid[nr][nc])` — you must wait until the water covers the neighbor's elevation."},"entityClasses":["hud-item","grid-cell","cell-h","cell-metric","heap-pill","cell","topCell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({INF, input, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({INF, input, masterTrace, ...(steps[position] || {})}),
+      read: () => ({INF, input,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({INF, input,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

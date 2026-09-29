@@ -884,7 +884,7 @@
     let activeExample = 1;
 
     // Build steps by running letterCombinations and recording snapshots.
-    function buildSteps(inputDigits) {
+    function originalInstructionBuilder(inputDigits) {
       const localSteps = [];
       const res = [];
       const path = [];
@@ -1435,13 +1435,42 @@
     digits = examples[1];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,8,9,11,12,13,14,17,18]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":17,"title":"Letter Combinations of a Phone Number","topic":"Backtracking","why":"Each recursion level chooses one letter for the next digit; a complete path becomes one output string.","meanings":{"digits":"input string of digits 2-9","map":"keypad mapping from each digit to its letters","res":"output list of all complete combination strings","path":"letters chosen so far (one per digit)","i":"index of the digit currently being expanded"},"entityClasses":["hud-item","key-digit","in-digits","active-digit","digit-cell","letter-chip","path-pill","depth-chip","res-pill","chooseChar","undoChar","triedChars","createTextNode"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({map, keypadOrder, digits, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({map, keypadOrder, digits, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({map, keypadOrder, digits, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -687,6 +687,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -962,29 +963,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseInput(text) {
-      const parts = text.split("|");
-      const arrText = parts[0];
-      let numsResult = null;
-      try {
-        const parsed = JSON.parse(arrText.trim());
-        if (Array.isArray(parsed)) numsResult = parsed.map(Number);
-      } catch (err) {
-        numsResult = null;
-      }
-      if (numsResult === null) {
-        numsResult = arrText.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n));
-      }
-      if (numsResult.some(n => !Number.isFinite(n) || !Number.isInteger(n)) || numsResult.length === 0) {
-        alert("Please enter integers like 4,5,6,7,0,1,2 | 0");
-        return null;
-      }
-      let targetResult = null;
-      if (parts.length > 1 && parts[1].trim() !== "") {
-        targetResult = Number(parts[1].trim());
-      }
-      return { numsResult, targetResult };
-    }
+    function parseInput(text) { try { const [arrayText, targetText] = StudyNumericInput.optionalParameter(text, null, 'Numbers and target'); const numsResult = StudyNumericInput.list(arrayText, {minLength: 1, label: 'Numbers'}); const targetResult = targetText === null ? null : StudyNumericInput.integer(targetText, {label: 'Target'}); return {numsResult, targetResult}; } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -1000,23 +979,7 @@
       init();
     }
 
-    function loadCustom() {
-      const parsed = parseInput(document.getElementById("custom-input").value);
-      if (!parsed) return;
-      nums = parsed.numsResult;
-      let t = parsed.targetResult;
-      if (t === null) {
-        t = Number(document.getElementById("target-input").value);
-      }
-      if (!Number.isFinite(t) || !Number.isInteger(t)) {
-        alert("Please enter an integer target.");
-        return;
-      }
-      target = t;
-      document.getElementById("target-input").value = target;
-      activeExample = 0;
-      init();
-    }
+    function loadCustom() { const parsed = parseInput(document.getElementById('custom-input').value); if (!parsed) return false; try { const t = parsed.targetResult === null ? StudyNumericInput.integer(document.getElementById('target-input').value, {label: 'Target'}) : parsed.targetResult; nums = parsed.numsResult; target = t; document.getElementById('target-input').value = t; activeExample = 0; init(); return true; } catch (error) { alert(error.message); return false; } }
 
     function init() {
       left = 0;
@@ -1054,22 +1017,40 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      target = prev.target;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      midValue = prev.midValue;
-      sortedHalf = prev.sortedHalf;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+target = snapshot.target;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+midValue = snapshot.midValue;
+sortedHalf = snapshot.sortedHalf;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(action) {
       trace.push({
@@ -1089,15 +1070,20 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = nums.length - 1;
-          mid = null;
-          midValue = null;
-          sortedHalf = null;
-          ans = null;
-          lastAction = "Initialize left at 0 and right at nums.length - 1.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ mid = null;
+midValue = null;
+sortedHalf = null;
+ans = null;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = nums.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1481,78 +1467,189 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start with <code>left = 0</code> and <code>right = nums.length - 1</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, the target could still be inside the window.' : 'The window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([5]);
+
           narrate('Calculate the middle index using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "CHECK_TARGET":
           if (midValue === target) {
-            highlightLines([6, 7]);
+
             narrate('The middle value equals the target. Return <code>mid</code>.');
           } else {
-            highlightLines([6]);
+
             narrate('<code>nums[mid]</code> is not the target, so we figure out which half is sorted.');
           }
           break;
         case "CHECK_SORTED":
           if (nums[left] <= midValue) {
-            highlightLines([9]);
+
             narrate('<code>nums[left] &lt;= nums[mid]</code>, so the <b>left half</b> is sorted (highlighted green).');
           } else {
-            highlightLines([9, 15]);
+
             narrate('<code>nums[left] &gt; nums[mid]</code>, so the <b>right half</b> is sorted (highlighted green).');
           }
           break;
         case "CHECK_RANGE":
           if (sortedHalf === "left") {
             if (nums[left] <= target && target < midValue) {
-              highlightLines([10, 11]);
+
               narrate('Target fits inside the sorted left half, so discard the right side.');
             } else {
-              highlightLines([10, 13]);
+
               narrate('Target does not fit in the sorted left half, so search the right side.');
             }
           } else {
             if (midValue < target && target <= nums[right]) {
-              highlightLines([16, 17]);
+
               narrate('Target fits inside the sorted right half, so discard the left side.');
             } else {
-              highlightLines([16, 19]);
+
               narrate('Target does not fit in the sorted right half, so search the left side.');
             }
           }
           break;
         case "MOVE_LEFT":
-          highlightLines(sortedHalf === "right" ? [17] : [13]);
+
           narrate('Discard the left half by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines(sortedHalf === "left" ? [11] : [19]);
+
           narrate('Discard the right half by setting <code>right = mid - 1</code>.');
           break;
         case "RETURN_FOUND":
-          highlightLines([7]);
+
           narrate('Return the index where the target was found.');
           break;
         case "RETURN_NOT_FOUND":
-          highlightLines([23]);
+
           narrate('The target does not exist in the array, so return <code>-1</code>.');
           break;
         case "END":
-          highlightLines(ans === -1 ? [23] : [7]);
+
           narrate(ans === -1 ? 'Done. The answer is <code>-1</code>.' : 'Done. The answer is index <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CHECK_TARGET":
+    if (midValue === target) {
+      return {
+        line: 6,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 6,
+        phase: execState
+      };
+    }
+  case "CHECK_SORTED":
+    if (nums[left] <= midValue) {
+      return {
+        line: 9,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 9,
+        phase: execState
+      };
+    }
+  case "CHECK_RANGE":
+    if (sortedHalf === "left") {
+      if (nums[left] <= target && target < midValue) {
+        return {
+          line: 10,
+          phase: execState
+        };
+      } else {
+        return {
+          line: 10,
+          phase: execState
+        };
+      }
+    } else {
+      if (midValue < target && target <= nums[right]) {
+        return {
+          line: 16,
+          phase: execState
+        };
+      } else {
+        return {
+          line: 16,
+          phase: execState
+        };
+      }
+    }
+  case "MOVE_LEFT":
+    return {
+      line: (sortedHalf === "right" ? [17] : [13])[0],
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: (sortedHalf === "left" ? [11] : [19])[0],
+      phase: execState
+    };
+  case "RETURN_FOUND":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "RETURN_NOT_FOUND":
+    return {
+      line: 23,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans === -1 ? [23] : [7])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1582,8 +1679,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":33,"title":"Search in Rotated Sorted Array","topic":"Binary Search","why":"At least one side of the midpoint is sorted. Check whether the target lies in that side before discarding it.","meanings":{"nums":"The rotated sorted input array to search.","target":"The value we are searching for.","left":"Left boundary index of the current search window.","right":"Right boundary index of the current search window.","mid":"Middle index, `Math.floor((left + right) / 2)`; one half around it is always sorted."},"entityClasses":["hud-item","cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, target, left, right, mid, midValue, sortedHalf, ans, execState, lastAction, ...({})}),

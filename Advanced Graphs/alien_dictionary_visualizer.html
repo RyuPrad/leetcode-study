@@ -880,6 +880,7 @@
           head: (extra.head === undefined) ? 0 : extra.head,
           res: (extra.res === undefined) ? "" : extra.res,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           phase: extra.phase,
           pairA: (extra.pairA === undefined) ? null : extra.pairA,
@@ -896,19 +897,22 @@
         });
       }
 
+      snap({phase: "collect", lines: [], executedLine: null, narration: "Ready to learn the alien character order."});
       // Phase 1: register every distinct char.
       snap({
-        phase: "collect", lines: [4, 5],
+        phase: "collect", lines: [4],
         narration: "Scan every word and register each distinct character as a node with <code>adj[ch] = {}</code> and <code>indegree[ch] = 0</code>."
       });
       for (const w of wordList) {
         for (const ch of w) {
           if (!adj.has(ch)) adj.set(ch, new Set());
+          snap({phase: "collect", lines: [5], narration: "Register this character's empty adjacency set. Its indegree has not been initialized yet."});
           if (!indegree.has(ch)) indegree.set(ch, 0);
+          snap({phase: "collect", lines: [5], narration: "Initialize this character's indegree if it was not registered before."});
         }
       }
       snap({
-        phase: "collect", lines: [6],
+        phase: "collect", lines: [4],
         narration: "All nodes created: <b>" + ([...indegree.keys()].join(", ") || "(none)") + "</b>. Every indegree starts at 0."
       });
 
@@ -919,7 +923,7 @@
         const w1 = wordList[i], w2 = wordList[i + 1];
         const minLen = Math.min(w1.length, w2.length);
         snap({
-          phase: "compare", lines: [7, 8, 9], pairA: i, pairB: i + 1,
+          phase: "compare", lines: [9], pairA: i, pairB: i + 1,
           narration: "Compare adjacent words <b>\"" + w1 + "\"</b> and <b>\"" + w2 + "\"</b>. Walk their characters left to right (minLen = " + minLen + ")."
         });
 
@@ -943,10 +947,12 @@
             const already = adj.get(a).has(b);
             if (!already) {
               adj.get(a).add(b);
+              snap({phase: "edge", lines: [13], pairA: i, pairB: i+1, diffIdx: j, freshEdge: a+b, activeEdge: a+b, narration: "Add this ordering edge. The indegree stays unchanged."});
               indegree.set(b, indegree.get(b) + 1);
+              snap({phase: "edge", lines: [13], pairA: i, pairB: i+1, diffIdx: j, freshEdge: a+b, activeEdge: a+b, narration: "Increase the later character's indegree."});
             }
             snap({
-              phase: "edge", lines: [12, 13, 14], pairA: i, pairB: i + 1, diffIdx: j,
+              phase: "edge", lines: [14], pairA: i, pairB: i + 1, diffIdx: j,
               freshEdge: already ? null : (a + b), activeEdge: a + b,
               narration: "First difference at index " + j + ": <b>'" + a + "'</b> vs <b>'" + b + "'</b>. " +
                 (already
@@ -973,23 +979,29 @@
       if (!invalid) {
         // Phase 3: seed the queue with indegree-0 nodes.
         const queue = [];
-        for (const [ch, d] of indegree) if (d === 0) queue.push(ch);
+        snap({phase: "seed", lines: [18], queue, head: 0, narration: "Create the empty topological queue."});
+        for (const [ch, d] of indegree) {
+          if (d === 0) queue.push(ch);
+          snap({phase: "seed", lines: [19], queue, head: 0, narration: "Add this character only if its indegree is zero."});
+        }
         snap({
-          phase: "seed", lines: [18, 19], queue, head: 0,
+          phase: "seed", lines: [19], queue, head: 0,
           narration: "Seed the Kahn queue with every node whose indegree is 0: <b>[" + queue.join(", ") + "]</b>." + (queue.length === 0 ? " The queue is empty &mdash; a cycle blocks all nodes." : "")
         });
 
         // Phase 4: Kahn BFS.
         let res = "", head = 0;
         snap({
-          phase: "kahn", lines: [20, 21], queue, head, res,
+          phase: "kahn", lines: [20], queue, head, res,
           narration: "Begin the topological sort. Repeatedly pop the queue head, append it to <code>res</code>, and relax its outgoing edges."
         });
         while (head < queue.length) {
+          snap({phase: "kahn", lines: [21], queue, head, res, narration: "Check whether another queued character is available."});
           const ch = queue[head++];
+          snap({phase: "kahn", lines: [22], queue, head, res, popping: ch, settled: settled.slice(), narration: "Read the next character and advance the queue head. The result string stays unchanged."});
           res += ch;
           snap({
-            phase: "kahn", lines: [22, 23], queue, head, res,
+            phase: "kahn", lines: [23], queue, head, res,
             popping: ch, settled: settled.slice(),
             narration: "Pop <b>'" + ch + "'</b> (head). Append to result &rarr; <code>res = \"" + res + "\"</code>."
           });
@@ -997,7 +1009,9 @@
           for (const nei of adj.get(ch)) {
             indegree.set(nei, indegree.get(nei) - 1);
             decremented.push(nei);
+            snap({phase: "kahn", lines: [24], queue, head, res, popping: ch, decremented, settled: settled.slice(), narration: "Decrease one neighbor's indegree. The queue stays unchanged."});
             if (indegree.get(nei) === 0) queue.push(nei);
+            snap({phase: "kahn", lines: [24], queue, head, res, popping: ch, decremented, settled: settled.slice(), narration: "Enqueue this neighbor only if its indegree reached zero."});
           }
           settled.push(ch);
           snap({
@@ -1419,7 +1433,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({words, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({words, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({words, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

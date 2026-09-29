@@ -23,12 +23,12 @@
       const splitter=document.querySelector('.study-diagram-splitter');
       splitter.onpointerdown=event=>{splitter.setPointerCapture(event.pointerId);const move=e=>{const box=workspace.getBoundingClientRect(),guide=panel.getBoundingClientRect(),available=box.right-guide.right;const percent=Math.max(30,Math.min(75,(e.clientX-guide.right)/available*100));workspace.style.setProperty('--study-diagram-width',`${percent}%`);splitter.setAttribute('aria-valuenow',String(Math.round(percent)));};const end=()=>{splitter.removeEventListener('pointermove',move);splitter.removeEventListener('lostpointercapture',end);};splitter.addEventListener('pointermove',move);splitter.addEventListener('lostpointercapture',end);};
       const loader=lesson.loader?window[lesson.loader.functionName]:null;
-      let progress=null,initialized=false,active=!embedded,busy=false,playing=false,timer=null,speed=1,generation=0,internal=0,resetting=false,sequence=0,justRevealed=null,feedback='',error='',targets=[];
+      let progress=null,initialized=false,active=!embedded,busy=false,playing=false,timer=null,speed=1,generation=0,internal=0,resetting=false,sequence=0,justRevealed=null,pendingReveal=null,feedback='',error='',targets=[];
       let priorVersion=false,initialValues=null;
       const terminal=lesson.checkpoints.at(-1).afterIndex;
       const controls=make('section','guided-controls');controls.setAttribute('aria-label','Guided playback');workspace.insertBefore(controls,workspace.querySelector('.study-diagram'));
       const button=(text,action,cls='')=>{const el=make('button',cls,text);el.type='button';el.onclick=action;return el;};
-      const playButton=button('Play',()=>{if(playing||currentCheckpoint())pause();else{playing=true;renderControls();schedule();}});
+      const playButton=button('Play',()=>{if(playing||currentCheckpoint())pause();else startPlayback();});
       const nextButton=button('Next step',()=>void next());
       const previousButton=button('Previous step',()=>void seek(Math.max(0,source.index()-1)));
       const jumpButton=button('Next prediction',()=>{justRevealed=null;void seek(core.limit(lesson,progress));});
@@ -40,18 +40,32 @@
       function pause(){playing=false;clearTimeout(timer);timer=null;renderControls();}
       function schedule(){clearTimeout(timer);if(!playing)return;timer=setTimeout(async()=>{if(!active||document.hidden){pause();return;}if(currentCheckpoint()){pause();return;}await window.studyWalkthrough.next();if(playing)schedule();},(window.studyWalkthrough.mode==='detailed'?2000:1000)/speed);}
       window.addEventListener('study:moment-pause',pause);
-      function watch(cp){if(window.studyWalkthrough.mode==='compact'){void reveal(cp);return;}window.studyWalkthrough.refresh();playing=true;render();schedule();}
+      function beginReveal(cp){
+        if(!core.resolved(progress.answers[cp.id]))return false;
+        if(source.index()===cp.beforeIndex)check(cp.before,'before-state');
+        pendingReveal=cp;justRevealed=null;feedback='';return true;
+      }
+      function restorePendingReveal(){pendingReveal=lesson.checkpoints.find(cp=>core.resolved(progress.answers[cp.id])&&cp.beforeIndex<source.index()&&source.index()<cp.afterIndex)||null;}
+      function startPlayback(cp=null){
+        if(!initialized||busy||!active||error||source.index()>=terminal)return;
+        try{
+          const ready=cp||lesson.checkpoints.find(item=>item.beforeIndex===source.index()&&core.resolved(progress.answers[item.id]));
+          if(ready){if(!beginReveal(ready))return;window.studyWalkthrough.refresh();}
+          else if(justRevealed){justRevealed=null;feedback='';}
+          playing=true;render();schedule();
+        }catch(e){error=e.message;pause();render();}
+      }
+      function watch(cp){startPlayback(cp);}
       function announceRun(){send({type:'guided:run',lessonId:lesson.id,version:lesson.version,caseId:lesson.caseId,runId:progress.runId,sequence:++sequence});}
       function persist(){if(!progress)return;progress.cursor=source.index();send({type:'guided:progress',lessonId:lesson.id,version:lesson.version,caseId:lesson.caseId,runId:progress.runId,sequence:++sequence,progress:structuredClone(progress)});}
       function currentCheckpoint(){return lesson.checkpoints.find(cp=>cp.beforeIndex===source.index()&&!core.resolved(progress?.answers[cp.id]));}
       function state(){return core.project(underlying.snapshot());}
       function check(assertions,label){if(!core.matches(state(),assertions))throw Error(`This lesson's ${label} no longer matches the animation. Restart the lesson or use the Visualizer tab.`);}
       function clearTargets(){for(const item of targets){item.el.classList.remove('guided-target');for(const [key,value]of Object.entries(item.attrs))value===null?item.el.removeAttribute(key):item.el.setAttribute(key,value);}targets=[];document.querySelectorAll('.guided-code-focus').forEach(el=>el.classList.remove('guided-code-focus'));}
-      function renderControls(){const index=source.index();for(const el of [playButton,nextButton,previousButton,jumpButton,restartButton,select,range])el.disabled=!initialized||busy||!active||!!error;restartButton.disabled=busy||!active;previousButton.disabled ||=index===0;nextButton.disabled ||=index>=terminal;playButton.disabled ||=index>=terminal;playButton.textContent=playing?'Pause':'Play';playButton.setAttribute('aria-pressed',String(playing));range.value=String(index);position.textContent=`Step ${index+1} · ${lesson.checkpoints.filter(cp=>core.resolved(progress?.answers[cp.id])).length}/3 predictions explored`;range.setAttribute('aria-valuetext',position.textContent);}
+      function renderControls(){const index=source.index();for(const el of [playButton,nextButton,previousButton,jumpButton,restartButton,select,range])el.disabled=!initialized||busy||!active||!!error;restartButton.disabled=busy||!active;previousButton.disabled ||=index===0;nextButton.disabled ||=index>=terminal;playButton.disabled ||=index>=terminal;playButton.textContent=playing?'Pause':'Play';playButton.setAttribute('aria-pressed',String(playing));range.value=String(index);position.textContent=`Step ${index+1} · ${lesson.checkpoints.filter(cp=>core.resolved(progress?.answers[cp.id])).length}/3 predictions explored`;range.setAttribute('aria-valuetext',position.textContent);window.studyWalkthrough.setGate({canAdvance:!!progress&&!currentCheckpoint(),active:initialized&&active&&!busy&&!error,isPlaying:playing,nextStep:()=>next(true)});}
       function basics(cp){const details=make('details','guided-basics');details.append(make('summary','','Explain the code'),make('p','',cp.basics));const labels=cp.codeLines.join(', ');details.append(make('small','',`Look at reference ${cp.codeLines.length===1?'line':'lines'} ${labels}.`));return details;}
       function render(){
         clearTargets();renderControls();panel.replaceChildren();
-        window.studyWalkthrough.setGate({canAdvance:!!progress&&!currentCheckpoint(),active:initialized&&active&&!busy&&!error,isPlaying:playing,nextStep:()=>next(true)});
         if(error){panel.append(make('p','guided-error',error));panel.setAttribute('role','alert');return;}
         panel.removeAttribute('role');if(!initialized){panel.append(make('p','','Restoring your guided lesson…'));return;}
         const heading=make('div','guided-heading');heading.append(make('span','viz-eyebrow','LEARN BY PREDICTING'),make('span','guided-position',`${lesson.checkpoints.filter(cp=>core.resolved(progress.answers[cp.id])).length}/3 explored`));panel.append(heading);
@@ -67,7 +81,8 @@
         const cp=currentCheckpoint();
         if(!cp){const ready=lesson.checkpoints.find(c=>c.beforeIndex===source.index()&&core.resolved(progress.answers[c.id]));if(ready){const answer=progress.answers[ready.id];panel.append(make('h3','',ready.prompt),make('p','guided-feedback',answer.revealed?'Let’s watch it together.':ready.options.find(o=>o.id===answer.choiceId)?.feedback||'Correct. Watch what changes next.'),basics(ready),button('Watch the change',()=>watch(ready),'guided-primary'));}else panel.append(make('p','guided-instruction','Watch the diagram and highlighted code. Use Next prediction to reach the next question.'),make('small','','The guided example is fixed. Explore other inputs in the Visualizer tab.'));return;}
         try{check(cp.before,'prediction state');}catch(e){error=e.message;pause();render();return;}
-        for(const line of cp.codeLines)(document.getElementById(`line-${line}`)||document.getElementById(`l${line}`))?.classList.add('guided-code-focus');
+        const predictionLine=underlying.snapshot().location.line;
+        (document.getElementById(`line-${predictionLine}`)||document.getElementById(`l${predictionLine}`))?.classList.add('guided-code-focus');
         panel.append(make('h3','guided-question',cp.prompt));
         const answer=progress.answers[cp.id]||{attempts:0,hintLevel:0,revealed:false,correct:false};
         const choices=make('div','guided-choices');for(const option of cp.options){const el=button(option.text,()=>choose(cp,option.id),'guided-choice');el.dataset.optionId=option.id;el.setAttribute('aria-pressed',String(answer.choiceId===option.id));choices.append(el);}panel.append(choices);
@@ -83,33 +98,37 @@
         const correct=id===cp.correctOptionId;progress.answers[cp.id]={...old,attempts:Math.min(10000,old.attempts+1),choiceId:id,correct};feedback=cp.options.find(o=>o.id===id).feedback;
         persist();render();
       }
-      async function reveal(cp){
-        if(busy||!active)return;
-        try{check(cp.before,'before-state');await seek(cp.afterIndex,false,true);if(error)return;check(cp.after,'revealed state');justRevealed=cp;feedback='';
-          if(lesson.checkpoints.every(c=>core.resolved(progress.answers[c.id]))&&source.index()>=terminal)progress.completedAt ||=new Date().toISOString();persist();render();
-        }catch(e){error=e.message;pause();render();}
-      }
-      async function seek(target,fromPlay=false,revealing=false){
+      function completeIfReady(){if(source.index()>=terminal&&lesson.checkpoints.every(cp=>core.resolved(progress.answers[cp.id]))){check(lesson.checkpoints.at(-1).after,'final state');progress.completedAt ||=new Date().toISOString();}}
+      async function seek(target){
         if(!initialized||busy||!active)return;
-        if(!fromPlay)pause();const token=generation;busy=true;clearTargets();renderControls();
-        try{const bound=Math.min(terminal,core.limit(lesson,progress));target=Math.max(0,Math.min(Math.floor(target),bound));internal++;await underlying.seek(target);if(token!==generation)return;progress.cursor=source.index();feedback='';if(!revealing)justRevealed=null;if(source.index()>=terminal&&lesson.checkpoints.every(cp=>core.resolved(progress.answers[cp.id]))){check(lesson.checkpoints.at(-1).after,'final state');progress.completedAt ||=new Date().toISOString();}persist();}
+        pause();const token=generation;busy=true;pendingReveal=null;justRevealed=null;clearTargets();renderControls();
+        try{const bound=Math.min(terminal,core.limit(lesson,progress));target=Math.max(0,Math.min(Math.floor(target),bound));internal++;await underlying.seek(target);if(token!==generation)return;progress.cursor=source.index();feedback='';restorePendingReveal();completeIfReady();persist();}
         catch(e){if(token===generation)error=e.message;}
         finally{internal--;if(token===generation){busy=false;if(currentCheckpoint())pause();render();}}
       }
       async function next(fromPlay=false){
-        if(!initialized||busy||!active)return;
-        if(justRevealed){pause();justRevealed=null;render();return;}
-        if(currentCheckpoint()){pause();render();return;}
-        const ready=lesson.checkpoints.find(cp=>cp.beforeIndex===source.index()&&core.resolved(progress.answers[cp.id]));if(ready){pause();await reveal(ready);return;}
-        await seek(source.index()+1,fromPlay);if(source.index()>=terminal)pause();
+        if(!initialized||busy||!active||error)return false;
+        if(!fromPlay)pause();
+        if(currentCheckpoint()||source.index()>=terminal){pause();render();return false;}
+        const token=generation,before=source.index();let entered=false;
+        try{
+          const ready=lesson.checkpoints.find(cp=>cp.beforeIndex===before&&core.resolved(progress.answers[cp.id]));
+          if(ready)beginReveal(ready);
+          justRevealed=null;busy=true;clearTargets();renderControls();internal++;entered=true;
+          await underlying.next();if(token!==generation)return false;
+          if(source.index()!==before+1)throw Error('This lesson did not advance by one instruction. Restart the lesson or use the Visualizer tab.');
+          if(pendingReveal&&source.index()===pendingReveal.afterIndex){check(pendingReveal.after,'revealed state');justRevealed=pendingReveal;pendingReveal=null;pause();}
+          completeIfReady();feedback='';persist();return true;
+        }catch(e){if(token===generation){error=e.message;pause();}return false;}
+        finally{if(entered)internal--;if(token===generation){busy=false;if(currentCheckpoint()||source.index()>=terminal)pause();render();}}
       }
       async function initialize(saved,isRestart=false){
-        generation++;pause();busy=true;initialized=false;error='';feedback='';justRevealed=null;clearTargets();render();
+        generation++;pause();busy=true;initialized=false;error='';feedback='';justRevealed=null;pendingReveal=null;clearTargets();render();
         const token=generation;
         progress=isRestart?saved:core.restore(lesson,saved);priorVersion=!!saved&&saved.lessonVersion!==lesson.version;
         try{internal++;resetting=true;try{if(loader)loader(...lesson.loader.args);else underlying.reset();}finally{resetting=false;}initialValues=state().values;
           if(lesson.expectedInput&&JSON.stringify(initialValues)!==JSON.stringify(lesson.expectedInput))throw Error('The guided example does not match this lesson. Use the Visualizer tab while this content is updated.');
-          await underlying.seek(progress.cursor);if(token!==generation)return;initialized=true;announceRun();persist();
+          await underlying.seek(progress.cursor);if(token!==generation)return;restorePendingReveal();initialized=true;announceRun();persist();
         }catch(e){if(token===generation)error=e.message;}
         finally{internal--;if(token===generation){busy=false;render();}}
       }

@@ -5,6 +5,19 @@ export interface VisualVariable { id: string; name: string; scope: string; value
 export interface VisualLocation { line: number; column: number; endLine: number; endColumn: number; }
 export interface VisualStackFrame { id: number; name: string; location: VisualLocation; variables: VisualVariable[]; }
 export interface VisualChange { name: string; before?: VisualValue; after?: VisualValue; objectId?: string; key?: string; }
+export interface ReferenceInstruction { line: number; phase: string; }
+/** One committed reference instruction, retained for the current input/run. */
+export interface ReferenceTransition {
+  fromIndex: number;
+  toIndex: number;
+  instruction: ReferenceInstruction;
+  beforeInputs: Record<string, string>;
+  afterInputs: Record<string, string>;
+  context: Record<string, null | boolean | number | string>;
+  changes: VisualChange[];
+  action: string;
+  resultCaption?: string;
+}
 export type OperationKind = 'read' | 'lookup' | 'compare' | 'calculate' | 'write' | 'copy' | 'swap' | 'remove' | 'pointer' | 'call' | 'return' | 'control';
 export interface VisualOperation {
   kind: OperationKind;
@@ -32,6 +45,7 @@ export interface VisualizationFrame {
 }
 export interface LessonAdapter {
   snapshot(): VisualizationFrame;
+  currentTransition?(): ReferenceTransition | null;
   next(): void;
   previous(): void;
   reset(): void;

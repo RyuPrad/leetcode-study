@@ -627,7 +627,7 @@
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">MyHashSet</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>() {</div>
 <div id="line-3" class="code-line">    <span class="kw">this</span>.size = <span class="nm">8</span>;</div>
-<div id="line-4" class="code-line">    <span class="kw">this</span>.buckets = <span class="vr">Array</span>.<span class="fn">from</span>({ length: <span class="kw">this</span>.size }, () => []);</div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.buckets = <span class="vr">Array</span>.<span class="fn">from</span>({ length: <span class="kw">this</span>.size }, () =&gt; []);</div>
 <div id="line-5" class="code-line">  }</div>
 <div id="line-6" class="code-line">  <span class="fn">hash</span>(key) {</div>
 <div id="line-7" class="code-line">    <span class="kw">return</span> key % <span class="kw">this</span>.size;</div>
@@ -640,7 +640,7 @@
 <div id="line-14" class="code-line">  }</div>
 <div id="line-15" class="code-line">  <span class="fn">remove</span>(key) {</div>
 <div id="line-16" class="code-line">    <span class="kw">const</span> idx = <span class="kw">this</span>.<span class="fn">hash</span>(key);</div>
-<div id="line-17" class="code-line">    <span class="kw">this</span>.buckets[idx] = <span class="kw">this</span>.buckets[idx].<span class="fn">filter</span>(k => k !== key);</div>
+<div id="line-17" class="code-line">    <span class="kw">this</span>.buckets[idx] = <span class="kw">this</span>.buckets[idx].<span class="fn">filter</span>(k =&gt; k !== key);</div>
 <div id="line-18" class="code-line">  }</div>
 <div id="line-19" class="code-line">  <span class="fn">contains</span>(key) {</div>
 <div id="line-20" class="code-line">    <span class="kw">const</span> idx = <span class="kw">this</span>.<span class="fn">hash</span>(key);</div>
@@ -872,173 +872,10 @@
     }
 
     function buildSteps(opList) {
-      const buckets = Array.from({ length: SIZE }, () => []);
-      const built = [];
-      const traceRows = [];
-
-      function snapshot(extra) {
-        const base = {
-          buckets: cloneBuckets(buckets),
-          key: null,
-          idx: null,
-          ans: "pending",
-          method: extra.method,
-          opNum: extra.opNum,
-          lines: extra.lines,
-          narration: extra.narration,
-          targetIdx: (extra.targetIdx === undefined) ? null : extra.targetIdx,
-          scanPos: (extra.scanPos === undefined) ? null : extra.scanPos,
-          matchKey: (extra.matchKey === undefined) ? null : extra.matchKey,
-          justAdded: (extra.justAdded === undefined) ? null : extra.justAdded,
-          removingKey: (extra.removingKey === undefined) ? null : extra.removingKey,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        };
-        if (extra.key !== undefined) base.key = extra.key;
-        if (extra.idx !== undefined) base.idx = extra.idx;
-        if (extra.ans !== undefined) base.ans = extra.ans;
-        built.push(base);
-      }
-
-      opList.forEach((op, opNum) => {
-        const key = op.key;
-
-        if (op.method === "add") {
-          // call entry
-          snapshot({
-            method: "add", opNum, key, lines: [9],
-            narration: "<b>add(" + key + ")</b> — insert key <b>" + key + "</b> into the set if it is not already present."
-          });
-          // compute hash
-          const idx = key % SIZE;
-          snapshot({
-            method: "add", opNum, key, idx, lines: [10, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. This selects bucket <b>" + idx + "</b>."
-          });
-          // scan the chain (includes check)
-          const chain = buckets[idx];
-          let found = false;
-          if (chain.length === 0) {
-            snapshot({
-              method: "add", opNum, key, idx, lines: [11], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty, so <code>includes(" + key + ")</code> is <b style=\"color:#569cd6\">false</b>. The key is new."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p] === key;
-              snapshot({
-                method: "add", opNum, key, idx, lines: [11], targetIdx: idx, scanPos: p,
-                matchKey: isMatch ? key : null,
-                narration: "Scan the chain: compare <b>" + chain[p] + "</b> with key <b>" + key + "</b> &rarr; " +
-                  (isMatch
-                    ? "<b style=\"color:#e24b4a\">match</b>. <code>includes(" + key + ")</code> is <b>true</b>, so a Set ignores this duplicate add."
-                    : "no match, keep scanning.")
-              });
-              if (isMatch) { found = true; break; }
-            }
-          }
-          // push or skip
-          if (!found) {
-            chain.push(key);
-            snapshot({
-              method: "add", opNum, key, idx, lines: [12], targetIdx: idx, justAdded: key,
-              narration: "<code>buckets[" + idx + "].push(" + key + ")</code> — append the new key to the end of the chain."
-            });
-            traceRows.push({ op: "add(" + key + ")", key, idx, result: "added" });
-          } else {
-            traceRows.push({ op: "add(" + key + ")", key, idx, result: "dup (ignored)" });
-          }
-          // return (void)
-          snapshot({
-            method: "add", opNum, key, idx, lines: [14], targetIdx: idx, result: "void",
-            narration: found
-              ? "add(" + key + ") returns. The key was already present, so the set is unchanged."
-              : "add(" + key + ") returns. The key now lives in bucket <b>" + idx + "</b>."
-          });
-
-        } else if (op.method === "remove") {
-          snapshot({
-            method: "remove", opNum, key, lines: [15],
-            narration: "<b>remove(" + key + ")</b> — delete key <b>" + key + "</b> from the set if it is present."
-          });
-          const idx = key % SIZE;
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [16, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. Look in bucket <b>" + idx + "</b>."
-          });
-          const chain = buckets[idx];
-          let existed = chain.includes(key);
-          // scan to show filtering decisions
-          if (chain.length === 0) {
-            snapshot({
-              method: "remove", opNum, key, idx, lines: [17], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty. <code>filter</code> keeps it empty — nothing to remove."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p] === key;
-              snapshot({
-                method: "remove", opNum, key, idx, lines: [17], targetIdx: idx, scanPos: p,
-                matchKey: isMatch ? key : null, removingKey: isMatch ? key : null,
-                narration: "<code>filter(k => k !== " + key + ")</code>: keep <b>" + chain[p] + "</b>? " +
-                  (isMatch
-                    ? "<b style=\"color:#e24b4a\">No</b> — " + chain[p] + " === " + key + ", so it is dropped."
-                    : "Yes — " + chain[p] + " !== " + key + ", so it stays.")
-              });
-            }
-          }
-          buckets[idx] = chain.filter(k => k !== key);
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [17], targetIdx: idx,
-            narration: existed
-              ? "Bucket <b>" + idx + "</b> is rebuilt without <b>" + key + "</b>."
-              : "Key <b>" + key + "</b> was not present; bucket <b>" + idx + "</b> is unchanged."
-          });
-          traceRows.push({ op: "remove(" + key + ")", key, idx, result: existed ? "removed" : "absent" });
-          snapshot({
-            method: "remove", opNum, key, idx, lines: [18], targetIdx: idx, result: "void",
-            narration: "remove(" + key + ") returns. " + (existed ? "The key is gone." : "Nothing changed.")
-          });
-
-        } else { // contains
-          snapshot({
-            method: "contains", opNum, key, lines: [19],
-            narration: "<b>contains(" + key + ")</b> — report whether key <b>" + key + "</b> is in the set."
-          });
-          const idx = key % SIZE;
-          snapshot({
-            method: "contains", opNum, key, idx, lines: [20, 6, 7], targetIdx: idx,
-            narration: "Compute <code>idx = hash(" + key + ") = " + key + " % " + SIZE + " = <b>" + idx + "</b></code>. Search bucket <b>" + idx + "</b>."
-          });
-          const chain = buckets[idx];
-          let found = false;
-          if (chain.length === 0) {
-            snapshot({
-              method: "contains", opNum, key, idx, lines: [21], targetIdx: idx, scanPos: -1,
-              narration: "Bucket <b>" + idx + "</b> is empty, so <code>includes(" + key + ")</code> is <b style=\"color:#569cd6\">false</b>."
-            });
-          } else {
-            for (let p = 0; p < chain.length; p++) {
-              const isMatch = chain[p] === key;
-              snapshot({
-                method: "contains", opNum, key, idx, lines: [21], targetIdx: idx, scanPos: p,
-                matchKey: isMatch ? key : null,
-                narration: "Scan the chain: compare <b>" + chain[p] + "</b> with <b>" + key + "</b> &rarr; " +
-                  (isMatch ? "<b style=\"color:#6a9955\">match found</b>." : "no match, keep scanning.")
-              });
-              if (isMatch) { found = true; break; }
-            }
-          }
-          traceRows.push({ op: "contains(" + key + ")", key, idx, result: String(found) });
-          snapshot({
-            method: "contains", opNum, key, idx, ans: found, lines: [21], targetIdx: idx,
-            result: found ? "true" : "false",
-            narration: "<code>contains(" + key + ")</code> returns <b style=\"color:" + (found ? "#6a9955" : "#e24b4a") + "\">" + found + "</b>."
-          });
-        }
-      });
-
-      return built;
+      const buckets=Array.from({length:SIZE},()=>[]),built=[],traceRows=[];let method="init",opNum=-1,key=null,idx=null;
+      const snap=(line,narration,extra={})=>built.push({buckets:cloneBuckets(buckets),key,idx,ans:"pending",method,opNum,executedLine:line,lines:line?[line]:[1],narration,targetIdx:idx,scanPos:null,matchKey:null,justAdded:null,removingKey:null,result:"void",traceLen:traceRows.length,...extra});
+      snap(null,"Ready to operate on the hash set.");snap(3,"Set the bucket count.");snap(4,"Create the empty buckets.");
+      opList.forEach((op,num)=>{opNum=num;method=op.method;key=op.key;idx=null;const callLine=method==='add'?9:method==='remove'?15:19,assignLine=method==='add'?10:method==='remove'?16:20;snap(callLine,"Call "+method+".");snap(6,"Call hash.");const hash=key%SIZE;snap(7,"Return the bucket index.",{hash});idx=hash;snap(assignLine,"Assign the bucket index.");const chain=buckets[idx],found=chain.includes(key);if(method==='add'){snap(11,"Check whether this key is absent.",{matchKey:found?key:null});if(!found){chain.push(key);snap(12,"Append the new key.",{justAdded:key});}traceRows.push({op:'add('+key+')',key,idx,result:found?'dup (ignored)':'added'});}else if(method==='remove'){buckets[idx]=chain.filter(k=>k!==key);traceRows.push({op:'remove('+key+')',key,idx,result:found?'removed':'absent'});snap(17,"Filter out the key.",{removingKey:found?key:null});}else{traceRows.push({op:'contains('+key+')',key,idx,result:String(found)});snap(21,"Return whether the key is in this bucket.",{ans:found,result:found?'true':'false',matchKey:found?key:null});}});return built;
     }
 
     function loadExample(exNum) {
@@ -1390,8 +1227,8 @@
       spec: {"number":705,"title":"Design HashSet","topic":"Array & Hashing","why":"Each operation changes or queries membership for one key; repeated insertion must not create a second copy.","meanings":{"size":"number of buckets (fixed at 8)","buckets":"array of `size` chains; each chain is a list of keys (separate chaining)","key":"the value being added, removed, or looked up","idx":"bucket index for a key, computed as `key % size`"},"entityClasses":["hud-item","bucket-index","bucket-chain","pill","buckets"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({SIZE, ops, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({SIZE, ops, masterTrace, ...(steps[position] || {})}),
+      read: () => ({SIZE, ops,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({SIZE, ops,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

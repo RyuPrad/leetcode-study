@@ -940,23 +940,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      mode = s.mode;
-      strs = [...s.strs];
-      encoded = s.encoded;
-      decoded = [...s.decoded];
-      index = s.index;
-      i = s.i;
-      j = s.j;
-      currentStr = s.currentStr;
-      len = s.len;
-      start = s.start;
-      execState = s.execState;
-      activeExample = s.activeExample;
-      trace = s.trace.map(row => ({ ...row }));
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+mode = snapshot.mode;
+strs = [...snapshot.strs];
+encoded = snapshot.encoded;
+decoded = [...snapshot.decoded];
+index = snapshot.index;
+i = snapshot.i;
+j = snapshot.j;
+currentStr = snapshot.currentStr;
+len = snapshot.len;
+start = snapshot.start;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -1017,12 +1036,13 @@
       switch (execState) {
         case "INIT":
           decoded = [];
-          i = 0;
+
           j = 0;
           len = undefined;
           start = undefined;
-          execState = "DEC_LOOP_CHECK";
+          execState = "DEC_INIT_I";
           break;
+        case "DEC_INIT_I": i = 0; execState = "DEC_LOOP_CHECK"; break;
         case "DEC_LOOP_CHECK":
           if (i < encoded.length) {
             j = i;
@@ -1033,10 +1053,14 @@
           break;
         case "DEC_FIND_HASH":
           if (encoded[j] !== "#") {
-            j++;
+            execState = "DEC_ADVANCE_J";
           } else {
             execState = "DEC_PARSE_LEN";
           }
+          break;
+        case "DEC_ADVANCE_J":
+          j++;
+          execState = "DEC_FIND_HASH";
           break;
         case "DEC_PARSE_LEN":
           len = Number(encoded.slice(i, j));
@@ -1308,6 +1332,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
       if (activeExample > 0) {
@@ -1351,25 +1378,27 @@
 
       if (mode === "encode") {
         switch (execState) {
-          case "INIT": highlightLines([3]); narrate('Start with an empty encoded string: <code>encoded = ""</code>.'); break;
-          case "ENC_LOOP_CHECK": highlightLines([4]); narrate(index < strs.length ? 'Loop to the next string. Current index is <b>' + index + '</b>.' : 'All strings are processed. Time to return the encoded string.'); break;
-          case "ENC_READ": highlightLines([4]); narrate('Read <code>strs[' + index + ']</code>. Its value is <b>"' + esc(currentStr) + '"</b>, and its length is <b>' + len + '</b>.'); break;
-          case "ENC_APPEND": highlightLines([5]); narrate('Append <code>length + "#" + string</code>. This makes the next piece: <b>' + esc(len + "#" + currentStr) + '</b>.'); break;
-          case "ENC_ADVANCE": highlightLines([6,4]); narrate('Move to the next string. The encoded stream is growing safely, even if the string contains <code>#</code> or is empty.'); break;
-          case "ENC_RETURN": highlightLines([7]); narrate('Return the final encoded string.'); break;
-          case "END": highlightLines([7]); narrate('✓ Done. Encoding is complete.'); break;
+          case "INIT":  narrate('Start with an empty encoded string: <code>encoded = ""</code>.'); break;
+          case "ENC_LOOP_CHECK":  narrate(index < strs.length ? 'Loop to the next string. Current index is <b>' + index + '</b>.' : 'All strings are processed. Time to return the encoded string.'); break;
+          case "ENC_READ":  narrate('Read <code>strs[' + index + ']</code>. Its value is <b>"' + esc(currentStr) + '"</b>, and its length is <b>' + len + '</b>.'); break;
+          case "ENC_APPEND":  narrate('Append <code>length + "#" + string</code>. This makes the next piece: <b>' + esc(len + "#" + currentStr) + '</b>.'); break;
+          case "ENC_ADVANCE":  narrate('Move to the next string. The encoded stream is growing safely, even if the string contains <code>#</code> or is empty.'); break;
+          case "ENC_RETURN":  narrate('Return the final encoded string.'); break;
+          case "END":  narrate('✓ Done. Encoding is complete.'); break;
         }
       } else {
         switch (execState) {
-          case "INIT": highlightLines([11,12]); narrate('Create <code>decoded = []</code> and start pointer <code>i = 0</code>.'); break;
-          case "DEC_LOOP_CHECK": highlightLines([13]); narrate(i < encoded.length ? 'Since <code>i &lt; s.length</code>, there is another encoded string to decode.' : 'The pointer reached the end of the encoded stream. Return the decoded array.'); break;
-          case "DEC_FIND_HASH": highlightLines([14,15]); narrate(encoded[j] === "#" ? 'Found the delimiter <code>#</code> at <b>j = ' + j + '</b>.' : 'Move <code>j</code> forward until it reaches the delimiter <code>#</code>. Current <code>j = ' + j + '</code>.'); break;
-          case "DEC_PARSE_LEN": highlightLines([16]); narrate('Parse the number before <code>#</code>: <code>len = Number(s.slice(i, j)) = ' + len + '</code>.'); break;
-          case "DEC_START": highlightLines([17]); narrate('The actual string starts right after <code>#</code>, so <code>start = j + 1 = ' + start + '</code>.'); break;
-          case "DEC_SLICE": highlightLines([18]); narrate('Slice exactly <b>' + len + '</b> characters. This is why special characters and empty strings work.'); break;
-          case "DEC_ADVANCE": highlightLines([19]); narrate('Move <code>i</code> to the beginning of the next encoded string: <code>i = start + len</code>.'); break;
-          case "DEC_RETURN": highlightLines([21]); narrate('Return the decoded array.'); break;
-          case "END": highlightLines([21]); narrate('✓ Done. Decoding restored the original array exactly.'); break;
+          case "INIT":  narrate('Create the decoded output array.'); break;
+          case "DEC_INIT_I":  narrate('Initialize i = 0.'); break;
+          case "DEC_LOOP_CHECK":  narrate(i < encoded.length ? 'Since <code>i &lt; s.length</code>, there is another encoded string to decode.' : 'The pointer reached the end of the encoded stream. Return the decoded array.'); break;
+          case "DEC_FIND_HASH":  narrate(encoded[j] === "#" ? 'Found the delimiter <code>#</code> at <b>j = ' + j + '</b>.' : 'Check whether encoded[' + j + '] is the length delimiter.'); break;
+          case "DEC_ADVANCE_J":  narrate('The character is not <code>#</code>, so advance <code>j</code> to ' + (j + 1) + '.'); break;
+          case "DEC_PARSE_LEN":  narrate('Parse the number before <code>#</code>: <code>len = Number(s.slice(i, j)) = ' + len + '</code>.'); break;
+          case "DEC_START":  narrate('The actual string starts right after <code>#</code>, so <code>start = j + 1 = ' + start + '</code>.'); break;
+          case "DEC_SLICE":  narrate('Slice exactly <b>' + len + '</b> characters. This is why special characters and empty strings work.'); break;
+          case "DEC_ADVANCE":  narrate('Move <code>i</code> to the beginning of the next encoded string: <code>i = start + len</code>.'); break;
+          case "DEC_RETURN":  narrate('Return the decoded array.'); break;
+          case "END":  narrate('✓ Done. Decoding restored the original array exactly.'); break;
         }
       }
 
@@ -1378,13 +1407,145 @@
       updateHud();
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ if (mode === "encode") {
+  switch (execState) {
+    case "INIT":
+      return {
+        line: 3,
+        phase: execState
+      };
+    case "ENC_LOOP_CHECK":
+      return {
+        line: 4,
+        phase: execState
+      };
+    case "ENC_READ":
+      return {
+        line: 4,
+        phase: execState
+      };
+    case "ENC_APPEND":
+      return {
+        line: 5,
+        phase: execState
+      };
+    case "ENC_ADVANCE":
+      return {
+        line: 4,
+        phase: execState
+      };
+    case "ENC_RETURN":
+      return {
+        line: 7,
+        phase: execState
+      };
+    case "END":
+      return {
+        line: 7,
+        phase: execState
+      };
+  }
+} else {
+  switch (execState) {
+    case "INIT":
+      return {
+        line: 11,
+        phase: execState
+      };
+    case "DEC_INIT_I":
+      return {
+        line: 12,
+        phase: execState
+      };
+    case "DEC_LOOP_CHECK":
+      return {
+        line: 13,
+        phase: execState
+      };
+    case "DEC_FIND_HASH":
+      return {
+        line: 14,
+        phase: execState
+      };
+    case "DEC_ADVANCE_J":
+      return {
+        line: 15,
+        phase: execState
+      };
+    case "DEC_PARSE_LEN":
+      return {
+        line: 16,
+        phase: execState
+      };
+    case "DEC_START":
+      return {
+        line: 17,
+        phase: execState
+      };
+    case "DEC_SLICE":
+      return {
+        line: 18,
+        phase: execState
+      };
+    case "DEC_ADVANCE":
+      return {
+        line: 19,
+        phase: execState
+      };
+    case "DEC_RETURN":
+      return {
+        line: 21,
+        phase: execState
+      };
+    case "END":
+      return {
+        line: 21,
+        phase: execState
+      };
+  }
+}
+ return null;
+}
+
     document.getElementById("custom-input").value = JSON.stringify(examples[1]);
     strs = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":271,"title":"Encode and Decode Strings","topic":"Array & Hashing","why":"A length prefix specifies exactly how many characters belong to the next string, including separator characters.","meanings":{"strs":"strings to encode","encoded":"length-prefixed encoded string","decoded":"decoded string array","i":"read pointer in encoded string","len":"parsed word length"},"entityClasses":["hud-item","chars","legend-item","charEnd","charStart"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({mode, strs, encoded, decoded, index, i, j, currentStr, len, start, execState, ...({})}),

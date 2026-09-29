@@ -947,24 +947,46 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      s = prev.s;
-      left = prev.left;
-      right = prev.right;
-      comparedCount = prev.comparedCount;
-      skippedLeft = prev.skippedLeft;
-      skippedRight = prev.skippedRight;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      matchedIndices = new Set(prev.matchedIndices);
-      skippedIndices = new Set(prev.skippedIndices);
-      mismatchPair = prev.mismatchPair ? { ...prev.mismatchPair } : null;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+s = snapshot.s;
+left = snapshot.left;
+right = snapshot.right;
+comparedCount = snapshot.comparedCount;
+skippedLeft = snapshot.skippedLeft;
+skippedRight = snapshot.skippedRight;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+matchedIndices = new Set(snapshot.matchedIndices);
+skippedIndices = new Set(snapshot.skippedIndices);
+mismatchPair = snapshot.mismatchPair ? {
+  ...snapshot.mismatchPair
+} : null;
+lastAction = snapshot.lastAction;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -972,11 +994,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = s.length - 1;
-          lastAction = "Initialized left at 0 and right at s.length - 1.";
-          execState = "LOOP_CHECK";
-          break;
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = s.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (left < right) {
@@ -1065,8 +1093,13 @@
 
         case "MOVE_INWARD":
           left++;
+          lastAction = "Moved left inward to " + left + ".";
+          execState = "MOVE_RIGHT_INWARD";
+          break;
+
+        case "MOVE_RIGHT_INWARD":
           right--;
-          lastAction = "Moved both pointers inward.";
+          lastAction = "Moved right inward to " + right + ".";
           execState = "LOOP_CHECK";
           break;
 
@@ -1166,7 +1199,7 @@
       const area = document.createElement("div");
       area.className = "compare-area";
 
-      if (execState === "COMPARE" || execState === "MOVE_INWARD" || execState === "RETURN_FALSE" || mismatchPair) {
+      if (execState === "COMPARE" || execState === "MOVE_INWARD" || execState === "MOVE_RIGHT_INWARD" || execState === "RETURN_FALSE" || mismatchPair) {
         const leftIdx = mismatchPair ? mismatchPair.left : left;
         const rightIdx = mismatchPair ? mismatchPair.right : right;
         const l = s[leftIdx] || "";
@@ -1352,45 +1385,120 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start by placing <code>left</code> at the first character and <code>right</code> at the last character.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([5]);
+
           narrate(left < right ? 'Check <code>left &lt; right</code>. Since it is true, continue scanning.' : 'The pointers have met or crossed, so every valid pair matched.');
           break;
         case "SKIP_LEFT":
-          highlightLines([6, 20, 21, 22, 23]);
+
           narrate(left < right && !isAlphaNumeric(s[left]) ? 'The left character is not alphanumeric, so increment <code>left</code>.' : 'The left character is valid. Now check the right side.');
           break;
         case "SKIP_RIGHT":
-          highlightLines([7, 20, 21, 22, 23]);
+
           narrate(left < right && !isAlphaNumeric(s[right]) ? 'The right character is not alphanumeric, so decrement <code>right</code>.' : 'The right character is valid. Now compare both characters.');
           break;
         case "COMPARE":
-          highlightLines([9]);
+
           narrate('Compare <code>s[left].toLowerCase()</code> against <code>s[right].toLowerCase()</code>.');
           break;
         case "MOVE_INWARD":
-          highlightLines([13, 14]);
-          narrate('The characters matched. Move both pointers inward and keep checking.');
+
+          narrate('The characters matched. Move <code>left</code> inward to ' + left + '.');
+          break;
+        case "MOVE_RIGHT_INWARD":
+
+          narrate('Now move <code>right</code> inward to ' + right + ', then compare the next pair.');
           break;
         case "RETURN_FALSE":
-          highlightLines([9, 10]);
+
           narrate('Mismatch found, so the function returns <code>false</code> immediately.');
           break;
         case "RETURN_TRUE":
-          highlightLines([17]);
+
           narrate('No mismatch was found. The function returns <code>true</code>.');
           break;
         case "END":
-          highlightLines(ans ? [17] : [10]);
+
           narrate(ans ? '✓ Done. This string is a valid palindrome.' : '✕ Done. This string is not a palindrome.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "SKIP_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "SKIP_RIGHT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "MOVE_INWARD":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "MOVE_RIGHT_INWARD":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans ? [17] : [10])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1419,8 +1527,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":125,"title":"Valid Palindrome","topic":"Two Pointers","why":"Skip non-alphanumeric characters and compare normalized characters from the two ends.","meanings":{"s":"input string","left":"left pointer","right":"right pointer","ans":"true if valid palindrome"},"entityClasses":["hud-item","char-col","char-index","char-box","compare-pill","cleaned-char","legend-item","chars"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, left, right, comparedCount, skippedLeft, skippedRight, ans, execState, matchedIndices, skippedIndices, mismatchPair, lastAction, ...({})}),

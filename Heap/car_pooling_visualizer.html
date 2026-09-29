@@ -1009,9 +1009,9 @@
 
       // sort by start (index 1)
       const trips = rawTrips.map(t => [...t]);
-      trips.sort((a, b) => a[1] - b[1]);
 
-      let cur = 0;
+
+      let cur = null;
       let result = null;
 
       function snap(extra) {
@@ -1029,14 +1029,15 @@
           result: result,
           over: false
         };
-        steps.push(Object.assign(base, extra));
+        steps.push(Object.assign(base, extra, {executedLine: extra.executedLine === null ? null : extra.codeLines[0]}));
       }
 
       snap({
-        codeLines: [1],
+        codeLines: [], executedLine: null,
         narration: "Can the car complete all trips without exceeding <b>capacity = " + capacity + "</b>? Sort trips by start, use a <b>min-heap keyed by end</b> to drop off passengers.",
         phase: "init"
       });
+      trips.sort((a, b) => a[1] - b[1]);
       snap({
         codeLines: [2],
         narration: "Sort trips by <b>start</b> (index 1): " + (trips.length ? trips.map(fmtTrip).join(", ") : "[]") + ".",
@@ -1045,8 +1046,10 @@
 
       const heap = new MinHeap();
 
+      snap({codeLines: [3], narration: "Create the empty drop-off heap.", phase: "init"});
+      cur = 0;
       snap({
-        codeLines: [3, 4],
+        codeLines: [4],
         narration: "Create an empty <b>min-heap</b> (compares by <code>el[0]</code> = end) and set <b>cur = 0</b> passengers on board.",
         phase: "init"
       });
@@ -1115,6 +1118,7 @@
           });
           const released = heap.pop();
           cur -= released[1];
+          snap({tripIdx: t, heap: heap.data.map(x=>[...x]), codeLines: [7], narration: "Subtract the released passengers.", phase: "trip"});
           trace.push({ trip: fmtTrip(trips[t]), released: fmtNode(released), cur: cur, ok: "yes" });
         }
         recorder = null;
@@ -1233,7 +1237,7 @@
       snap({
         heap: heap.data.map(x => [...x]),
         highlight: {},
-        codeLines: [13, 14],
+        codeLines: [13],
         narration: "All trips processed and capacity never exceeded. Return <b style=\"color:#6a9955\">true</b>.",
         phase: "done",
         result: true
@@ -1648,7 +1652,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({recorder, trips, capacity, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({recorder, trips, capacity, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({recorder, trips, capacity, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

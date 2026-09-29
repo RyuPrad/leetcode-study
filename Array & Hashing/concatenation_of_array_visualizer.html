@@ -708,6 +708,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -980,23 +981,12 @@
     }
 
     function loadCustom() {
-      const rawNums = document.getElementById("custom-input").value.trim();
-      if (rawNums === "") {
-        nums = [];
-      } else {
-        nums = rawNums
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-      if (nums.some(Number.isNaN)) {
-        alert("Please enter only numbers. Example nums: 1, 2, 1");
-        return;
-      }
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false,  label:'Numbers'}); nums = parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       res = new Array(nums.length * 2).fill(undefined);
@@ -1034,21 +1024,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      res = [...s.res];
-      i = s.i;
-      value = s.value;
-      firstIndex = s.firstIndex;
-      secondIndex = s.secondIndex;
-      resultStatus = s.resultStatus;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      justWroteFirst = s.justWroteFirst;
-      justWroteSecond = s.justWroteSecond;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+res = [...snapshot.res];
+i = snapshot.i;
+value = snapshot.value;
+firstIndex = snapshot.firstIndex;
+secondIndex = snapshot.secondIndex;
+resultStatus = snapshot.resultStatus;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+justWroteFirst = snapshot.justWroteFirst;
+justWroteSecond = snapshot.justWroteSecond;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -1388,6 +1395,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1406,11 +1416,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Create <code>res</code> with enough space for two copies of <code>nums</code>: <b>nums.length * 2</b>.");
           break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (i < nums.length) {
             narrate("The loop continues because <b>i = " + i + "</b> is still inside <code>nums</code>.");
           } else {
@@ -1418,27 +1428,27 @@
           }
           break;
         case "READ_VALUE":
-          highlightLines([4]);
+
           narrate("Focus on <code>nums[" + i + "]</code>. The value we need to copy twice is <b>" + value + "</b>.");
           break;
         case "WRITE_FIRST":
-          highlightLines([5]);
+
           narrate("Write the first copy: <code>res[" + firstIndex + "] = nums[" + i + "]</code>, so <b>res[" + firstIndex + "] = " + value + "</b>.");
           break;
         case "WRITE_SECOND":
-          highlightLines([6]);
+
           narrate("Write the second copy using the offset <code>i + nums.length</code>: <b>" + i + " + " + nums.length + " = " + secondIndex + "</b>.");
           break;
         case "ADVANCE_LOOP":
-          highlightLines([7, 4]);
+
           narrate("Both copies for this value are done. Move to the next index.");
           break;
         case "RETURN":
-          highlightLines([9]);
+
           narrate("Return the completed array: <b>" + escapeHtml(formatResPlain()) + "</b>.");
           break;
         case "END":
-          highlightLines([9]);
+
           narrate("✓ Done. The answer is two copies of the original array: <b>" + escapeHtml(formatResPlain()) + "</b>.");
           break;
       }
@@ -1494,12 +1504,89 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "READ_VALUE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WRITE_FIRST":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "WRITE_SECOND":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ADVANCE_LOOP":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 9,
+      phase: execState
+    };
+}
+ return null;
+}
+
     nums = [...examples[1].nums];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":1929,"title":"Concatenation of Array","topic":"Array & Hashing","why":"Each input value is copied to its original index and to that index plus the input length.","meanings":{"nums":"input array","res":"concatenated output","i":"loop index","n":"length of nums"},"entityClasses":["hud-item","cell","divider-cell","op-pill","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, res, i, value, firstIndex, secondIndex, resultStatus, execState, justWroteFirst, justWroteSecond, ...({})}),

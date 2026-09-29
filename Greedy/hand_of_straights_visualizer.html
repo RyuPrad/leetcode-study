@@ -807,107 +807,19 @@
       return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([v, c]) => [v, c]);
     }
 
-    function buildSteps(handArg, gs) {
-      const out = [];
-      const handCopy = handArg.slice();
-
-      function record(s) {
-        out.push({
-          line: s.line.slice(),
-          countSnap: s.count ? snapMap(s.count) : [],
-          keys: s.keys ? s.keys.slice() : [],
-          start: (s.start === undefined ? null : s.start),
-          need: (s.need === undefined ? null : s.need),
-          card: (s.card === undefined ? null : s.card),
-          ans: s.ans,
-          phase: s.phase,
-          narr: s.narr,
-          activeCards: s.activeCards ? s.activeCards.slice() : [],
-          failCard: (s.failCard === undefined ? null : s.failCard),
-          trace: s.trace ? s.trace.map(r => ({ ...r })) : [],
-          divisible: s.divisible
-        });
-      }
-
-      const trace = [];
-      const remainderOk = (handCopy.length % gs === 0);
-
-      if (!remainderOk) {
-        record({
-          line: [2], ans: false, phase: "divfail",
-          narr: "hand.length = " + handCopy.length + " is <b>not divisible</b> by groupSize = " + gs +
-                ", so the cards can never split evenly. Return <b style=\"color:#e24b4a\">false</b>.",
-          divisible: false, trace
-        });
-        return out;
-      }
-
-      record({
-        line: [2], ans: "pending", phase: "divok",
-        narr: "hand.length = " + handCopy.length + " <b>is divisible</b> by groupSize = " + gs +
-              ". The size check passes, so we keep going.",
-        divisible: true, trace
-      });
-
-      const count = new Map();
-      for (const c of handCopy) count.set(c, (count.get(c) || 0) + 1);
-      record({
-        line: [3, 4], count, ans: "pending", phase: "counted",
-        narr: "Tally each card value into the <b>count</b> Map. Each bar shows how many copies of that value remain.",
-        trace
-      });
-
-      const keys = [...count.keys()].sort((a, b) => a - b);
-      record({
-        line: [5], count, keys, ans: "pending", phase: "keys",
-        narr: "Sort the distinct values ascending: <b>keys = [" + keys.join(", ") + "]</b>. We always start groups from the smallest available card.",
-        trace
-      });
-
-      for (const start of keys) {
-        const need = count.get(start);
-        record({
-          line: [6, 7], count, keys, start, need, ans: "pending", phase: "pickstart",
-          narr: "Smallest available start = <b>" + start + "</b>. There are <b>need = " + need + "</b> copies of it; we must build " + need + " consecutive group(s) beginning here.",
-          activeCards: [start], trace
-        });
-
-        if (need > 0) {
-          record({
-            line: [8], count, keys, start, need, ans: "pending", phase: "needpos",
-            narr: "need = " + need + " &gt; 0, so value " + start + " still needs to be used as the head of a straight.",
-            activeCards: [start], trace
-          });
-
-          for (let card = start; card < start + groupSize; card++) {
-            const have = count.get(card) || 0;
-            if (have < need) {
-              trace.push({ start, card, have, need, result: "missing" });
-              record({
-                line: [10], count, keys, start, need, card, ans: false, phase: "removefail",
-                narr: "Need " + need + " copies of <b>" + card + "</b> to extend the straight " + start + ".." + (start + groupSize - 1) + ", but only <b>" + have + "</b> remain. Impossible — return <b style=\"color:#e24b4a\">false</b>.",
-                failCard: card, activeCards: [card], trace
-              });
-              return out;
-            }
-            count.set(card, count.get(card) - need);
-            trace.push({ start, card, have, need, result: "removed" });
-            record({
-              line: [10, 11], count, keys, start, need, card, ans: "pending", phase: "removed",
-              narr: "Remove <b>" + need + "</b> copy(s) of <b>" + card + "</b> (had " + have + ", now " + (have - need) + "). This card joins the straight headed by " + start + ".",
-              activeCards: [card], trace
-            });
-          }
-        }
-      }
-
-      record({
-        line: [15], count, keys, ans: true, phase: "done",
-        narr: "Every card was consumed by some consecutive group of size " + groupSize + ". The hand splits cleanly — return <b style=\"color:#6a9955\">true</b>.",
-        trace
-      });
-      return out;
-    }
+    function buildSteps(handArg,gs){
+ const out=[],handCopy=handArg.slice(),count=new Map(),trace=[];let keys=[];
+ function snap(line,phase,narr,extra={}){out.push({countSnap:snapMap(count),keys:keys.slice(),start:null,need:null,card:null,ans:'pending',activeCards:[],failCard:null,trace:trace.map(r=>({...r})),divisible:handCopy.length%gs===0,...extra,line:line?[line]:[],executedLine:line||null,phase,narr});}
+ snap(null,'ready','Ready to check the hand size.');const divisible=handCopy.length%gs===0;snap(2,divisible?'divok':'divfail','Check divisibility by groupSize: '+divisible+'.',divisible?{}:{ans:false});if(!divisible)return out;
+ snap(3,'init-count','Create the empty count map.');for(const card of handCopy){count.set(card,(count.get(card)||0)+1);snap(4,'counted','Increase the count for card '+card+'.',{card,activeCards:[card]});}
+ keys=[...count.keys()].sort((a,b)=>a-b);snap(5,'keys','Sort the distinct card values.');
+ for(const start of keys){snap(6,'read-start','Read starting value '+start+'.',{start,activeCards:[start]});const need=count.get(start);snap(7,'pickstart','Read need = '+need+'.',{start,need,activeCards:[start]});snap(8,'needpos','Check need > 0: '+(need>0)+'.',{start,need});if(need<=0)continue;
+  for(let card=start;card<start+gs;card++){snap(9,'read-card','Read next required card '+card+'.',{start,need,card});const have=count.get(card)||0;snap(10,'check-count','Check available copies '+have+' >= '+need+'.',{start,need,card,activeCards:[card]});if(have<need){trace.push({start,card,have,need,result:'missing'});snap(10,'removefail','Return false: card '+card+' has too few copies.',{start,need,card,ans:false,failCard:card,activeCards:[card]});return out;}
+   count.set(card,have-need);trace.push({start,card,have,need,result:'removed'});snap(11,'removed','Decrease the count of '+card+' to '+(have-need)+'.',{start,need,card,activeCards:[card]});
+  }
+ }
+ snap(15,'done','Return true: every card belongs to a consecutive group.',{ans:true});return out;
+}
 
     function loadExample(exNum) {
       activeExample = exNum;
@@ -1242,7 +1154,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({hand, groupSize, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({hand, groupSize, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({hand, groupSize, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

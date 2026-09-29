@@ -957,21 +957,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const st = historyStack.pop();
-      s = st.s;
-      seen = [...st.seen];
-      left = st.left;
-      right = st.right;
-      ans = st.ans;
-      execState = st.execState;
-      trace = st.trace.map(row => ({ ...row }));
-      justAdded = st.justAdded;
-      justLeft = st.justLeft;
-      lastHadRepeat = st.lastHadRepeat;
-      improved = st.improved;
+      restoreState(st);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+s = snapshot.s;
+seen = [...snapshot.seen];
+left = snapshot.left;
+right = snapshot.right;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+justAdded = snapshot.justAdded;
+justLeft = snapshot.justLeft;
+lastHadRepeat = snapshot.lastHadRepeat;
+improved = snapshot.improved;
+}
 
     function windowSubstr() {
       if (right >= s.length) return "";
@@ -986,12 +1003,23 @@
 
       switch (execState) {
         case "INIT":
-          seen = [];
-          left = 0;
-          ans = 0;
-          right = 0;
-          execState = "LOOP_CHECK";
-          break;
+ seen = [];
+ right = 0;
+ lastAction = "Initialize seen.";
+ execState = "INIT_LEFT";
+ break;
+case "INIT_LEFT":
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (right < s.length) {
@@ -1013,15 +1041,18 @@
         }
 
         case "SHRINK": {
-          // seen.delete(s[left]); left++
           const leaving = s[left];
           const idx = seen.indexOf(leaving);
           if (idx !== -1) seen.splice(idx, 1);
           justLeft = leaving;
+          execState = "ADVANCE_LEFT";
+          break;
+        }
+
+        case "ADVANCE_LEFT":
           left++;
           execState = "WHILE_CHECK";
           break;
-        }
 
         case "ADD_SET":
           if (!seen.includes(s[right])) seen.push(s[right]);
@@ -1111,7 +1142,7 @@
         return row;
       }
 
-      const inLoop = ["LOOP_CHECK", "WHILE_CHECK", "SHRINK", "ADD_SET", "UPDATE_ANS"].includes(execState);
+      const inLoop = ["LOOP_CHECK", "WHILE_CHECK", "SHRINK", "ADVANCE_LEFT", "ADD_SET", "UPDATE_ANS"].includes(execState);
       const tileW = 54;
       const gap = 10;
 
@@ -1121,7 +1152,7 @@
         const hi = right;
         const band = document.createElement("div");
         band.className = "window-band";
-        if (execState === "SHRINK" || (execState === "WHILE_CHECK" && lastHadRepeat === true)) {
+        if (execState === "SHRINK" || execState === "ADVANCE_LEFT" || (execState === "WHILE_CHECK" && lastHadRepeat === true)) {
           band.classList.add("shrinking");
         }
         band.style.left = (lo * (tileW + gap) - 6) + "px";
@@ -1157,7 +1188,7 @@
         if (inLoop && idx >= left && idx <= right && right < s.length) tile.classList.add("in-window");
         if (idx < left) tile.classList.add("checked");
         if (idx === right && execState === "WHILE_CHECK" && lastHadRepeat) tile.classList.add("duplicate");
-        if (idx === left && execState === "SHRINK") tile.classList.add("leaving");
+        if (idx === left && (execState === "SHRINK" || execState === "ADVANCE_LEFT")) tile.classList.add("leaving");
         if (idx === right && execState === "ADD_SET") tile.classList.add("adding");
 
         const idxLabel = document.createElement("div");
@@ -1211,7 +1242,7 @@
       zone.appendChild(box);
 
       // show char leaving during shrink
-      if (execState === "SHRINK" && justLeft !== null) {
+      if ((execState === "SHRINK" || execState === "ADVANCE_LEFT") && justLeft !== null) {
         const leavingLabel = document.createElement("div");
         leavingLabel.className = "memory-label";
         leavingLabel.style.color = "#f0c08a";
@@ -1289,6 +1320,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1309,11 +1343,19 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate("Create an empty <b>seen</b> Set, set <b>left = 0</b> and <b>ans = 0</b>. The window covers <code>[left, right]</code>.");
-          break;
+
+ narrate("Initialize seen from this line.");
+ break;
+case "INIT_LEFT":
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([5]);
+
           if (right < s.length) {
             narrate("Loop continues: <b>right = " + right + "</b> reads character <b>'" + esc(curCh) + "'</b>.");
           } else {
@@ -1321,7 +1363,7 @@
           }
           break;
         case "WHILE_CHECK":
-          highlightLines([6]);
+
           if (lastHadRepeat) {
             narrate("<code>seen.has('" + esc(curCh) + "')</code> is <b style=\"color:#e24b4a\">true</b>. The new character already sits in the window, so we must shrink from the left.");
           } else {
@@ -1329,15 +1371,19 @@
           }
           break;
         case "SHRINK":
-          highlightLines([7, 8]);
-          narrate("Shrink: <code>seen.delete('" + esc(justLeft) + "')</code> and <code>left++</code>. The left edge slides right to drop the old character.");
+
+          narrate("Remove the old left character <code>'" + esc(justLeft) + "'</code> from the set.");
+          break;
+        case "ADVANCE_LEFT":
+
+          narrate("Now move the window edge right with <code>left++</code> to " + (left + 1) + ".");
           break;
         case "ADD_SET":
-          highlightLines([10]);
+
           narrate("<code>seen.add('" + esc(curCh) + "')</code> - extend the window to the right with the new unique character.");
           break;
         case "UPDATE_ANS":
-          highlightLines([11]);
+
           if (improved) {
             narrate("Window <b>\"" + windowSubstr().replace(/ /g, "␣") + "\"</b> has length <b>" + (right - left + 1) + "</b>. New best: <code>ans = " + ans + "</code>.");
           } else {
@@ -1345,15 +1391,15 @@
           }
           break;
         case "ADVANCE":
-          highlightLines([12, 5]);
+
           narrate("Advance the right edge: <b>right++</b>. The window slides forward to the next character.");
           break;
         case "RETURN":
-          highlightLines([13]);
+
           narrate("Return <b style=\"color:#6a9955\">ans = " + ans + "</b> - the length of the longest substring with no repeats.");
           break;
         case "END":
-          highlightLines([13]);
+
           narrate("Done. The longest substring without repeating characters has length <b>" + ans + "</b>.");
           break;
       }
@@ -1405,13 +1451,110 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "SHRINK":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADVANCE_LEFT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADD_SET":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "UPDATE_ANS":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 13,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     s = examples[1];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":3,"title":"Longest Substring Without Repeating Characters","topic":"Sliding Window","why":"Removing characters from the left restores uniqueness before the window can grow again.","meanings":{"s":"input string being scanned","left":"left edge of the window; slides right to drop repeated characters","right":"right edge of the window; advances one character each iteration","seen":"Set of the characters currently inside the window `[left, right]`","ans":"longest window length found so far, `max(ans, right - left + 1)`"},"entityClasses":["hud-item","tile","set-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, seen, left, right, ans, execState, justAdded, justLeft, lastHadRepeat, improved, ...({})}),

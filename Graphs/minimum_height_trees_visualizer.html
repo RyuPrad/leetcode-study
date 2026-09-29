@@ -586,7 +586,7 @@
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">function</span> <span class="fn">findMinHeightTrees</span>(n, edges) {</div>
 <div id="line-2" class="code-line">  <span class="kw">if</span> (n === <span class="nm">1</span>) <span class="kw">return</span> [<span class="nm">0</span>];</div>
-<div id="line-3" class="code-line">  <span class="kw">const</span> adj = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, () => []);</div>
+<div id="line-3" class="code-line">  <span class="kw">const</span> adj = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, () =&gt; []);</div>
 <div id="line-4" class="code-line">  <span class="kw">const</span> degree = <span class="kw">new</span> <span class="vr">Array</span>(n).<span class="fn">fill</span>(<span class="nm">0</span>);</div>
 <div id="line-5" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [a, b] <span class="kw">of</span> edges) {</div>
 <div id="line-6" class="code-line">    adj[a].<span class="fn">push</span>(b); adj[b].<span class="fn">push</span>(a);</div>
@@ -597,7 +597,7 @@
 <div id="line-11" class="code-line">    <span class="kw">if</span> (degree[i] === <span class="nm">1</span>) leaves.<span class="fn">push</span>(i);</div>
 <div id="line-12" class="code-line">  }</div>
 <div id="line-13" class="code-line">  <span class="kw">let</span> remaining = n;</div>
-<div id="line-14" class="code-line">  <span class="kw">while</span> (remaining > <span class="nm">2</span>) {</div>
+<div id="line-14" class="code-line">  <span class="kw">while</span> (remaining &gt; <span class="nm">2</span>) {</div>
 <div id="line-15" class="code-line">    remaining -= leaves.length;</div>
 <div id="line-16" class="code-line">    <span class="kw">const</span> next = [];</div>
 <div id="line-17" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> leaf <span class="kw">of</span> leaves) {</div>
@@ -798,12 +798,14 @@
     function buildSteps(N, edgeList) {
       const built = [];
       const traceRows = [];
+      const adj = Array.from({ length: N }, () => []);
 
       // peeled[i] = true once node removed; rendering uses degree + peeled set.
       const peeled = new Array(N).fill(false);
 
       function snapshot(extra) {
         built.push({
+          adj: adj.map(row=>row.slice()),
           degree: extra.degree.slice(),
           leaves: extra.leaves.slice(),
           nextLeaves: (extra.nextLeaves || []).slice(),
@@ -815,11 +817,13 @@
           ans: (extra.ans === undefined) ? null : extra.ans.slice(),
           done: (extra.done === undefined) ? false : extra.done,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           trace: traceRows.map(r => ({ ...r }))
         });
       }
 
+      snapshot({degree: new Array(N).fill(0), leaves: [], remaining: N, lines: [], executedLine: null, narration: "Ready to trim the tree."});
       // n === 1 special case
       if (N === 1) {
         const degree = new Array(N).fill(0);
@@ -830,20 +834,23 @@
         return built;
       }
 
-      const adj = Array.from({ length: N }, () => []);
+
       const degree = new Array(N).fill(0);
       snapshot({
-        degree, leaves: [], remaining: N, lines: [3, 4],
+        degree, leaves: [], remaining: N, lines: [4],
         narration: "Build the adjacency list <code>adj</code> and a <code>degree</code> array (all zero). The tree is undirected."
       });
 
       for (const [a, b] of edgeList) {
         adj[a].push(b);
+        snapshot({degree, leaves: [], remaining: N, lines: [6], narration: "Add the second endpoint to the first endpoint's adjacency list. The reverse list and degrees are unchanged."});
         adj[b].push(a);
+        snapshot({degree, leaves: [], remaining: N, lines: [6], narration: "Add both directed adjacency entries for this undirected edge. Degrees stay unchanged."});
         degree[a]++;
+        snapshot({degree, leaves: [], remaining: N, lines: [7], narration: "Increase the first endpoint's degree. The other endpoint is unchanged."});
         degree[b]++;
         snapshot({
-          degree, leaves: [], remaining: N, lines: [6, 7], peelingNode: null,
+          degree, leaves: [], remaining: N, lines: [7], peelingNode: null,
           narration: "Edge <b>[" + a + ", " + b + "]</b>: link " + a + " ↔ " + b + ". <code>degree[" + a + "] = " + degree[a] + "</code>, <code>degree[" + b + "] = " + degree[b] + "</code>."
         });
       }
@@ -851,9 +858,10 @@
       let leaves = [];
       for (let i = 0; i < N; i++) {
         if (degree[i] === 1) leaves.push(i);
+        snapshot({degree, leaves, remaining: N, lines: [11], narration: "Check this node's degree and add it if it is a leaf."});
       }
       snapshot({
-        degree, leaves, remaining: N, lines: [9, 10, 11],
+        degree, leaves, remaining: N, lines: [11],
         narration: "Collect the initial <b>leaves</b> — every node with <code>degree === 1</code>: <b>[" + leaves.join(", ") + "]</b>."
       });
 
@@ -867,11 +875,12 @@
         });
         remaining -= leaves.length;
         snapshot({
-          degree, leaves, remaining, round, lines: [15, 16],
+          degree, leaves, remaining, round, lines: [15],
           narration: "<code>remaining -= leaves.length</code> → <b>" + remaining + "</b> nodes will be left after peeling these " + leaves.length + " leaves."
         });
 
         const next = [];
+        snapshot({degree, leaves, nextLeaves: next, remaining, round, lines: [16], narration: "Create the empty next leaf frontier."});
         for (const leaf of leaves) {
           // mark leaf peeled for visualization
           peeled[leaf] = true;
@@ -881,11 +890,12 @@
             const becameLeaf = degree[nei] === 1;
             snapshot({
               degree, leaves, nextLeaves: next, remaining, round,
-              peelingNode: leaf, neiNode: nei, lines: [18, 19, 20],
+              peelingNode: leaf, neiNode: nei, lines: [19],
               narration: "Peel leaf <b>" + leaf + "</b> → neighbor <b>" + nei + "</b>: <code>degree[" + nei + "]-- = " + degree[nei] + "</code>. " +
                 (becameLeaf ? "It is now a leaf — push to <code>next</code>." : "Not a leaf yet.")
             });
             if (becameLeaf) next.push(nei);
+            snapshot({degree, leaves, nextLeaves: next, remaining, round, peelingNode: leaf, neiNode: nei, lines: [20], narration: "Check the updated degree and enqueue this neighbor if it became a leaf."});
           }
           traceRows.push({ round, layer: "[" + leaves.join(",") + "]", peeled: leaf, remaining, next: "[" + next.join(",") + "]" });
         }
@@ -897,7 +907,7 @@
       }
 
       snapshot({
-        degree, leaves, remaining, ans: leaves, done: true, lines: [14, 25],
+        degree, leaves, remaining, ans: leaves, done: true, lines: [25],
         narration: "<code>remaining (" + remaining + ") ≤ 2</code> — stop. The surviving node(s) are the centroid(s). <code>return [" + leaves.join(", ") + "]</code>."
       });
 
@@ -1263,7 +1273,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({n, edges, positions, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({n, edges, positions, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({n, edges, positions, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

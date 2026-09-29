@@ -875,21 +875,38 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      word1 = prev.word1;
-      word2 = prev.word2;
-      i = prev.i;
-      j = prev.j;
-      res = prev.res.slice();
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAddedFrom = prev.lastAddedFrom;
-      lastAddedIndex = prev.lastAddedIndex;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+word1 = snapshot.word1;
+word2 = snapshot.word2;
+i = snapshot.i;
+j = snapshot.j;
+res = snapshot.res.slice();
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAddedFrom = snapshot.lastAddedFrom;
+lastAddedIndex = snapshot.lastAddedIndex;
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(appended) {
       trace.push({
@@ -909,12 +926,23 @@
 
       switch (execState) {
         case "INIT":
-          i = 0;
-          j = 0;
-          res = [];
-          lastAction = "Initialized i = 0, j = 0, and res = [].";
-          execState = "WHILE_CHECK";
-          break;
+ i = 0;
+
+ lastAction = "Initialize i.";
+ execState = "INIT_J";
+ break;
+case "INIT_J":
+ j = 0;
+
+ lastAction = "Initialize j.";
+ execState = "INIT_RES";
+ break;
+case "INIT_RES":
+ res = [];
+
+ lastAction = "Initialize res.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (i < word1.length || j < word2.length) {
@@ -928,29 +956,49 @@
 
         case "IF_WORD1":
           if (i < word1.length) {
+            execState = "PUSH_WORD1";
+            lastAction = "word1 has a character at index " + i + ", so add it next.";
+          } else {
+            lastAction = "word1 is exhausted, so skip its push.";
+            execState = "IF_WORD2";
+          }
+          break;
+
+        case "PUSH_WORD1":
             res.push(word1[i]);
             lastAddedFrom = "w1";
             lastAddedIndex = res.length - 1;
             addTrace("word1[" + i + "] = '" + word1[i] + "'");
-            i++;
-            lastAction = "i < word1.length, so push word1[" + (i - 1) + "] and advance i.";
-          } else {
-            lastAction = "word1 is exhausted, so skip its push.";
-          }
+            lastAction = "Pushed word1[" + i + "] into the result.";
+            execState = "ADVANCE_WORD1";
+          break;
+
+        case "ADVANCE_WORD1":
+          i++;
           execState = "IF_WORD2";
           break;
 
         case "IF_WORD2":
           if (j < word2.length) {
+            execState = "PUSH_WORD2";
+            lastAction = "word2 has a character at index " + j + ", so add it next.";
+          } else {
+            lastAction = "word2 is exhausted, so skip its push.";
+            execState = "WHILE_CHECK";
+          }
+          break;
+
+        case "PUSH_WORD2":
             res.push(word2[j]);
             lastAddedFrom = "w2";
             lastAddedIndex = res.length - 1;
             addTrace("word2[" + j + "] = '" + word2[j] + "'");
-            j++;
-            lastAction = "j < word2.length, so push word2[" + (j - 1) + "] and advance j.";
-          } else {
-            lastAction = "word2 is exhausted, so skip its push.";
-          }
+            lastAction = "Pushed word2[" + j + "] into the result.";
+            execState = "ADVANCE_WORD2";
+          break;
+
+        case "ADVANCE_WORD2":
+          j++;
           execState = "WHILE_CHECK";
           break;
 
@@ -987,7 +1035,7 @@
         return row;
       }
 
-      const isPointerStep = execState === "IF_WORD1" || execState === "IF_WORD2" || execState === "WHILE_CHECK";
+      const isPointerStep = ["IF_WORD1", "PUSH_WORD1", "ADVANCE_WORD1", "IF_WORD2", "PUSH_WORD2", "ADVANCE_WORD2", "WHILE_CHECK"].includes(execState);
       for (let idx = 0; idx < word.length; idx++) {
         const col = document.createElement("div");
         col.className = "char-col";
@@ -1183,33 +1231,129 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Start with <code>i = 0</code>, <code>j = 0</code>, and an empty <code>res</code>.');
-          break;
+
+ narrate("Initialize i from this line.");
+ break;
+case "INIT_J":
+
+ narrate("Initialize j from this line.");
+ break;
+case "INIT_RES":
+
+ narrate("Initialize res from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           narrate((i < word1.length || j < word2.length) ? 'At least one string has characters left, so continue.' : 'Both strings are fully consumed, so stop.');
           break;
         case "IF_WORD1":
-          highlightLines([6, 7, 8]);
-          narrate(i < word1.length ? 'Append <code>word1[' + i + '] = "' + esc(word1[i]) + '"</code>, then increment <code>i</code>.' : 'word1 is exhausted, so this push is skipped.');
+
+          narrate(i < word1.length ? 'Check whether word1 has a character at index ' + i + '.' : 'word1 is exhausted, so skip its push.');
+          break;
+        case "PUSH_WORD1":
+
+          narrate('Append <code>word1[' + i + '] = "' + esc(word1[i]) + '"</code> to the result.');
+          break;
+        case "ADVANCE_WORD1":
+
+          narrate('Now advance <code>i</code> to ' + (i + 1) + '.');
           break;
         case "IF_WORD2":
-          highlightLines([10, 11, 12]);
-          narrate(j < word2.length ? 'Append <code>word2[' + j + '] = "' + esc(word2[j]) + '"</code>, then increment <code>j</code>.' : 'word2 is exhausted, so this push is skipped.');
+
+          narrate(j < word2.length ? 'Check whether word2 has a character at index ' + j + '.' : 'word2 is exhausted, so skip its push.');
+          break;
+        case "PUSH_WORD2":
+
+          narrate('Append <code>word2[' + j + '] = "' + esc(word2[j]) + '"</code> to the result.');
+          break;
+        case "ADVANCE_WORD2":
+
+          narrate('Now advance <code>j</code> to ' + (j + 1) + '.');
           break;
         case "RETURN_RES":
-          highlightLines([15]);
+
           narrate('Join <code>res</code> into a string and return it.');
           break;
         case "END":
-          highlightLines([15]);
+
           narrate('Done. The merged string is <code>"' + esc(res.join("")) + '"</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_J":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_RES":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "IF_WORD1":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "PUSH_WORD1":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADVANCE_WORD1":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "IF_WORD2":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "PUSH_WORD2":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "ADVANCE_WORD2":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "RETURN_RES":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 15,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1238,8 +1382,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":1768,"title":"Merge Strings Alternately","topic":"Two Pointers","why":"Alternate available characters from both strings, then append the remainder of the longer string.","meanings":{"word1":"first input string","word2":"second input string","i":"pointer into word1","j":"pointer into word2","res":"array of appended characters, joined into the merged string"},"entityClasses":["hud-item","char-col","char-index","char-box","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({word1, word2, i, j, res, execState, lastAddedFrom, lastAddedIndex, lastAction, ...({})}),

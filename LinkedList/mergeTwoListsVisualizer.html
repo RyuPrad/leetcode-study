@@ -321,7 +321,7 @@
 <div id="line-3" class="code-line">  <span class="kw">let</span> tail = dummy;</div>
 <div id="line-4" class="code-line"></div>
 <div id="line-5" class="code-line">  <span class="kw">while</span> (list1 !== <span class="kw">null</span> && list2 !== <span class="kw">null</span>) {</div>
-<div id="line-6" class="code-line">    <span class="kw">if</span> (list1.val <= list2.val) {</div>
+<div id="line-6" class="code-line">    <span class="kw">if</span> (list1.val &lt;= list2.val) {</div>
 <div id="line-7" class="code-line">      tail.next = list1;</div>
 <div id="line-8" class="code-line">      list1 = list1.next;</div>
 <div id="line-9" class="code-line">    } <span class="kw">else</span> {</div>
@@ -432,16 +432,28 @@
         function prevStep() {
             if (historyStack.length === 0) return;
             const s = historyStack.pop();
-            execState = s.execState;
-            l1Idx = s.l1Idx; l2Idx = s.l2Idx;
-            tailOwner = s.tailOwner; tailIdx = s.tailIdx;
-            mergedChain = s.mergedChain;
-            pickedSide = s.pickedSide;
-            lastLinkMade = s.lastLinkMade;
+      restoreState(s);
+
+
+
+
+
+
             document.getElementById('btn-next').disabled = false;
             document.getElementById('btn-next').textContent = "Step Over";
             render();
         }
+
+function restoreState(snapshot) {
+execState = snapshot.execState;
+l1Idx = snapshot.l1Idx;
+l2Idx = snapshot.l2Idx;
+tailOwner = snapshot.tailOwner;
+tailIdx = snapshot.tailIdx;
+mergedChain = snapshot.mergedChain;
+pickedSide = snapshot.pickedSide;
+lastLinkMade = snapshot.lastLinkMade;
+}
 
         function nextStep() {
             if (execState === "END") return;
@@ -449,12 +461,18 @@
 
             switch(execState) {
                 case "INIT":
-                    // dummy created, tail -> dummy
-                    tailOwner = "dummy"; tailIdx = 0;
-                    lastLinkMade = null;
-                    pickedSide = null;
-                    execState = "WHILE_CHECK";
-                    break;
+ mergedChain = [];
+ lastLinkMade = null;
+pickedSide = null;
+ lastAction = "Initialize dummy.";
+ execState = "INIT_TAIL";
+ break;
+case "INIT_TAIL":
+ tailOwner = "dummy"; tailIdx = 0;
+
+ lastAction = "Initialize tail.";
+ execState = "WHILE_CHECK";
+ break;
 
                 case "WHILE_CHECK":
                     pickedSide = null;
@@ -921,6 +939,9 @@
         }
 
         function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
             document.getElementById('btn-prev').disabled = (historyStack.length === 0);
 
             // Active example button
@@ -943,11 +964,15 @@
 
             switch(execState) {
                 case "INIT":
-                    highlightLines([2, 3]);
-                    narrate("Create a <b>dummy</b> node to simplify the merge. <b>tail</b> will track the last node of the growing merged list; it starts at dummy.");
-                    break;
+
+ narrate("Initialize dummy from this line.");
+ break;
+case "INIT_TAIL":
+
+ narrate("Initialize tail from this line.");
+ break;
                 case "WHILE_CHECK":
-                    highlightLines([5]);
+
                     if (l1Idx !== null && l2Idx !== null) {
                         narrate(`Both lists still have nodes (<b>list1</b> = ${v1}, <b>list2</b> = ${v2}). Enter the loop.`);
                     } else {
@@ -955,7 +980,7 @@
                     }
                     break;
                 case "IF_COMPARE":
-                    highlightLines([6]);
+
                     if (v1 <= v2) {
                         narrate(`Compare: ${v1} ≤ ${v2} → pick from <b style="color:#569cd6">list1</b>.`);
                     } else {
@@ -963,27 +988,27 @@
                     }
                     break;
                 case "ATTACH_L1":
-                    highlightLines([7]);
+
                     narrate(`<code>tail.next = list1</code> — splice the list1 node (value ${origL1[l1Idx]}) onto the merged list.`);
                     break;
                 case "ADVANCE_L1":
-                    highlightLines([8]);
+
                     narrate(`<code>list1 = list1.next</code> — advance the list1 pointer.`);
                     break;
                 case "ATTACH_L2":
-                    highlightLines([10]);
+
                     narrate(`<code>tail.next = list2</code> — splice the list2 node (value ${origL2[l2Idx]}) onto the merged list.`);
                     break;
                 case "ADVANCE_L2":
-                    highlightLines([11]);
+
                     narrate(`<code>list2 = list2.next</code> — advance the list2 pointer.`);
                     break;
                 case "MOVE_TAIL":
-                    highlightLines([13]);
+
                     narrate(`<code>tail = tail.next</code> — tail now points to the node we just attached.`);
                     break;
                 case "AFTER_LOOP":
-                    highlightLines([17]);
+
                     if (mergedChain.length === 0 && origL1.length === 0 && origL2.length === 0) {
                         narrate(`Both lists were empty. <b>tail.next</b> stays null.`);
                     } else {
@@ -993,11 +1018,11 @@
                     }
                     break;
                 case "RETURN":
-                    highlightLines([19]);
+
                     narrate(`Return <code>dummy.next</code> — skipping past the placeholder to the real head of the merged list.`);
                     break;
                 case "END":
-                    highlightLines([19]);
+
                     narrate(`✓ Done. Merged list has ${mergedChain.length} node${mergedChain.length === 1 ? '' : 's'}.`);
                     break;
             }
@@ -1046,14 +1071,113 @@
             }
         }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_TAIL":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "IF_COMPARE":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ATTACH_L1":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADVANCE_L1":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ATTACH_L2":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "ADVANCE_L2":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "MOVE_TAIL":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "AFTER_LOOP":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 19,
+      phase: execState
+    };
+}
+
+// 2. Build the list visuals
+ return null;
+}
+
         // Boot
         origL1 = [...examples[1].l1];
         origL2 = [...examples[1].l2];
         init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":21,"title":"Merge sorted linked list","topic":"LinkedList","why":"Link the smaller current head into the result; everything already merged remains sorted.","meanings":{"list1":"first sorted list","list2":"second sorted list","dummy":"sentinel head node","tail":"end of merged list","curr":"node being attached"},"entityClasses":["hud-item","node","obj-node","hl-node","dummy-node","extra-node"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({pos1, pos2, pos3, pos4, rawMemoryView, origL1, origL2, l1Idx, l2Idx, tailOwner, tailIdx, mergedChain, pickedSide, lastLinkMade, execState, ...({})}),

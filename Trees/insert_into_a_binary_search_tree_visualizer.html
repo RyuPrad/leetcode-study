@@ -546,7 +546,7 @@
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">var</span> <span class="fn">insertIntoBST</span> = <span class="kw">function</span>(root, val) {</div>
 <div id="line-2" class="code-line">  <span class="kw">if</span> (!root) <span class="kw">return</span> <span class="kw">new</span> <span class="fn">TreeNode</span>(val);</div>
-<div id="line-3" class="code-line">  <span class="kw">if</span> (val < root.val) {</div>
+<div id="line-3" class="code-line">  <span class="kw">if</span> (val &lt; root.val) {</div>
 <div id="line-4" class="code-line">    root.left = <span class="fn">insertIntoBST</span>(root.left, val);</div>
 <div id="line-5" class="code-line">  } <span class="kw">else</span> {</div>
 <div id="line-6" class="code-line">    root.right = <span class="fn">insertIntoBST</span>(root.right, val);</div>
@@ -837,127 +837,40 @@
       }
 
       const trace = [];
-
-      if (!root) {
-        steps.push({
-          line: [2],
-          treeSnap: [],
-          current: null,
-          path: [],
-          slotParent: null,
-          slotSide: null,
-          insertedVal: null,
-          finished: false,
-          trace: [],
-          note: "The tree is empty (<code>!root</code> is true), so the new node <b>" + insertVal + "</b> becomes the root."
-        });
-        root = new TreeNode(insertVal);
-        steps.push({
-          line: [2],
-          treeSnap: snapshot(root),
-          current: insertVal,
-          path: [insertVal],
-          slotParent: null,
-          slotSide: null,
-          insertedVal: insertVal,
-          finished: true,
-          trace: [{ node: "(empty)", cmp: "tree empty", action: "create root " + insertVal }],
-          note: "✓ Created <code>new TreeNode(" + insertVal + ")</code> and returned it as the new root."
-        });
-        return;
+      function emit(extra) {
+        steps.push({line:extra.line,executedLine:extra.executedLine === undefined ? extra.line.at(-1) : extra.executedLine,
+          treeSnap:snapshot(root),current:null,path:[],slotParent:null,slotSide:null,insertedVal:null,finished:false,
+          trace:trace.map(row=>({...row})),...extra});
       }
-
-      // Initial step
-      steps.push({
-        line: [1],
-        treeSnap: snapshot(root),
-        current: root.val,
-        path: [],
-        slotParent: null,
-        slotSide: null,
-        insertedVal: null,
-        finished: false,
-        trace: [],
-        note: "Start the recursion at the root. We compare <b>val = " + insertVal + "</b> to each node and move down until we hit an empty slot."
-      });
-
-      let node = root;
-      const path = [];
-      let parent = null;
-      let side = null;
-
-      let guard = 0;
-      while (node && guard < 1000) {
-        guard++;
-        path.push(node.val);
-
-        // visiting node: check !root false, then compare
-        const goLeft = insertVal < node.val;
-        trace.push({
-          node: node.val,
-          cmp: insertVal + (goLeft ? " < " : " >= ") + node.val,
-          action: goLeft ? "go left" : "go right"
-        });
-
-        steps.push({
-          line: goLeft ? [3, 4] : [5, 6],
-          treeSnap: snapshot(root),
-          current: node.val,
-          path: [...path],
-          slotParent: null,
-          slotSide: null,
-          insertedVal: null,
-          finished: false,
-          trace: trace.map(r => ({ ...r })),
-          note: goLeft
-            ? "<b>" + insertVal + " < " + node.val + "</b>, so recurse into the <b>left</b> child."
-            : "<b>" + insertVal + " >= " + node.val + "</b>, so recurse into the <b>right</b> child."
-        });
-
-        parent = node;
-        side = goLeft ? "left" : "right";
-        node = goLeft ? node.left : node.right;
-
+      emit({line:[],executedLine:null,note:"Ready to insert the value into the BST."});
+      function insert(node, path, parent=null, side=null) {
         if (!node) {
-          // Found empty slot: show it before attaching
-          steps.push({
-            line: [2],
-            treeSnap: snapshot(root),
-            current: parent.val,
-            path: [...path],
-            slotParent: parent.val,
-            slotSide: side,
-            insertedVal: null,
-            finished: false,
-            trace: trace.map(r => ({ ...r })),
-            note: "<code>" + parent.val + "." + side + "</code> is <b>null</b> (<code>!root</code> is true). This empty slot is where <b>" + insertVal + "</b> belongs."
-          });
-
-          // Attach
+          emit({line:[2],current:parent?.val??null,path:path.slice(),slotParent:parent?.val??null,slotSide:side,note:"This subtree is empty; create and return the new node."});
           const fresh = new TreeNode(insertVal);
-          if (side === "left") parent.left = fresh; else parent.right = fresh;
-          path.push(insertVal);
-          trace.push({
-            node: "(null)",
-            cmp: "!root true",
-            action: "create node " + insertVal
-          });
-
-          steps.push({
-            line: [2, 8],
-            treeSnap: snapshot(root),
-            current: insertVal,
-            path: [...path],
-            slotParent: parent.val,
-            slotSide: side,
-            insertedVal: insertVal,
-            finished: true,
-            trace: trace.map(r => ({ ...r })),
-            note: "✓ Attached <code>new TreeNode(" + insertVal + ")</code> as the <b>" + side + "</b> child of <b>" + parent.val + "</b>. The unchanged root is returned all the way up."
-          });
-          return;
+          trace.push({node:"(null)",cmp:"!root true",action:"create node "+insertVal});
+          if (!parent) root = fresh;
+          emit({line:[2],current:insertVal,path:[...path,insertVal],slotParent:parent?.val??null,slotSide:side,insertedVal:insertVal,createdNode:insertVal,finished:!parent,note:"Create the node and return it to the caller. The parent's child pointer has not been assigned yet."});
+          return fresh;
         }
+        const here=[...path,node.val];
+        emit({line:[2],current:node.val,path:here,note:"This subtree has a root; continue to the comparison."});
+        const goLeft = insertVal < node.val;
+        trace.push({node:node.val,cmp:insertVal+(goLeft?" < ":" >= ")+node.val,action:goLeft?"go left":"go right"});
+        emit({line:[3],current:node.val,path:here,note:goLeft?"The insertion value is smaller; use the left subtree.":"The insertion value is larger; use the right subtree."});
+        if (goLeft) {
+          const child=insert(node.left,here,node,"left");
+          node.left=child;
+          emit({line:[4],current:node.val,path:here,insertedVal:insertVal,note:"Store the returned subtree in this node's left child pointer."});
+        } else {
+          emit({line:[5],current:node.val,path:here,note:"Take the else branch into the right subtree."});
+          const child=insert(node.right,here,node,"right");
+          node.right=child;
+          emit({line:[6],current:node.val,path:here,insertedVal:insertVal,note:"Store the returned subtree in this node's right child pointer."});
+        }
+        emit({line:[8],current:node.val,path:here,insertedVal:insertVal,finished:parent===null,note:"Return this subtree's root to the caller."});
+        return node;
       }
+      root=insert(root,[]);
     }
 
     function init() {
@@ -1225,8 +1138,8 @@
       spec: {"number":701,"title":"Insert into a Binary Search Tree","topic":"Trees","why":"Follow BST comparisons to the missing child where the new value belongs.","meanings":{"root":"root node of the BST (also the recursion's current subtree root)","node":"current node on the insert path","val":"value being inserted","ans":"the (unchanged) root returned after insertion"},"entityClasses":["hud-item","tnode","slot","slotParent","nodes","slotSide","node"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({treeArr, root, insertVal, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({treeArr, root, insertVal, ...(steps[position] || {})}),
+      read: () => ({treeArr, root: buildTree(steps[stepIndex]?.treeSnap || []), insertVal, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({treeArr, root: buildTree(steps[studySnapshotIndex]?.treeSnap || []), insertVal, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

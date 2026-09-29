@@ -712,6 +712,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -990,21 +991,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseWeights(text) {
-      const body = text.split("|")[0];
-      try {
-        const parsed = JSON.parse(body.trim());
-        if (!Array.isArray(parsed)) throw new Error("not array");
-        const clean = parsed.map(Number);
-        if (clean.some(n => !Number.isFinite(n) || !Number.isInteger(n) || n < 1)) throw new Error("bad");
-        return clean;
-      } catch (err) {
-        const fallback = body.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n) && Number.isInteger(n) && n >= 1);
-        if (fallback.length > 0) return fallback;
-        alert("Please enter positive integer weights like 1,2,3,4,5 (use the | to add days, e.g. 1,2,3,4,5 | 2)");
-        return null;
-      }
-    }
+    function parseWeights(text) { try { return StudyNumericInput.list(text.split("|")[0], {min: 1, json: true, label: 'Numbers'}); } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -1021,28 +1008,22 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parsed = parseWeights(raw);
-      if (!parsed) return;
-      if (parsed.length < 1) {
-        alert("Need at least 1 package.");
-        return;
+      try {
+        const parser = window.StudyNumericInput;
+        const [arrayText, parameterText] = parser.optionalParameter(document.getElementById("custom-input").value, document.getElementById("target-input").value, 'Weights and days');
+        const parsed = parser.list(arrayText, {min: 1, minLength: 1, label: 'Weights'});
+        if (!Number.isSafeInteger(parsed.reduce((sum, value) => sum + value, 0))) throw Error('The sum of weights must be a safe integer.');
+        const parsedDays = parser.integer(parameterText, {min: 1, max: parsed.length, label: 'Days'});
+        weights = parsed;
+        days = parsedDays;
+        document.getElementById("target-input").value = days;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
       }
-      let dVal;
-      if (raw.includes("|")) {
-        dVal = Number(raw.split("|")[1].trim());
-      } else {
-        dVal = Number(document.getElementById("target-input").value);
-      }
-      if (!Number.isFinite(dVal) || !Number.isInteger(dVal) || dVal < 1 || dVal > parsed.length) {
-        alert("days must be an integer between 1 and the number of packages (" + parsed.length + ").");
-        return;
-      }
-      weights = parsed;
-      days = dVal;
-      document.getElementById("target-input").value = days;
-      activeExample = 0;
-      init();
     }
 
     function init() {
@@ -1089,26 +1070,48 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      weights = prev.weights.slice();
-      days = prev.days;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      ans = prev.ans;
-      need = prev.need;
-      cur = prev.cur;
-      simIndex = prev.simIndex;
-      feasible = prev.feasible;
-      dayLoads = prev.dayLoads.map(d => d.slice());
-      overflowAt = prev.overflowAt;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+weights = snapshot.weights.slice();
+days = snapshot.days;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+ans = snapshot.ans;
+need = snapshot.need;
+cur = snapshot.cur;
+simIndex = snapshot.simIndex;
+feasible = snapshot.feasible;
+dayLoads = snapshot.dayLoads.map(d => d.slice());
+overflowAt = snapshot.overflowAt;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace() {
       trace.push({
@@ -1128,19 +1131,29 @@
 
       switch (execState) {
         case "INIT":
-          left = Math.max(...weights);
-          right = sumArray(weights);
-          ans = right;
-          mid = null;
-          need = null;
-          cur = null;
-          simIndex = -1;
-          feasible = null;
-          dayLoads = [];
-          overflowAt = -1;
-          lastAction = "Initialize left = max(weights) = " + left + ", right = sum(weights) = " + right + ". ans = right.";
-          execState = "WHILE_CHECK";
-          break;
+ left = Math.max(...weights);
+ mid = null;
+need = null;
+cur = null;
+simIndex = -1;
+feasible = null;
+dayLoads = [];
+overflowAt = -1;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = sumArray(weights);
+
+ lastAction = "Initialize right.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = right;
+
+ lastAction = "Initialize ans.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1154,41 +1167,63 @@
 
         case "CALC_MID":
           mid = Math.floor((left + right) / 2);
+          lastAction = "Candidate capacity mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Start with need = 1 day, cur = 0.";
+          execState = "INIT_NEED";
+          break;
+
+        case "INIT_NEED":
           need = 1;
+          execState = "INIT_CUR";
+          break;
+
+        case "INIT_CUR":
           cur = 0;
           simIndex = -1;
           feasible = null;
           overflowAt = -1;
           dayLoads = [[]];
-          lastAction = "Candidate capacity mid = floor((" + left + " + " + right + ") / 2) = " + mid + ". Start with need = 1 day, cur = 0.";
           execState = "SIM_STEP";
           break;
 
         case "SIM_STEP":
           if (simIndex + 1 < weights.length) {
             simIndex++;
-            const w = weights[simIndex];
             overflowAt = -1;
-            if (cur + w > mid) {
-              need++;
-              cur = 0;
-              dayLoads.push([]);
-              overflowAt = simIndex;
-              cur += w;
-              dayLoads[dayLoads.length - 1].push(w);
-              lastAction = "Package " + w + " would overflow capacity " + mid + " (cur was " + (need > 1 ? "full" : "0") + "). Open day " + need + " and place it. cur = " + cur + ".";
-            } else {
-              cur += w;
-              dayLoads[dayLoads.length - 1].push(w);
-              lastAction = "Package " + w + " fits in day " + need + ". cur = " + cur + " (<= " + mid + ").";
-            }
-            if (simIndex + 1 >= weights.length) {
-              execState = "SIM_DONE";
-            }
+            lastAction = "Inspect package " + weights[simIndex] + " against capacity " + mid + ".";
+            execState = "CHECK_OVERFLOW";
           } else {
             execState = "SIM_DONE";
           }
           break;
+
+        case "CHECK_OVERFLOW":
+          if (cur + weights[simIndex] > mid) {
+            overflowAt = simIndex;
+            execState = "COUNT_DAY";
+          } else {
+            execState = "ADD_WEIGHT";
+          }
+          break;
+
+        case "COUNT_DAY":
+          need++;
+          execState = "RESET_CUR";
+          break;
+
+        case "RESET_CUR":
+          cur = 0;
+          dayLoads.push([]);
+          execState = "ADD_WEIGHT";
+          break;
+
+        case "ADD_WEIGHT": {
+          const w = weights[simIndex];
+          cur += w;
+          dayLoads[dayLoads.length - 1].push(w);
+          lastAction = "Package " + w + " fits in day " + need + ". cur = " + cur + " (<= " + mid + ").";
+          execState = simIndex + 1 >= weights.length ? "SIM_DONE" : "SIM_STEP";
+          break;
+        }
 
         case "SIM_DONE":
           feasible = need <= days;
@@ -1199,21 +1234,26 @@
           } else {
             lastAction = "Greedy packing used need = " + need + " days > days = " + days + ". Capacity " + mid + " is TOO SMALL.";
           }
-          execState = "COMPARE";
+          execState = feasible ? "COMPARE_FEASIBLE" : "COMPARE_INFEASIBLE";
           break;
 
-        case "COMPARE":
-          if (feasible) {
-            lastAction = "Feasible: record ans = mid = " + mid + ", then try a smaller capacity with right = mid - 1.";
-            execState = "MOVE_RIGHT";
-          } else {
-            lastAction = "Infeasible: capacity must grow, so left = mid + 1.";
-            execState = "MOVE_LEFT";
-          }
+        case "COMPARE_FEASIBLE":
+          lastAction = "Feasible: record ans = mid = " + mid + ", then try a smaller capacity with right = mid - 1.";
+          execState = "RECORD_ANS";
+          break;
+
+        case "COMPARE_INFEASIBLE":
+          lastAction = "Infeasible: capacity must grow, so left = mid + 1.";
+          execState = "MOVE_LEFT";
+          break;
+
+        case "RECORD_ANS":
+          ans = mid;
+          lastAction = "Record " + mid + " as the best feasible capacity so far.";
+          execState = "MOVE_RIGHT";
           break;
 
         case "MOVE_RIGHT":
-          ans = mid;
           right = mid - 1;
           mid = null;
           need = null;
@@ -1360,7 +1400,8 @@
       weights.forEach((w, idx) => {
         const pkg = document.createElement("div");
         pkg.className = "sim-pkg";
-        if (speedKnown && idx === simIndex && execState === "SIM_STEP") {
+        const activePackage = execState === "SIM_STEP" ? idx === simIndex + 1 : idx === simIndex && ["CHECK_OVERFLOW", "COUNT_DAY", "RESET_CUR", "ADD_WEIGHT"].includes(execState);
+        if (speedKnown && activePackage) {
           pkg.classList.add(idx === overflowAt ? "overflow" : "active");
         } else if (speedKnown && idx <= simIndex) {
           pkg.classList.add("placed");
@@ -1385,7 +1426,7 @@
         const box = document.createElement("div");
         box.className = "day-box";
         const isLast = idx === dayLoads.length - 1;
-        if (isLast && execState === "SIM_STEP") box.classList.add("current");
+        if (isLast && ["SIM_STEP", "CHECK_OVERFLOW", "COUNT_DAY", "RESET_CUR", "ADD_WEIGHT"].includes(execState)) box.classList.add("current");
         else box.classList.add("full");
         const loadSum = load.reduce((a, b) => a + b, 0);
         let chips = "";
@@ -1563,59 +1604,205 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate('Set <code>left = max(weights)</code>, <code>right = sum(weights)</code>, and start <code>ans = right</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, there is still a capacity to test.' : 'The capacity window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([6, 7, 8]);
-          narrate('Pick candidate capacity <code>mid = floor((left + right) / 2)</code>. Start with <code>need = 1</code> day and <code>cur = 0</code>.');
+
+          narrate('Pick the middle capacity candidate from the current search range.');
+          break;
+        case "INIT_NEED":
+
+          narrate('Start the greedy check by opening the first day.');
+          break;
+        case "INIT_CUR":
+
+          narrate('Start the current day load at zero.');
           break;
         case "SIM_STEP":
-          if (simIndex === overflowAt && overflowAt !== -1) {
-            highlightLines([10, 11, 12, 14]);
-            narrate('Adding <code>' + weights[simIndex] + '</code> exceeds capacity <code>' + mid + '</code>, so open a new day (<code>need++</code>) and put it there.');
-          } else {
-            highlightLines([10, 14]);
-            narrate('Package <code>' + weights[simIndex] + '</code> fits in the current day, so add it to <code>cur</code>.');
-          }
+
+          narrate(simIndex + 1 < weights.length
+            ? 'Read the next package, <b>' + weights[simIndex + 1] + '</b>.'
+            : 'All packages have been placed; finish the packing loop.');
+          break;
+        case "CHECK_OVERFLOW":
+
+          narrate(cur + weights[simIndex] > mid
+            ? 'This package would exceed capacity, so open a new day.'
+            : 'This package fits in the current day.');
+          break;
+        case "COUNT_DAY":
+
+          narrate('Open one more day for this package.');
+          break;
+        case "RESET_CUR":
+
+          narrate('The new day starts with an empty load.');
+          break;
+        case "ADD_WEIGHT":
+
+          narrate('Add package <b>' + weights[simIndex] + '</b> to the current day; its load becomes <b>' + (cur + weights[simIndex]) + '</b>.');
           break;
         case "SIM_DONE":
-          highlightLines([16]);
+
           narrate('Greedy packing finished: <code>need = ' + need + '</code> days. Compare against <code>days = ' + days + '</code>.');
           break;
-        case "COMPARE":
-          if (feasible) {
-            highlightLines([16, 17, 18]);
-            narrate('<code>need &lt;= days</code> is <b style="color:#73d66b">true</b>: capacity ' + mid + ' works, so record it and shrink the capacity.');
-          } else {
-            highlightLines([19, 20]);
-            narrate('<code>need &lt;= days</code> is <b style="color:#ff5c68">false</b>: this capacity is too small, grow it.');
-          }
+        case "COMPARE_FEASIBLE":
+
+          narrate('<code>need &lt;= days</code> is <b style="color:#73d66b">true</b>: capacity ' + mid + ' works, so record it and shrink the capacity.');
+          break;
+        case "COMPARE_INFEASIBLE":
+
+          narrate('<code>need &lt;= days</code> is <b style="color:#ff5c68">false</b>: this capacity is too small, grow it.');
+          break;
+        case "RECORD_ANS":
+
+          narrate('Save this feasible capacity as the current best answer.');
           break;
         case "MOVE_RIGHT":
-          highlightLines([17, 18]);
-          narrate('Record <code>ans = mid</code> and discard larger capacities with <code>right = mid - 1</code>.');
+
+          narrate('Discard larger capacities with <code>right = mid - 1</code>.');
           break;
         case "MOVE_LEFT":
-          highlightLines([20]);
+
           narrate('Discard smaller capacities with <code>left = mid + 1</code>.');
           break;
         case "RETURN_ANS":
-          highlightLines([23]);
+
           narrate('Return <code>ans</code>, the smallest feasible capacity.');
           break;
         case "END":
-          highlightLines([23]);
+
           narrate('&#10003; Done. The minimum ship capacity is <code>' + ans + '</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "INIT_NEED":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "INIT_CUR":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "SIM_STEP":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "CHECK_OVERFLOW":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "COUNT_DAY":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "RESET_CUR":
+    return {
+      line: 12,
+      phase: execState
+    };
+  case "ADD_WEIGHT":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "SIM_DONE":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "COMPARE_FEASIBLE":
+    return {
+      line: 16,
+      phase: execState
+    };
+  case "COMPARE_INFEASIBLE":
+    return {
+      line: 19,
+      phase: execState
+    };
+  case "RECORD_ANS":
+    return {
+      line: 17,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 18,
+      phase: execState
+    };
+  case "MOVE_LEFT":
+    return {
+      line: 20,
+      phase: execState
+    };
+  case "RETURN_ANS":
+    return {
+      line: 23,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 23,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1645,8 +1832,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":1011,"title":"Capacity to Ship Packages Within D Days","topic":"Binary Search","why":"A proposed capacity determines the required shipping days; search for the smallest capacity meeting the day limit.","meanings":{"weights":"array of package weights, shipped in order","days":"maximum number of days allowed to ship everything","left":"low end of the candidate capacity range (starts at max(weights))","right":"high end of the candidate capacity range (starts at sum(weights))","mid":"candidate ship capacity being tested = floor((left + right) / 2)","ans":"smallest feasible capacity found so far (the answer)"},"entityClasses":["hud-item","sim-pkg","day-box","day-chip","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({weights, days, left, right, mid, ans, need, cur, simIndex, feasible, dayLoads, overflowAt, execState, lastAction, ...({})}),

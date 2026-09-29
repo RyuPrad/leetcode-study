@@ -644,6 +644,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -899,25 +900,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      if (raw === "") {
-        nums = [];
-      } else {
-        nums = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (nums.some(Number.isNaN)) {
-        alert("Please enter only numbers separated by commas. Example: 3, 2, 3");
-        return;
-      }
-
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed = parser.list(document.getElementById('custom-input').value, {json:false,  label:'Numbers'}); nums = parsed;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       i = 0;
@@ -951,19 +939,34 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      i = s.i;
-      num = s.num;
-      count = s.count;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      lastDelta = s.lastDelta;
-      tookOver = s.tookOver;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+i = snapshot.i;
+num = snapshot.num;
+count = snapshot.count;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastDelta = snapshot.lastDelta;
+tookOver = snapshot.tookOver;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -973,11 +976,18 @@
 
       switch (execState) {
         case "INIT":
-          // count = 0; ans = 0; set in init. Begin loop.
-          count = 0;
-          ans = 0;
-          execState = "LOOP_CHECK";
-          break;
+ // count = 0; ans = 0; set in init. Begin loop.
+count = 0;
+
+ lastAction = "Initialize count.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (i < nums.length) {
@@ -1228,6 +1238,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1246,11 +1259,15 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate("Initialize the vote counter <b>count = 0</b> and the candidate <b>ans = 0</b>. The intuition: each non-matching element cancels one vote; the true majority survives.");
-          break;
+
+ narrate("Initialize count from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([4]);
+
           if (i < nums.length) {
             narrate("<code>for (const num of nums)</code> reads the next element at index <b>" + i + "</b>.");
           } else {
@@ -1258,7 +1275,7 @@
           }
           break;
         case "CHECK_ZERO":
-          highlightLines([5]);
+
           if (count === 0) {
             narrate("<code>count === 0</code> is <b style=\"color:#ce9178\">true</b>. All previous votes cancelled out, so we adopt <b>num = " + num + "</b> as the new candidate.");
           } else {
@@ -1266,11 +1283,11 @@
           }
           break;
         case "SET_CANDIDATE":
-          highlightLines([6]);
+
           narrate("<code>ans = num</code> → the candidate becomes <b style=\"color:#569cd6\">" + num + "</b>. This takeover only happens when count had dropped to 0.");
           break;
         case "VOTE":
-          highlightLines([8]);
+
           if (lastDelta === 1) {
             narrate("<code>num === ans</code> (" + num + " === " + ans + "), so <code>count += 1</code> → the candidate gains a vote.");
           } else {
@@ -1278,15 +1295,15 @@
           }
           break;
         case "ADVANCE":
-          highlightLines([9, 4]);
+
           narrate("Move to the next element and repeat. Pairing off different values is what makes the minority cancel out.");
           break;
         case "RETURN":
-          highlightLines([10]);
+
           narrate("Return <b>ans = " + ans + "</b>. Because the majority appears more than ⌊n/2⌋ times, it cannot be fully cancelled — it is always the last one standing.");
           break;
         case "END":
-          highlightLines([10]);
+
           narrate("✓ Done. The majority element is <b>" + ans + "</b>.");
           break;
       }
@@ -1333,13 +1350,95 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CHECK_ZERO":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "SET_CANDIDATE":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "VOTE":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 10,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = [...examples[1]];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":169,"title":"Majority Element","topic":"Array & Hashing","why":"Canceling different values leaves a majority candidate because a true majority cannot be fully canceled.","meanings":{"nums":"input array","num":"current value being read in the loop","count":"vote counter for the current candidate","ans":"current candidate (the value finally returned)"},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, i, num, count, ans, execState, lastDelta, tookOver, ...({})}),

@@ -854,7 +854,7 @@
     // ---- Precompute steps via instrumented post-order pruning ----
     // step: {line, phase, nodeId, leftChildVal, rightChildVal, deleted (set as obj), pathIds,
     //        narr, traceSnap, action, finalArr}
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
       const traceRows = [];
       const deleted = {}; // id -> true (node removed from tree)
@@ -868,6 +868,7 @@
         walk(n.left);
         walk(n.right);
       })(root);
+      for (const [node,id] of idMap) node._id=id;
 
       function snapDeleted() { return { ...deleted }; }
       function snapTrace() { return traceRows.map(r => ({ ...r })); }
@@ -875,6 +876,8 @@
       function push(o, stack) {
         steps.push({
           line: o.line,
+          root: JSON.parse(JSON.stringify(root)),
+          nodes: nodes.map(record => {const live=[...idMap].find(([,id])=>id===record.id)?.[0]; return {...record,leftId:live?.left? idMap.get(live.left):null,rightId:live?.right?idMap.get(live.right):null};}),
           phase: o.phase,
           nodeId: o.nodeId == null ? null : o.nodeId,
           leftChildVal: o.leftChildVal === undefined ? null : o.leftChildVal,
@@ -999,6 +1002,7 @@
       }
 
       const resultRoot = dfs(root);
+      root = resultRoot;
 
       // serialize result tree to leetcode level-order (trailing nulls trimmed)
       const finalArr = serialize(resultRoot);
@@ -1273,13 +1277,42 @@
     target = examples[1].target;
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,8]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":1325,"title":"Delete Leaves With a Given Value","topic":"Trees","why":"Process children before deciding whether their parent has become a removable target-valued leaf.","meanings":{"root":"current node being processed by `removeLeafNodes`","node":"the active node in the recursion (same as `root` inside a frame)","target":"leaf value to delete","root.left":"left child after its subtree has been pruned (may be `null`)","root.right":"right child after its subtree has been pruned (may be `null`)"},"entityClasses":["hud-item","tree-node","nodeId","node"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({rootArr, target, root, nodes, stageWidth, stageHeight, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({rootArr, target, root, nodes, stageWidth, stageHeight, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({rootArr, target, root, nodes, stageWidth, stageHeight, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

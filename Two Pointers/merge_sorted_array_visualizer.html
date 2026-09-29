@@ -563,6 +563,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -846,40 +847,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parts = raw.split("|");
-      if (parts.length !== 4) {
-        alert("Use the format: nums1 | m | nums2 | n  (example: 1,2,3,0,0,0 | 3 | 2,5,6 | 3)");
-        return;
-      }
-
-      const newNums1 = parseListPart(parts[0]);
-      const newM = Number(parts[1].trim());
-      const newNums2 = parseListPart(parts[2]);
-      const newN = Number(parts[3].trim());
-
-      if (newNums1.some(Number.isNaN) || newNums2.some(Number.isNaN) || Number.isNaN(newM) || Number.isNaN(newN)) {
-        alert("Please enter only integers. Example: 1,2,3,0,0,0 | 3 | 2,5,6 | 3");
-        return;
-      }
-
-      if (newNums1.length !== newM + newN) {
-        alert("nums1.length must equal m + n. Got nums1.length = " + newNums1.length + " but m + n = " + (newM + newN) + ".");
-        return;
-      }
-
-      if (newNums2.length !== newN) {
-        alert("nums2.length must equal n. Got nums2.length = " + newNums2.length + " but n = " + newN + ".");
-        return;
-      }
-
-      nums1 = newNums1;
-      nums2 = newNums2;
-      m = newM;
-      n = newN;
-      activeExample = 0;
-      init(true);
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const [aText,mText,bText,nText]=parser.parts(document.getElementById('custom-input').value,4,'nums1, m, nums2, n'); const a=parser.list(aText,{json:false,label:'nums1'}), b=parser.list(bText,{json:false,label:'nums2'}), pm=parser.integer(mText,{min:0,max:a.length,label:'m'}), pn=parser.integer(nText,{min:0,max:a.length,label:'n'}); if(a.length!==pm+pn || b.length!==pn) throw Error('nums1.length must equal m + n, and nums2.length must equal n.'); if(a.slice(0,pm).some((v,i,p)=>i>0&&v<p[i-1]) || b.some((v,i)=>i>0&&v<b[i-1])) throw Error('The populated lists must be sorted in non-decreasing order.'); nums1=a; nums2=b; m=pm; n=pn;
+ activeExample = 0; init(true); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init(newInput = false) {
       if (newInput) originalNums1 = nums1.slice();
@@ -917,22 +890,40 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums1 = prev.nums1.slice();
-      nums2 = prev.nums2.slice();
-      originalNums1 = prev.originalNums1.slice();
-      m = prev.m;
-      n = prev.n;
-      i = prev.i;
-      j = prev.j;
-      k = prev.k;
-      execState = prev.execState;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastWriteK = prev.lastWriteK;
-      lastSource = prev.lastSource;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums1 = snapshot.nums1.slice();
+nums2 = snapshot.nums2.slice();
+originalNums1 = snapshot.originalNums1.slice();
+m = snapshot.m;
+n = snapshot.n;
+i = snapshot.i;
+j = snapshot.j;
+k = snapshot.k;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastWriteK = snapshot.lastWriteK;
+lastSource = snapshot.lastSource;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -942,11 +933,23 @@
 
       switch (execState) {
         case "INIT":
-          i = m - 1;
-          j = n - 1;
-          k = m + n - 1;
-          execState = "WHILE_CHECK";
-          break;
+ i = m - 1;
+
+ lastAction = "Initialize i.";
+ execState = "INIT_J";
+ break;
+case "INIT_J":
+ j = n - 1;
+
+ lastAction = "Initialize j.";
+ execState = "INIT_K";
+ break;
+case "INIT_K":
+ k = m + n - 1;
+
+ lastAction = "Initialize k.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (j >= 0) {
@@ -976,10 +979,14 @@
             wrote: wroteVal + " (nums1[" + i + "])",
             source: "nums1"
           });
+          execState = "DEC_I";
+          break;
+        }
+
+        case "DEC_I":
           i--;
           execState = "DEC_K";
           break;
-        }
 
         case "WRITE_J": {
           const wroteVal = nums2[j];
@@ -993,10 +1000,14 @@
             wrote: wroteVal + " (nums2[" + j + "])",
             source: "nums2"
           });
+          execState = "DEC_J";
+          break;
+        }
+
+        case "DEC_J":
           j--;
           execState = "DEC_K";
           break;
-        }
 
         case "DEC_K":
           k--;
@@ -1047,7 +1058,7 @@
       const row = document.createElement("div");
       row.className = "array-row";
 
-      const pointersActive = ["WHILE_CHECK", "COMPARE", "WRITE_I", "WRITE_J", "DEC_K"].includes(execState);
+      const pointersActive = ["WHILE_CHECK", "COMPARE", "WRITE_I", "DEC_I", "WRITE_J", "DEC_J", "DEC_K"].includes(execState);
       const finished = execState === "END" || execState === "RETURN";
 
       if (nums1.length === 0) {
@@ -1242,6 +1253,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1260,11 +1274,19 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4]);
-          narrate("Set <b>i = m - 1 = " + (m - 1) + "</b> (end of nums1's real part), <b>j = n - 1 = " + (n - 1) + "</b> (end of nums2), and <b>k = m + n - 1 = " + (m + n - 1) + "</b> (last write slot).");
-          break;
+
+ narrate("Initialize i from this line.");
+ break;
+case "INIT_J":
+
+ narrate("Initialize j from this line.");
+ break;
+case "INIT_K":
+
+ narrate("Initialize k from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([5]);
+
           if (j >= 0) {
             narrate("<code>while (j &gt;= 0)</code> is <b>true</b> (j = " + j + "): nums2 still has values to place.");
           } else {
@@ -1272,7 +1294,7 @@
           }
           break;
         case "COMPARE":
-          highlightLines([6]);
+
           if (i >= 0 && nums1[i] > nums2[j]) {
             narrate("<code>i &gt;= 0 &amp;&amp; nums1[" + i + "] &gt; nums2[" + j + "]</code> (" + nums1[i] + " &gt; " + nums2[j] + "): the bigger value is in <b>nums1</b>.");
           } else if (i < 0) {
@@ -1282,23 +1304,31 @@
           }
           break;
         case "WRITE_I":
-          highlightLines([7, 8]);
-          narrate("Write the nums1 value into the tail: <code>nums1[" + lastWriteK + "] = nums1[" + (i + 1) + "] = " + nums1[lastWriteK] + "</code>, then <code>i--</code>.");
+
+          narrate("Copy <code>nums1[" + i + "]</code> into the tail at index <b>" + lastWriteK + "</b>.");
+          break;
+        case "DEC_I":
+
+          narrate("Now move the source pointer back: <code>i--</code> to " + (i - 1) + ".");
           break;
         case "WRITE_J":
-          highlightLines([10, 11]);
-          narrate("Write the nums2 value into the tail: <code>nums1[" + lastWriteK + "] = nums2[" + (j + 1) + "] = " + nums1[lastWriteK] + "</code>, then <code>j--</code>.");
+
+          narrate("Copy <code>nums2[" + j + "]</code> into nums1 at index <b>" + lastWriteK + "</b>.");
+          break;
+        case "DEC_J":
+
+          narrate("Now move the source pointer back: <code>j--</code> to " + (j - 1) + ".");
           break;
         case "DEC_K":
-          highlightLines([13]);
+
           narrate("Move the write pointer left: <code>k--</code> -> " + k + ". The slot at the old k is now finalized.");
           break;
         case "RETURN":
-          highlightLines([14]);
+
           narrate("The loop is finished. <code>nums1</code> is now fully merged and sorted in place.");
           break;
         case "END":
-          highlightLines([15]);
+
           narrate("Done. <code>nums1 = [" + nums1.join(", ") + "]</code> - merged in place, no value returned.");
           break;
       }
@@ -1347,6 +1377,75 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_J":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_K":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "WRITE_I":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "DEC_I":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "WRITE_J":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "DEC_J":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "DEC_K":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 14,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 15,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     (function boot() {
       const ex = examples[1];
@@ -1358,8 +1457,36 @@
     })();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":88,"title":"Merge Sorted Array","topic":"Two Pointers","why":"Write from the back so a selected large value cannot overwrite an unread value in the first array.","meanings":{"nums1":"first sorted array with n trailing slots, merged in place","nums2":"second sorted array to merge into nums1","m":"number of real elements in nums1","n":"number of elements in nums2","i":"scanner at the end of nums1's real part, starts at m - 1","j":"scanner at the end of nums2, starts at n - 1","k":"write position from the back of nums1, starts at m + n - 1"},"entityClasses":["hud-item","cell","slot"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums1, nums2, m, n, i, j, k, execState, lastWriteK, lastSource, originalNums1, ...({})}),

@@ -862,88 +862,32 @@
     }
 
     // Build the full list of snapshots once, so Step Back is just index--.
-    function buildSteps() {
-      steps = [];
-      need = {};
-      for (const c of t) need[c] = (need[c] || 0) + 1;
-      needCount = Object.keys(need).length;
-
-      const windowMap = {};
-      let have = 0;
-      let left = 0;
-      let resLen = Infinity;
-      let resStart = 0;
-      const traceRows = [];
-
-      function snap(extra) {
-        steps.push(Object.assign({
-          window: cloneFreq(windowMap),
-          have,
-          left,
-          right: extra.right === undefined ? -1 : extra.right,
-          resLen,
-          resStart,
-          trace: traceRows.map(r => ({ ...r })),
-          entering: null,
-          leaving: null,
-          recordedBest: false
-        }, extra));
-      }
-
-      // INIT snapshot (before the for loop)
-      snap({ line: [2, 3, 4, 5, 6, 7], phase: "INIT", right: -1, left: 0 });
-
-      if (t.length > s.length) {
-        // The reference code does not early-return, but no window can ever
-        // satisfy need, so we simply run the loop; result stays "".
-      }
-
-      for (let right = 0; right < s.length; right++) {
-        const c = s[right];
-        windowMap[c] = (windowMap[c] || 0) + 1;
-        let became = false;
-        if (need[c] !== undefined && windowMap[c] === need[c]) {
-          have++;
-          became = true;
-        }
-        snap({ line: became ? [9, 10, 11] : [9, 10], phase: "EXPAND", right, entering: right, became });
-
-        while (have === needCount) {
-          let recordedBest = false;
-          if (right - left + 1 < resLen) {
-            resLen = right - left + 1;
-            resStart = left;
-            recordedBest = true;
-          }
-          snap({ line: [13, 14], phase: "RECORD", right, recordedBest });
-
-          const d = s[left];
-          windowMap[d]--;
-          let dropped = false;
-          if (need[d] !== undefined && windowMap[d] < need[d]) {
-            have--;
-            dropped = true;
-          }
-          const leavingIdx = left;
-          left++;
-          snap({ line: dropped ? [16, 17, 18, 19] : [16, 17, 19], phase: "SHRINK", right, leaving: leavingIdx, left, dropped });
-        }
-
-        // push trace row for this right after the inner while settles
-        traceRows.push({
-          right,
-          ch: s[right],
-          have,
-          needCount,
-          winLen: (have === needCount ? "-" : (right - left + 1)),
-          bestLen: resLen === Infinity ? "Inf" : resLen,
-          bestStr: resLen === Infinity ? "\"\"" : s.substring(resStart, resStart + resLen)
-        });
-      }
-
-      const finalAns = resLen === Infinity ? "" : s.substring(resStart, resStart + resLen);
-      snap({ line: [22], phase: "END", right: s.length - 1, left, ans: finalAns, resStart, resLen });
-    }
+    function buildSteps(){
+ steps=[];need={};needCount=0;const windowMap={},traceRows=[];let have=0,left=0,resLen=Infinity,resStart=0;
+ function snap(line,phase,narration,extra={}){steps.push({need:cloneFreq(need),needCount,window:cloneFreq(windowMap),have,left,right:-1,resLen,resStart,entering:null,leaving:null,recordedBest:false,trace:traceRows.map(r=>({...r})),...extra,line:line?[line]:[],executedLine:line||null,phase,narration});}
+ snap(null,'READY','Ready to build the required character counts.');snap(2,'INIT_NEED','Create the need frequency map.');
+ for(const c of t){need[c]=(need[c]||0)+1;snap(3,'COUNT_NEED','Increase the required count of '+c+'.',{c});}
+ needCount=Object.keys(need).length;snap(4,'INIT_NEED_COUNT','Store '+needCount+' distinct required characters.');
+ snap(5,'INIT_WINDOW','Create the empty window map.');snap(6,'INIT_POINTERS','Set have and left to zero.');snap(7,'INIT_BEST','Initialize the best window length and start.');
+ for(let right=0;right<s.length;right++){
+  snap(8,'ENTER','Read the next right index.',{right});const c=s[right];snap(9,'READ_ENTERING','Read character '+c+'.',{right,c,entering:right});
+  windowMap[c]=(windowMap[c]||0)+1;snap(10,'COUNT_ENTERING','Increase the window count of '+c+'.',{right,c,entering:right});
+  const became=need[c]!==undefined&&windowMap[c]===need[c];snap(11,'CHECK_COVERAGE','Check whether this count meets its requirement: '+became+'.',{right,c});
+  if(became){have++;snap(11,'EXPAND','Increase have to '+have+'.',{right,entering:right,became:true});}
+  while(true){
+   snap(12,'CHECK_WINDOW','Check have === needCount: '+(have===needCount)+'.',{right});if(have!==needCount)break;
+   const shorter=right-left+1<resLen;snap(13,'CHECK_BEST','Check whether this window is shorter: '+shorter+'.',{right});
+   if(shorter){resLen=right-left+1;snap(14,'BEST_LENGTH','Store the new best length '+resLen+'.',{right});resStart=left;snap(14,'RECORD','Store the best start '+left+'.',{right,recordedBest:true});}
+   const d=s[left],leavingIdx=left;snap(16,'READ_LEAVING','Read the character leaving the window: '+d+'.',{right,leaving:leavingIdx,d});
+   windowMap[d]--;snap(17,'COUNT_LEAVING','Decrease the window count of '+d+'.',{right,leaving:leavingIdx,d});
+   const dropped=need[d]!==undefined&&windowMap[d]<need[d];snap(18,'CHECK_REMOVAL','Check whether this removal breaks coverage: '+dropped+'.',{right,leaving:leavingIdx,d});
+   if(dropped){have--;snap(18,'DROP_COVERAGE','Decrease have to '+have+'.',{right,leaving:leavingIdx,d,dropped:true});}
+   left++;snap(19,'SHRINK','Advance left to '+left+'.',{right,leaving:leavingIdx,dropped});
+  }
+  traceRows.push({right,ch:s[right],have,needCount,winLen:right-left+1,bestLen:resLen===Infinity?'Inf':resLen,bestStr:resLen===Infinity?'""':s.substring(resStart,resStart+resLen)});
+ }
+ const ans=resLen===Infinity?'':s.substring(resStart,resStart+resLen);snap(22,'END','Return '+JSON.stringify(ans)+'.',{right:s.length-1,ans});
+}
 
     function loadExample(exNum) {
       activeExample = exNum;
@@ -1095,6 +1039,7 @@
     }
 
     function renderMaps(st) {
+      const need = st.need, needCount = st.needCount;
       const zone = document.createElement("div");
       zone.className = "maps-zone";
 
@@ -1207,6 +1152,7 @@
 
     function render() {
       const st = steps[stepIndex];
+      const need = st.need, needCount = st.needCount;
 
       document.getElementById("btn-prev").disabled = stepIndex === 0;
 
@@ -1260,6 +1206,7 @@
           }
           break;
       }
+      if (st.narration) narrate(st.narration);
 
       const visualUi = document.getElementById("visual-ui");
       visualUi.innerHTML = "";
@@ -1330,7 +1277,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({s, t, need, needCount, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({s, t, need, needCount, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({s, t, need, needCount, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -652,7 +652,7 @@
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">class</span> <span class="vr">DSU</span> {</div>
 <div id="line-2" class="code-line">  <span class="fn">constructor</span>(n) {</div>
-<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) => i);</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.parent = <span class="vr">Array</span>.<span class="fn">from</span>({ length: n }, (_, i) =&gt; i);</div>
 <div id="line-4" class="code-line">  }</div>
 <div id="line-5" class="code-line">  <span class="fn">find</span>(x) {</div>
 <div id="line-6" class="code-line">    <span class="kw">while</span> (<span class="kw">this</span>.parent[x] !== x) {</div>
@@ -669,8 +669,8 @@
 <div id="line-17" class="code-line"><span class="kw">function</span> <span class="fn">accountsMerge</span>(accounts) {</div>
 <div id="line-18" class="code-line">  <span class="kw">const</span> dsu = <span class="kw">new</span> <span class="vr">DSU</span>(accounts.length);</div>
 <div id="line-19" class="code-line">  <span class="kw">const</span> emailToId = <span class="kw">new</span> <span class="fn">Map</span>();</div>
-<div id="line-20" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i < accounts.length; i++) {</div>
-<div id="line-21" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> j = <span class="nm">1</span>; j < accounts[i].length; j++) {</div>
+<div id="line-20" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; accounts.length; i++) {</div>
+<div id="line-21" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> j = <span class="nm">1</span>; j &lt; accounts[i].length; j++) {</div>
 <div id="line-22" class="code-line">      <span class="kw">const</span> email = accounts[i][j];</div>
 <div id="line-23" class="code-line">      <span class="kw">if</span> (emailToId.<span class="fn">has</span>(email)) dsu.<span class="fn">union</span>(i, emailToId.<span class="fn">get</span>(email));</div>
 <div id="line-24" class="code-line">      <span class="kw">else</span> emailToId.<span class="fn">set</span>(email, i);</div>
@@ -960,14 +960,28 @@
           activeRoot: extra.activeRoot === undefined ? null : extra.activeRoot,
           freshResIdx: extra.freshResIdx === undefined ? null : extra.freshResIdx,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           status: extra.status === undefined ? "running" : extra.status,
           traceLen: traceRows.length
         });
       }
 
+      function findWithSteps(x, context) {
+        while (dsu.parent[x] !== x) {
+          snap({...context, lines: [6], narration: "The account is not its own root; continue following parent pointers."});
+          dsu.parent[x] = dsu.parent[dsu.parent[x]];
+          snap({...context, lines: [7], narration: "Shorten this account's parent pointer by one level."});
+          x = dsu.parent[x];
+          snap({...context, lines: [8], activeId: x, narration: "Move to the updated parent."});
+        }
+        snap({...context, lines: [10], activeRoot: x, narration: "Return the component root."});
+        return x;
+      }
+      snap({phase: "init", lines: [], executedLine: null, narration: "Ready to merge accounts."});
+      snap({phase: "init", lines: [18], narration: "Create the DSU with one separate set per account."});
       snap({
-        phase: "init", lines: [17, 18, 19],
+        phase: "init", lines: [19],
         narration: "Create a <code>DSU</code> with one node per account (index 0.." + (accs.length - 1) + ") and an empty <code>emailToId</code> map. Each account starts as its own set."
       });
 
@@ -975,15 +989,17 @@
       for (let i = 0; i < accs.length; i++) {
         for (let j = 1; j < accs[i].length; j++) {
           const email = accs[i][j];
+          snap({phase: "scan", lines: [22], i, j, email, activeId: i, narration: "Read this account's next email."});
           if (emailToId.has(email)) {
             const other = emailToId.get(email);
             snap({
-              phase: "scan-hit", lines: [22, 23], i, j, email, activeId: i, otherId: other,
+              phase: "scan-hit", lines: [23], i, j, email, activeId: i, otherId: other,
               narration: "Account <b>" + i + "</b> has email <code>" + email + "</code>, already first-seen on account <b>" + other + "</b>. Call <code>union(" + i + ", " + other + ")</code> to merge their sets."
             });
-            const ra = dsu.find(i);
-            const rb = dsu.find(other);
-            dsu.union(i, other);
+            const context = {phase: "union", i, j, email, activeId: i, otherId: other};
+            const ra = findWithSteps(i, context);
+            const rb = findWithSteps(other, context);
+            dsu.parent[ra] = rb;
             traceRows.push({ kind: "union", detail: "union(" + i + ", " + other + ") via " + email, ra, rb });
             snap({
               phase: "union", lines: [13], i, j, email, activeId: i, otherId: other,
@@ -1001,29 +1017,37 @@
       }
 
       snap({
-        phase: "phase2-start", lines: [27, 28],
+        phase: "phase2-start", lines: [27],
         narration: "All emails scanned. Now group every email by the <b>root</b> of its owning account: <code>for (const [email, id] of emailToId)</code>."
       });
 
       // Phase 2: group emails by root
       for (const [email, id] of emailToId) {
-        const root = dsu.find(id);
-        if (!groups.has(root)) groups.set(root, []);
+        snap({phase: "group", lines: [28], email, activeId: id, narration: "Read the next email and its owning account."});
+        const root = findWithSteps(id, {phase: "group", email, activeId: id});
+        snap({phase: "group", lines: [29], email, activeId: id, activeRoot: root, narration: "Read this account's component root."});
+        if (!groups.has(root)) {
+          groups.set(root, []);
+          snap({phase: "group", lines: [30], email, activeId: id, activeRoot: root, narration: "Create an empty email list for this component. The email has not been appended yet."});
+        }
         groups.get(root).push(email);
         snap({
-          phase: "group", lines: [29, 30, 31], email, activeId: id, activeRoot: root,
+          phase: "group", lines: [31], email, activeId: id, activeRoot: root,
           narration: "Email <code>" + email + "</code> belongs to account <b>" + id + "</b>; <code>find(" + id + ") = " + root + "</code>. Append it to group <b>" + root + "</b>."
         });
       }
 
       // Phase 3: build sorted result
+      snap({phase: "emit", lines: [33], narration: "Create the empty merged-account result."});
       let resIdx = 0;
       for (const [root, emails] of groups) {
+        snap({phase: "emit", lines: [34], activeRoot: root, narration: "Read the next component and its email list."});
         emails.sort();
+        snap({phase: "emit", lines: [35], activeRoot: root, narration: "Sort this component's emails. The result stays unchanged."});
         res.push([accs[root][0], ...emails]);
         traceRows.push({ kind: "result", detail: accs[root][0] + ": " + emails.join(", "), ra: root, rb: "—" });
         snap({
-          phase: "emit", lines: [35, 36], activeRoot: root, freshResIdx: resIdx,
+          phase: "emit", lines: [36], activeRoot: root, freshResIdx: resIdx,
           narration: "Group <b>" + root + "</b>: sort its emails, then push <code>[\"" + accs[root][0] + "\", ...emails]</code> onto <code>res</code>."
         });
         resIdx++;
@@ -1441,8 +1465,8 @@
       spec: {"number":721,"title":"Accounts Merge","topic":"Graphs","why":"Shared email addresses connect accounts transitively, so merge the entire connected group.","meanings":{"accounts":"Input list; each entry is `[name, email1, email2, ...]`. Accounts sharing any email belong to one person.","dsu":"The `DSU` (union-find) over account indices `0..accounts.length-1`.","parent":"`parent[x]` is account `x`'s parent pointer; the root identifies its merged group.","emailToId":"`Map` from each email to the index of the first account that listed it.","i":"Index of the account currently being scanned.","j":"Index of the current email within `accounts[i]` (starts at 1, since index 0 is the name).","email":"The current email string `accounts[i][j]`.","groups":"`Map` from a set root to the list of emails belonging to that merged person.","root":"`find(id)` — the representative account index for an email's owner.","res":"Output: one entry per merged person = `[name, ...sortedEmails]`."},"entityClasses":["hud-item","email-pill","tree-nodes","node"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({accounts, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({accounts, masterTrace, ...(steps[position] || {})}),
+      read: () => ({accounts,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({accounts,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

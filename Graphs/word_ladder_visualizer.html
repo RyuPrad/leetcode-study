@@ -615,7 +615,7 @@
 <div id="line-4" class="code-line">  <span class="kw">let</span> queue = [beginWord];</div>
 <div id="line-5" class="code-line">  <span class="kw">const</span> visited = <span class="kw">new</span> <span class="fn">Set</span>([beginWord]);</div>
 <div id="line-6" class="code-line">  <span class="kw">let</span> level = <span class="nm">1</span>;</div>
-<div id="line-7" class="code-line">  <span class="kw">while</span> (queue.length > <span class="nm">0</span>) {</div>
+<div id="line-7" class="code-line">  <span class="kw">while</span> (queue.length &gt; <span class="nm">0</span>) {</div>
 <div id="line-8" class="code-line">    <span class="kw">const</span> next = [];</div>
 <div id="line-9" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> word <span class="kw">of</span> queue) {</div>
 <div id="line-10" class="code-line">      <span class="kw">if</span> (word === endWord) <span class="kw">return</span> level;</div>
@@ -853,11 +853,15 @@
           visitedLen: visitedLog.length,
           levelIdx: (extra.levelIdx === undefined) ? null : extra.levelIdx,
           wordList: list,
+          next: nextQueue.slice(),
+          c: extra.c ?? null,
+          ch: extra.ch ?? null,
           level,
           begin,
           end,
           ans: (extra.ans === undefined) ? answer : extra.ans,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           currentWord: (extra.currentWord === undefined) ? null : extra.currentWord,
           candidate: (extra.candidate === undefined) ? null : extra.candidate,
@@ -869,6 +873,8 @@
         });
       }
 
+      let nextQueue = [];
+      snap({lines: [], executedLine: null, narration: "Ready to search for a word ladder."});
       // Line 2: build word Set
       snap({
         lines: [2],
@@ -923,14 +929,17 @@
       while (levels[curLevel].length > 0 && !done) {
         const queue = levels[curLevel];
         snap({
-          lines: [7, 9],
+          lines: [7],
           levelIdx: curLevel,
           narration: "Level <b>" + level + "</b>: the frontier holds <b>" + queue.length + "</b> word" + (queue.length === 1 ? "" : "s") + ". Expand each by changing one letter at a time."
         });
         const next = [];
+        nextQueue = next;
+        snap({lines: [8], levelIdx: curLevel, narration: "Create the empty next frontier."});
 
         for (let qi = 0; qi < queue.length; qi++) {
           const word = queue[qi];
+          snap({lines: [9], levelIdx: curLevel, currentWord: word, narration: "Read the next word from the current frontier."});
           // Line 10: word === endWord?
           if (word === end) {
             answer = level;
@@ -953,55 +962,21 @@
             currentWord: word
           });
 
-          // Lines 11-19: for each position, sweep a..z
           for (let i = 0; i < word.length; i++) {
-            const hitsAtPos = [];
+            snap({lines: [11], levelIdx: curLevel, currentWord: word, mutPos: i, narration: "Choose the next character position."});
             for (let c = 97; c <= 122; c++) {
+              snap({lines: [12], levelIdx: curLevel, currentWord: word, mutPos: i, c, narration: "Read the next character code."});
               const ch = String.fromCharCode(c);
+              snap({lines: [13], levelIdx: curLevel, currentWord: word, mutPos: i, c, ch, narration: "Convert the character code to a letter."});
               const cand = word.slice(0, i) + ch + word.slice(i + 1);
-              if (cand === word) continue; // same letter, no real change
-              if (words.has(cand)) {
-                if (visitedSet.has(cand)) {
-                  hitsAtPos.push({ cand, status: "dup" });
-                } else {
-                  hitsAtPos.push({ cand, status: "new" });
-                }
-              }
-            }
-            // Summarise the 26-letter sweep at this position.
-            snap({
-              lines: [11, 12, 13, 14],
-              levelIdx: curLevel,
-              currentWord: word,
-              mutPos: i,
-              narration: "Change position <b>" + i + "</b> of <code>" + word + "</code> through a–z (" +
-                (hitsAtPos.length === 0 ? "no list words appear here" : hitsAtPos.length + " list word" + (hitsAtPos.length === 1 ? "" : "s") + " appear: " + hitsAtPos.map(h => h.cand).join(", ")) + ")."
-            });
-            // Emit a detailed snapshot for each in-list candidate at this position.
-            for (const hit of hitsAtPos) {
-              if (hit.status === "new") {
-                addVisited(hit.cand);
-                next.push(hit.cand);
-                snap({
-                  lines: [15, 16, 17],
-                  levelIdx: curLevel,
-                  currentWord: word,
-                  mutPos: i,
-                  candidate: hit.cand,
-                  candStatus: "new",
-                  justAdded: hit.cand,
-                  narration: "<code>" + hit.cand + "</code> is in the list and unvisited — add it to <code>visited</code> and the next frontier."
-                });
-              } else {
-                snap({
-                  lines: [15],
-                  levelIdx: curLevel,
-                  currentWord: word,
-                  mutPos: i,
-                  candidate: hit.cand,
-                  candStatus: "dup",
-                  narration: "<code>" + hit.cand + "</code> is a list word but already <b>visited</b>, so skip it (a shorter or equal path already found it)."
-                });
+              const valid = words.has(cand) && !visitedSet.has(cand);
+              snap({lines: [14], levelIdx: curLevel, currentWord: word, mutPos: i, c, ch, candidate: cand, narration: "Build the candidate word. The visited set and next frontier stay unchanged."});
+              snap({lines: [15], levelIdx: curLevel, currentWord: word, mutPos: i, c, ch, candidate: cand, candStatus: valid ? "new" : "dup", narration: valid ? "The candidate is a list word and has not been visited." : "The candidate is missing from the list or already visited. Skip it."});
+              if (valid) {
+                addVisited(cand);
+                snap({lines: [16], levelIdx: curLevel, currentWord: word, mutPos: i, c, ch, candidate: cand, candStatus: "new", justAdded: cand, narration: "Mark the candidate visited. The next frontier stays unchanged."});
+                next.push(cand);
+                snap({lines: [17], levelIdx: curLevel, currentWord: word, mutPos: i, c, ch, candidate: cand, candStatus: "new", justAdded: cand, narration: "Append the candidate to the next frontier."});
               }
             }
           }
@@ -1011,12 +986,13 @@
 
         // Lines 22-23: advance level
         levels.push(next);
+        curLevel++;
+        snap({lines: [22], levelIdx: curLevel, narration: "Use the collected next frontier as queue. The level stays unchanged."});
         const fromLevel = level;
         level++;
-        curLevel++;
         traceRows.push({ level: fromLevel, action: "expanded " + queue.length + " → " + next.length + " new", frontier: frontierLabel(queue), visited: visitedSet.size });
         snap({
-          lines: [22, 23],
+          lines: [23],
           levelIdx: curLevel,
           narration: "Level " + fromLevel + " fully expanded. <code>queue = next</code> (" + next.length + " word" + (next.length === 1 ? "" : "s") + "), <code>level++ → " + level + "</code>.",
           currentWord: null
@@ -1131,12 +1107,17 @@
       return {
         queue,
         visited,
+        visitedLen: visited.length,
         wordList: raw.wordList,
         level: raw.level,
         begin: raw.begin,
         end: raw.end,
         ans: raw.ans,
         lines: raw.lines,
+        executedLine: raw.executedLine,
+        next: raw.next,
+        c: raw.c,
+        ch: raw.ch,
         narration: raw.narration,
         currentWord: raw.currentWord,
         candidate: raw.candidate,
@@ -1434,8 +1415,8 @@
       spec: {"number":127,"title":"Word Ladder","topic":"Graphs","why":"Each breadth-first search layer adds one transformation, so the first arrival uses the fewest changes.","meanings":{"beginWord":"The starting word of the transformation ladder.","endWord":"The target word we must reach by changing one letter at a time.","wordList":"The set of allowed intermediate words; every step must land on one.","words":"A `Set` built from `wordList` for O(1) membership checks.","queue":"The current BFS frontier: all words reachable in the same number of steps.","visited":"A `Set` of words already enqueued, so BFS never revisits one.","level":"BFS depth = number of words on the path so far (the answer when `endWord` is popped).","word":"The word popped from the frontier and expanded this step.","cand":"A candidate word formed by replacing one letter of `word` with a–z."},"entityClasses":["hud-item","word-chip","fromCharCode"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({beginWord, endWord, wordList, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({beginWord, endWord, wordList, ...(steps[position] || {})}),
+      read: () => ({beginWord, endWord, wordList, ...viewOf(steps[stepIndex])}),
+      readAt: (studySnapshotIndex) => ({beginWord, endWord, wordList, ...viewOf(steps[studySnapshotIndex])}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -682,6 +682,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -956,11 +957,10 @@
 
       // build & sort projects [capital, profit]
       const projects = [];
-      for (let idx = 0; idx < n; idx++) projects.push([capital[idx], profits[idx]]);
-      projects.sort((a, b) => a[0] - b[0]);
+
 
       let w = w0;
-      let i = 0;
+      let i = null;
       let admittedFlags = new Array(n).fill(false);
 
       function snap(extra) {
@@ -978,24 +978,29 @@
           phase: "init",
           done: false
         };
-        steps.push(Object.assign(base, extra));
+        steps.push(Object.assign(base, extra, {executedLine: extra.executedLine === null ? null : extra.codeLines[0]}));
       }
 
       snap({
-        codeLines: [1],
+        codeLines: [], executedLine: null,
         narration: "Goal: do at most <b>k = " + k + "</b> projects starting with capital <b>w = " + w + "</b>, maximizing final capital. Use a <b>max-heap of profits</b>.",
         phase: "init"
       });
+      for (let idx = 0; idx < n; idx++) projects.push([capital[idx], profits[idx]]);
+      snap({codeLines: [2], narration: "Pair each project capital with its profit.", phase: "init"});
+      projects.sort((a, b) => a[0] - b[0]);
       snap({
-        codeLines: [2, 3],
+        codeLines: [3],
         narration: "Build <b>projects = [capital, profit]</b> and sort by capital ascending: " + (projects.length ? projects.map(p => "[" + p[0] + "," + p[1] + "]").join(", ") : "[]") + ".",
         phase: "init"
       });
 
       const maxHeap = new MaxHeap();
 
+      snap({codeLines: [4], narration: "Create an empty max heap.", phase: "init"});
+      i = 0;
       snap({
-        codeLines: [4, 5],
+        codeLines: [5],
         narration: "Create an empty <b>max-heap</b> (compares by profit) and set pointer <b>i = 0</b>.",
         phase: "init"
       });
@@ -1061,6 +1066,7 @@
           admittedFlags[i] = true;
           trace.push({ round: j, w_before: w, admitted: "profit " + adm + " (cap " + projects[i][0] + ")", picked: "-", w_after: "-" });
           i++;
+          snap({round: j, heap: maxHeap.data.slice(), codeLines: [8], narration: "Advance i after admitting the project.", phase: "round"});
         }
         recorder = null;
 
@@ -1160,7 +1166,7 @@
       snap({
         heap: maxHeap.data.slice(),
         highlight: {},
-        codeLines: [13, 14],
+        codeLines: [13],
         narration: "Done. Maximum capital achievable: <b>w = " + w + "</b>.",
         phase: "done",
         done: true
@@ -1202,32 +1208,11 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      if (parts.length < 4) {
-        alert("Format: k | w | profits | capital. Example: 2 | 0 | 1,2,3 | 0,1,1");
-        return;
-      }
-      const pk = Number(parts[0].trim());
-      const pw = Number(parts[1].trim());
-      const pp = parts[2].split(",").map(s => Number(s.trim())).filter(v => !Number.isNaN(v) || true);
-      const pc = parts[3].split(",").map(s => Number(s.trim()));
-      if (Number.isNaN(pk) || Number.isNaN(pw)) {
-        alert("k and w must be numbers. Example: 2 | 0 | 1,2,3 | 0,1,1");
-        return;
-      }
-      if (pp.some(Number.isNaN) || pc.some(Number.isNaN)) {
-        alert("profits and capital must be comma-separated numbers.");
-        return;
-      }
-      if (pp.length !== pc.length) {
-        alert("profits and capital must have the same length.");
-        return;
-      }
-      k = pk; w = pw; profits = pp; capital = pc;
-      activeExample = 0;
-      init();
-    }
+ try { const parser=window.StudyNumericInput;
+ const [kText,wText,profitsText,capitalText]=parser.parts(document.getElementById('custom-input').value,4,'k, w, profits, capital');const pk=parser.integer(kText,{min:0,label:'k'}),pw=parser.integer(wText,{min:0,label:'w'}),pp=parser.list(profitsText,{json:false,min:0,label:'Profits'}),pc=parser.list(capitalText,{json:false,min:0,label:'Capital'});if(pp.length!==pc.length)throw Error('Profits and capital must have the same length.');if(!Number.isSafeInteger(pw+pp.reduce((sum,v)=>sum+v,0)))throw Error('The total capital must remain a safe integer.');k=pk;w=pw;profits=pp;capital=pc;
+ activeExample=0;init();return true;
+ } catch(error) {alert(error.message);return false;}
+}
 
     function init() {
       steps = buildSteps(k, w, profits, capital);
@@ -1563,7 +1548,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({recorder, k, w, profits, capital, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({recorder, k, w, profits, capital, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({recorder, k, w, profits, capital, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

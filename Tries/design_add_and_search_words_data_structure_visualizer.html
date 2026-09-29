@@ -645,7 +645,7 @@
 <div id="line-20" class="code-line">  }</div>
 <div id="line-21" class="code-line"></div>
 <div id="line-22" class="code-line">  <span class="fn">search</span>(word) {</div>
-<div id="line-23" class="code-line">    <span class="kw">const</span> dfs = (node, i) => {</div>
+<div id="line-23" class="code-line">    <span class="kw">const</span> dfs = (node, i) =&gt; {</div>
 <div id="line-24" class="code-line">      <span class="kw">if</span> (i === word.length) <span class="kw">return</span> node.isEnd;</div>
 <div id="line-25" class="code-line">      <span class="kw">const</span> ch = word[i];</div>
 <div id="line-26" class="code-line">      <span class="kw">if</span> (ch === <span class="str">"."</span>) {</div>
@@ -938,6 +938,7 @@
           wildEdge: (extra.wildEdge === undefined) ? null : extra.wildEdge, // {from,to} edge highlighted as a wildcard branch
           createdId: (extra.createdId === undefined) ? null : extra.createdId,
           frames: (extra.frames === undefined) ? [] : extra.frames.map(f => ({ ...f })), // DFS call-stack rows
+          executedLine: extra.lines[0] ?? null,
           lines: extra.lines,
           narration: extra.narration,
           ans: (extra.ans === undefined) ? "pending" : extra.ans,
@@ -947,6 +948,8 @@
         });
       }
 
+      snap({method:"init",opNum:-1,lines:[],narration:"Ready to operate on the word dictionary."});
+      snap({method:"init",opNum:-1,lines:[10],narration:"Create the root trie node."});
       opList.forEach((op, opNum) => {
         const word = op.arg;
         const chars = Array.from(word);
@@ -996,18 +999,17 @@
             narration: "<code>node.isEnd = true</code> — mark the final node so \"" + word + "\" is a complete stored word (✓)."
           });
           traceRows.push({ op: "addWord", word, result: "void", outcome: "added" });
-          snap({
-            method: "addWord", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [20], charIndex: chars.length - 1,
-            narration: "addWord(\"" + word + "\") returns."
-          });
+          built.at(-1).traceLen = traceRows.length;
 
         } else {
           // search: instrumented recursive DFS with '.' wildcard branching.
           snap({
-            method: "search", arg: word, opNum, lines: [22, 35], charIndex: -1,
+            method: "search", arg: word, opNum, lines: [22], charIndex: -1,
             narration: "<b>search(\"" + word + "\")</b> — run <code>dfs(root, 0)</code>. A '.' matches ANY child, so the DFS may branch and backtrack."
           });
 
+          snap({method:"search",arg:word,opNum,lines:[23],narration:"Define the recursive search helper."});
+          snap({method:"search",arg:word,opNum,lines:[35],narration:"Call dfs for the root node."});
           // frames: stack of { depth, ch, nodeId, enterCh, isWild, tryingKey, status }
           const frames = [];
 
@@ -1038,11 +1040,12 @@
               pathIds: cleanPath, stackIds: cleanPath,
               wildEdge: isWildEntry && parentId !== null ? { from: parentId, to: node.id } : null,
               frames: frames.slice(),
-              lines: [23],
+              lines: [viaCh === null ? 35 : viaCh === "." ? 28 : 33],
               narration: "Enter <code>dfs(node, i=" + i + ")</code>" +
                 (parentId !== null ? (isWildEntry ? " via wildcard '.' resolved to child '" + enterCh + "'" : " into child '" + enterCh + "'") : " — the root call") + "."
             });
 
+            snap({method:"search",arg:word,opNum,nodeId:node.id,charIndex:i,pathIds:cleanPath,stackIds:cleanPath,frames:frames.slice(),lines:[24],narration:"Check whether every character has been consumed."});
             // if (i === word.length) return node.isEnd;
             if (i === chars.length) {
               const r = node.isEnd;
@@ -1071,6 +1074,7 @@
               narration: "<code>ch = word[" + i + "] = '" + ch + "'</code>."
             });
 
+            snap({method:"search",arg:word,opNum,nodeId:node.id,charIndex:i,ch,pathIds:cleanPath,stackIds:cleanPath,frames:frames.slice(),lines:[26],narration:"Check whether the character is a wildcard."});
             if (ch === ".") {
               frame.isWild = true;
               const keys = Object.keys(node.children).sort();
@@ -1079,12 +1083,13 @@
                 nodeId: node.id, charIndex: i, ch,
                 pathIds: cleanPath, stackIds: cleanPath,
                 frames: frames.slice(),
-                lines: [26, 27],
+                lines: [27],
                 narration: keys.length === 0
                   ? "<code>ch === '.'</code> (wildcard), but this node has <b>no children</b> — the for…in loop body never runs."
                   : "<code>ch === '.'</code> (wildcard). Try EVERY child of this node: <b>" + keys.map(k => "'" + k + "'").join(", ") + "</b>."
               });
               for (const key of keys) {
+                snap({method:"search",arg:word,opNum,nodeId:node.id,charIndex:i,ch,pathIds:cleanPath,stackIds:cleanPath,frames:frames.slice(),lines:[27],narration:"Read the next wildcard child."});
                 frame.tryingKey = key;
                 snap({
                   method: "search", arg: word, opNum,
@@ -1151,6 +1156,7 @@
               frames.pop();
               return false;
             }
+            snap({method:"search",arg:word,opNum,nodeId:node.id,charIndex:i,ch,pathIds:cleanPath,stackIds:cleanPath,frames:frames.slice(),lines:[32],narration:"The required child exists."});
             // return dfs(node.children[ch], i + 1);
             snap({
               method: "search", arg: word, opNum,
@@ -1637,8 +1643,8 @@
       spec: {"number":211,"title":"Design Add and Search Words Data Structure","topic":"Tries","why":"A dot explores all possible child edges at that character position; ordinary letters follow one edge.","meanings":{"root":"The dictionary's entry point: a `TrieNode` holding the first letter of every added word as its children. `search` always starts its DFS here with `dfs(this.root, 0)`.","node":"The current `TrieNode` being examined — the first parameter of `dfs(node, i)`, and the walking pointer in `addWord`.","ch":"The current search character `word[i]`. If it equals `\".\"` it is a wildcard that matches ANY child; otherwise it must match a single specific child.","word":"The string passed to `addWord` (letters only) or `search` (letters plus `.` wildcards).","i":"The DFS depth / index into `word`. The base case is `i === word.length`, where the answer is `node.isEnd`.","key":"A child letter iterated by `for (const key in node.children)` while resolving a `.` wildcard — every key is a branch the DFS may try.","children":"A `TrieNode` field: the map `{ letter: TrieNode }` of outgoing edges. At a `.`, the DFS recurses into each entry of this map.","isEnd":"A `TrieNode` boolean flag marking where a complete added word ends (drawn as a ✓). Returned at the base case `i === word.length`.","dfs":"The recursive arrow function inside `search`. It returns `true` as soon as one branch succeeds and backtracks (`return false`) when a path dead-ends, so `.` patterns explore the trie depth-first."},"entityClasses":["hud-item","char-chip","trie-node","dfs-frame","charIndex","nodeId","frames"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nodeCounter, ops, masterTrace, NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nodeCounter, ops, masterTrace, NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[position] || {})}),
+      read: () => ({nodeCounter, ops,  NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nodeCounter, ops,  NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

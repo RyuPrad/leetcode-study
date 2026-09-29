@@ -603,6 +603,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -842,10 +843,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseNums(text) {
-      const clean = text.split(",").map(part => Number(part.trim())).filter(part => part !== "" && Number.isFinite(part));
-      return clean;
-    }
+    function parseNums(text) {try{return StudyNumericInput.list(text,{json:false,minLength:1,label:'Numbers'});}catch(error){alert(error.message);return null;}}
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -861,148 +859,28 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value;
-      const parts = raw.split("|");
-      const parsedNums = parseNums(parts[0] || "");
-      const parsedK = Number((parts[1] || "0").trim());
-      if (parsedNums.length === 0) {
-        alert("Please enter at least one number for nums. Example: 1,2,3,4,5,6,7 | 3");
-        return;
-      }
-      if (!Number.isFinite(parsedK) || parsedK < 0 || !Number.isInteger(parsedK)) {
-        alert("Please enter a non-negative integer for k. Example: 1,2,3,4,5,6,7 | 3");
-        return;
-      }
-      nums = parsedNums;
-      k = parsedK;
-      activeExample = 0;
-      init();
-    }
+ try { const parser=window.StudyNumericInput;
+ const [arrayText,kText]=parser.optionalParameter(document.getElementById('custom-input').value,'0','Numbers and k');const parsed=parser.list(arrayText,{json:false,minLength:1,label:'Numbers'}),parsedK=parser.integer(kText,{min:0,label:'k'});nums=parsed;k=parsedK;
+ activeExample=0;init();return true;
+ } catch(error) {alert(error.message);return false;}
+}
 
     // Build the full list of reversible step snapshots by simulating the algorithm.
-    function buildSteps(startNums, rawK) {
-      const out = [];
-      const n = startNums.length;
-      const arr = startNums.slice();
-      const trace = [];
-
-      function snapshot(extra) {
-        return Object.assign({
-          nums: arr.slice(),
-          k: kVal,
-          left: null,
-          right: null,
-          phase: 0,
-          range: null,
-          swapped: null,
-          completedPhases: completed.slice(),
-          codeLines: [],
-          narration: "",
-          trace: trace.map(row => ({ ...row })),
-          done: false
-        }, extra);
-      }
-
-      let kVal = rawK;
-      const completed = [false, false, false];
-
-      // Step 0: initial state
-      out.push(snapshot({
-        codeLines: [1],
-        narration: 'Input <code>nums = ' + esc(formatArray(arr)) + '</code> with <code>k = ' + rawK + '</code>. Press Step Over to normalize k.'
-      }));
-
-      // Step: k = k % n
-      const beforeK = kVal;
-      kVal = n === 0 ? 0 : kVal % n;
-      out.push(snapshot({
-        codeLines: [2],
-        narration: 'Normalize the rotation: <code>k = ' + beforeK + ' % ' + n + ' = ' + kVal + '</code>. Rotating by a full length changes nothing.'
-      }));
-
-      // Reverse phases. Each phase = (lo, hi).
-      const phases = [
-        { id: 1, lo: 0, hi: n - 1, line: 3, name: "reverse(nums, 0, n - 1)", label: "entire array" },
-        { id: 2, lo: 0, hi: kVal - 1, line: 4, name: "reverse(nums, 0, k - 1)", label: "first k elements" },
-        { id: 3, lo: kVal, hi: n - 1, line: 5, name: "reverse(nums, k, n - 1)", label: "remaining n - k elements" }
-      ];
-
-      for (const ph of phases) {
-        let left = ph.lo;
-        let right = ph.hi;
-
-        // Enter phase: show the call line + first while check
-        out.push(snapshot({
-          phase: ph.id,
-          range: { lo: ph.lo, hi: ph.hi },
-          left,
-          right,
-          codeLines: [ph.line, 9],
-          narration: 'Phase ' + ph.id + ': call <code>' + esc(ph.name) + '</code> to reverse the ' + ph.label + ' (indexes ' + ph.lo + ' to ' + ph.hi + '). Check <code>left &lt; right</code>.'
-        }));
-
-        while (left < right) {
-          // Swap
-          const a = arr[left];
-          const b = arr[right];
-          arr[left] = b;
-          arr[right] = a;
-          trace.push({
-            step: trace.length + 1,
-            phase: "Phase " + ph.id,
-            left,
-            right,
-            swap: a + " <-> " + b,
-            result: formatArray(arr)
-          });
-          out.push(snapshot({
-            phase: ph.id,
-            range: { lo: ph.lo, hi: ph.hi },
-            left,
-            right,
-            swapped: { left, right },
-            codeLines: [10],
-            narration: 'Phase ' + ph.id + ': swap <code>nums[' + left + ']</code> and <code>nums[' + right + ']</code> (' + a + ' and ' + b + ').'
-          }));
-
-          // Move pointers
-          left++;
-          right--;
-          out.push(snapshot({
-            phase: ph.id,
-            range: { lo: ph.lo, hi: ph.hi },
-            left,
-            right,
-            codeLines: [11, 12, 9],
-            narration: left < right
-              ? 'Phase ' + ph.id + ': move pointers inward to <code>left = ' + left + '</code>, <code>right = ' + right + '</code>, then re-check <code>left &lt; right</code>.'
-              : 'Phase ' + ph.id + ': pointers met (<code>left = ' + left + '</code>, <code>right = ' + right + '</code>). This reverse is complete.'
-          }));
-        }
-
-        completed[ph.id - 1] = true;
-        // Phase complete snapshot
-        out.push(snapshot({
-          phase: ph.id,
-          range: { lo: ph.lo, hi: ph.hi },
-          left: null,
-          right: null,
-          codeLines: ph.id === 3 ? [13, 14] : [13],
-          narration: 'Phase ' + ph.id + ' complete. Array is now <code>' + esc(formatArray(arr)) + '</code>.'
-        }));
-      }
-
-      // Final done snapshot
-      out.push(snapshot({
-        left: null,
-        right: null,
-        codeLines: [6],
-        done: true,
-        narration: 'Done. The rotated array is <code>' + esc(formatArray(arr)) + '</code>.'
-      }));
-
-      return out;
-    }
+    function buildSteps(startNums,rawK){
+ const out=[],n=startNums.length,arr=startNums.slice(),trace=[],completed=[false,false,false];let kVal=rawK;
+ function snap(line,narration,extra={}){out.push({nums:arr.slice(),k:kVal,left:null,right:null,phase:0,range:null,swapped:null,completedPhases:completed.slice(),codeLines:line?[line]:[],executedLine:line||null,narration,trace:trace.map(row=>({...row})),done:false,...extra});}
+ snap(null,'Ready to normalize k.');kVal=n===0?0:kVal%n;snap(2,'Set k to '+kVal+'.');
+ const phases=[{id:1,lo:0,hi:n-1,line:3},{id:2,lo:0,hi:kVal-1,line:4},{id:3,lo:kVal,hi:n-1,line:5}];
+ for(const ph of phases){
+  let left=ph.lo,right=ph.hi;const state=()=>({phase:ph.id,range:{lo:ph.lo,hi:ph.hi},left,right});snap(ph.line,'Call reverse for indices '+left+' through '+right+'.',state());
+  while(true){snap(9,'Check left < right: '+(left<right)+'.',state());if(left>=right)break;
+   const a=arr[left],b=arr[right];[arr[left],arr[right]]=[b,a];trace.push({step:trace.length+1,phase:'Phase '+ph.id,left,right,swap:a+' <-> '+b,result:formatArray(arr)});snap(10,'Swap the two array values.',{...state(),swapped:{left,right}});
+   left++;snap(11,'Advance left to '+left+'.',state());right--;snap(12,'Decrease right to '+right+'.',state());
+  }
+  completed[ph.id-1]=true;snap(ph.line,'Return from this reverse call.',{...state(),left:null,right:null,done:ph.id===3});
+ }
+ return out;
+}
 
     function init() {
       steps = buildSteps(nums, k);
@@ -1267,7 +1145,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({nums, k, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, k, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nums, k, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

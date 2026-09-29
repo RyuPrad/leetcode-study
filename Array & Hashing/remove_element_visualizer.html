@@ -573,6 +573,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -832,42 +833,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      if (parts.length !== 2) {
-        alert("Use the format:  nums | val\nExample:  3, 2, 2, 3 | 3");
-        return;
-      }
-
-      const numsRaw = parts[0].trim();
-      const valRaw = parts[1].trim();
-
-      let parsedNums;
-      if (numsRaw === "") {
-        parsedNums = [];
-      } else {
-        parsedNums = numsRaw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (parsedNums.some(Number.isNaN)) {
-        alert("The numbers part must contain only numbers separated by commas. Example: 3, 2, 2, 3 | 3");
-        return;
-      }
-
-      if (valRaw === "" || Number.isNaN(Number(valRaw))) {
-        alert("The val (after the | ) must be a single number. Example: 3, 2, 2, 3 | 3");
-        return;
-      }
-
-      nums = parsedNums;
-      val = Number(valRaw);
-      activeExample = 0;
-      init(true);
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const [arrayText,valText]=parser.parts(document.getElementById('custom-input').value,2,'Numbers and val'); const parsed=parser.list(arrayText,{json:false,label:'Numbers'}), parsedVal=parser.integer(valText,{label:'val'}); nums=parsed; val=parsedVal;
+ activeExample = 0; init(true); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init(newInput = false) {
       if (newInput) original = [...nums];
@@ -903,20 +874,36 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      nums = [...s.nums];
-      original = [...s.original];
-      val = s.val;
-      i = s.i;
-      k = s.k;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      lastWriteIndex = s.lastWriteIndex;
-      lastRemovedIndex = s.lastRemovedIndex;
+      restoreState(s);
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = [...snapshot.nums];
+original = [...snapshot.original];
+val = snapshot.val;
+i = snapshot.i;
+k = snapshot.k;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastWriteIndex = snapshot.lastWriteIndex;
+lastRemovedIndex = snapshot.lastRemovedIndex;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -1192,6 +1179,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1210,11 +1200,11 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2]);
+
           narrate("Initialize the slow / write pointer <b>k = 0</b>. <b>k</b> counts how many elements we keep, and marks the next write position.");
           break;
         case "LOOP_CHECK":
-          highlightLines([3]);
+
           if (i < nums.length) {
             narrate("<code>for</code> loop continues because the fast pointer <b>i = " + i + "</b> is still inside the array.");
           } else {
@@ -1222,7 +1212,7 @@
           }
           break;
         case "COMPARE":
-          highlightLines([4]);
+
           if (nums[i] !== val) {
             narrate("Compare <code>nums[" + i + "] = " + nums[i] + "</code> with <code>val = " + val + "</code>. They differ, so this element is <b style=\"color:#6a9955\">kept</b>.");
           } else {
@@ -1230,15 +1220,15 @@
           }
           break;
         case "WRITE":
-          highlightLines([5]);
+
           narrate("<code>nums[k] = nums[i]</code> → write <b>" + nums[i] + "</b> to index <b>k = " + k + "</b>. Kept elements keep their original relative order.");
           break;
         case "INCREMENT_K":
-          highlightLines([6]);
+
           narrate("<code>k++</code> → advance the write pointer to <b>" + (k + 1) + "</b>. One more element has been kept.");
           break;
         case "ADVANCE":
-          highlightLines([3]);
+
           if (lastRemovedIndex !== null) {
             narrate("That value equalled <code>val</code>, so nothing was written. Advance the fast pointer: <code>i++</code>. Everything at index ≥ k is now \"beyond the result\" and doesn't matter.");
           } else {
@@ -1246,11 +1236,11 @@
           }
           break;
         case "RETURN":
-          highlightLines([9]);
+
           narrate("Return <b>k = " + k + "</b>. The first <b>k</b> elements of nums are the kept values; anything after index " + (k - 1) + " is irrelevant.");
           break;
         case "END":
-          highlightLines([9]);
+
           narrate("✓ Done. <b>k = " + ans + "</b> elements remain. nums[0.." + (ans - 1) + "] = " + formatArray(nums.slice(0, ans)) + ". The order of kept elements is preserved; extras beyond k don't matter.");
           break;
       }
@@ -1305,6 +1295,55 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "WRITE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "INCREMENT_K":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 9,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     const boot = examples[1];
     nums = [...boot.nums];
@@ -1312,8 +1351,36 @@
     init(true);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":27,"title":"Remove Element","topic":"Array & Hashing","why":"Copy each retained value into the next output position; values beyond the returned length are irrelevant.","meanings":{"nums":"input array (mutated in place)","val":"value to remove","i":"fast / read pointer scanning every element","k":"slow / write pointer; also the count of kept elements","ans":"returned value: final k"},"entityClasses":["hud-item","cell","prefix-pills","prefix-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, original, val, i, k, ans, execState, lastWriteIndex, lastRemovedIndex, boot, ...({})}),

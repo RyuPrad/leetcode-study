@@ -932,18 +932,34 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const st = historyStack.pop();
-      freq = { ...st.freq };
-      left = st.left;
-      right = st.right;
-      maxFreq = st.maxFreq;
-      ans = st.ans;
-      execState = st.execState;
-      trace = st.trace.map(row => ({ ...row }));
-      leavingIndex = st.leavingIndex;
+      restoreState(st);
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+freq = {
+  ...snapshot.freq
+};
+left = snapshot.left;
+right = snapshot.right;
+maxFreq = snapshot.maxFreq;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+leavingIndex = snapshot.leavingIndex;
+}
 
     function windowSize() {
       if (right < left) return 0;
@@ -957,13 +973,29 @@
 
       switch (execState) {
         case "INIT":
-          freq = {};
-          left = 0;
-          maxFreq = 0;
-          ans = 0;
-          right = -1;
-          execState = "LOOP_CHECK";
-          break;
+ freq = {};
+ right = -1;
+ lastAction = "Initialize freq.";
+ execState = "INIT_LEFT";
+ break;
+case "INIT_LEFT":
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_MAXFREQ";
+ break;
+case "INIT_MAXFREQ":
+ maxFreq = 0;
+
+ lastAction = "Initialize maxFreq.";
+ execState = "INIT_ANS";
+ break;
+case "INIT_ANS":
+ ans = 0;
+
+ lastAction = "Initialize ans.";
+ execState = "LOOP_CHECK";
+ break;
 
         case "LOOP_CHECK":
           if (right + 1 < s.length) {
@@ -1001,10 +1033,14 @@
           const ch = s[left];
           freq[ch]--;
           leavingIndex = left;
+          execState = "ADVANCE_LEFT";
+          break;
+        }
+
+        case "ADVANCE_LEFT":
           left++;
           execState = "WHILE_CHECK";
           break;
-        }
 
         case "UPDATE_ANS": {
           ans = Math.max(ans, windowSize());
@@ -1081,7 +1117,7 @@
 
       const maj = majorityChar();
       const windowActive = right >= left && right >= 0 &&
-        ["ADD_RIGHT", "UPDATE_MAX", "WHILE_CHECK", "SHRINK", "UPDATE_ANS", "RETURN", "END"].includes(execState);
+        ["ADD_RIGHT", "UPDATE_MAX", "WHILE_CHECK", "SHRINK", "ADVANCE_LEFT", "UPDATE_ANS", "RETURN", "END"].includes(execState);
 
       // window band behind cells in [left, right]
       if (windowActive && windowSize() > 0) {
@@ -1185,7 +1221,7 @@
       const size = windowSize();
       const replacements = size - maxFreq;
       const valid = replacements <= k;
-      const showCheck = right >= 0 && ["WHILE_CHECK", "SHRINK", "UPDATE_ANS"].includes(execState);
+      const showCheck = right >= 0 && ["WHILE_CHECK", "SHRINK", "ADVANCE_LEFT", "UPDATE_ANS"].includes(execState);
 
       if (showCheck) card.classList.add(valid ? "valid" : "invalid");
 
@@ -1266,6 +1302,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1285,11 +1324,23 @@
       const size = windowSize();
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4, 5]);
-          narrate("Initialize an empty <b>freq</b> map, <b>left = 0</b>, <b>maxFreq = 0</b>, and <b>ans = 0</b>.");
-          break;
+
+ narrate("Initialize freq from this line.");
+ break;
+case "INIT_LEFT":
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_MAXFREQ":
+
+ narrate("Initialize maxFreq from this line.");
+ break;
+case "INIT_ANS":
+
+ narrate("Initialize ans from this line.");
+ break;
         case "LOOP_CHECK":
-          highlightLines([6]);
+
           if (right + 1 < s.length) {
             narrate("Loop continues: the next <b>right</b> index <b>" + (right + 1) + "</b> is still inside <b>s</b>.");
           } else {
@@ -1297,15 +1348,15 @@
           }
           break;
         case "ADD_RIGHT":
-          highlightLines([7]);
+
           narrate("Grow the window: add <b>s[" + right + "] = '" + s[right] + "'</b> into <b>freq</b>, so freq['" + s[right] + "'] = <b>" + freq[s[right]] + "</b>.");
           break;
         case "UPDATE_MAX":
-          highlightLines([8]);
+
           narrate("Update <b>maxFreq = max(maxFreq, freq['" + s[right] + "']) = " + maxFreq + "</b> &mdash; the count of the most common char in the window.");
           break;
         case "WHILE_CHECK":
-          highlightLines([9]);
+
           if (size - maxFreq > k) {
             narrate("Check validity: replacements <b>(" + size + " - " + maxFreq + ") = " + (size - maxFreq) + "</b> &gt; <b>k=" + k + "</b>. Too many to replace &mdash; shrink from the left.");
           } else {
@@ -1313,19 +1364,23 @@
           }
           break;
         case "SHRINK":
-          highlightLines([10, 11]);
-          narrate("Shrink: decrement <b>freq['" + s[leavingIndex] + "']</b> for the leaving cell and advance <b>left</b> to <b>" + left + "</b>.");
+
+          narrate("Remove the leaving character from the count: <b>freq['" + s[leavingIndex] + "']--</b>.");
+          break;
+        case "ADVANCE_LEFT":
+
+          narrate("Now advance the left edge to <b>" + (left + 1) + "</b>.");
           break;
         case "UPDATE_ANS":
-          highlightLines([13]);
+
           narrate("Record the answer: <b>ans = max(ans, windowSize) = " + ans + "</b>.");
           break;
         case "RETURN":
-          highlightLines([15]);
+
           narrate("Return the longest valid window length found: <b>ans = " + ans + "</b>.");
           break;
         case "END":
-          highlightLines([15]);
+
           narrate("Done. The longest repeating-character window after at most <b>k=" + k + "</b> replacements has length <b>" + ans + "</b>.");
           break;
       }
@@ -1376,14 +1431,116 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_MAXFREQ":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "INIT_ANS":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "LOOP_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "ADD_RIGHT":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "UPDATE_MAX":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 9,
+      phase: execState
+    };
+  case "SHRINK":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "ADVANCE_LEFT":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "UPDATE_ANS":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 15,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 15,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     s = examples[1][0];
     k = examples[1][1];
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":424,"title":"Longest Repeating Character Replacement","topic":"Sliding Window","why":"Window length minus its most frequent character count is the number of replacements needed.","meanings":{"s":"input string","k":"max number of characters allowed to replace","left":"left bound of the window","right":"right bound of the window","freq":"map of char to its count inside the current window","maxFreq":"count of the most common char in the window","ans":"longest valid window length found so far"},"entityClasses":["hud-item","cell","left-cell","set-pill"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({s, k, freq, left, right, maxFreq, ans, execState, leavingIndex, ...({})}),

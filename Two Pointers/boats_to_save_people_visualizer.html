@@ -636,6 +636,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -849,6 +850,7 @@
     };
 
     let people = [];
+    let originalPeople = [];
     let limit = 0;
     let left = 0;
     let right = 0;
@@ -880,22 +882,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseInput(text) {
-      const parts = text.split("|");
-      if (parts.length !== 2) {
-        alert("Use the format: people | limit, e.g. 3,2,2,1 | 3");
-        return null;
-      }
-      const rawParts = parts[0].split(",").map(p => p.trim()).filter(p => p.length > 0);
-      const ppl = rawParts.map(p => Number(p));
-      const lim = Number(parts[1].trim());
-      if (ppl.length < 1 || ppl.some(n => !Number.isFinite(n)) || !Number.isFinite(lim)) {
-        alert("Use the format: people | limit, e.g. 3,2,2,1 | 3");
-        return null;
-      }
-      const sorted = ppl.slice().sort((a, b) => a - b);
-      return { people: sorted, limit: lim };
-    }
+    function parseInput(text) { try { const [arrayText, limitText] = StudyNumericInput.parts(text, 2, 'People and limit'); const people = StudyNumericInput.list(arrayText, {json: false, min: 1, minLength: 1, label: 'Weights'}); const limit = StudyNumericInput.integer(limitText, {min: Math.max(...people), label: 'Limit'}); return {people, limit}; } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -904,23 +891,33 @@
 
     function loadExample(exNum) {
       activeExample = exNum;
-      people = examples[exNum].people.slice();
+      originalPeople = examples[exNum].people.slice();
+      people = originalPeople.slice();
       limit = examples[exNum].limit;
       document.getElementById("custom-input").value = people.join(", ") + " | " + limit;
       init();
     }
 
     function loadCustom() {
-      const parsed = parseInput(document.getElementById("custom-input").value);
-      if (!parsed) return;
-      people = parsed.people;
-      limit = parsed.limit;
-      activeExample = 0;
-      init();
+      try {
+        const parser = window.StudyNumericInput;
+        const [arrayText, parameterText] = parser.parts(document.getElementById("custom-input").value, 2, 'People and limit');
+        const parsed = parser.list(arrayText, {json: false, min: 1, minLength: 1, label: 'Weights'});
+        const parsedLimit = parser.integer(parameterText, {min: Math.max(...parsed), label: 'Limit'});
+        originalPeople = parsed.slice();
+        people = originalPeople.slice();
+        limit = parsedLimit;
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
+      }
     }
 
     function init() {
-      people = people.slice().sort((a, b) => a - b);
+      people = originalPeople.slice();
       left = 0;
       right = people.length - 1;
       boats = 0;
@@ -929,7 +926,7 @@
       trace = [];
       boardedIndices = new Set();
       lastBoat = null;
-      lastAction = "Ready. people is sorted ascending.";
+      lastAction = "Ready to sort the passenger weights.";
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
@@ -954,101 +951,97 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      people = prev.people.slice();
-      limit = prev.limit;
-      left = prev.left;
-      right = prev.right;
-      boats = prev.boats;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      boardedIndices = new Set(prev.boardedIndices);
-      lastBoat = prev.lastBoat ? { ...prev.lastBoat } : null;
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
 
-    function nextStep() {
-      if (execState === "END") return;
-      saveState();
+function restoreState(snapshot) {
+people = snapshot.people.slice();
+limit = snapshot.limit;
+left = snapshot.left;
+right = snapshot.right;
+boats = snapshot.boats;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+boardedIndices = new Set(snapshot.boardedIndices);
+lastBoat = snapshot.lastBoat ? {
+  ...snapshot.lastBoat
+} : null;
+lastAction = snapshot.lastAction;
+}
 
+    function nextStep() {
+      if (execState === 'END') return;
+      saveState();
       switch (execState) {
         case "INIT":
-          people = people.slice().sort((a, b) => a - b);
-          left = 0;
-          right = people.length - 1;
-          boats = 0;
-          lastBoat = null;
-          lastAction = "Sorted people ascending. left at the lightest, right at the heaviest.";
-          execState = "WHILE_CHECK";
-          break;
+ people = people.slice().sort((a, b) => a - b);
+ lastBoat = null;
+ lastAction = "Initialize people.";
+ execState = "INIT_LEFT";
+ break;
+case "INIT_LEFT":
+ left = 0;
 
-        case "WHILE_CHECK":
-          if (left <= right) {
-            lastAction = "left <= right, so there is still someone waiting. Check the lightest + heaviest pair.";
-            execState = "COMPARE";
-          } else {
-            lastAction = "left passed right. Everyone has a boat.";
-            execState = "RETURN";
-          }
-          break;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = people.length - 1;
 
-        case "COMPARE": {
+ lastAction = "Initialize right.";
+ execState = "INIT_BOATS";
+ break;
+case "INIT_BOATS":
+ boats = 0;
+
+ lastAction = "Initialize boats.";
+ execState = "WHILE_CHECK";
+ break;
+        case 'WHILE_CHECK':
+          execState = left <= right ? 'COMPARE' : 'RETURN';
+          lastAction = left <= right ? 'There are passengers waiting. Compare the pointed weights next.' : 'All passengers have boarded.';
+          break;
+        case 'COMPARE': {
           const fit = people[left] + people[right] <= limit;
-          if (fit) {
-            lastBoat = { type: "pair", left, right, lw: people[left], rw: people[right], total: people[left] + people[right] };
-            boardedIndices.add(left);
-            boardedIndices.add(right);
-            trace.push({
-              step: trace.length + 1,
-              left, right,
-              lw: people[left], rw: people[right],
-              fit: "yes (" + (people[left] + people[right]) + " <= " + limit + ")",
-              boats: boats + 1,
-              action: "pair boards: left++ , right-- , boats++"
-            });
-            lastAction = "The pair fits, so both board one boat. Move left++ and right--, and boats++.";
-            execState = "PAIR_BOARD";
-          } else {
-            lastBoat = { type: "single", left, right, lw: people[left], rw: people[right], total: people[left] + people[right] };
-            boardedIndices.add(right);
-            trace.push({
-              step: trace.length + 1,
-              left, right,
-              lw: people[left], rw: people[right],
-              fit: "no (" + (people[left] + people[right]) + " > " + limit + ")",
-              boats: boats + 1,
-              action: "heaviest goes alone: right-- , boats++"
-            });
-            lastAction = "The pair is too heavy, so the heaviest person goes alone. Only right-- and boats++.";
-            execState = "SINGLE_BOARD";
-          }
-          break;
+          const passengers = left === right || !fit ? [right] : [left, right];
+          lastBoat = {type: passengers.length === 1 ? 'single' : 'pair', left, right, lw: people[left], rw: people[right], total: passengers.reduce((sum,index)=>sum+people[index],0), passengers, number: boats + 1, dispatched: false, fit};
+          lastAction = left === right ? 'Both pointers refer to the same passenger. Only this passenger will board.' : fit ? 'The two passengers fit. Their pointer moves board them one at a time.' : 'The pair is too heavy. The heaviest passenger will board alone.';
+          execState = fit ? 'PAIR_BOARD' : 'SINGLE_BOARD'; break;
         }
-
-        case "PAIR_BOARD":
-          left++;
-          right--;
+        case 'PAIR_BOARD':
+          boardedIndices.add(left); left++;
+          lastAction = 'Board the passenger consumed by left++; the right pointer and boat count stay unchanged.';
+          execState = 'MOVE_RIGHT'; break;
+        case 'MOVE_RIGHT':
+        case 'SINGLE_BOARD':
+          boardedIndices.add(right); right--;
+          lastAction = 'Board the passenger consumed by right--; the boat count stays unchanged.';
+          execState = 'COUNT_BOAT'; break;
+        case 'COUNT_BOAT':
           boats++;
-          lastAction = "Lightest and heaviest both boarded. boats is now " + boats + ".";
-          execState = "WHILE_CHECK";
-          break;
-
-        case "SINGLE_BOARD":
-          right--;
-          boats++;
-          lastAction = "Heaviest boarded alone. boats is now " + boats + ".";
-          execState = "WHILE_CHECK";
-          break;
-
-        case "RETURN":
-          lastAction = "Returned the final boat count.";
-          execState = "END";
-          break;
+          lastBoat.dispatched = true;
+          trace.push({step: trace.length + 1, left: lastBoat.left, right: lastBoat.right, lw: lastBoat.lw, rw: lastBoat.rw, fit: lastBoat.left === lastBoat.right ? 'one passenger' : lastBoat.fit ? 'yes' : 'no', boats, action: lastBoat.passengers.length === 1 ? 'one passenger dispatched' : 'two distinct passengers dispatched'});
+          lastAction = 'Dispatch boat ' + boats + '. Count and trace now include this boat.';
+          execState = 'WHILE_CHECK'; break;
+        case 'RETURN': lastAction = 'Return the final boat count.'; execState = 'END'; break;
       }
-
       render();
     }
 
@@ -1100,12 +1093,12 @@
         bar.style.height = h + "px";
         bar.textContent = people[idx];
 
-        const boarding = (execState === "PAIR_BOARD" || execState === "COMPARE" || execState === "SINGLE_BOARD");
+        const boarding = ["PAIR_BOARD", "MOVE_RIGHT", "SINGLE_BOARD", "COUNT_BOAT", "COMPARE"].includes(execState);
         const isCurrentBoarded = lastBoat && ((idx === lastBoat.left && lastBoat.type === "pair") || idx === lastBoat.right);
 
         if (!ended && idx === left && left <= right) bar.classList.add("left-active");
         if (!ended && idx === right && left <= right) bar.classList.add("right-active");
-        if (boarding && isCurrentBoarded) bar.classList.add("boarded");
+        if (boardedIndices.has(idx)) bar.classList.add("boarded");
         if (boardedIndices.has(idx) && !(idx === left || idx === right) && !ended) bar.classList.add("gone");
         if (ended) bar.classList.add("boarded");
 
@@ -1126,71 +1119,29 @@
     }
 
     function renderSumArea() {
-      const area = document.createElement("div");
-      area.className = "sum-area";
-
-      const active = left <= right && left < people.length && right >= 0 && execState !== "END";
-      const lw = active ? people[left] : null;
-      const rw = active ? people[right] : null;
-      const total = active ? lw + rw : null;
-
-      const card1 = document.createElement("div");
-      card1.className = "sum-card";
-      card1.innerHTML = '<div class="sum-title">Lightest + Heaviest</div><div class="sum-val">' +
-        (active ? '<span class="l">' + lw + '</span> + <span class="r">' + rw + '</span>' : "none") + '</div>';
-
-      const card2 = document.createElement("div");
-      card2.className = "sum-card";
-      const cls = total === null ? "" : (total <= limit ? "good" : "bad");
-      card2.innerHTML = '<div class="sum-title">total vs limit</div><div class="sum-val">' +
-        (total === null ? "-" : '<span class="' + cls + '">' + total + (total <= limit ? " &lt;= " : " &gt; ") + limit + '</span>') + '</div>';
-
-      const card3 = document.createElement("div");
-      card3.className = "sum-card";
-      card3.innerHTML = '<div class="sum-title">boats so far</div><div class="sum-val"><span class="good">' + boats + '</span></div>';
-
-      area.appendChild(card1);
-      area.appendChild(card2);
-      area.appendChild(card3);
+      const area = document.createElement('div'); area.className = 'sum-area';
+      const proposal = lastBoat;
+      const cards = [
+        [proposal?.left === proposal?.right && proposal ? 'One passenger remains' : 'Compared weights', proposal ? proposal.left === proposal.right ? String(proposal.rw) : proposal.lw + ' + ' + proposal.rw : 'not checked'],
+        ['Condition result', proposal ? proposal.left === proposal.right ? 'Both pointers refer to this same passenger' : proposal.total + (proposal.fit ? ' <= ' : ' > ') + limit : 'not checked'],
+        ['Boats dispatched', String(boats)]
+      ];
+      for (const [title, value] of cards) { const card = document.createElement('div'); card.className = 'sum-card'; card.innerHTML = '<div class="sum-title">' + title + '</div><div class="sum-val">' + value + '</div>'; area.append(card); }
       return area;
     }
 
     function renderBoat() {
-      const div = document.createElement("div");
-      div.className = "boat";
-      if (!lastBoat || execState === "INIT") {
-        div.innerHTML = '<div class="boat-title">Boat</div><div class="boat-body">No boat dispatched yet.</div>';
-        return div;
-      }
-      if (lastBoat.type === "pair") {
-        div.classList.add("pair");
-        div.innerHTML = '<div class="boat-title">Boat ' + boats + (execState === "COMPARE" ? " (loading)" : "") + '</div>' +
-          '<div class="boat-body"><span class="l">' + lastBoat.lw + '</span> + <span class="r">' + lastBoat.rw +
-          '</span> = <span class="good">' + lastBoat.total + '</span> &nbsp;(fits, two people)</div>';
-      } else {
-        div.classList.add("single");
-        div.innerHTML = '<div class="boat-title">Boat ' + boats + (execState === "COMPARE" ? " (loading)" : "") + '</div>' +
-          '<div class="boat-body"><span class="r">' + lastBoat.rw + '</span> rides alone &nbsp;(<span class="l">' + lastBoat.lw +
-          '</span> + <span class="r">' + lastBoat.rw + '</span> = ' + lastBoat.total + ' &gt; ' + limit + ')</div>';
-      }
+      const div = document.createElement('div'); div.className = 'boat';
+      if (!lastBoat || execState === 'INIT') { div.innerHTML = '<div class="boat-title">Boat</div><div class="boat-body">No boat proposed yet.</div>'; return div; }
+      div.classList.add(lastBoat.type);
+      const title = (lastBoat.dispatched ? 'Boat ' : 'Proposed boat ') + lastBoat.number;
+      const weights = lastBoat.passengers.map(index => people[index]);
+      const body = weights.length === 1 ? weights[0] + ' rides alone (one passenger)' : weights.join(' + ') + ' = ' + weights.reduce((a, b) => a + b, 0) + ' (two distinct passengers)';
+      div.innerHTML = '<div class="boat-title">' + title + '</div><div class="boat-body">' + body + '</div>';
       return div;
     }
 
-    function renderDecision() {
-      const div = document.createElement("div");
-      div.className = "decision";
-      if (execState === "COMPARE") {
-        const fit = people[left] + people[right] <= limit;
-        if (fit) {
-          div.innerHTML = '<span class="found">people[left] + people[right] &lt;= limit</span> -> the pair shares one boat. Do <b>left++</b>, <b>right--</b>, <b>boats++</b>.';
-        } else {
-          div.innerHTML = '<span class="move-right">people[left] + people[right] &gt; limit</span> -> too heavy together. The heaviest rides alone. Do <b>right--</b>, <b>boats++</b>.';
-        }
-      } else {
-        div.innerHTML = esc(lastAction || "Step through the algorithm to see the decision here.");
-      }
-      return div;
-    }
+    function renderDecision() { const div = document.createElement('div'); div.className = 'decision'; div.textContent = lastAction || 'Step through the instructions to see the decision.'; return div; }
 
     function renderResultBanner() {
       const banner = document.createElement("div");
@@ -1315,17 +1266,32 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3, 4, 5]);
-          narrate('Sort <code>people</code> ascending, then set <code>left = 0</code>, <code>right = people.length - 1</code>, and <code>boats = 0</code>.');
-          break;
+
+ narrate("Initialize people from this line.");
+ break;
+case "INIT_LEFT":
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
+case "INIT_BOATS":
+
+ narrate("Initialize boats from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([6]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, at least one person still needs a boat.' : 'The pointers crossed, so everyone has boarded. Return <code>boats</code>.');
           break;
         case "COMPARE":
-          highlightLines([7]);
+
           {
             const fit = people[left] + people[right] <= limit;
             narrate(fit
@@ -1334,23 +1300,100 @@
           }
           break;
         case "PAIR_BOARD":
-          highlightLines([8, 10, 11]);
-          narrate('Both board: <code>left++</code>, <code>right--</code>, <code>boats++</code>.');
+
+          narrate('The lightest passenger joins this boat; advance <code>left</code> to ' + (left + 1) + '.');
+          break;
+        case "MOVE_RIGHT":
+
+          narrate('The heaviest passenger also joins; advance <code>right</code> to ' + (right - 1) + '.');
           break;
         case "SINGLE_BOARD":
-          highlightLines([10, 11]);
-          narrate('Only the heaviest boards: <code>right--</code>, <code>boats++</code>. left stays put.');
+
+          narrate('The heaviest passenger rides alone; advance <code>right</code> to ' + (right - 1) + '.');
+          break;
+        case "COUNT_BOAT":
+
+          narrate('Increment the boat count to <b>' + (boats + 1) + '</b>.');
           break;
         case "RETURN":
-          highlightLines([13]);
+
           narrate('Everyone is on a boat. Return <code>boats = ' + boats + '</code>.');
           break;
         case "END":
-          highlightLines([13]);
+
           narrate('Done. The minimum number of boats is <b>' + boats + '</b>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "INIT_BOATS":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "PAIR_BOARD":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "SINGLE_BOARD":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "COUNT_BOAT":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 13,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 13,
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1378,8 +1421,36 @@
     loadExample(2);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":881,"title":"Boats to Save People","topic":"Two Pointers","why":"The heaviest remaining person must leave on the next boat; pair with the lightest when the limit permits.","meanings":{"people":"weights of each person, sorted ascending","limit":"maximum total weight one boat can carry","left":"pointer at the lightest remaining person","right":"pointer at the heaviest remaining person","boats":"running count of boats used (the answer)"},"entityClasses":["hud-item","weight-bar","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({people, limit, left, right, boats, execState, boardedIndices, lastBoat, lastAction, ...({})}),

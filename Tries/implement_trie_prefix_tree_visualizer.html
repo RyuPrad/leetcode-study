@@ -907,179 +907,11 @@
     // Build a full list of immutable step snapshots by running the
     // REAL Trie algorithm and recording state at each logical step.
     function buildSteps(opList) {
-      nodeCounter = 0;
-      const root = new TrieNode();
-      const built = [];
-      const traceRows = [];
-
-      // snapshot helper: every field defaulted so render() is simple.
-      function snap(extra) {
-        built.push({
-          trie: snapshotTrie(root),
-          method: extra.method,
-          arg: (extra.arg === undefined) ? null : extra.arg,
-          charIndex: (extra.charIndex === undefined) ? -1 : extra.charIndex, // index into arg being processed
-          ch: (extra.ch === undefined) ? null : extra.ch,
-          nodeId: (extra.nodeId === undefined) ? null : extra.nodeId,        // current "node" pointer
-          pathIds: (extra.pathIds === undefined) ? [] : extra.pathIds.slice(), // ids walked so far (incl root)
-          createdId: (extra.createdId === undefined) ? null : extra.createdId, // node just created this step
-          lines: extra.lines,
-          narration: extra.narration,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          result: (extra.result === undefined) ? "void" : extra.result,      // void | true | false
-          opNum: extra.opNum,
-          traceLen: traceRows.length
-        });
-      }
-
-      opList.forEach((op, opNum) => {
-        const word = op.arg;
-        const chars = Array.from(word);
-
-        if (op.method === "insert") {
-          let node = root;
-          const path = [root.id];
-          snap({
-            method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [13],
-            narration: "<b>insert(\"" + word + "\")</b> — walk down from the root, creating any missing letter nodes."
-          });
-          snap({
-            method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [14], charIndex: -1,
-            narration: "<code>node = this.root</code>. Start at the root before reading any character."
-          });
-          for (let i = 0; i < chars.length; i++) {
-            const ch = chars[i];
-            snap({
-              method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [15], charIndex: i, ch,
-              narration: "Loop: take next character <b>ch = '" + ch + "'</b> (index " + i + ")."
-            });
-            const exists = !!node.children[ch];
-            if (!exists) {
-              node.children[ch] = new TrieNode();
-              const newId = node.children[ch].id;
-              snap({
-                method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [16], charIndex: i, ch,
-                createdId: newId,
-                narration: "<code>node.children['" + ch + "']</code> is missing, so create a <b>new TrieNode()</b> for '" + ch + "'."
-              });
-            } else {
-              snap({
-                method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [16], charIndex: i, ch,
-                narration: "<code>node.children['" + ch + "']</code> already exists — reuse the shared prefix node for '" + ch + "'."
-              });
-            }
-            node = node.children[ch];
-            path.push(node.id);
-            snap({
-              method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [17], charIndex: i, ch,
-              narration: "<code>node = node.children['" + ch + "']</code> — descend into the '" + ch + "' node."
-            });
-          }
-          node.isEnd = true;
-          snap({
-            method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [19], charIndex: chars.length - 1,
-            result: "void",
-            narration: "<code>node.isEnd = true</code> — mark the final node so \"" + word + "\" counts as a complete word (✓)."
-          });
-          traceRows.push({ op: "insert(\"" + word + "\")", word, result: "void", outcome: "inserted" });
-          snap({
-            method: "insert", arg: word, opNum, nodeId: node.id, pathIds: path, lines: [20], charIndex: chars.length - 1,
-            result: "void",
-            narration: "insert(\"" + word + "\") returns. The word now lives in the trie."
-          });
-
-        } else {
-          // search or startsWith — both walk via _find.
-          const isSearch = op.method === "search";
-          const callLine = isSearch ? 22 : 27;
-          snap({
-            method: op.method, arg: word, opNum, lines: [callLine],
-            narration: "<b>" + op.method + "(\"" + word + "\")</b> — " +
-              (isSearch
-                ? "the word is present only if the path exists AND its last node has isEnd = true."
-                : "true if the trie contains any word that starts with this prefix (path must exist).")
-          });
-          // _find walk
-          let node = root;
-          const path = [root.id];
-          let failed = false;
-          snap({
-            method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [31, 32], charIndex: -1,
-            narration: "<code>_find</code>: <code>node = this.root</code>. Begin at the root."
-          });
-          for (let i = 0; i < chars.length; i++) {
-            const ch = chars[i];
-            snap({
-              method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [33], charIndex: i, ch,
-              narration: "Loop: examine character <b>ch = '" + ch + "'</b> (index " + i + ")."
-            });
-            if (!node.children[ch]) {
-              snap({
-                method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [34], charIndex: i, ch,
-                result: "false",
-                narration: "No child '" + ch + "' from the current node — <code>return null</code>. The path dead-ends here."
-              });
-              failed = true;
-              break;
-            }
-            snap({
-              method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [34], charIndex: i, ch,
-              narration: "Child '" + ch + "' exists — the path continues."
-            });
-            node = node.children[ch];
-            path.push(node.id);
-            snap({
-              method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [35], charIndex: i, ch,
-              narration: "<code>node = node.children['" + ch + "']</code> — step onto the '" + ch + "' node."
-            });
-          }
-
-          if (failed) {
-            // _find returned null
-            if (isSearch) {
-              snap({
-                method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [23, 24], charIndex: chars.length,
-                result: "false", ans: false,
-                narration: "<code>_find</code> returned <b>null</b>, so <code>node !== null</code> is false → <b style=\"color:#e24b4a\">false</b>."
-              });
-            } else {
-              snap({
-                method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [28], charIndex: chars.length,
-                result: "false", ans: false,
-                narration: "<code>_find</code> returned <b>null</b>, so the prefix is absent → <b style=\"color:#e24b4a\">false</b>."
-              });
-            }
-            traceRows.push({ op: op.method + "(\"" + word + "\")", word, result: "false", outcome: "miss" });
-          } else {
-            // _find returned the node
-            snap({
-              method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [37], charIndex: chars.length,
-              narration: "Reached the end of \"" + word + "\". <code>_find</code> returns this node (not null)."
-            });
-            if (isSearch) {
-              const ans = node.isEnd;
-              snap({
-                method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [23, 24], charIndex: chars.length,
-                result: ans ? "true" : "false", ans,
-                narration: ans
-                  ? "Node is non-null AND <b>isEnd = true</b> → <b style=\"color:#6a9955\">true</b>. \"" + word + "\" is a complete word."
-                  : "Node is non-null but <b>isEnd = false</b> → <b style=\"color:#e24b4a\">false</b>. \"" + word + "\" is only a prefix, not a stored word."
-              });
-              traceRows.push({ op: "search(\"" + word + "\")", word, result: ans ? "true" : "false", outcome: ans ? "hit" : "miss" });
-            } else {
-              snap({
-                method: op.method, arg: word, opNum, nodeId: node.id, pathIds: path, lines: [28], charIndex: chars.length,
-                result: "true", ans: true,
-                narration: "<code>_find</code> is non-null → <b style=\"color:#6a9955\">true</b>. At least one word starts with \"" + word + "\"."
-              });
-              traceRows.push({ op: "startsWith(\"" + word + "\")", word, result: "true", outcome: "hit" });
-            }
-          }
-        }
-      });
-
-      masterTrace = traceRows;
-      return built;
+      nodeCounter=0;const root=new TrieNode(),built=[],traceRows=[];let method='init',arg=null,opNum=-1,charIndex=-1,ch=null,node=null,path=[];
+      const snap=(line,narration,extra={})=>built.push({trie:snapshotTrie(root),method,arg,charIndex,ch,nodeId:node?.id??null,pathIds:[...path],createdId:null,executedLine:line,lines:line?[line]:[1],narration,ans:'pending',result:'void',opNum,traceLen:traceRows.length,...extra});
+      snap(null,"Ready to operate on the trie.");snap(10,"Create the root trie node.");
+      opList.forEach((op,num)=>{opNum=num;method=op.method;arg=op.arg;charIndex=-1;ch=null;node=null;path=[];const chars=Array.from(arg);if(method==='insert'){snap(13,"Call insert.");node=root;path=[root.id];snap(14,"Set the current node to the root.");for(charIndex=0;charIndex<chars.length;charIndex++){ch=chars[charIndex];snap(15,"Read the next character.");let createdId=null;if(!node.children[ch]){node.children[ch]=new TrieNode();createdId=node.children[ch].id;}snap(16,createdId===null?"The child already exists.":"Create the missing child.",{createdId});node=node.children[ch];path.push(node.id);snap(17,"Move to this child.");}ch=null;snap(15,"There are no more characters.");node.isEnd=true;traceRows.push({op:'insert("'+arg+'")',word:arg,result:'void',outcome:'inserted'});snap(19,"Mark this node as the end of a word.");}else{const search=method==='search';snap(search?22:27,"Call "+method+".");snap(search?23:28,"Call _find for this string.");snap(31,"Enter _find.");node=root;path=[root.id];snap(32,"Set the current node to the root.");let failed=false;for(charIndex=0;charIndex<chars.length;charIndex++){ch=chars[charIndex];snap(33,"Read the next character.");if(!node.children[ch]){snap(34,"The child is absent. Return null from _find.");node=null;failed=true;break;}snap(34,"The child exists.");node=node.children[ch];path.push(node.id);snap(35,"Move to this child.");}if(!failed){ch=null;snap(33,"There are no more characters.");snap(37,"Return the reached node from _find.");}if(search)snap(23,"Assign the node returned by _find.");const ans=!failed&&(!search||node.isEnd);traceRows.push({op:method+'("'+arg+'")',word:arg,result:String(ans),outcome:ans?'hit':'miss'});snap(search?24:28,"Return whether the word or prefix is present.",{ans,result:String(ans)});}});
+      masterTrace=traceRows;return built;
     }
 
     function loadExample(exNum) {
@@ -1493,8 +1325,8 @@
       spec: {"number":208,"title":"Implement Trie (Prefix Tree)","topic":"Tries","why":"Each character selects a trie edge; a terminal marker distinguishes a whole word from a prefix.","meanings":{"root":"The trie's entry point: a `TrieNode` with no letter of its own. Every word's first character is a child of `root`.","node":"The pointer that walks down the trie one level at a time during `insert` / `_find`. Starts at `this.root`.","ch":"The current character of `word` / `prefix` being consumed inside the `for (const ch of ...)` loop.","word":"The string passed to `insert` or `search` — the full word to store or look up.","prefix":"The string passed to `startsWith` — only the path needs to exist; `isEnd` is irrelevant.","str":"The generic parameter of the shared helper `_find(str)`, reused by both `search` and `startsWith`.","children":"A `TrieNode` field: a map `{ letter: TrieNode }` of outgoing edges from that node.","isEnd":"A `TrieNode` boolean flag: `true` only on the node where a complete inserted word ends (drawn as a ✓). `search` requires it; `startsWith` does not."},"entityClasses":["hud-item","char-chip","trie-node","charIndex","nodeId"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nodeCounter, ops, masterTrace, NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nodeCounter, ops, masterTrace, NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[position] || {})}),
+      read: () => ({nodeCounter, ops,  NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nodeCounter, ops,  NODE_W, GAP_X, LEVEL_H, PAD, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

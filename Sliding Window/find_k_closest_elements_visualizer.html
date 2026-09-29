@@ -569,6 +569,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -829,42 +830,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|").map(p => p.trim());
-      if (parts.length < 3) {
-        alert("Enter three parts separated by |  e.g. 1,2,3,4,5 | 4 | 3");
-        return;
-      }
-
-      let parsedArr;
-      if (parts[0] === "") {
-        parsedArr = [];
-      } else {
-        parsedArr = parts[0]
-          .split(",")
-          .map(p => p.trim())
-          .filter(p => p.length > 0)
-          .map(p => Number(p));
-      }
-
-      const parsedK = Number(parts[1]);
-      const parsedX = Number(parts[2]);
-
-      if (parsedArr.some(Number.isNaN) || Number.isNaN(parsedK) || Number.isNaN(parsedX)) {
-        alert("Please enter valid numbers. Example: 1,2,3,4,5 | 4 | 3");
-        return;
-      }
-      if (parsedK < 1 || parsedK > parsedArr.length) {
-        alert("k must be between 1 and arr.length.");
-        return;
-      }
-
-      arr = parsedArr;
-      k = parsedK;
-      x = parsedX;
-      activeExample = 0;
-      init();
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const [arrayText,kText,xText]=parser.parts(document.getElementById('custom-input').value,3,'Array, k, x'); const parsed=parser.list(arrayText,{json:false,minLength:1,label:'Array'}), pk=parser.integer(kText,{min:1,max:parsed.length,label:'k'}), px=parser.integer(xText,{label:'x'}); if(parsed.some((v,i)=>i>0&&v<parsed[i-1])) throw Error('The array must be sorted in non-decreasing order.'); arr=parsed; k=pk; x=px;
+ activeExample = 0; init(); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init() {
       left = 0;
@@ -895,17 +866,30 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const s = historyStack.pop();
-      left = s.left;
-      right = s.right;
-      ans = s.ans;
-      execState = s.execState;
-      trace = s.trace.map(row => ({ ...row }));
-      lastDiscard = s.lastDiscard;
-      lastDiscardIdx = s.lastDiscardIdx;
+      restoreState(s);
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+left = snapshot.left;
+right = snapshot.right;
+ans = snapshot.ans;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastDiscard = snapshot.lastDiscard;
+lastDiscardIdx = snapshot.lastDiscardIdx;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -915,10 +899,17 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = arr.length - 1;
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = arr.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (right - left + 1 > k) {
@@ -1182,6 +1173,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1202,11 +1196,15 @@
 
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate("Initialize the window to cover the whole sorted array: <b>left = 0</b>, <b>right = arr.length - 1</b>.");
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           if (winSize > k) {
             narrate("Window size is <b>right - left + 1 = " + winSize + "</b>, still larger than <b>k = " + k + "</b>. Keep shrinking.");
           } else {
@@ -1214,7 +1212,7 @@
           }
           break;
         case "COMPARE": {
-          highlightLines([5]);
+
           const dl = x - arr[left];
           const dr = arr[right] - x;
           if (dl > dr) {
@@ -1225,19 +1223,19 @@
           break;
         }
         case "DISCARD_LEFT":
-          highlightLines([6]);
+
           narrate("<code>left++</code> - discard the far-left element <b>arr[" + lastDiscardIdx + "] = " + arr[lastDiscardIdx] + "</b>. The window shrinks from the left.");
           break;
         case "DISCARD_RIGHT":
-          highlightLines([8]);
+
           narrate("<code>right--</code> - discard the far-right element <b>arr[" + lastDiscardIdx + "] = " + arr[lastDiscardIdx] + "</b>. The window shrinks from the right.");
           break;
         case "RETURN":
-          highlightLines([11]);
+
           narrate("The window now holds exactly <b>k = " + k + "</b> elements. Return <code>arr.slice(left, right + 1)</code>.");
           break;
         case "END":
-          highlightLines([11]);
+
           narrate("Done. The <b>" + k + "</b> closest elements to <b>x = " + x + "</b> are <b>[" + ans.join(", ") + "]</b>.");
           break;
       }
@@ -1293,12 +1291,91 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "COMPARE":
+    {
+      return {
+        line: 5,
+        phase: execState
+      };
+    }
+  case "DISCARD_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "DISCARD_RIGHT":
+    return {
+      line: 8,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: 11,
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     loadExample(1);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":658,"title":"Find K Closest Elements","topic":"Sliding Window","why":"Remove the farther endpoint until k values remain; equal distances favor the smaller values.","meanings":{"arr":"sorted input array","k":"number of closest elements to return","x":"target value the elements should be close to","left":"left bound of the current window","right":"right bound of the current window"},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({arr, k, x, left, right, ans, execState, lastDiscard, lastDiscardIdx, ...({})}),

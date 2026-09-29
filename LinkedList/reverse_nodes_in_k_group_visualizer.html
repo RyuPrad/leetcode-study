@@ -629,7 +629,7 @@
 <div id="line-3" class="code-line">  <span class="kw">let</span> groupPrev = dummy;</div>
 <div id="line-4" class="code-line">  <span class="kw">while</span> (<span class="kw">true</span>) {</div>
 <div id="line-5" class="code-line">    <span class="kw">let</span> kth = groupPrev;</div>
-<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i < k; i++) {</div>
+<div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; k; i++) {</div>
 <div id="line-7" class="code-line">      kth = kth.next;</div>
 <div id="line-8" class="code-line">      <span class="kw">if</span> (!kth) <span class="kw">return</span> dummy.next;</div>
 <div id="line-9" class="code-line">    }</div>
@@ -854,232 +854,57 @@
     // traversal order (dummy first). Pointer positions reference node ids.
 
     function buildSteps(vals, k) {
-      const out = [];
-
-      // Build node objects with stable ids.
-      // id 0 is dummy. ids 1..n are the value nodes (in original order).
-      const dummyId = 0;
-      const nodes = { 0: { id: 0, val: "D", isDummy: true } };
-      for (let idx = 0; idx < vals.length; idx++) {
-        nodes[idx + 1] = { id: idx + 1, val: vals[idx], isDummy: false };
+      const out = [], nodes = {0: {id: 0, val: 'D', isDummy: true}}, nextOf = {0: null};
+      for (let index = 0; index < vals.length; index++) {
+        nodes[index + 1] = {id: index + 1, val: vals[index], isDummy: false};
+        nextOf[index + 1] = index + 1 < vals.length ? index + 2 : null;
       }
-
-      // nextOf: id -> id|null  (the live .next pointers)
-      const nextOf = {};
-      nextOf[0] = vals.length > 0 ? 1 : null;
-      for (let idx = 0; idx < vals.length; idx++) {
-        nextOf[idx + 1] = (idx + 1 < vals.length) ? (idx + 2) : null;
-      }
-
-      // helper: produce ordered id list starting from dummy following nextOf
+      let groupPrev = null, kth = null, groupNext = null, prev = null, curr = null, nextPtr = null, group = 0;
       function order() {
-        const seq = [];
-        let cur = 0;
-        const guard = new Set();
-        while (cur !== null && cur !== undefined && !guard.has(cur)) {
-          guard.add(cur);
-          seq.push(cur);
-          cur = nextOf[cur];
-        }
+        const seq = [], visited = new Set(); let node = 0;
+        while (node !== null && node !== undefined && !visited.has(node)) {visited.add(node); seq.push(node); node = nextOf[node];}
         return seq;
       }
-
-      // values of result (excluding dummy) for display / final answer
-      function resultVals() {
+      function snap(executedLine, action, extra = {}) {
         const seq = order();
-        return seq.filter(id => id !== 0).map(id => nodes[id].val);
+        out.push({seq, nextOf: {...nextOf}, nodesRef: nodes, k,
+          result: seq.filter(id => id !== 0).map(id => nodes[id].val), finished: false,
+          group, groupPrev, kth, groupNext, prev, curr, next: nextPtr,
+          executedLine, lines: executedLine ? [executedLine] : [1], action, narr: action, ...extra});
       }
-
-      function snapshot(extra) {
-        const base = {
-          seq: order(),                 // ordered ids dummy-first
-          nextOf: Object.assign({}, nextOf),
-          nodesRef: nodes,
-          k: k,
-          result: resultVals(),
-          finished: false
-        };
-        return Object.assign(base, extra);
-      }
-
-      // pointer container reused across steps. Each is an id or null.
-      let groupPrev = dummyId;
-      let kth = null;
-      let groupNext = null;
-      let prev = null;
-      let curr = null;
-      let nextPtr = null;
-      let groupNum = 0;
-
-      // ---- Edge: empty list ----
-      if (vals.length === 0) {
-        out.push(snapshot({
-          lines: [1, 2, 3],
-          group: 0,
-          groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-          action: "init",
-          narr: "Create <span style=\"color:#888\">dummy</span> in front of <b>head</b> and set <span style=\"color:#888\">groupPrev = dummy</span>. The list is empty."
-        }));
-        out.push(snapshot({
-          lines: [5, 6, 7, 8],
-          group: 1,
-          groupPrev, kth: 0, groupNext, prev, curr, next: nextPtr,
-          action: "abort",
-          finished: true,
-          narr: "Walking k steps from groupPrev immediately hits <b>null</b> (<code>!kth</code>). <code>return dummy.next</code> = empty list."
-        }));
-        return out;
-      }
-
-      // ---- Init: dummy + groupPrev ----
-      out.push(snapshot({
-        lines: [1, 2, 3],
-        group: 0,
-        groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-        action: "init",
-        narr: "Create <span style=\"color:#888\">dummy</span> whose <code>.next</code> is <b>head</b>. Set <span style=\"color:#888\">groupPrev = dummy</span>. We reverse the list in groups of <b>k = " + k + "</b>."
-      }));
-
-      // main loop
+      snap(null, 'The original nodes are ready. Step Over to create the dummy head.');
+      nextOf[0] = vals.length ? 1 : null;
+      snap(2, 'Create dummy, with its next reference pointing to head.');
+      groupPrev = 0; snap(3, 'Set groupPrev to dummy.');
       while (true) {
-        groupNum++;
-
-        // line 5: kth = groupPrev
-        kth = groupPrev;
-        out.push(snapshot({
-          lines: [4, 5],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev: null, curr: null, next: null,
-          action: "find kth",
-          narr: "<b>Group " + groupNum + "</b>: start <code>kth = groupPrev</code>. Walk k steps to find the k-th node of this group."
-        }));
-
-        // for loop: advance kth k times, abort if null
-        let aborted = false;
+        group++; groupNext = prev = curr = nextPtr = null;
+        snap(4, 'Begin group ' + group + '.');
+        kth = groupPrev; snap(5, 'Start kth at groupPrev.');
         for (let i = 0; i < k; i++) {
-          kth = nextOf[kth];
+          snap(6, 'Check the kth search loop: step ' + (i + 1) + ' of ' + k + '.');
+          kth = nextOf[kth]; snap(7, 'Advance kth to its next node.');
           if (kth === null || kth === undefined) {
-            // line 8 abort
-            out.push(snapshot({
-              lines: [6, 7, 8],
-              group: groupNum,
-              groupPrev, kth: null, groupNext, prev: null, curr: null, next: null,
-              action: "abort (leftover < k)",
-              finished: true,
-              narr: "Step " + (i + 1) + ": <code>kth = kth.next</code> is <b>null</b> before completing the group. Fewer than k nodes remain, so the leftover tail stays as-is. <code>return dummy.next</code>."
-            }));
-            aborted = true;
-            break;
+            snap(8, 'kth is null. Return dummy.next and keep the incomplete tail unchanged.', {finished: true});
+            return out;
           }
-          out.push(snapshot({
-            lines: [6, 7],
-            group: groupNum,
-            groupPrev, kth, groupNext, prev: null, curr: null, next: null,
-            action: "kth = kth.next (" + (i + 1) + "/" + k + ")",
-            narr: "Step " + (i + 1) + " of " + k + ": advance <code>kth = kth.next</code> -> node <b>" + nodes[kth].val + "</b>."
-          }));
+          snap(8, 'kth is a node, so continue finding the group boundary.');
         }
-        if (aborted) break;
-
-        // line 10: groupNext = kth.next
-        groupNext = nextOf[kth];
-        out.push(snapshot({
-          lines: [10],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev: null, curr: null, next: null,
-          action: "groupNext = kth.next",
-          narr: "Found the group's last node <span style=\"color:#ce9178\">kth = " + nodes[kth].val + "</span>. Save <span style=\"color:#569cd6\">groupNext = kth.next</span> (" + (groupNext === null ? "null" : nodes[groupNext].val) + ") - the boundary where reversal stops."
-        }));
-
-        // line 11,12: prev = groupNext; curr = groupPrev.next
-        prev = groupNext;
-        curr = nextOf[groupPrev];
-        out.push(snapshot({
-          lines: [11, 12],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev, curr, next: null,
-          action: "prev=groupNext; curr=groupPrev.next",
-          narr: "Set <span style=\"color:#c586c0\">prev = groupNext</span> (so the group's tail points outward) and <span style=\"color:#d7ba7d\">curr = groupPrev.next</span> (first node of the group). Now reverse."
-        }));
-
-        // inner reverse loop: while curr !== groupNext
+        snap(6, 'The kth search has completed k steps.');
+        groupNext = nextOf[kth]; snap(10, 'Save groupNext = kth.next.');
+        prev = groupNext; snap(11, 'Set prev to groupNext. curr stays unchanged.');
+        curr = nextOf[groupPrev]; snap(12, 'Set curr to the first node of this group.');
         while (curr !== groupNext) {
-          // line 14: next = curr.next
-          nextPtr = nextOf[curr];
-          out.push(snapshot({
-            lines: [13, 14],
-            group: groupNum,
-            groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-            action: "next = curr.next",
-            narr: "<code>curr !== groupNext</code>. Save <span style=\"color:#9cdcfe\">next = curr.next</span> (" + (nextPtr === null ? "null" : nodes[nextPtr].val) + ") before we overwrite the link."
-          }));
-
-          // line 15: curr.next = prev  (the rewire)
-          nextOf[curr] = prev;
-          out.push(snapshot({
-            lines: [15],
-            group: groupNum,
-            groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-            rewireFrom: curr,
-            action: "curr.next = prev",
-            narr: "<b style=\"color:#e24b4a\">Rewire:</b> <code>curr.next = prev</code>. Node <b>" + nodes[curr].val + "</b> now points " + (prev === null ? "to <b>null</b>" : "back to <b>" + nodes[prev].val + "</b>") + "."
-          }));
-
-          // line 16,17: prev = curr; curr = next
-          prev = curr;
-          curr = nextPtr;
-          out.push(snapshot({
-            lines: [16, 17],
-            group: groupNum,
-            groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-            action: "prev=curr; curr=next",
-            narr: "Advance the reversal: <span style=\"color:#c586c0\">prev = curr</span> (= " + nodes[prev].val + "), <span style=\"color:#d7ba7d\">curr = next</span> (" + (curr === null ? "null" : nodes[curr].val) + ")."
-          }));
+          snap(13, 'curr has not reached groupNext.');
+          nextPtr = nextOf[curr]; snap(14, 'Save next = curr.next before rewiring.');
+          nextOf[curr] = prev; snap(15, 'Rewire curr.next to prev.', {rewireFrom: curr});
+          prev = curr; snap(16, 'Move prev to curr. curr stays unchanged.');
+          curr = nextPtr; snap(17, 'Move curr to next. prev stays unchanged.');
         }
-
-        // exited inner loop
-        out.push(snapshot({
-          lines: [13, 18],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-          action: "group reversed",
-          narr: "<code>curr === groupNext</code>: the group is fully reversed. Now reconnect it to the rest of the list."
-        }));
-
-        // line 19: temp = groupPrev.next  (old head of group = new tail)
-        const temp = nextOf[groupPrev];
-        out.push(snapshot({
-          lines: [19],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-          tempId: temp,
-          action: "temp = groupPrev.next",
-          narr: "<code>temp = groupPrev.next</code> = <b>" + nodes[temp].val + "</b>. Before rewiring, this is the group's old first node, which is now its <b>tail</b> and the next groupPrev."
-        }));
-
-        // line 20: groupPrev.next = kth  (connect to new head)
-        nextOf[groupPrev] = kth;
-        out.push(snapshot({
-          lines: [20],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-          rewireFrom: groupPrev,
-          action: "groupPrev.next = kth",
-          narr: "<b style=\"color:#e24b4a\">Reconnect:</b> <code>groupPrev.next = kth</code>. The node before the group now points to <span style=\"color:#ce9178\">kth = " + nodes[kth].val + "</span>, the group's new head."
-        }));
-
-        // line 21: groupPrev = temp
-        groupPrev = temp;
-        out.push(snapshot({
-          lines: [21, 22, 4],
-          group: groupNum,
-          groupPrev, kth, groupNext, prev, curr, next: nextPtr,
-          action: "groupPrev = temp",
-          narr: "Advance <span style=\"color:#888\">groupPrev = temp</span> (= " + nodes[temp].val + ") to the tail of the just-reversed group. Loop back to handle the next group."
-        }));
+        snap(13, 'curr has reached groupNext. The group is reversed.');
+        const temp = nextOf[groupPrev]; snap(19, 'Save the old group head as temp.', {tempId: temp});
+        nextOf[groupPrev] = kth; snap(20, 'Reconnect groupPrev.next to kth.', {rewireFrom: groupPrev, tempId: temp});
+        groupPrev = temp; snap(21, 'Move groupPrev to temp, the new tail of this group.', {tempId: temp});
       }
-
-      return out;
     }
 
     function loadExample(exNum) {
@@ -1405,7 +1230,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({exampleInputs, inputVals, inputK, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({exampleInputs, inputVals, inputK, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({exampleInputs, inputVals, inputK, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

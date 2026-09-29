@@ -587,10 +587,10 @@
       <h2>Live Debugger</h2>
       <div class="code-panel">
 <div id="line-1" class="code-line"><span class="kw">function</span> <span class="fn">checkIfPrerequisite</span>(numCourses, prerequisites, queries) {</div>
-<div id="line-2" class="code-line">  <span class="kw">const</span> adj = <span class="vr">Array</span>.<span class="fn">from</span>({ length: numCourses }, () => []);</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> adj = <span class="vr">Array</span>.<span class="fn">from</span>({ length: numCourses }, () =&gt; []);</div>
 <div id="line-3" class="code-line">  <span class="kw">for</span> (<span class="kw">const</span> [a, b] <span class="kw">of</span> prerequisites) adj[a].<span class="fn">push</span>(b);</div>
-<div id="line-4" class="code-line">  <span class="kw">const</span> reach = <span class="vr">Array</span>.<span class="fn">from</span>({ length: numCourses }, () => <span class="kw">new</span> <span class="vr">Array</span>(numCourses).<span class="fn">fill</span>(<span class="kw">false</span>));</div>
-<div id="line-5" class="code-line">  <span class="kw">const</span> dfs = (src, node) => {</div>
+<div id="line-4" class="code-line">  <span class="kw">const</span> reach = <span class="vr">Array</span>.<span class="fn">from</span>({ length: numCourses }, () =&gt; <span class="kw">new</span> <span class="vr">Array</span>(numCourses).<span class="fn">fill</span>(<span class="kw">false</span>));</div>
+<div id="line-5" class="code-line">  <span class="kw">const</span> dfs = (src, node) =&gt; {</div>
 <div id="line-6" class="code-line">    <span class="kw">for</span> (<span class="kw">const</span> nei <span class="kw">of</span> adj[node]) {</div>
 <div id="line-7" class="code-line">      <span class="kw">if</span> (!reach[src][nei]) {</div>
 <div id="line-8" class="code-line">        reach[src][nei] = <span class="kw">true</span>;</div>
@@ -599,7 +599,7 @@
 <div id="line-11" class="code-line">    }</div>
 <div id="line-12" class="code-line">  };</div>
 <div id="line-13" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; numCourses; i<span class="op">++</span>) <span class="fn">dfs</span>(i, i);</div>
-<div id="line-14" class="code-line">  <span class="kw">return</span> queries.<span class="fn">map</span>(([u, v]) => reach[u][v]);</div>
+<div id="line-14" class="code-line">  <span class="kw">return</span> queries.<span class="fn">map</span>(([u, v]) =&gt; reach[u][v]);</div>
 <div id="line-15" class="code-line">}</div>
       </div>
     </div>
@@ -806,75 +806,30 @@
     function cloneReach(reach) { return reach.map(row => row.slice()); }
 
     // ----- Precompute DFS transitive-closure steps with full snapshots -----
-    function buildSteps(nc, prereqs, qs) {
-      const adj = Array.from({ length: nc }, () => []);
-      for (const [a, b] of prereqs) adj[a].push(b);
-      const reach = Array.from({ length: nc }, () => new Array(nc).fill(false));
-      const built = [];
-      const traceRows = [];
-
-      function snap(extra) {
-        built.push({
-          adj: adj.map(r => r.slice()),
-          reach: cloneReach(reach),
-          src: extra.src === undefined ? null : extra.src,
-          node: extra.node === undefined ? null : extra.node,
-          nei: extra.nei === undefined ? null : extra.nei,
-          justCell: extra.justCell === undefined ? null : extra.justCell,
-          activeEdge: extra.activeEdge === undefined ? null : extra.activeEdge,
-          phase: extra.phase === undefined ? "dfs" : extra.phase,
-          queryIdx: extra.queryIdx === undefined ? null : extra.queryIdx,
-          results: extra.results === undefined ? null : extra.results.slice(),
-          lines: extra.lines,
-          narration: extra.narration,
-          traceLen: traceRows.length
-        });
+    function buildSteps(nc,prereqs,qs){
+  const built=[],traceRows=[];let adj=Array.from({length:nc},()=>[]),reach=Array.from({length:nc},()=>new Array(nc).fill(false));
+  function snap(extra){built.push({adj:adj.map(r=>r.slice()),reach:cloneReach(reach),src:null,node:null,nei:null,justCell:null,activeEdge:null,phase:'dfs',queryIdx:null,results:null,...extra,executedLine:extra.lines?.[0]??null,traceLen:traceRows.length});}
+  snap({phase:'ready',lines:[],narration:'Ready to build the prerequisite graph.'});
+  adj=Array.from({length:nc},()=>[]);snap({phase:'adj-init',lines:[2],narration:'Create one empty neighbor list per course.'});
+  for(const[a,b]of prereqs){adj[a].push(b);snap({phase:'build',lines:[3],activeEdge:[a,b],narration:'Append course '+b+' to adj['+a+'].'});}
+  reach=Array.from({length:nc},()=>new Array(nc).fill(false));snap({phase:'reach-init',lines:[4],narration:'Create the false reachability matrix.'});
+  const dfs=(src,node)=>{
+    for(const nei of adj[node]){
+      snap({src,node,nei,activeEdge:[node,nei],lines:[6],narration:'Read neighbor '+nei+' of course '+node+'.'});
+      snap({src,node,nei,activeEdge:[node,nei],lines:[7],narration:'Check !reach['+src+']['+nei+']: '+!reach[src][nei]+'.'});
+      if(!reach[src][nei]){
+        reach[src][nei]=true;traceRows.push({src,node,nei,action:'reach['+src+']['+nei+'] = true'});
+        snap({src,node,nei,justCell:[src,nei],activeEdge:[node,nei],lines:[8],narration:'Mark reach['+src+']['+nei+'] true.'});
+        snap({src,node,nei,activeEdge:[node,nei],lines:[9],phase:'call',narration:'Call dfs('+src+', '+nei+').'});dfs(src,nei);
       }
-
-      snap({
-        lines: [2, 3], phase: "build",
-        narration: "Build the adjacency list: each edge <code>[a, b]</code> means <b>a → b</b> (a is a prerequisite of b). <code>adj[a]</code> lists the courses that a directly unlocks."
-      });
-
-      snap({
-        lines: [4], phase: "build",
-        narration: "Create the <code>reach</code> matrix: <b>" + nc + "×" + nc + "</b> booleans, all <code>false</code>. <code>reach[src][dst]</code> will become <code>true</code> when <b>src</b> is a (direct or indirect) prerequisite of <b>dst</b>."
-      });
-
-      const dfs = (src, node) => {
-        for (const nei of adj[node]) {
-          snap({ src, node, nei, activeEdge: [node, nei], lines: [6, 7], phase: "dfs",
-            narration: "From source <b>" + src + "</b>, at node <b>" + node + "</b>, look at neighbor <b>" + nei + "</b>. Is <code>reach[" + src + "][" + nei + "]</code> already set? " + (reach[src][nei] ? "<b>Yes</b> — skip." : "<b>No</b> — mark it.") });
-          if (!reach[src][nei]) {
-            reach[src][nei] = true;
-            traceRows.push({ src, node, nei, action: "reach[" + src + "][" + nei + "] = true" });
-            snap({ src, node, nei, justCell: [src, nei], activeEdge: [node, nei], lines: [8], phase: "dfs",
-              narration: "Set <code>reach[" + src + "][" + nei + "] = true</code> — <b>" + src + "</b> is a prerequisite of <b>" + nei + "</b>. Now recurse from <b>" + nei + "</b> to inherit its descendants." });
-            dfs(src, nei);
-          }
-        }
-      };
-
-      for (let i = 0; i < nc; i++) {
-        snap({ src: i, node: i, lines: [13], phase: "dfs",
-          narration: "Start a DFS rooted at course <b>" + i + "</b> (<code>dfs(" + i + ", " + i + ")</code>). Everything reachable from <b>" + i + "</b> gets <code>reach[" + i + "][·] = true</code>." });
-        dfs(i, i);
-      }
-
-      const results = [];
-      qs.forEach((q, qi) => {
-        const [u, v] = q;
-        const val = reach[u][v];
-        results.push(val);
-        snap({ queryIdx: qi, results, lines: [14], phase: "query",
-          narration: "Query <code>[" + u + ", " + v + "]</code>: is <b>" + u + "</b> a prerequisite of <b>" + v + "</b>? Look up <code>reach[" + u + "][" + v + "] = </code><b style=\"color:" + (val ? "#6a9955" : "#e24b4a") + "\">" + val + "</b>." });
-      });
-
-      snap({ results, lines: [14], phase: "done",
-        narration: "All queries answered. <code>queries.map(([u, v]) => reach[u][v])</code> returns <code>[" + results.join(", ") + "]</code>." });
-
-      return built;
     }
+  };
+  snap({phase:'define-dfs',lines:[5],narration:'Define the DFS helper.'});
+  for(let i=0;i<nc;i++){snap({src:i,node:i,lines:[13],phase:'call-root',narration:'Call DFS from course '+i+'.'});dfs(i,i);}
+  const results=[];
+  qs.forEach(([u,v],qi)=>{results.push(reach[u][v]);snap({queryIdx:qi,results:results.slice(),lines:[14],phase:'query',narration:'Read reach['+u+']['+v+'] = '+reach[u][v]+'.'});});
+  snap({results:results.slice(),lines:[14],phase:'done',narration:'Return ['+results.join(', ')+'].'});return built;
+}
 
     function buildMasterTrace(nc, prereqs) {
       const adj = Array.from({ length: nc }, () => []);
@@ -1309,8 +1264,8 @@
       spec: {"number":1462,"title":"Course Schedule IV","topic":"Graphs","why":"Prerequisite reachability is transitive: reaching an intermediate course can reveal further dependent courses.","meanings":{"numCourses":"Number of courses, labeled `0 .. numCourses - 1`.","prerequisites":"List of pairs `[a, b]` meaning `a` is a prerequisite of `b` (directed edge `a → b`).","queries":"List of pairs `[u, v]`; each asks \"is `u` a prerequisite of `v`?\"","adj":"Adjacency list; `adj[a]` holds every course that `a` directly unlocks.","reach":"`numCourses × numCourses` boolean matrix; `reach[src][dst]` is `true` when `src` is a (direct or indirect) prerequisite of `dst`.","dfs":"Depth-first search from a fixed `src`; marks `reach[src][nei]` for everything reachable.","src":"The root course whose transitive descendants we are filling in.","nei":"A neighbor of the current node being marked reachable from `src`.","res":"Result array: `queries.map(([u, v]) => reach[u][v])`."},"entityClasses":["hud-item","gnode-circle","querycell","node","justCell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({numCourses, prerequisites, queries, positions, SVG_W, SVG_H, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({numCourses, prerequisites, queries, positions, SVG_W, SVG_H, masterTrace, ...(steps[position] || {})}),
+      read: () => ({numCourses, prerequisites, queries, positions, SVG_W, SVG_H,  ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({numCourses, prerequisites, queries, positions, SVG_W, SVG_H,  ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

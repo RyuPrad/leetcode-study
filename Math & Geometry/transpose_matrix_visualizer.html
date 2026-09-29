@@ -746,7 +746,7 @@
     }
 
     // Build precomputed immutable steps[] (DEEP-COPIED snapshots).
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
       const m = matrix.length;
       const n = m > 0 ? matrix[0].length : 0;
@@ -1078,13 +1078,42 @@
     matrix = deepCopy(examples[1]);
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,9]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":867,"title":"Transpose Matrix","topic":"Math & Geometry","why":"Transposition exchanges each cell's row and column coordinates.","meanings":{"matrix":"The input 2D matrix (`m` rows by `n` columns).","m":"Number of rows in the input matrix (`matrix.length`).","n":"Number of columns in the input matrix (`matrix[0].length`).","res":"The output matrix, allocated as `n` rows by `m` columns and filled with zeros.","i":"Outer loop index walking the rows of the source matrix (`0 .. m-1`).","j":"Inner loop index walking the columns of the source matrix (`0 .. n-1`)."},"entityClasses":["hud-item","cell","activeCell","srcCell","tgtCell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({matrix, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({matrix, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({matrix, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

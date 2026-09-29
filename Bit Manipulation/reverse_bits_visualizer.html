@@ -769,7 +769,7 @@
       return (val >>> 0).toString(2).padStart(32, "0");
     }
 
-    function buildSteps() {
+    function originalInstructionBuilder() {
       steps = [];
       let n = nInput >>> 0;
       let res = 0;
@@ -1154,13 +1154,42 @@
     nInput = examples[1];
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,7]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":190,"title":"Reverse Bits","topic":"Bit Manipulation","why":"Read one bit from the input and place it at the mirrored position in the thirty-two-bit result.","meanings":{"n":"The 32-bit unsigned input, treated as a register. Each iteration its lowest bit is read (`n & 1`) and then it is shifted right (`n >>> 1`), exposing the next bit.","res":"The accumulating reversed value. Each iteration it is shifted left (`res << 1`) to open a slot, then the pulled bit is OR'd into position 0.","i":"Loop counter from 0 to 31, guaranteeing exactly 32 bits are processed regardless of leading zeros."},"entityClasses":["hud-item","bit-cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({nInput, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nInput, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({nInput, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

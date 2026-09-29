@@ -703,6 +703,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -982,29 +983,7 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseInput(text) {
-      const parts = text.split("|");
-      const arrText = parts[0];
-      let numsResult = null;
-      try {
-        const parsed = JSON.parse(arrText.trim());
-        if (Array.isArray(parsed)) numsResult = parsed.map(Number);
-      } catch (err) {
-        numsResult = null;
-      }
-      if (numsResult === null) {
-        numsResult = arrText.split(",").map(part => Number(part.trim())).filter(n => Number.isFinite(n));
-      }
-      if (numsResult.some(n => !Number.isFinite(n) || !Number.isInteger(n)) || numsResult.length === 0) {
-        alert("Please enter integers like 2,5,6,0,0,1,2 | 0");
-        return null;
-      }
-      let targetResult = null;
-      if (parts.length > 1 && parts[1].trim() !== "") {
-        targetResult = Number(parts[1].trim());
-      }
-      return { numsResult, targetResult };
-    }
+    function parseInput(text) { try { const [arrayText, targetText] = StudyNumericInput.optionalParameter(text, null, 'Numbers and target'); const numsResult = StudyNumericInput.list(arrayText, {minLength: 1, label: 'Numbers'}); const targetResult = targetText === null ? null : StudyNumericInput.integer(targetText, {label: 'Target'}); return {numsResult, targetResult}; } catch (error) { alert(error.message); return null; } }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -1020,23 +999,7 @@
       init();
     }
 
-    function loadCustom() {
-      const parsed = parseInput(document.getElementById("custom-input").value);
-      if (!parsed) return;
-      nums = parsed.numsResult;
-      let t = parsed.targetResult;
-      if (t === null) {
-        t = Number(document.getElementById("target-input").value);
-      }
-      if (!Number.isFinite(t) || !Number.isInteger(t)) {
-        alert("Please enter an integer target.");
-        return;
-      }
-      target = t;
-      document.getElementById("target-input").value = target;
-      activeExample = 0;
-      init();
-    }
+    function loadCustom() { const parsed = parseInput(document.getElementById('custom-input').value); if (!parsed) return false; try { const t = parsed.targetResult === null ? StudyNumericInput.integer(document.getElementById('target-input').value, {label: 'Target'}) : parsed.targetResult; nums = parsed.numsResult; target = t; document.getElementById('target-input').value = t; activeExample = 0; init(); return true; } catch (error) { alert(error.message); return false; } }
 
     function init() {
       left = 0;
@@ -1076,23 +1039,42 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      target = prev.target;
-      left = prev.left;
-      right = prev.right;
-      mid = prev.mid;
-      midValue = prev.midValue;
-      sortedHalf = prev.sortedHalf;
-      caseType = prev.caseType;
-      ans = prev.ans;
-      execState = prev.execState;
-      activeExample = prev.activeExample;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastAction = prev.lastAction;
+      restoreState(prev);
+
+
+
+
+
+
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+target = snapshot.target;
+left = snapshot.left;
+right = snapshot.right;
+mid = snapshot.mid;
+midValue = snapshot.midValue;
+sortedHalf = snapshot.sortedHalf;
+caseType = snapshot.caseType;
+ans = snapshot.ans;
+execState = snapshot.execState;
+activeExample = snapshot.activeExample;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastAction = snapshot.lastAction;
+}
 
     function addTrace(action, caseLabel) {
       trace.push({
@@ -1112,16 +1094,21 @@
 
       switch (execState) {
         case "INIT":
-          left = 0;
-          right = nums.length - 1;
-          mid = null;
-          midValue = null;
-          sortedHalf = null;
-          caseType = null;
-          ans = null;
-          lastAction = "Initialize left at 0 and right at nums.length - 1.";
-          execState = "WHILE_CHECK";
-          break;
+ left = 0;
+ mid = null;
+midValue = null;
+sortedHalf = null;
+caseType = null;
+ans = null;
+ lastAction = "Initialize left.";
+ execState = "INIT_RIGHT";
+ break;
+case "INIT_RIGHT":
+ right = nums.length - 1;
+
+ lastAction = "Initialize right.";
+ execState = "WHILE_CHECK";
+ break;
 
         case "WHILE_CHECK":
           if (left <= right) {
@@ -1179,12 +1166,17 @@
         case "SHRINK_BOTH":
           addTrace("left++, right--", "ambiguous");
           left = left + 1;
+          lastAction = "The ends are ambiguous, so move left inward to " + left + ".";
+          execState = "SHRINK_RIGHT";
+          break;
+
+        case "SHRINK_RIGHT":
           right = right - 1;
           mid = null;
           midValue = null;
           sortedHalf = null;
           caseType = null;
-          lastAction = "Trim one element off each end: left++ and right--.";
+          lastAction = "Now move right inward to " + right + ".";
           execState = "WHILE_CHECK";
           break;
 
@@ -1544,85 +1536,215 @@
     }
 
     function renderNarrationAndLines() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       switch (execState) {
         case "INIT":
-          highlightLines([2, 3]);
-          narrate('Start with <code>left = 0</code> and <code>right = nums.length - 1</code>.');
-          break;
+
+ narrate("Initialize left from this line.");
+ break;
+case "INIT_RIGHT":
+
+ narrate("Initialize right from this line.");
+ break;
         case "WHILE_CHECK":
-          highlightLines([4]);
+
           narrate(left <= right ? 'Since <code>left &lt;= right</code>, the target could still be inside the window.' : 'The window is empty because <code>left &gt; right</code>.');
           break;
         case "CALC_MID":
-          highlightLines([5]);
+
           narrate('Calculate the middle index using <code>Math.floor((left + right) / 2)</code>.');
           break;
         case "CHECK_TARGET":
           if (midValue === target) {
-            highlightLines([6, 7]);
-            narrate('The middle value equals the target. Return <code>true</code>.');
+
+            narrate('The middle value equals the target. The next step returns <code>true</code>.');
           } else {
-            highlightLines([6]);
+
             narrate('<code>nums[mid]</code> is not the target, so classify this window next.');
           }
           break;
         case "CHECK_CASE":
           if (nums[left] === midValue && midValue === nums[right]) {
-            highlightLines([9]);
+
             narrate('<code>nums[left] === nums[mid] === nums[right]</code>: the sorted half is <b>ambiguous</b> (ends highlighted pink).');
           } else if (nums[left] <= midValue) {
-            highlightLines([12]);
+
             narrate('<code>nums[left] &lt;= nums[mid]</code>, so the <b>left half</b> is sorted (highlighted green).');
           } else {
-            highlightLines([12, 18]);
+
             narrate('<code>nums[left] &gt; nums[mid]</code>, so the <b>right half</b> is sorted (highlighted green).');
           }
           break;
         case "SHRINK_BOTH":
-          highlightLines([10, 11]);
-          narrate('Ambiguous case: trim a duplicate from each end with <code>left++</code> and <code>right--</code>.');
+
+          narrate('Ambiguous case: trim the left duplicate with <code>left++</code>, now ' + left + '.');
+          break;
+        case "SHRINK_RIGHT":
+
+          narrate('Now trim the right duplicate with <code>right--</code>, now ' + right + '.');
           break;
         case "CHECK_RANGE":
           if (sortedHalf === "left") {
             if (nums[left] <= target && target < midValue) {
-              highlightLines([13, 14]);
+
               narrate('Target fits inside the sorted left half, so discard the right side.');
             } else {
-              highlightLines([13, 16]);
+
               narrate('Target does not fit in the sorted left half, so search the right side.');
             }
           } else {
             if (midValue < target && target <= nums[right]) {
-              highlightLines([19, 20]);
+
               narrate('Target fits inside the sorted right half, so discard the left side.');
             } else {
-              highlightLines([19, 22]);
+
               narrate('Target does not fit in the sorted right half, so search the left side.');
             }
           }
           break;
         case "MOVE_LEFT":
-          highlightLines(sortedHalf === "right" ? [20] : [16]);
+
           narrate('Discard the left half by setting <code>left = mid + 1</code>.');
           break;
         case "MOVE_RIGHT":
-          highlightLines(sortedHalf === "left" ? [14] : [22]);
+
           narrate('Discard the right half by setting <code>right = mid - 1</code>.');
           break;
         case "RETURN_TRUE":
-          highlightLines([7]);
+
           narrate('Return <code>true</code> because the target was found.');
           break;
         case "RETURN_FALSE":
-          highlightLines([26]);
+
           narrate('The target does not exist in the array, so return <code>false</code>.');
           break;
         case "END":
-          highlightLines(ans ? [7] : [26]);
+
           narrate(ans ? 'Done. The target exists, so the answer is <code>true</code>.' : 'Done. The target is absent, so the answer is <code>false</code>.');
           break;
       }
     }
+
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_RIGHT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "WHILE_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "CALC_MID":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "CHECK_TARGET":
+    if (midValue === target) {
+      return {
+        line: 6,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 6,
+        phase: execState
+      };
+    }
+  case "CHECK_CASE":
+    if (nums[left] === midValue && midValue === nums[right]) {
+      return {
+        line: 9,
+        phase: execState
+      };
+    } else if (nums[left] <= midValue) {
+      return {
+        line: 12,
+        phase: execState
+      };
+    } else {
+      return {
+        line: 12,
+        phase: execState
+      };
+    }
+  case "SHRINK_BOTH":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "SHRINK_RIGHT":
+    return {
+      line: 11,
+      phase: execState
+    };
+  case "CHECK_RANGE":
+    if (sortedHalf === "left") {
+      if (nums[left] <= target && target < midValue) {
+        return {
+          line: 13,
+          phase: execState
+        };
+      } else {
+        return {
+          line: 13,
+          phase: execState
+        };
+      }
+    } else {
+      if (midValue < target && target <= nums[right]) {
+        return {
+          line: 19,
+          phase: execState
+        };
+      } else {
+        return {
+          line: 19,
+          phase: execState
+        };
+      }
+    }
+  case "MOVE_LEFT":
+    return {
+      line: (sortedHalf === "right" ? [20] : [16])[0],
+      phase: execState
+    };
+  case "MOVE_RIGHT":
+    return {
+      line: (sortedHalf === "left" ? [14] : [22])[0],
+      phase: execState
+    };
+  case "RETURN_TRUE":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "RETURN_FALSE":
+    return {
+      line: 26,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (ans ? [7] : [26])[0],
+      phase: execState
+    };
+}
+ return null;
+}
 
     function render() {
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
@@ -1652,8 +1774,36 @@
     init();
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":81,"title":"Search in Rotated Sorted Array II","topic":"Binary Search","why":"Duplicate boundary values can hide the sorted side; remove ambiguity before choosing a search half.","meanings":{"nums":"The rotated sorted input array, which may contain duplicates.","target":"The value we are searching for.","left":"Left boundary index of the current search window.","right":"Right boundary index of the current search window.","mid":"Middle index, `Math.floor((left + right) / 2)`; when `nums[left] === nums[mid] === nums[right]` the sorted half is ambiguous and both ends shrink."},"entityClasses":["hud-item","cell","legend-item"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, target, left, right, mid, midValue, sortedHalf, caseType, ans, execState, lastAction, ...({})}),

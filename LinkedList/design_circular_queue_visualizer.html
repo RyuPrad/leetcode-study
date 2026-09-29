@@ -956,9 +956,9 @@
     // flags, and a traceLen marker so the trace table grows one row at a time.
     function buildSteps(opList) {
       let queue = [];
-      let head = 0;
-      let count = 0;
-      let capacity = 0;
+      let head = null;
+      let count = null;
+      let capacity = null;
       const built = [];
       const traceRows = [];
 
@@ -973,6 +973,7 @@
           method: extra.method,
           opNum: extra.opNum,
           lines: extra.lines,
+          executedLine: extra.executedLine === null ? null : extra.lines[0],
           narration: extra.narration,
           writeIdx: (extra.writeIdx === undefined) ? null : extra.writeIdx,
           clearIdx: (extra.clearIdx === undefined) ? null : extra.clearIdx,
@@ -981,14 +982,18 @@
         });
       }
 
+      snapshot({method: "new", opNum: -1, lines: [], executedLine: null, narration: "Ready. Construct the queue before running its methods."});
       opList.forEach((op, opNum) => {
         if (op.method === "new") {
-          capacity = op.k;
-          queue = new Array(capacity).fill(0);
+          queue = new Array(op.k).fill(0);
+          snapshot({method: "new", opNum, arg: op.k, lines: [3], narration: "Allocate the fixed-size queue array."});
           head = 0;
+          snapshot({method: "new", opNum, arg: op.k, lines: [4], narration: "Set the head to index zero."});
           count = 0;
+          snapshot({method: "new", opNum, arg: op.k, lines: [5], narration: "Set the number of stored items to zero."});
+          capacity = op.k;
           snapshot({
-            method: "new", opNum, arg: op.k, lines: [2, 3, 4, 5, 6],
+            method: "new", opNum, arg: op.k, lines: [6],
             narration: "<b>new MyCircularQueue(" + op.k + ")</b> -- allocate a fixed array of size <b>" + op.k + "</b>, set <code>head = 0</code> and <code>count = 0</code>."
           });
           traceRows.push({ op: "new(" + op.k + ")", arg: op.k, ret: "-", head, count, queue: "[" + queue.join(", ") + "]" });
@@ -998,7 +1003,7 @@
         if (op.method === "enQueue") {
           const value = op.value;
           snapshot({
-            method: "enQueue", opNum, arg: value, lines: [8, 9],
+            method: "enQueue", opNum, arg: value, lines: [9],
             narration: "<b>enQueue(" + value + ")</b> -- first check <code>isFull()</code>: is <code>count (" + count + ") === capacity (" + capacity + ")</code>?"
           });
           if (count === capacity) {
@@ -1030,7 +1035,7 @@
 
         if (op.method === "deQueue") {
           snapshot({
-            method: "deQueue", opNum, lines: [14, 15],
+            method: "deQueue", opNum, lines: [15],
             narration: "<b>deQueue()</b> -- first check <code>isEmpty()</code>: is <code>count (" + count + ") === 0</code>?"
           });
           if (count === 0) {
@@ -1041,11 +1046,11 @@
             traceRows.push({ op: "deQueue()", arg: "-", ret: "false", head, count, queue: "[" + queue.join(", ") + "]" });
           } else {
             const clearIdx = head;
+            head = (head + 1) % capacity;
             snapshot({
               method: "deQueue", opNum, lines: [16], clearIdx,
               narration: "Not empty. Advance <code>head = (head + 1) % capacity = (" + head + " + 1) % " + capacity + " = <b>" + ((head + 1) % capacity) + "</b></code>; slot " + clearIdx + " logically leaves the queue."
             });
-            head = (head + 1) % capacity;
             count--;
             snapshot({
               method: "deQueue", opNum, lines: [17],
@@ -1062,7 +1067,7 @@
 
         if (op.method === "Front") {
           snapshot({
-            method: "Front", opNum, lines: [20, 21],
+            method: "Front", opNum, lines: [20],
             narration: "<b>Front()</b> -- if empty return <b>-1</b>, else return <code>queue[head]</code>."
           });
           if (count === 0) {
@@ -1084,7 +1089,7 @@
 
         if (op.method === "Rear") {
           snapshot({
-            method: "Rear", opNum, lines: [23, 24],
+            method: "Rear", opNum, lines: [23],
             narration: "<b>Rear()</b> -- if empty return <b>-1</b>, else return <code>queue[(head + count - 1) % capacity]</code>."
           });
           if (count === 0) {
@@ -1108,7 +1113,7 @@
         if (op.method === "isEmpty") {
           const e = count === 0;
           snapshot({
-            method: "isEmpty", opNum, ans: e, lines: [26, 27], result: e ? "true" : "false",
+            method: "isEmpty", opNum, ans: e, lines: [27], result: e ? "true" : "false",
             narration: "<b>isEmpty()</b> -> <code>count === 0</code> is <b>" + e + "</b>."
           });
           traceRows.push({ op: "isEmpty()", arg: "-", ret: String(e), head, count, queue: "[" + queue.join(", ") + "]" });
@@ -1118,7 +1123,7 @@
         if (op.method === "isFull") {
           const f = count === capacity;
           snapshot({
-            method: "isFull", opNum, ans: f, lines: [29, 30], result: f ? "true" : "false",
+            method: "isFull", opNum, ans: f, lines: [30], result: f ? "true" : "false",
             narration: "<b>isFull()</b> -> <code>count === capacity</code> is <b>" + f + "</b>."
           });
           traceRows.push({ op: "isFull()", arg: "-", ret: String(f), head, count, queue: "[" + queue.join(", ") + "]" });
@@ -1602,8 +1607,8 @@
       spec: {"number":622,"title":"Design Circular Queue","topic":"LinkedList","why":"Wrap head and tail positions modulo capacity while separately tracking whether the queue is empty or full.","meanings":{"queue":"fixed-size backing array of length `capacity`","head":"index of the front element","count":"number of elements currently in the queue","capacity":"maximum number of elements (`k`)","value":"value passed to `enQueue`"},"entityClasses":["hud-item","ring-slot","slot-idx","empty-slot","cell"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({ops, masterTrace, queueCapacity, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, masterTrace, queueCapacity, ...(steps[position] || {})}),
+      read: () => ({ops,  queueCapacity, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({ops,  queueCapacity, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -816,19 +816,19 @@
       const traceRows = [];
 
       // Build the indexed + sorted edge array (origIdx kept in slot 3).
-      const indexed = edges.map((e, i) => [e[0], e[1], e[2], i]);
-      indexed.sort((a, b) => a[2] - b[2]);
+      let indexed = [];
 
       const critical = [];
       const pseudo = [];
       let mstWeight = Infinity;
       // classify[sortedPos] = "critical" | "pseudo" | "none" | "pending"
-      const classify = indexed.map(() => "pending");
+      const classify = edges.map(() => "pending");
 
       // Helper: instrumented buildMST that pushes snapshots while running.
       // phase describes the current run ("baseline" | "skip i" | "force i").
       function snapshot(extra) {
         built.push({
+          indexed: indexed.map(edge=>edge.slice()),
           parent: extra.parent ? extra.parent.slice() : null,
           dsuCount: (extra.dsuCount === undefined) ? null : extra.dsuCount,
           weight: (extra.weight === undefined) ? null : extra.weight,
@@ -844,6 +844,7 @@
           skip: (extra.skip === undefined) ? -1 : extra.skip,
           force: (extra.force === undefined) ? -1 : extra.force,
           lines: extra.lines,
+          executedLine: extra.executedLine === undefined ? extra.lines.at(-1) : extra.executedLine,
           narration: extra.narration,
           traceLen: traceRows.length,
           done: (extra.done === undefined) ? false : extra.done
@@ -858,10 +859,38 @@
         let weight = 0;
         const edgeState = {}; // sortedPos -> 'intree'|'rejected'|'skipped'|'forced'
 
+        function record(line, narration, extra={}) {
+          snapshot({parent: dsu.parent, dsuCount: dsu.count, weight, phase, phaseLabel, edgeState: {...edgeState}, skip, force, lines: [line], narration, ...extra});
+        }
+        function find(x) {
+          while (dsu.parent[x] !== x) {
+            record(7, "This vertex is not a root; follow its parent pointer.", {touched:[x]});
+            dsu.parent[x] = dsu.parent[dsu.parent[x]];
+            record(8, "Shorten this vertex's parent pointer by one level.", {touched:[x]});
+            x = dsu.parent[x];
+            record(9, "Move to the updated parent.", {touched:[x]});
+          }
+          record(11, "Return the component root.", {touched:[x]});
+          return x;
+        }
+        function union(a,b) {
+          const ra = find(a), rb = find(b);
+          record(14, "Read both component roots.", {touched:[a,b]});
+          record(15, ra === rb ? "Both endpoints share a root; reject this cycle." : "The roots differ, so the components can be joined.", {touched:[a,b]});
+          if (ra === rb) return false;
+          dsu.parent[ra] = rb;
+          record(16, "Point the first root at the second root. The component count and weight stay unchanged.", {touched:[a,b]});
+          dsu.count--;
+          record(17, "Decrease the component count. The tree weight stays unchanged.", {touched:[a,b]});
+          record(18, "Return true: the union joined two components.", {touched:[a,b]});
+          return true;
+        }
+        record(25, "Create one DSU component per vertex.");
+        record(26, "Initialize this tree's weight to zero.");
         // forced edge first
         if (force !== -1) {
           const fe = indexed[force];
-          dsu.union(fe[0], fe[1]);
+          union(fe[0], fe[1]);
           weight += fe[2];
           edgeState[force] = "forced";
           snapshot({
@@ -884,10 +913,11 @@
             continue;
           }
           const e = indexed[i];
-          const ra = dsu.find(e[0]), rb = dsu.find(e[1]);
-          const joins = ra !== rb;
+          record(28, "Read the next sorted edge.", {curEdgePos:i});
+          record(29, "This edge is not excluded.", {curEdgePos:i});
+          const joins = union(e[0], e[1]);
+          const ra = e[0], rb = e[1];
           if (joins) {
-            dsu.union(e[0], e[1]);
             weight += e[2];
             if (edgeState[i] !== "forced") edgeState[i] = "intree";
             snapshot({
@@ -920,15 +950,19 @@
       }
 
       // ---- Setup ----
+      snapshot({phase: "setup", phaseLabel: "Ready", edgeState: {}, lines: [], executedLine: null, narration: "Ready to classify MST edges."});
+      indexed = edges.map((e,i)=>[e[0],e[1],e[2],i]);
+      snapshot({phase: "setup", phaseLabel: "Index edges", edgeState: {}, lines: [22], narration: "Attach each edge's original index."});
+      indexed.sort((a,b)=>a[2]-b[2]);
       snapshot({
         phase: "setup", phaseLabel: "Setup",
-        edgeState: {}, lines: [22, 23],
+        edgeState: {}, lines: [23],
         narration: "<b>Index</b> each edge with its original position (slot 3), then <b>sort</b> all " + indexed.length + " edges by weight. Kruskal always considers edges cheapest-first."
       });
 
       // ---- Baseline MST ----
       const base = runBuildMST(-1, -1, "baseline", "buildMST(-1, -1) &mdash; baseline MST", {
-        force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+        force: [27], skip: [29], union: [30], ret: [32]
       });
       mstWeight = base.result;
       // mark which edges are in the baseline tree (helps visualization on later phases)
@@ -945,13 +979,13 @@
         // Phase A: skip edge i.
         snapshot({
           phase: "classify-start", phaseLabel: "Edge #" + e[3] + " &mdash; test critical",
-          edgeState: { [i]: "considering" }, curEdgePos: i, lines: [36, 37],
+          edgeState: { [i]: "considering" }, curEdgePos: i, lines: [36],
           touched: [e[0], e[1]],
           narration: "Classify edge #" + e[3] + " <code>(" + e[0] + "&ndash;" + e[1] + ", w=" + e[2] + ")</code>. First run <code>buildMST(skip = " + i + ")</code> &mdash; rebuild the MST <b>without</b> this edge."
         });
 
         const skipRun = runBuildMST(i, -1, "skip", "buildMST(" + i + ", -1) &mdash; without edge #" + e[3], {
-          force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+          force: [27], skip: [29], union: [30], ret: [32]
         });
 
         if (skipRun.result > mstWeight) {
@@ -975,7 +1009,7 @@
         });
 
         const forceRun = runBuildMST(-1, i, "force", "buildMST(-1, " + i + ") &mdash; forcing edge #" + e[3], {
-          force: [27], skip: [29], union: [28, 29, 30], ret: [32]
+          force: [27], skip: [29], union: [30], ret: [32]
         });
 
         if (forceRun.result === mstWeight) {
@@ -992,7 +1026,7 @@
           traceRows.push({ origIdx: e[3], u: e[0], v: e[1], w: e[2], skipW: skipRun.result, forceW: forceRun.result, cls: "none" });
           snapshot({
             phase: "classified", phaseLabel: "Edge #" + e[3] + " is neither",
-            edgeState: { ...forceRun.edgeState }, curEdgePos: i, lines: [38, 39],
+            edgeState: { ...forceRun.edgeState }, curEdgePos: i, lines: [38],
             narration: "Forcing edge #" + e[3] + " gives weight <b>" + forceRun.result + " &gt; mstWeight (" + mstWeight + ")</b>. It is in no optimal MST &mdash; neither critical nor pseudo-critical."
           });
         }
@@ -1458,8 +1492,8 @@
       spec: {"number":1489,"title":"Find Critical and Pseudo-Critical Edges in Minimum Spanning Tree","topic":"Advanced Graphs","why":"Compare minimum spanning-tree cost when an edge is excluded or forced to determine its role across optimal trees.","meanings":{"n":"Number of vertices `0 .. n-1`. A spanning tree connects all `n` of them with exactly `n - 1` edges.","edges":"Input array of `[u, v, w]` weighted undirected edges. Indices into this array are what the answer reports.","indexed":"`edges` rewritten as `[u, v, w, origIndex]`, then sorted ascending by weight `w`. Sorting is what makes Kruskal greedy; `origIndex` (slot 3) lets us report answers in the caller's original numbering.","dsu":"A `DSU` (Disjoint Set Union / union-find) instance. `dsu.find(x)` returns x's component root (with path-halving); `dsu.union(a,b)` merges and returns `true` only if they were separate.","parent":"The DSU's backing array; `parent[x]` points one step toward x's root, and a root points to itself. Snapshotted each step so Step Back is reversible.","buildMST":"`(skip, force) => weight`. Runs Kruskal but (a) ignores edge `skip`, and (b) unions edge `force` first regardless of order. Returns the spanning-tree weight, or `Infinity` if the result is disconnected (`dsu.count !== 1`).","skip":"Index (into `indexed`) of an edge to exclude. `buildMST(i, -1)` tests \"what is the best MST without edge `i`?\"","force":"Index of an edge to include up front. `buildMST(-1, i)` tests \"is there an MST that uses edge `i`?\"","weight":"Running total of accepted edge weights inside one `buildMST` run.","mstWeight":"The baseline `buildMST(-1, -1)` weight — the true minimum spanning tree weight, the yardstick for every classification.","critical":"Edges where `buildMST(skip=i) > mstWeight` (removing the edge raises the MST weight or disconnects the graph). Every MST must contain them.","pseudo":"Edges that are not critical but where `buildMST(force=i) === mstWeight` (some MST can include them).","i":"Loop index over `indexed`; identifies the edge currently being added (inside `buildMST`) or classified (in the outer loop)."},"entityClasses":["hud-item","node-circle","dsu-cells","dsu-cell","dsu-node"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({inputN, inputEdges, finalAnswer, sortedEdges, VW, VH, layout, indexedCache, masterTrace, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({inputN, inputEdges, finalAnswer, sortedEdges, VW, VH, layout, indexedCache, masterTrace, ...(steps[position] || {})}),
+      read: () => ({inputN, inputEdges,   VW, VH, layout,   ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({inputN, inputEdges,   VW, VH, layout,   ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

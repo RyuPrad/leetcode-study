@@ -980,9 +980,10 @@
       let timeline = [];
 
       function push(state) {
-        steps.push(JSON.parse(JSON.stringify(state)));
+        steps.push(JSON.parse(JSON.stringify({...state, executedLine: state.executedLine === undefined ? state.line.at(-1) : state.executedLine})));
       }
 
+      push({phase:"ready",line:[],executedLine:null,freq:{},heapData:[],queue:[],time:0,ran:null,timeline:[],note:"Ready to schedule tasks."});
       // line 2: create freq
       freq = {};
       push({ phase: "init-freq", line: [2], freq: {}, heapData: [], queue: [],
@@ -991,6 +992,7 @@
       // line 3: count freqs
       for (const t of tasks) {
         freqLocal[t] = (freqLocal[t] || 0) + 1;
+        push({phase:"count",line:[3],freq:{...freqLocal},heapData:[],queue:[],time:0,ran:null,timeline:[],note:"Increment this task's frequency."});
       }
       freq = { ...freqLocal };
       push({ phase: "count", line: [3], freq: { ...freqLocal }, heapData: [], queue: [],
@@ -1010,8 +1012,9 @@
 
       // line 6-7
       let time = 0;
+      push({phase:"setup-clock",line:[6],freq:{...freqLocal},heapData:snapshotHeap(heap),queue:[],time,ran:null,timeline:[],note:"Initialize the CPU time to zero."});
       const queue = [];
-      push({ phase: "setup-clock", line: [6, 7], freq: { ...freqLocal }, heapData: snapshotHeap(heap), queue: [],
+      push({ phase: "setup-clock", line: [7], freq: { ...freqLocal }, heapData: snapshotHeap(heap), queue: [],
              time: 0, ran: null, timeline: [], note: "Set <b>time = 0</b> and an empty cooldown <b>queue</b>. Each queue entry is [count, readyTime]." });
 
       // main loop
@@ -1056,9 +1059,11 @@
 
         // line 14-16
         if (queue.length && queue[0][1] === time) {
+          push({phase:"cooldown-ready",line:[14],freq:{...freqLocal},heapData:snapshotHeap(heap),queue:queue.map(q=>[...q]),time,ran:ranThisTick,timeline:[...timeline],note:"The first cooldown entry is ready to return to the heap."});
           const front = queue.shift();
+          push({phase:"cooldown-remove",line:[15],freq:{...freqLocal},heapData:snapshotHeap(heap),queue:queue.map(q=>[...q]),time,ran:ranThisTick,timeline:[...timeline],front:front.slice(),note:"Remove the ready entry from the cooldown queue. The heap stays unchanged."});
           heap.push(front[0]);
-          push({ phase: "from-cooldown", line: [14, 15], freq: { ...freqLocal }, heapData: snapshotHeap(heap),
+          push({ phase: "from-cooldown", line: [15], freq: { ...freqLocal }, heapData: snapshotHeap(heap),
                  queue: queue.map(q => [...q]), time, ran: ranThisTick, timeline: [...timeline], pushed: front[0],
                  note: "Front of queue is ready (readyTime <b>" + front[1] + "</b> === time). Push count <b>" + front[0] + "</b> back onto the heap." });
         } else if (queue.length) {
@@ -1458,7 +1463,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({tasks, n, freq, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({tasks, n, freq, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({tasks, n, freq, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

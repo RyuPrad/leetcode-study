@@ -783,7 +783,7 @@
     function cloneIv(iv) { return iv.map(p => p.slice()); }
 
     // Build the precomputed, immutable, deep-copied steps[].
-    function buildSteps(intervals, newInterval) {
+    function originalInstructionBuilder(intervals, newInterval) {
       const out = [];
       const trace = [];
 
@@ -1205,13 +1205,42 @@
     newIntervalInput = examples[1][1].slice();
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,6,7,9,10,11,13,14,15,16,18]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":57,"title":"Insert Interval","topic":"Intervals","why":"Keep intervals before the insertion, merge its overlaps, then append the intervals that follow it.","meanings":{"intervals":"The input list of non-overlapping intervals, already sorted by start.","newInterval":"The interval to insert; it grows in Phase 2 as overlapping intervals are absorbed (`[min(start), max(end)]`).","res":"The output list of intervals being assembled across the three phases.","i":"Index sweeping left to right through `intervals`.","n":"`intervals.length`, the fixed loop bound."},"entityClasses":["hud-item","bars","bar","new-interval","intervals","newInterval","interval"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({intervalsInput, newIntervalInput, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({intervalsInput, newIntervalInput, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({intervalsInput, newIntervalInput, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };

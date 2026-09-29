@@ -646,7 +646,7 @@
 <div id="line-18" class="code-line">      <span class="kw">this</span>.<span class="fn">touch</span>(key);</div>
 <div id="line-19" class="code-line">      <span class="kw">return</span>;</div>
 <div id="line-20" class="code-line">    }</div>
-<div id="line-21" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.keyToVal.size >= <span class="kw">this</span>.capacity) {</div>
+<div id="line-21" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.keyToVal.size &gt;= <span class="kw">this</span>.capacity) {</div>
 <div id="line-22" class="code-line">      <span class="kw">const</span> keys = <span class="kw">this</span>.freqToKeys.<span class="fn">get</span>(<span class="kw">this</span>.minFreq);</div>
 <div id="line-23" class="code-line">      <span class="kw">const</span> evict = keys.<span class="fn">values</span>().<span class="fn">next</span>().value;</div>
 <div id="line-24" class="code-line">      keys.<span class="fn">delete</span>(evict);</div>
@@ -941,188 +941,11 @@
 
     // ----- Precompute steps by running the real implementation -----
     function buildSteps(opList) {
-      const state = emptyState();
-      let capacity = 0;
-      const built = [];
-      const traceRows = [];
-
-      function snapshot(extra) {
-        built.push({
-          state: cloneState(state),
-          capacity: capacity,
-          key: (extra.key === undefined) ? null : extra.key,
-          value: (extra.value === undefined) ? null : extra.value,
-          ans: (extra.ans === undefined) ? "pending" : extra.ans,
-          method: extra.method,
-          opNum: extra.opNum,
-          lines: extra.lines,
-          narration: extra.narration,
-          touchedKey: (extra.touchedKey === undefined) ? null : extra.touchedKey,
-          justAddedKey: (extra.justAddedKey === undefined) ? null : extra.justAddedKey,
-          evictingKey: (extra.evictingKey === undefined) ? null : extra.evictingKey,
-          result: (extra.result === undefined) ? "void" : extra.result,
-          traceLen: traceRows.length
-        });
-      }
-
-      // touch(key): increment a key's frequency, moving it up one group.
-      function doTouch(key, opNum, method) {
-        const f = state.keyToFreq[key];
-        snapshot({
-          method, opNum, key, lines: [34, 35], touchedKey: key,
-          narration: "<code>touch(" + key + ")</code>: current frequency is <code>f = " + f + "</code>."
-        });
-        state.keyToFreq[key] = f + 1;
-        snapshot({
-          method, opNum, key, lines: [36], touchedKey: key,
-          narration: "<code>keyToFreq[" + key + "] = " + (f + 1) + "</code> -- its frequency increases by one."
-        });
-        const g = getGroup(state.freqToKeys, f);
-        const pos = g.keys.indexOf(key);
-        if (pos >= 0) g.keys.splice(pos, 1);
-        snapshot({
-          method, opNum, key, lines: [37], touchedKey: key,
-          narration: "<code>freqToKeys.get(" + f + ").delete(" + key + ")</code> -- remove it from the freq-" + f + " group."
-        });
-        if (g.keys.length === 0) {
-          removeGroupIfEmpty(state.freqToKeys, f);
-          if (state.minFreq === f) {
-            state.minFreq = f + 1;
-            snapshot({
-              method, opNum, key, lines: [38, 39, 40], touchedKey: key,
-              narration: "Group freq-" + f + " is now empty, so delete it. Since <code>minFreq === " + f + "</code>, bump <code>minFreq = " + (f + 1) + "</code>."
-            });
-          } else {
-            snapshot({
-              method, opNum, key, lines: [38, 39], touchedKey: key,
-              narration: "Group freq-" + f + " is now empty, so delete it. minFreq stays <b>" + state.minFreq + "</b>."
-            });
-          }
-        } else {
-          snapshot({
-            method, opNum, key, lines: [38], touchedKey: key,
-            narration: "Group freq-" + f + " still has other keys, so it is kept. minFreq stays <b>" + state.minFreq + "</b>."
-          });
-        }
-        const g2 = ensureGroup(state.freqToKeys, f + 1);
-        g2.keys.push(key);
-        snapshot({
-          method, opNum, key, lines: [42, 43], touchedKey: key,
-          narration: "Add <b>" + key + "</b> to the freq-" + (f + 1) + " group (appended last, so newest within that group)."
-        });
-      }
-
-      opList.forEach((op, opNum) => {
-        if (op.method === "new") {
-          capacity = op.capacity;
-          state.keyToVal = {};
-          state.keyToFreq = {};
-          state.freqToKeys = [];
-          state.minFreq = 0;
-          snapshot({
-            method: "new", opNum, lines: [2, 3, 4, 5, 6, 7],
-            narration: "<b>new LFUCache(" + op.capacity + ")</b> -- capacity " + op.capacity + ", empty maps, <code>minFreq = 0</code>."
-          });
-          traceRows.push({ op: "new(" + op.capacity + ")", key: "-", value: "-", ret: "-", minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-          return;
-        }
-
-        if (op.method === "get") {
-          const key = op.key;
-          const has = Object.hasOwn(state.keyToVal, key);
-          snapshot({
-            method: "get", opNum, key, lines: [9, 10], touchedKey: has ? key : null,
-            narration: "<b>get(" + key + ")</b> -- is <code>keyToVal.has(" + key + ")</code>? " + (has ? "<b style=\"color:#6a9955\">Yes</b>." : "<b style=\"color:#e24b4a\">No</b>.")
-          });
-          if (!has) {
-            snapshot({
-              method: "get", opNum, key, ans: -1, lines: [10], result: "miss",
-              narration: "Key <b>" + key + "</b> is absent, so <code>get</code> returns <b style=\"color:#e24b4a\">-1</b>."
-            });
-            traceRows.push({ op: "get(" + key + ")", key, value: "-", ret: "-1", minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-          } else {
-            doTouch(key, opNum, "get");
-            const val = state.keyToVal[key];
-            snapshot({
-              method: "get", opNum, key, value: val, ans: val, lines: [12], touchedKey: key, result: "hit",
-              narration: "<code>get(" + key + ")</code> returns <code>keyToVal.get(" + key + ") = <b style=\"color:#6a9955\">" + val + "</b></code>."
-            });
-            traceRows.push({ op: "get(" + key + ")", key, value: "-", ret: String(val), minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-          }
-          return;
-        }
-
-        if (op.method === "put") {
-          const key = op.key;
-          const value = op.value;
-          snapshot({
-            method: "put", opNum, key, value, lines: [14, 15],
-            narration: "<b>put(" + key + ", " + value + ")</b> -- capacity is " + capacity + (capacity === 0 ? ", which is 0, so return immediately." : ".")
-          });
-          if (capacity === 0) {
-            traceRows.push({ op: "put(" + key + "," + value + ")", key, value, ret: "void", minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-            return;
-          }
-          const has = Object.hasOwn(state.keyToVal, key);
-          snapshot({
-            method: "put", opNum, key, value, lines: [16], touchedKey: has ? key : null,
-            narration: "Does <code>keyToVal.has(" + key + ")</code>? " + (has ? "<b style=\"color:#569cd6\">Yes</b> -- update value then touch." : "<b>No</b> -- maybe evict, then insert fresh.")
-          });
-          if (has) {
-            state.keyToVal[key] = value;
-            snapshot({
-              method: "put", opNum, key, value, lines: [17, 18], touchedKey: key,
-              narration: "<code>keyToVal.set(" + key + ", " + value + ")</code> updates the value; now <code>touch(" + key + ")</code> raises its frequency."
-            });
-            doTouch(key, opNum, "put");
-            snapshot({
-              method: "put", opNum, key, value, lines: [19], touchedKey: key,
-              narration: "Existing-key put complete. Returns (void)."
-            });
-            traceRows.push({ op: "put(" + key + "," + value + ")", key, value, ret: "void", minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-            return;
-          }
-          // New key: evict if full.
-          const size = Object.keys(state.keyToVal).length;
-          if (size >= capacity) {
-            const minGroup = getGroup(state.freqToKeys, state.minFreq);
-            const evict = minGroup.keys[0];
-            snapshot({
-              method: "put", opNum, key, value, lines: [21, 22, 23], evictingKey: evict,
-              narration: "Cache is full (size " + size + " >= capacity " + capacity + "). In the minFreq=" + state.minFreq + " group, the oldest key is <b>" + evict + "</b> -- evict it."
-            });
-            minGroup.keys.shift();
-            removeGroupIfEmpty(state.freqToKeys, state.minFreq);
-            delete state.keyToVal[evict];
-            delete state.keyToFreq[evict];
-            snapshot({
-              method: "put", opNum, key, value, lines: [24, 25, 26],
-              narration: "Remove <b>" + evict + "</b> from its freq group, <code>keyToVal</code>, and <code>keyToFreq</code>."
-            });
-          } else {
-            snapshot({
-              method: "put", opNum, key, value, lines: [21],
-              narration: "Room available (size " + size + " < capacity " + capacity + "), so no eviction."
-            });
-          }
-          state.keyToVal[key] = value;
-          state.keyToFreq[key] = 1;
-          ensureGroup(state.freqToKeys, 1).keys.push(key);
-          state.minFreq = 1;
-          snapshot({
-            method: "put", opNum, key, value, lines: [28, 29, 30, 31, 32], justAddedKey: key,
-            narration: "Insert <b>" + key + "</b> with value " + value + " at frequency 1, add it to the freq-1 group, and set <code>minFreq = 1</code>."
-          });
-          snapshot({
-            method: "put", opNum, key, value, lines: [33], justAddedKey: key,
-            narration: "New-key put complete. Returns (void)."
-          });
-          traceRows.push({ op: "put(" + key + "," + value + ")", key, value, ret: "void", minFreq: state.minFreq, groups: groupsToString(state.freqToKeys) });
-          return;
-        }
-      });
-
-      return built;
+      const state=emptyState(),built=[],traceRows=[];let capacity=0,method='init',opNum=-1,key=null,value=null;
+      const snap=(line,narration,extra={})=>built.push({state:cloneState(state),capacity,key,value,ans:'pending',method,opNum,executedLine:line,lines:line?[line]:[1],narration,touchedKey:null,justAddedKey:null,evictingKey:null,result:'void',traceLen:traceRows.length,...extra});
+      const record=(ret)=>traceRows.push({op:method==='new'?'new('+capacity+')':method+'('+key+(method==='put'?','+value:'')+')',key:method==='new'?'-':key,value:method==='put'?value:'-',ret,minFreq:state.minFreq,groups:groupsToString(state.freqToKeys)});
+      const touch=(callLine)=>{snap(callLine,"Call touch.",{touchedKey:key});const f=state.keyToFreq[key];snap(35,"Read the current frequency.",{touchedKey:key,f});state.keyToFreq[key]=f+1;snap(36,"Increase the key's frequency.",{touchedKey:key,f});const group=getGroup(state.freqToKeys,f),pos=group.keys.indexOf(key);if(pos>=0)group.keys.splice(pos,1);snap(37,"Remove the key from its old frequency group.",{touchedKey:key,f});snap(38,"Check whether the old group is empty.",{touchedKey:key,f});if(group.keys.length===0){removeGroupIfEmpty(state.freqToKeys,f);snap(39,"Delete the empty frequency group.",{touchedKey:key,f});if(state.minFreq===f)state.minFreq++;snap(40,"Advance the minimum frequency if needed.",{touchedKey:key,f});}const exists=!!getGroup(state.freqToKeys,f+1);const next=ensureGroup(state.freqToKeys,f+1);snap(42,exists?"The next frequency group exists.":"Create the next frequency group.",{touchedKey:key,f});next.keys.push(key);snap(43,"Append the key to its new frequency group.",{touchedKey:key,f});};
+      snap(null,"Ready to operate on the LFU cache.");opList.forEach((op,num)=>{opNum=num;method=op.method;key=op.key??null;value=op.value??null;if(method==='new'){snap(2,"Call the cache constructor.");capacity=op.capacity;snap(3,"Assign the capacity.");state.keyToVal={};snap(4,"Create the value map.");state.keyToFreq={};snap(5,"Create the frequency map.");state.freqToKeys=[];snap(6,"Create the frequency groups.");state.minFreq=0;record('-');snap(7,"Initialize the minimum frequency.");return;}if(method==='get'){snap(9,"Call get.");const has=Object.hasOwn(state.keyToVal,key);if(!has){record('-1');snap(10,"The key is absent. Return -1.",{ans:-1,result:'miss'});return;}snap(10,"The key is present.",{touchedKey:key});touch(11);const ans=state.keyToVal[key];record(String(ans));snap(12,"Return the cached value.",{value:ans,ans,touchedKey:key,result:'hit'});return;}snap(14,"Call put.");snap(15,capacity===0?"The capacity is zero. Return.":"The capacity is nonzero.");if(capacity===0){record('void');return;}const has=Object.hasOwn(state.keyToVal,key);snap(16,"Check whether this key already exists.",{touchedKey:has?key:null});if(has){state.keyToVal[key]=value;snap(17,"Update its cached value.",{touchedKey:key});touch(18);record('void');snap(19,"Return from the existing-key update.",{touchedKey:key});return;}const full=Object.keys(state.keyToVal).length>=capacity;snap(21,"Check whether the cache is full.");if(full){const group=getGroup(state.freqToKeys,state.minFreq);snap(22,"Read the group with minimum frequency.");const evict=group.keys[0];snap(23,"Read the oldest key in this group.",{evictingKey:evict,evict});group.keys.shift();snap(24,"Delete the key from its frequency group.",{evict});delete state.keyToVal[evict];snap(25,"Delete its stored value.",{evict});delete state.keyToFreq[evict];snap(26,"Delete its recorded frequency.",{evict});}state.keyToVal[key]=value;snap(28,"Store the new value.");state.keyToFreq[key]=1;snap(29,"Set its initial frequency to one.");const group=ensureGroup(state.freqToKeys,1);snap(30,"Create the frequency-one group if needed.");group.keys.push(key);snap(31,"Append the new key to that group.",{justAddedKey:key});state.minFreq=1;record('void');snap(32,"Set the minimum frequency to one.",{justAddedKey:key});});return built;
     }
 
     // Independent recompute of operation-level trace rows (final state per op).
@@ -1559,8 +1382,8 @@
       spec: {"number":460,"title":"LFU Cache","topic":"LinkedList","why":"Eviction chooses the lowest access frequency, breaking ties by least recent use.","meanings":{"capacity":"maximum number of entries the cache holds","keyToVal":"`Map` from key to its stored value","keyToFreq":"`Map` from key to its current access frequency","freqToKeys":"`Map` from frequency to a `Set` of keys at that frequency (insertion-ordered)","minFreq":"smallest frequency currently present; its oldest key is evicted first","key":"key being read or written","value":"value read from or written to the cache"},"entityClasses":["hud-item","key-pill"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({ops, masterTrace, cacheCapacity, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({ops, masterTrace, cacheCapacity, ...(steps[position] || {})}),
+      read: () => ({ops,  cacheCapacity, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({ops,  cacheCapacity, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

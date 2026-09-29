@@ -912,6 +912,7 @@
           unionRoots: (extra.unionRoots === undefined) ? null : extra.unionRoots,
           phase: extra.phase,
           lines: extra.lines,
+          executedLine: extra.lines?.[0] ?? null,
           narration: extra.narration,
           ans: (extra.ans === undefined) ? "pending" : extra.ans,
           result: (extra.result === undefined) ? "pending" : extra.result,
@@ -919,6 +920,7 @@
         });
       }
 
+      snap({phase: 'ready', lines: [], narration: 'Ready to read the array length.'});
       const primeToIndex = new Map();
 
       snap({
@@ -926,6 +928,7 @@
         narration: "<code>n = nums.length = " + n + "</code>."
       });
 
+      snap({phase: 'check-single', lines: [8], narration: 'Check n === 1: ' + (n === 1) + '.'});
       if (n === 1) {
         finalAnswer = true;
         snap({
@@ -958,6 +961,7 @@
           narration: "<code>x = nums[" + i + "] = " + x + "</code>."
         });
 
+        snap({phase: 'check-one', lines: [13], i, x, _map: primeToIndex, narration: 'Check x === 1: ' + (x === 1) + '.'});
         if (x === 1) {
           finalAnswer = false;
           snap({
@@ -971,11 +975,14 @@
 
         // trial division
         for (let p = 2; p * p <= x; p++) {
+          snap({phase: 'factor-loop', lines: [14], i, x, p, _map: primeToIndex, narration: 'Read divisor ' + p + '; its square is at most ' + x + '.'});
+          snap({phase: 'factor-check', lines: [15], i, x, p, _map: primeToIndex, narration: 'Check x % p === 0: ' + (x % p === 0) + '.'});
           if (x % p === 0) {
             snap({
-              phase: "found-prime", lines: [15, 16], i, x, p, activePrime: p, _map: primeToIndex,
+              phase: "found-prime", lines: [15], i, x, p, activePrime: p, _map: primeToIndex,
               narration: "<code>" + x + " % " + p + " === 0</code> — <b>" + p + "</b> is a prime factor of node <b>" + i + "</b>'s value."
             });
+            snap({phase: 'check-owner', lines: [16], i, x, p, activePrime: p, _map: primeToIndex, narration: 'Check whether prime ' + p + ' already has an owner: ' + primeToIndex.has(p) + '.'});
             if (primeToIndex.has(p)) {
               const owner = primeToIndex.get(p);
               const ra = dsu.find(i), rb = dsu.find(owner);
@@ -996,20 +1003,21 @@
                 narration: "Prime <b>" + p + "</b> is new. <code>primeToIndex.set(" + p + ", " + i + ")</code> — node <b>" + i + "</b> claims it."
               });
             }
-            const before = x;
-            while (x % p === 0) x = Math.floor(x / p);
-            snap({
-              phase: "divide", lines: [18], i, x, p, activePrime: p, _map: primeToIndex,
-              narration: "Divide out every factor of <b>" + p + "</b>: <code>" + before + " → " + x + "</code>."
-            });
+            while (x % p === 0) {
+              const previous = x; x = Math.floor(x / p);
+              snap({phase: 'divide', lines: [18], i, x, p, activePrime: p, _map: primeToIndex, narration: 'Divide once by ' + p + ': ' + previous + ' -> ' + x + '.'});
+            }
+
           }
         }
 
+        snap({phase: 'leftover-check', lines: [21], i, x, _map: primeToIndex, narration: 'Check x > 1: ' + (x > 1) + '.'});
         if (x > 1) {
           snap({
             phase: "leftover", lines: [21], i, x, activePrime: x, _map: primeToIndex,
             narration: "After trial division <code>x = " + x + " &gt; 1</code>, so <b>" + x + "</b> is itself a (large) prime factor of node <b>" + i + "</b>."
           });
+          snap({phase: 'leftover-owner', lines: [22], i, x, _map: primeToIndex, narration: 'Check whether prime ' + x + ' already has an owner: ' + primeToIndex.has(x) + '.'});
           if (primeToIndex.has(x)) {
             const owner = primeToIndex.get(x);
             const ra = dsu.find(i), rb = dsu.find(owner);
@@ -1436,8 +1444,8 @@
       spec: {"number":2709,"title":"Greatest Common Divisor Traversal","topic":"Advanced Graphs","why":"A shared prime factor connects values; transitive factor connections determine whether every value is reachable.","meanings":{"nums":"Input array. Two indices may be traversed between when `gcd(nums[i], nums[j]) > 1`, i.e. they share a prime factor.","n":"Length of `nums`; also the number of nodes in the union-find.","dsu":"`class DSU` disjoint-set. Each index starts in its own component; `union` merges components that share a prime. `dsu.count` tracks how many components remain.","parent":"The `dsu.parent` array. `parent[x]` is `x`'s parent; following it to a fixed point gives the component root. Path compression flattens it during `find`.","primeToIndex":"`Map` from a prime `p` to the **first** node index that contained `p`. The second node to see `p` unions itself with that owner.","i":"Index of the node currently being factored.","x":"Working copy of `nums[i]` that is divided down as prime factors are extracted; any leftover `> 1` is itself a prime.","p":"Trial-division candidate. The loop runs while `p * p <= x`."},"entityClasses":["hud-item","node-card","node-val","node-idx","node-primes","prime-chip","cell-union"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({nums, finalAnswer, nodePrimes, _origInit, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({nums, finalAnswer, nodePrimes, _origInit, ...(steps[position] || {})}),
+      read: () => ({nums,   _origInit, ...(steps[stepIndex] || {})}),
+      readAt: (studySnapshotIndex) => ({nums,   _origInit, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

@@ -336,6 +336,13 @@
       animation: pulseWrite 0.9s ease-in-out;
     }
 
+    .cell.pending-write {
+      border-color: var(--yellow);
+      background: #3a3322;
+      color: var(--yellow);
+      border-style: dashed;
+    }
+
     .cell.tail {
       opacity: 0.35;
     }
@@ -524,6 +531,7 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <script defer src="../visualizer-ui/numeric-input.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -779,33 +787,12 @@
     }
 
     function loadCustom() {
-      const raw = document.getElementById("custom-input").value.trim();
-      let parsed;
-      if (raw === "") {
-        parsed = [];
-      } else {
-        parsed = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => Number(part));
-      }
-
-      if (parsed.some(Number.isNaN)) {
-        alert("Please enter only numbers separated by commas. Example: 1, 1, 2");
-        return;
-      }
-
-      // The algorithm assumes a sorted array; sort defensively and warn if needed.
-      const sorted = parsed.slice().sort((a, b) => a - b);
-      const wasSorted = parsed.every((v, idx) => v === sorted[idx]);
-      if (!wasSorted) {
-        alert("Input must be sorted in non-decreasing order. It has been sorted for you.");
-      }
-      nums = sorted;
-      activeExample = 0;
-      init(true);
-    }
+ try {
+ const parser = window.StudyNumericInput;
+ const parsed=parser.list(document.getElementById('custom-input').value,{json:false,label:'Numbers'}); const sorted=parsed.slice().sort((a,b)=>a-b); if(parsed.some((v,i)=>v!==sorted[i])) alert('Input must be sorted in non-decreasing order. It has been sorted for you.'); nums=sorted;
+ activeExample = 0; init(true); return true;
+ } catch (error) { alert(error.message); return false; }
+}
 
     function init(newInput = false) {
       if (newInput) originalInput = nums.slice();
@@ -837,17 +824,30 @@
     function prevStep() {
       if (historyStack.length === 0) return;
       const prev = historyStack.pop();
-      nums = prev.nums.slice();
-      left = prev.left;
-      right = prev.right;
-      execState = prev.execState;
-      trace = prev.trace.map(row => ({ ...row }));
-      lastWriteIndex = prev.lastWriteIndex;
-      lastCompareEqual = prev.lastCompareEqual;
+      restoreState(prev);
+
+
+
+
+
+
+
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";
       render();
     }
+
+function restoreState(snapshot) {
+nums = snapshot.nums.slice();
+left = snapshot.left;
+right = snapshot.right;
+execState = snapshot.execState;
+trace = snapshot.trace.map(row => ({
+  ...row
+}));
+lastWriteIndex = snapshot.lastWriteIndex;
+lastCompareEqual = snapshot.lastCompareEqual;
+}
 
     function nextStep() {
       if (execState === "END") return;
@@ -857,16 +857,11 @@
 
       switch (execState) {
         case "INIT":
-          if (nums.length === 0) {
-            execState = "RETURN_EMPTY";
-            break;
-          }
-          left = 0;
-          right = 1;
-          execState = "FOR_CHECK";
-          break;
-
-        case "FOR_CHECK":
+ execState = nums.length === 0 ? "RETURN_EMPTY" : "INIT_LEFT";
+ break;
+ case "INIT_LEFT":
+ left = 0; right = 1; execState = "FOR_CHECK"; break;
+ case "FOR_CHECK":
           if (right < nums.length) {
             execState = "COMPARE";
           } else {
@@ -889,13 +884,17 @@
             });
             execState = "ADVANCE";
           } else {
-            execState = "WRITE";
+            execState = "ADVANCE_LEFT";
           }
           break;
         }
 
-        case "WRITE": {
+        case "ADVANCE_LEFT":
           left++;
+          execState = "WRITE";
+          break;
+
+        case "WRITE": {
           nums[left] = nums[right];
           lastWriteIndex = left;
           trace.push({
@@ -972,7 +971,7 @@
         return row;
       }
 
-      const pointersActive = ["FOR_CHECK", "COMPARE", "WRITE", "ADVANCE"].includes(execState);
+      const pointersActive = ["FOR_CHECK", "COMPARE", "ADVANCE_LEFT", "WRITE", "ADVANCE"].includes(execState);
       const finished = execState === "END" || execState === "RETURN";
 
       nums.forEach((val, idx) => {
@@ -1010,13 +1009,15 @@
         cell.className = "cell";
         cell.textContent = val;
 
-        // Cells in [0..left] are the dedup result so far (green).
-        if (idx <= left) cell.classList.add("unique");
+        // During the gap between left++ and the copy, the destination has not
+        // joined the unique prefix yet.
+        if (execState === "WRITE" && idx === left) cell.classList.add("pending-write");
+        else if (idx <= left) cell.classList.add("unique");
         // Cells after left that have already been scanned by right are "tail" leftovers.
         if (idx > left && idx < right) cell.classList.add("tail");
         // The cell currently under right, when it equals nums[left], is a duplicate.
         if (showRight && execState === "COMPARE" && lastCompareEqual === true) cell.classList.add("duplicate");
-        if (execState === "WRITE" && lastWriteIndex === idx) cell.classList.add("writing");
+        if (execState === "ADVANCE" && lastWriteIndex === idx) cell.classList.add("writing");
         if (showLeft) cell.classList.add("left-active");
         if (showRight) cell.classList.add("right-active");
         if (finished && idx > left) cell.classList.add("tail");
@@ -1039,14 +1040,20 @@
 
       const label = document.createElement("div");
       label.className = "result-label";
-      label.textContent = "k = left + 1  (unique prefix)";
+      label.textContent = execState === "WRITE"
+        ? "Unique prefix  (next slot pending)"
+        : "k = left + 1  (unique prefix)";
 
       const value = document.createElement("div");
       value.className = "result-value";
       if (execState === "END") value.classList.add("done");
-      const k = kValue();
-      const prefix = nums.length === 0 ? "[]" : "[" + nums.slice(0, k).join(", ") + "]";
-      value.textContent = "k = " + k + "  ->  " + prefix;
+      if (execState === "WRITE") {
+        value.textContent = "k = " + left + "  ->  [" + nums.slice(0, left).join(", ") + "]  ·  writing index " + left;
+      } else {
+        const k = kValue();
+        const prefix = nums.length === 0 ? "[]" : "[" + nums.slice(0, k).join(", ") + "]";
+        value.textContent = "k = " + k + "  ->  " + prefix;
+      }
 
       card.appendChild(label);
       card.appendChild(value);
@@ -1098,6 +1105,9 @@
     }
 
     function render() {
+ const instruction = pendingInstruction();
+ highlightLines(instruction ? [instruction.line] : []);
+
       document.getElementById("btn-prev").disabled = historyStack.length === 0;
 
       document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
@@ -1115,16 +1125,10 @@
       }
 
       switch (execState) {
-        case "INIT":
-          highlightLines([2, 3]);
-          if (nums.length === 0) {
-            narrate("The array is empty, so the function returns <b>0</b> immediately.");
-          } else {
-            narrate("Set <b>left = 0</b>. <code>left</code> is the last index of the unique prefix (the write boundary). <code>right</code> will scan from index 1.");
-          }
-          break;
-        case "FOR_CHECK":
-          highlightLines([4]);
+        case "INIT":  narrate('Check whether the input array is empty.'); break;
+ case "INIT_LEFT":  narrate('Initialize the unique-prefix pointer left = 0.'); break;
+ case "FOR_CHECK":
+
           if (right < nums.length) {
             narrate("<code>for</code> loop continues: <b>right = " + right + "</b> is still inside the array.");
           } else {
@@ -1132,31 +1136,35 @@
           }
           break;
         case "COMPARE":
-          highlightLines([5]);
+
           if (lastCompareEqual === true) {
             narrate("<code>nums[" + right + "] === nums[" + left + "]</code> (" + nums[right] + " === " + nums[left] + "): this is a <b style=\"color:#e24b4a\">duplicate</b>, so skip it.");
           } else {
             narrate("<code>nums[" + right + "] !== nums[" + left + "]</code> (" + nums[right] + " vs " + nums[left] + "): a <b style=\"color:#569cd6\">new unique</b> value was found.");
           }
           break;
+        case "ADVANCE_LEFT":
+
+          narrate("Move the write boundary forward: <code>left++</code> advances it to " + (left + 1) + ". The destination slot is pending until the next step.");
+          break;
         case "WRITE":
-          highlightLines([6, 7]);
-          narrate("Advance the write boundary (<code>left++</code> -> " + left + ") and write the new unique value: <code>nums[" + left + "] = nums[" + right + "] = " + nums[right] + "</code>.");
+
+          narrate("Copy the new unique value into index <b>" + left + "</b>: <code>nums[" + left + "] = nums[" + right + "] = " + nums[right] + "</code>.");
           break;
         case "ADVANCE":
-          highlightLines([4]);
+
           narrate("Move the scanner forward (<code>right++</code>). The prefix <code>nums[0..left]</code> holds every unique value seen so far.");
           break;
         case "RETURN":
-          highlightLines([10]);
+
           narrate("Return <b>left + 1 = " + (left + 1) + "</b>. That is <code>k</code>, the number of unique elements.");
           break;
         case "RETURN_EMPTY":
-          highlightLines([2]);
+
           narrate("Empty input: return <b>0</b>.");
           break;
         case "END":
-          highlightLines(nums.length === 0 ? [2] : [10]);
+
           narrate("Done. <code>k = " + kValue() + "</code> and the unique prefix is <b>[" + nums.slice(0, kValue()).join(", ") + "]</b>.");
           break;
       }
@@ -1201,13 +1209,100 @@
       }
     }
 
+function pendingInstruction() {
+ if (execState === 'END' || execState.startsWith('END_')) return null;
+
+
+ switch (execState) {
+  case "INIT":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "INIT_LEFT":
+    return {
+      line: 3,
+      phase: execState
+    };
+  case "FOR_CHECK":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "COMPARE":
+    return {
+      line: 5,
+      phase: execState
+    };
+  case "ADVANCE_LEFT":
+    return {
+      line: 6,
+      phase: execState
+    };
+  case "WRITE":
+    return {
+      line: 7,
+      phase: execState
+    };
+  case "ADVANCE":
+    return {
+      line: 4,
+      phase: execState
+    };
+  case "RETURN":
+    return {
+      line: 10,
+      phase: execState
+    };
+  case "RETURN_EMPTY":
+    return {
+      line: 2,
+      phase: execState
+    };
+  case "END":
+    return {
+      line: (nums.length === 0 ? [2] : [10])[0],
+      phase: execState
+    };
+}
+ return null;
+}
+
     // Boot
     nums = examples[1].slice();
     init(true);
 
     // STUDY LESSON BRIDGE START
+    const renderHistorySnapshot = render;
+    function preview(index) {
+      if (!Number.isInteger(index) || index < 0 || index > historyStack.length) return null;
+      const diagram = () => document.querySelector('#visual-ui,#lists-ui,#svg,#lists');
+      const liveDiagram = diagram();
+      const savedDiagram = liveDiagram.cloneNode(true);
+      const codeClasses = [...document.querySelectorAll('.code-line')].map(element => [element, element.className]);
+      saveState();
+      const live = historyStack.pop();
+      const snapshot = index === historyStack.length ? live : historyStack[index];
+      try {
+        restoreState(snapshot);
+        renderHistorySnapshot();
+        const clone = diagram()?.cloneNode(true) || null;
+        clone?.removeAttribute('data-operation-kind');
+        return clone;
+      } finally {
+        restoreState(live);
+        renderHistorySnapshot();
+        [...liveDiagram.attributes].forEach(attribute => liveDiagram.removeAttribute(attribute.name));
+        [...savedDiagram.attributes].forEach(attribute => liveDiagram.setAttribute(attribute.name, attribute.value));
+        liveDiagram.replaceChildren(...[...savedDiagram.childNodes].map(node => node.cloneNode(true)));
+        codeClasses.forEach(([element, className]) => { element.className = className; });
+      }
+    }
+
     window.studyLessonSource = {
       spec: {"number":26,"title":"Remove Duplicates from Sorted Array","topic":"Two Pointers","why":"The write pointer separates the unique prefix from unread values; the sorted order makes duplicates adjacent.","meanings":{"nums":"sorted input array, deduplicated in place","left":"last unique index / write boundary (the prefix nums[0..left] is unique)","right":"scanner index that walks forward looking for new values","k":"count of unique elements returned, equals left + 1"},"entityClasses":["hud-item","cell"],"entitySelectors":[],"mode":"history"},
+      pendingInstruction,
+      preview,
       index: () => historyStack.length,
       count: () => null,
       read: () => ({nums, originalInput, left, right, execState, lastWriteIndex, lastCompareEqual, ...({})}),

@@ -794,7 +794,7 @@
     let stepIndex = 0;
 
     // ---- Build the precomputed steps[] (immutable deep-copied snapshots) ----
-    function buildSteps(startDigits) {
+    function originalInstructionBuilder(startDigits) {
       const out = [];
       const trace = [];
 
@@ -809,7 +809,7 @@
           done: false,
           result: null,          // final returned array
           trace: trace.map(r => Object.assign({}, r))
-        }, extra));
+        }, extra, {executedLine: ({INIT:null,LOOP_CHECK:2,COMPARE:3,INCREMENT:4,RETURN_EARLY:5,SET_ZERO:7,ADVANCE:2,PREPEND_ONE:9,END:extra.returnLine})[extra.state]}));
       }
 
       const digits = startDigits.slice();
@@ -863,7 +863,7 @@
       }
 
       // END
-      snap({ state: "END", digits: result.slice(), i: null, result: result.slice(), done: true });
+      snap({ state: "END", returnLine: finished ? 5 : 9, digits: result.slice(), i: null, result: result.slice(), done: true });
 
       return out;
     }
@@ -1131,7 +1131,7 @@
           narrate("<code>digits[" + s.i + "] = 0</code>. A 9 plus the incoming 1 becomes 10: write 0 here and carry the 1 to the left.");
           break;
         case "ADVANCE":
-          highlightLines([8, 2]);
+          highlightLines([8]);
           narrate("<code>i--</code> → i = " + s.i + ". Continue the carry into the next digit to the left.");
           break;
         case "PREPEND_ONE":
@@ -1139,7 +1139,7 @@
           narrate("<code>return [1, ...digits]</code> — the carry ran off the front (e.g. 99 → 100), so we prepend a brand-new leading <b>1</b>.");
           break;
         case "END":
-          highlightLines(s.result && s.result.length > (s.digits ? s.digits.length : 0) ? [9] : [5, 9]);
+          highlightLines(s.result && s.result.length > (s.digits ? s.digits.length : 0) ? [9] : [5]);
           narrate("✓ Finished! The result is <b>[" + s.result.join(", ") + "]</b>.");
           break;
       }
@@ -1192,13 +1192,42 @@
     inputDigits = examples[1].slice();
     init();
 
+
+    // Scalar instruction metadata is captured when this run is authored, before rendering or seeking.
+    function prepareInstructionSteps(frames) {
+      const statements = new Set([1,2,3,4,5,7,9]);
+      let previousLine = null;
+      for (const frame of frames) {
+        if (frame.executedLine === undefined) {
+          const raw = frame.lines ?? frame.codeLines ?? frame.line ?? frame.highlightLines ?? frame.highlight ?? frame.hl;
+          const candidates = (Array.isArray(raw) ? raw : [raw]).filter(Number.isInteger);
+          const executable = [...new Set(candidates.filter(line => statements.has(line)))];
+          if (executable.length > 1) throw new Error("Grouped executable instructions require genuine intermediate states.");
+          frame.executedLine = executable[0] ?? (candidates.length ? previousLine : null);
+        }
+        if (frame.executedLine !== null) previousLine = frame.executedLine;
+      }
+      if (frames.length && frames[0].executedLine !== null) {
+        const ready = {...frames[0], executedLine: null};
+        for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
+        if (Array.isArray(ready.highlight)) ready.highlight = [];
+        if (Array.isArray(ready.hl)) ready.hl = [];
+        frames.unshift(ready);
+      }
+      return frames;
+    }
+    function buildSteps(...args) {
+      const result = originalInstructionBuilder.apply(this, args);
+      prepareInstructionSteps(Array.isArray(result) ? result : steps);
+      return result;
+    }
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":66,"title":"Plus One","topic":"Math & Geometry","why":"A digit below nine absorbs the carry; a nine becomes zero and passes the carry left.","meanings":{"digits":"The array of single digits representing one big number, most-significant first. We add 1 to it in place.","i":"The loop index, walking from the rightmost digit (`digits.length - 1`) toward index 0 as the carry propagates.","carry":"Conceptual flag: a digit was 9, so it became 0 and the +1 must continue into the digit to its left.","ans":"The returned array — either the in-place modified `digits`, or `[1, ...digits]` when every digit carried (e.g. `[9,9]` → `[1,0,0]`)."},"entityClasses":["hud-item","cell","digits"],"entitySelectors":[],"mode":"precomputed"},
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({inputDigits, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({inputDigits, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({inputDigits, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

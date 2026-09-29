@@ -634,7 +634,7 @@
 <div id="line-11" class="code-line">      stack.<span class="fn">push</span>(<span class="fn">Number</span>(op));</div>
 <div id="line-12" class="code-line">    }</div>
 <div id="line-13" class="code-line">  }</div>
-<div id="line-14" class="code-line">  <span class="kw">return</span> stack.<span class="fn">reduce</span>((a, b) => a + b, <span class="nm">0</span>);</div>
+<div id="line-14" class="code-line">  <span class="kw">return</span> stack.<span class="fn">reduce</span>((a, b) =&gt; a + b, <span class="nm">0</span>);</div>
 <div id="line-15" class="code-line">};</div>
       </div>
     </div>
@@ -817,117 +817,21 @@
 
     // Build the full list of snapshots up front (precomputed steps[] engine).
     function buildSteps() {
-      steps = [];
-      let stack = [];
-
-      // Initial snapshot: before the loop.
-      steps.push({
-        i: -1,
-        op: null,
-        stack: [...stack],
-        res: null,
-        phase: "INIT",
-        lines: [2],
-        highlightTop: 0,
-        justPushed: false,
-        aboutPop: false,
-        trace: []
-      });
-
-      const trace = [];
-
-      for (let i = 0; i < operations.length; i++) {
-        const op = operations[i];
-        const kind = classifyOp(op);
-
-        // 1) Read op (loop check + branch decision).
-        steps.push({
-          i,
-          op,
-          stack: [...stack],
-          res: null,
-          phase: "READ",
-          kind,
-          lines: kind === "num" ? [3, 4, 6, 8, 10] : kind === "plus" ? [3, 4] : kind === "d" ? [3, 6] : [3, 8],
-          highlightTop: kind === "plus" ? 2 : (kind === "d" ? 1 : 0),
-          justPushed: false,
-          aboutPop: kind === "c",
-          trace: trace.map(r => ({ ...r }))
-        });
-
-        // 2) Apply the op (mutate stack), then snapshot the result.
-        let action = "";
-        let pushedVal = null;
-        let didPop = false;
-        if (kind === "plus") {
-          pushedVal = stack[stack.length - 1] + stack[stack.length - 2];
-          stack.push(pushedVal);
-          action = "push top1 + top2 = " + pushedVal;
-        } else if (kind === "d") {
-          pushedVal = stack[stack.length - 1] * 2;
-          stack.push(pushedVal);
-          action = "push 2 * top = " + pushedVal;
-        } else if (kind === "c") {
-          stack.pop();
-          didPop = true;
-          action = "pop (cancel)";
-        } else {
-          pushedVal = Number(op);
-          stack.push(pushedVal);
-          action = "push " + pushedVal;
-        }
-
-        const sum = stack.reduce((a, b) => a + b, 0);
-        trace.push({
-          i,
-          op,
-          action,
-          stack: "[" + stack.join(", ") + "]",
-          sum
-        });
-
-        steps.push({
-          i,
-          op,
-          stack: [...stack],
-          res: null,
-          phase: "APPLY",
-          kind,
-          lines: kind === "plus" ? [5] : kind === "d" ? [7] : kind === "c" ? [9] : [11],
-          highlightTop: 0,
-          justPushed: !didPop,
-          aboutPop: false,
-          trace: trace.map(r => ({ ...r }))
-        });
+      steps=[];const stack=[],trace=[];let i=-1,op=null;
+      const snap=(line,phase,narr,extra={})=>steps.push({i,op,stack:[...stack],res:null,phase,executedLine:line,lines:line?[line]:[1],highlightTop:0,justPushed:false,aboutPop:false,trace:trace.map(r=>({...r})),narr,...extra});
+      snap(null,"INIT","Ready to process the scores.");snap(2,"INIT","Create an empty score stack.");
+      for(i=0;i<operations.length;i++) {
+        op=operations[i];const kind=classifyOp(op);snap(3,"READ","Read the next operation.",{kind});snap(4,"READ","Check whether this adds the previous two scores.",{kind});
+        if(kind!=="plus")snap(6,"READ","Check whether this doubles the previous score.",{kind});
+        if(kind!=="plus"&&kind!=="d")snap(8,"READ","Check whether this cancels the previous score.",{kind});
+        let action,line;
+        if(kind==="plus"){const v=stack[stack.length-1]+stack[stack.length-2];stack.push(v);action="push "+v;line=5;}
+        else if(kind==="d"){const v=stack[stack.length-1]*2;stack.push(v);action="push "+v;line=7;}
+        else if(kind==="c"){stack.pop();action="pop (cancel)";line=9;}
+        else{stack.push(Number(op));action="push "+Number(op);line=11;}
+        trace.push({i,op,action,stack:"["+stack.join(", ")+"]",sum:stack.reduce((a,b)=>a+b,0)});snap(line,"APPLY",action,{kind,justPushed:kind!=="c"});
       }
-
-      // Final: reduce to sum.
-      const finalRes = stack.reduce((a, b) => a + b, 0);
-      steps.push({
-        i: operations.length,
-        op: null,
-        stack: [...stack],
-        res: finalRes,
-        phase: "RETURN",
-        lines: [14],
-        highlightTop: 0,
-        justPushed: false,
-        aboutPop: false,
-        trace: trace.map(r => ({ ...r }))
-      });
-
-      steps.push({
-        i: operations.length,
-        op: null,
-        stack: [...stack],
-        res: finalRes,
-        phase: "END",
-        lines: [14],
-        highlightTop: 0,
-        justPushed: false,
-        aboutPop: false,
-        trace: trace.map(r => ({ ...r }))
-      });
+      op=null;snap(3,"READ","There are no more operations.");snap(14,"END","Return the sum of the scores.",{res:stack.reduce((a,b)=>a+b,0)});
     }
 
     function loadExample(exNum) {
@@ -1216,6 +1120,8 @@
           break;
       }
 
+      if (step.narr) narrate(step.narr);
+
       const visualUi = document.getElementById("visual-ui");
       visualUi.innerHTML = "";
       visualUi.appendChild(renderOpsRow(step));
@@ -1268,7 +1174,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({operations, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({operations, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({operations, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

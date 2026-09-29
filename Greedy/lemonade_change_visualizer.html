@@ -836,141 +836,11 @@
     // Build the entire run once into steps[]. Each snapshot is fully deep-copied
     // so Step Back is exactly reversible.
     function buildSteps() {
-      steps = [];
-      const trace = [];
-
-      function snap(extra) {
-        steps.push(Object.assign({
-          bills: bills.slice(),
-          five: extra.five,
-          ten: extra.ten,
-          bill: extra.bill,
-          i: extra.i,
-          ans: extra.ans,
-          phase: extra.phase,
-          lines: extra.lines.slice(),
-          narration: extra.narration,
-          billClass: extra.billClass || null,    // "ok" | "fail" | null for current bill
-          regGive: extra.regGive || false,
-          regTake: extra.regTake || false,
-          trace: trace.map(r => Object.assign({}, r))
-        }));
-      }
-
-      let five = 0, ten = 0;
-      let ans = "pending";
-
-      // INIT
-      snap({
-        five, ten, bill: undefined, i: -1, ans, phase: "INIT",
-        lines: [2],
-        narration: "Initialize the register: <b>five = 0</b>, <b>ten = 0</b>. We process each customer's bill in order and must always give correct change."
-      });
-
-      for (let i = 0; i < bills.length; i++) {
-        const bill = bills[i];
-
-        // Loop / read current bill
-        snap({
-          five, ten, bill, i, ans, phase: "READ",
-          lines: [3],
-          narration: "Customer " + i + " pays with a <b>$" + bill + "</b> bill (lemonade costs $5)."
-        });
-
-        if (bill === 5) {
-          snap({
-            five, ten, bill, i, ans, phase: "BRANCH5",
-            lines: [4, 5],
-            regTake: true,
-            narration: "It is a <b>$5</b> bill. No change needed — just keep it. <b>five++</b>."
-          });
-          five++;
-          trace.push({ i, bill, action: "take $5", five, ten, ok: true });
-          snap({
-            five, ten, bill, i, ans, phase: "DONE5",
-            lines: [5],
-            regTake: true, billClass: "ok",
-            narration: "Register updated. five = <b>" + five + "</b>, ten = <b>" + ten + "</b>."
-          });
-        } else if (bill === 10) {
-          snap({
-            five, ten, bill, i, ans, phase: "BRANCH10",
-            lines: [6, 7],
-            narration: "It is a <b>$10</b> bill. We must return <b>$5</b> change. Do we have a $5?"
-          });
-          if (five === 0) {
-            ans = false;
-            trace.push({ i, bill, action: "no $5 -> false", five, ten, ok: false });
-            snap({
-              five, ten, bill, i, ans, phase: "FAIL10",
-              lines: [7],
-              billClass: "fail",
-              narration: "❌ <b>five === 0</b> — no $5 to give back. Return <b>false</b> immediately."
-            });
-            break;
-          }
-          five--;
-          ten++;
-          trace.push({ i, bill, action: "give $5, take $10", five, ten, ok: true });
-          snap({
-            five, ten, bill, i, ans, phase: "DONE10",
-            lines: [8, 9],
-            regGive: true, regTake: true, billClass: "ok",
-            narration: "Give one $5 back (<b>five--</b>) and keep the $10 (<b>ten++</b>). five = <b>" + five + "</b>, ten = <b>" + ten + "</b>."
-          });
-        } else {
-          // $20
-          snap({
-            five, ten, bill, i, ans, phase: "BRANCH20",
-            lines: [10, 11],
-            narration: "It is a <b>$20</b> bill. We must return <b>$15</b>. Prefer a $10 + $5 (keep more $5s for later)."
-          });
-          if (ten > 0 && five > 0) {
-            ten--;
-            five--;
-            trace.push({ i, bill, action: "give $10+$5", five, ten, ok: true });
-            snap({
-              five, ten, bill, i, ans, phase: "DONE20A",
-              lines: [11],
-              regGive: true, regTake: true, billClass: "ok",
-              narration: "Have a $10 and a $5 — give both (<b>ten--; five--</b>). five = <b>" + five + "</b>, ten = <b>" + ten + "</b>."
-            });
-          } else if (five >= 3) {
-            snap({
-              five, ten, bill, i, ans, phase: "CHECK20B",
-              lines: [12],
-              narration: "No $10 available, but <b>five &gt;= 3</b> — we can make $15 from three $5 bills."
-            });
-            five -= 3;
-            trace.push({ i, bill, action: "give 3x$5", five, ten, ok: true });
-            snap({
-              five, ten, bill, i, ans, phase: "DONE20B",
-              lines: [12],
-              regGive: true, regTake: true, billClass: "ok",
-              narration: "Give three $5 bills (<b>five -= 3</b>). five = <b>" + five + "</b>, ten = <b>" + ten + "</b>."
-            });
-          } else {
-            ans = false;
-            trace.push({ i, bill, action: "can't make $15 -> false", five, ten, ok: false });
-            snap({
-              five, ten, bill, i, ans, phase: "FAIL20",
-              lines: [13],
-              billClass: "fail",
-              narration: "❌ Cannot make $15 change (need a $10+$5 or three $5s). Return <b>false</b> immediately."
-            });
-            break;
-          }
-        }
-      }
-
-      if (ans !== false) {
-        ans = true;
-        snap({
-          five, ten, bill: undefined, i: bills.length, ans, phase: "RETURN_TRUE",
-          lines: [16],
-          narration: "✓ Served every customer with correct change. Return <b>true</b>."
-        });
-      }
+      steps=[];const trace=[];let five=0,ten=0,bill=undefined,i=-1,ans="pending";
+      const snap=(line,phase,narration,extra={})=>steps.push({bills:[...bills],five,ten,bill,i,ans,phase,executedLine:line,lines:line?[line]:[1],narration,billClass:null,regGive:false,regTake:false,trace:trace.map(r=>({...r})),...extra});
+      snap(null,"INIT","Ready to serve the customers.");snap(2,"INIT","Initialize the register.");
+      for(i=0;i<bills.length;i++){bill=bills[i];snap(3,"READ","Read the customer's bill.");snap(4,"BRANCH5","Check whether the bill is $5.");if(bill===5){five++;trace.push({i,bill,action:"take $5",five,ten,ok:true});snap(5,"DONE5","Keep the $5 bill.",{regTake:true,billClass:"ok"});continue;}snap(6,"BRANCH10","Check whether the bill is $10.");if(bill===10){if(five===0){ans=false;trace.push({i,bill,action:"no $5 -> false",five,ten,ok:false});snap(7,"FAIL10","No $5 change is available. Return false.",{billClass:"fail"});return;}snap(7,"BRANCH10","A $5 bill is available for change.");five--;snap(8,"DONE10","Give back one $5 bill.",{regGive:true});ten++;trace.push({i,bill,action:"give $5, take $10",five,ten,ok:true});snap(9,"DONE10","Keep the $10 bill.",{regTake:true,billClass:"ok"});continue;}if(ten>0&&five>0){ten--;snap(11,"DONE20A","Give back one $10 bill.",{regGive:true});five--;trace.push({i,bill,action:"give $10+$5",five,ten,ok:true});snap(11,"DONE20A","Give back one $5 bill.",{regGive:true,billClass:"ok"});}else{snap(11,"BRANCH20","A $10 plus $5 combination is unavailable.");if(five>=3){five-=3;trace.push({i,bill,action:"give 3x$5",five,ten,ok:true});snap(12,"DONE20B","Give back three $5 bills.",{regGive:true,billClass:"ok"});}else{snap(12,"CHECK20B","Three $5 bills are unavailable.");ans=false;trace.push({i,bill,action:"cannot make $15",five,ten,ok:false});snap(13,"FAIL20","Return false.",{billClass:"fail"});return;}}}
+      bill=undefined;snap(3,"READ","There are no more customers.");ans=true;snap(16,"RETURN_TRUE","Return true.");
     }
 
     function loadExample(exNum) {
@@ -1254,7 +1124,7 @@
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({bills, ...(steps[stepIndex] || {})}),
-      readAt: (position) => ({bills, ...(steps[position] || {})}),
+      readAt: (studySnapshotIndex) => ({bills, ...(steps[studySnapshotIndex] || {})}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(steps[stepIndex]); },
     };
