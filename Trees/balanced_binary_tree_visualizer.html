@@ -585,6 +585,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -931,6 +936,7 @@
       let balanced = true;
       const badNodes = {};    // id -> true when |left-right|>1 at that node
 
+      const objectFrames = [];
       function snap(extra) {
         const base = {
           line: [],
@@ -946,7 +952,13 @@
           trace: traceRows.map(r => ({ ...r })),
           activeTrace: traceRows.length - 1
         };
-        steps.push(Object.assign(base, extra));
+        const snapshot = Object.assign(base, extra);
+        const active = objectFrames.at(-1);
+        Object.defineProperties(snapshot, {
+          objectLocals: {value: active ? {left: active.left, right: active.right} : {}},
+          objectOmit: {value: active ? [] : ['node', 'left', 'right']}
+        });
+        steps.push(snapshot);
       }
 
       snap({
@@ -958,6 +970,8 @@
       const callStack = [];
 
       function height(node) {
+        const objectFrame = {};
+        objectFrames.push(objectFrame);
         const frameId = node ? node._id : "null";
         callStack.push(frameId);
 
@@ -969,6 +983,7 @@
             currentId: null
           });
           callStack.pop();
+          objectFrames.pop();
           return 0;
         }
 
@@ -987,6 +1002,7 @@
           currentId: node._id
         });
         const left = height(node.left);
+        objectFrame.left = left;
 
         snap({
           line: [6],
@@ -995,6 +1011,7 @@
           currentId: node._id
         });
         const right = height(node.right);
+        objectFrame.right = right;
 
         const diff = Math.abs(left - right);
         const over = diff > 1;
@@ -1032,6 +1049,7 @@
           currentId: node._id
         });
         callStack.pop();
+        objectFrames.pop();
         return ret;
       }
 
@@ -1386,6 +1404,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":110,"title":"Balanced Binary Tree","topic":"Trees","why":"Compare the two child heights at every node; a local height difference above one makes the tree unbalanced.","meanings":{"root":"tree root node passed into `isBalanced`","node":"current node in the `height` recursion","left":"height of the current node's left subtree","right":"height of the current node's right subtree","balanced":"answer flag, set to `false` if any node has `"},"entityClasses":["hud-item","node","node-badge","frame-pill","nodeState","badNodes"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(110, {...window.studyLessonSource.readAt(index), objectLocals: steps[index].objectLocals || {}, objectOmit: steps[index].objectOmit || ['node', 'left', 'right']}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({inputArr, layout, layoutW, layoutH, ...(steps[stepIndex] || {})}),

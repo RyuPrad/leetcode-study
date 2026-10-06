@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 700. Search in a Binary Search Tree Visualizer</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui,sans-serif; background:#1e1e1e; color:#d4d4d4; }
+    body { margin:0; padding:24px; } button,input { font:inherit; } button { cursor:pointer; }
+    .panel { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:16px; }
+    .layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; } h2 { font-size:16px; }
+    .code-line { white-space:pre; font:14px/1.7 Consolas,monospace; padding:0 8px; }
+    .code-line.active { background:#34312a; border-left:3px solid #d7ba7d; }
+    .kw { color:#c586c0; } .fn { color:#dcdcaa; } .tree-canvas { position:relative; margin:auto; }
+    .tree-node { position:absolute; width:44px; height:44px; display:grid; place-items:center; border:2px solid #569cd6; border-radius:50%; background:#252526; box-sizing:border-box; }
+    .tree-node.current { border-color:#d7ba7d; background:#3c3525; } .tree-node.found { border-color:#6a9955; }
+    .tree-node.path { box-shadow:0 0 0 3px #569cd630; } .pointer { position:absolute; top:-24px; font-size:12px; color:#d7ba7d; }
+    .console { white-space:pre-wrap; font:13px/1.7 Consolas,monospace; } .result-value { color:#b5cea8; }
+    #drag-container > div { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; } #custom-input { min-width:260px; }
+  </style>
+  <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
+  <script defer src="../visualizer-ui/workspace.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/learning.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <script defer src="../visualizer-ui/operation-rules.js"></script>
+  <script defer src="../visualizer-ui/operations.js"></script>
+  <script defer src="../visualizer-ui/learning.js"></script>
+  <script defer src="../visualizer-ui/guided-core.js"></script>
+  <script defer src="../visualizer-ui/guided.js"></script>
+</head>
+<body>
+  <h1 class="page-title">700. Search in a Binary Search Tree</h1>
+  <div id="drag-container">
+    <div><button id="btn-prev" onclick="prevStep()">Back</button><button id="btn-next" onclick="nextStep()">Step Over</button><button id="btn-reset" onclick="init()">Reset</button><button id="btn-fullscreen" onclick="document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()">Fullscreen</button></div>
+    <div><button id="btn-ex-1" onclick="loadExample(1)">Found on left</button><button id="btn-ex-2" onclick="loadExample(2)">Absent target</button><button id="btn-ex-3" onclick="loadExample(3)">Found on right</button><button id="btn-ex-4" onclick="loadExample(4)">Empty tree</button></div>
+    <div><label for="custom-input">Tree | target</label><input id="custom-input" value="[4,2,7,1,3] | 2" /><button onclick="loadCustom()">Load</button></div>
+  </div>
+  <div class="layout">
+    <div class="panel"><h2>BST search</h2><div id="narration-ui"></div><div id="visual-ui"></div><div id="final-ui" class="result-value"></div></div>
+    <div class="panel code-panel"><h2>Live Debugger</h2><div id="reference-code">
+<div id="line-1" class="code-line"><span class="kw">var</span> <span class="fn">searchBST</span> = <span class="kw">function</span>(root, val) {</div>
+<div id="line-2" class="code-line">  <span class="kw">let</span> curr = root;</div>
+<div id="line-3" class="code-line">  <span class="kw">while</span> (curr !== <span class="kw">null</span>) {</div>
+<div id="line-4" class="code-line">    <span class="kw">if</span> (curr.val === val) {</div>
+<div id="line-5" class="code-line">      <span class="kw">return</span> curr;</div>
+<div id="line-6" class="code-line">    }</div>
+<div id="line-7" class="code-line">    <span class="kw">if</span> (val &lt; curr.val) {</div>
+<div id="line-8" class="code-line">      curr = curr.left;</div>
+<div id="line-9" class="code-line">    } <span class="kw">else</span> {</div>
+<div id="line-10" class="code-line">      curr = curr.right;</div>
+<div id="line-11" class="code-line">    }</div>
+<div id="line-12" class="code-line">  }</div>
+<div id="line-13" class="code-line">  <span class="kw">return null</span>;</div>
+<div id="line-14" class="code-line">};</div>
+    </div></div>
+    <div class="panel"><h2>Object View — nested JS object format (debugger-style)</h2><div id="object-view"></div></div>
+    <div class="panel"><h2>Variables & Outputs</h2><div id="console-ui" class="console"></div></div>
+    <div class="panel"><h2>Step Trace</h2><div id="trace-ui"></div></div>
+  </div>
+  <script>
+    const examples = {1:[[4,2,7,1,3],2],2:[[4,2,7,1,3],5],3:[[4,2,7,1,3,null,9],9],4:[[],2]};
+    let treeArr = examples[1][0].slice(), val = examples[1][1], root = null, steps = [], stepIndex = 0;
+    function buildTree(values) {
+      if (!values.length) return null;
+      if (values[0] === null) { if(values.length>1)throw Error('Tree values cannot follow a null root.');return null; }
+      let nextId = 0;
+      const node = value => { const result={val:value,left:null,right:null};Object.defineProperty(result,'_studyId',{value:'tree-node:'+nextId++});return result; };
+      const first=node(values[0]), queue=[first];let index=1;
+      while(queue.length && index<values.length){const parent=queue.shift();for(const side of ['left','right']){if(index>=values.length)break;const value=values[index++];if(value!==null){parent[side]=node(value);queue.push(parent[side]);}}}
+      if(index<values.length)throw Error('The level-order tree contains values with no parent.');
+      return first;
+    }
+    function buildSteps() {
+      root=buildTree(treeArr);steps=[];let curr, result, finished=false;const path=[],trace=[];
+      const snap=(executedLine,phase,narration)=>steps.push({root,val,curr,currInitialized:executedLine!==null,result,finished,path:path.slice(),trace:trace.map(row=>({...row})),executedLine,lines:executedLine?[executedLine]:[],phase,narration});
+      snap(null,'ready','The tree and target are the function arguments.');
+      curr=root;snap(2,'initialize','Set curr to the existing root object.');
+      while(true){snap(3,'loop-check',curr===null?'curr is null. Leave the loop.':'curr is non-null. Enter the loop.');if(curr===null)break;
+        path.push(curr._studyId);const equal=curr.val===val;snap(4,'equality-check',equal?'curr.val equals the target.':'curr.val differs from the target.');
+        if(equal){result=curr;finished=true;trace.push({node:curr.val,action:'return current subtree'});snap(5,'return-found','Return the same node referenced by curr, including its children.');return;}
+        const left=val<curr.val;snap(7,'branch-check',left?'The target is smaller. Follow the left child.':'The target is larger. Follow the right child.');
+        const from=curr;curr=left?curr.left:curr.right;trace.push({node:from.val,action:left?'follow left':'follow right'});snap(left?8:10,left?'move-left':'move-right','Move curr to the existing '+(left?'left':'right')+' child reference.');
+      }
+      result=null;finished=true;snap(13,'return-absent','Return null because the search reached an empty subtree.');
+    }
+    function init(){buildSteps();stepIndex=0;render();}
+    function nextStep(){if(stepIndex<steps.length-1){stepIndex++;render();}}
+    function prevStep(){if(stepIndex>0){stepIndex--;render();}}
+    function loadExample(number){[treeArr,val]=[examples[number][0].slice(),examples[number][1]];document.getElementById('custom-input').value=JSON.stringify(treeArr)+' | '+val;init();}
+    function loadCustom(){
+      const parts=document.getElementById('custom-input').value.split('|');
+      try{if(parts.length!==2)throw Error('Use a level-order tree and target, e.g. [4,2,7,1,3] | 2.');const text=parts[0].trim();const values=JSON.parse(text.startsWith('[')?text:'['+text+']'), target=Number(parts[1].trim());
+        if(!Array.isArray(values)||values.length>200||values.some(value=>value!==null&&!Number.isSafeInteger(value))||!parts[1].trim()||!Number.isSafeInteger(target))throw Error('Use at most 200 integer tree values, null for missing children, and an integer target.');
+        const candidate=buildTree(values);function valid(node,min=-Infinity,max=Infinity){return node===null||node.val>min&&node.val<max&&valid(node.left,min,node.val)&&valid(node.right,node.val,max);}if(!valid(candidate))throw Error('The tree must be a binary search tree with distinct values.');
+        treeArr=values;val=target;init();
+      }catch(error){alert(error.message);}
+    }
+    function renderTree(state){
+      const visual=document.getElementById('visual-ui');if(!state.root){visual.textContent='root = null';return;}
+      const positions=new Map();let order=0,maxDepth=0;function layout(node,depth){if(!node)return;layout(node.left,depth+1);positions.set(node,{x:30+order++*68,y:45+depth*85});maxDepth=Math.max(maxDepth,depth);layout(node.right,depth+1);}layout(state.root,0);
+      const width=Math.max(200,order*68+20),height=(maxDepth+1)*85+30;let edges='',nodes='';for(const [node,p] of positions){for(const child of [node.left,node.right])if(child){const c=positions.get(child);edges+='<line x1="'+(p.x+22)+'" y1="'+(p.y+22)+'" x2="'+(c.x+22)+'" y2="'+(c.y+22)+'" stroke="#777" stroke-width="2" />';}
+        const current=node===state.curr;nodes+='<div class="tree-node'+(current?' current':'')+(node===state.result?' found':'')+(state.path.includes(node._studyId)?' path':'')+'" data-node-id="'+node._studyId+'" style="left:'+p.x+'px;top:'+p.y+'px">'+node.val+(current?'<span class="pointer" data-study-pointer="curr" data-study-pointer-target="'+node._studyId+'">curr</span>':'')+'</div>';}
+      visual.innerHTML='<div class="tree-canvas" data-study-motion-scope="search-tree" style="width:'+width+'px;height:'+height+'px"><svg width="'+width+'" height="'+height+'" style="position:absolute">'+edges+'</svg>'+nodes+'</div>';
+    }
+    function render(){const state=steps[stepIndex];document.getElementById('btn-prev').disabled=stepIndex===0;document.getElementById('btn-next').disabled=stepIndex===steps.length-1;document.getElementById('btn-next').textContent=state.finished?'Finished!':'Step Over';document.querySelectorAll('.code-line').forEach(line=>line.classList.toggle('active',line.id==='line-'+state.executedLine));document.getElementById('narration-ui').textContent=state.narration;renderTree(state);document.getElementById('console-ui').textContent='root = '+(root?'node('+root.val+')':'null')+'\nval = '+val+'\ncurr = '+(!state.currInitialized?'uninitialized':state.curr?'node('+state.curr.val+')':'null');document.getElementById('final-ui').textContent=state.finished?'return '+(state.result?'subtree rooted at '+state.result.val:'null'):'';document.getElementById('trace-ui').innerHTML='<table><tbody>'+state.trace.map(row=>'<tr><td>'+row.node+'</td><td>'+row.action+'</td></tr>').join('')+'</tbody></table>';}
+    init();
+    // STUDY LESSON BRIDGE START
+    window.studyLessonSource = {
+      spec: {number:700,title:'Search in a Binary Search Tree',topic:'BST',why:'A binary search tree lets us discard one whole side after comparing the target with the current node.',meanings:{root:'tree root',curr:'current node while searching',val:'target value'},entityClasses:['tree-node'],entitySelectors:[],mode:'precomputed'},
+      index:()=>stepIndex,count:()=>steps.length,read:()=>steps[stepIndex],readAt:index=>steps[index],
+      phases:()=>steps.map((state,index)=>({index,phase:state.phase})),
+      jump:index=>{stepIndex=Math.max(0,Math.min(steps.length-1,index));render();},
+      objectFrame(index=stepIndex){const state=steps[index];const roots=[{name:'root',value:state.root},{name:'val',value:state.val},{name:'curr',value:state.curr}];if(state.finished)roots.push({name:'return',scope:'Return value',value:state.result});const frame=StudyObjectView.capture(roots,{frameName:'searchBST',idOf:(object)=>object._studyId});if(!state.currInitialized)frame.stack[0].variables.find(variable=>variable.name==='curr').value={special:'not initialized'};return frame;}
+    };
+    // STUDY LESSON BRIDGE END
+  </script>
+</body>
+</html>

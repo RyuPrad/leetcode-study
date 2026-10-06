@@ -18,7 +18,7 @@ try {
   assert.ok(await app.evaluate(({ app }) => app.isPackaged));
   assert.equal(await app.evaluate(({ app }) => app.getVersion()), expectedVersion);
   const { catalog, data } = await page.evaluate(() => window.study.bootstrap());
-  assert.equal(catalog.visualizers.length, 250);
+  assert.equal(catalog.visualizers.length, 252);
   await app.evaluate(({ session }) => session.defaultSession.enableNetworkEmulation({ offline: true }));
   if (seed) {
     await page.getByRole('button', { name: 'Open Two Sum', exact: true }).click();
@@ -32,10 +32,10 @@ try {
       await frame.locator('.study-workspace').waitFor();
       await frame.locator('#btn-next').evaluate(button => button.click());
       assert.equal(await frame.evaluate(() => typeof window.study), 'undefined');
-      if (++count % 50 === 0) console.log(`Installed offline content: ${count}/250`);
+      if (++count % 50 === 0) console.log(`Installed offline content: ${count}/${catalog.visualizers.length}`);
     }
     assert.deepEqual(errors, []);
-    console.log('PASS installed app launches with no Node/Git on PATH and all 250 packaged visualizers work offline');
+    console.log('PASS installed app launches with no Node/Git on PATH and all 252 packaged visualizers work offline');
   } else {
     assert.equal(data.progress['leetcode:1'].status, 'completed');
     assert.ok(data.progress['leetcode:1'].bookmarked);
@@ -46,5 +46,5 @@ try {
     console.log('PASS reinstall preserves progress, bookmarks and practice history');
   }
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(ROOT, `test-results/installer-${expectedVersion}-${seed ? 'first-run' : 'reinstall'}.json`), JSON.stringify({ passed: true, version: expectedVersion, packaged: true, offline: true, count: seed ? 250 : undefined }, null, 2));
+  fs.writeFileSync(path.join(ROOT, `test-results/installer-${expectedVersion}-${seed ? 'first-run' : 'reinstall'}.json`), JSON.stringify({ passed: true, version: expectedVersion, packaged: true, offline: true, count: seed ? catalog.visualizers.length : undefined }, null, 2));
 } finally { await app.close(); }

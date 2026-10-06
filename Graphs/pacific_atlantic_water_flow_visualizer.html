@@ -552,6 +552,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -835,7 +840,9 @@
         return n;
       }
 
+      let objectLocals = {}, objectOceanName;
       function snapshot(extra) {
+        const objectIndex = built.length;
         built.push({
           pac: cloneMatrix(pac),
           atl: cloneMatrix(atl),
@@ -853,6 +860,10 @@
           atlCount: countTrue(atl),
           traceLen: traceRows.length
         });
+        Object.defineProperties(built[objectIndex], {
+          objectLocals: {value: {...objectLocals}}, objectOceanName: {value: objectOceanName},
+          objectOmit: {value: ['r','c','prev','dr','dc','ocean'].filter(name => !(name in objectLocals) && !(name === 'ocean' && objectOceanName !== undefined))}
+        });
       }
 
       snapshot({phase: "init", lines: [], executedLine: null, narration: "Ready to find the cells reachable from both oceans."});
@@ -865,6 +876,9 @@
 
       // A single DFS that records each visited cell as a step.
       const dfs = (r, c, ocean, prev, oceanName) => {
+        const previousLocals = objectLocals, previousOcean = objectOceanName;
+        objectLocals = {r, c, prev}; objectOceanName = oceanName;
+        try {
         snapshot({phase: "dfs", ocean: oceanName, cur: [r,c], lines: [8], narration: "Check whether the coordinates are inside the grid."});
         if (r < 0 || r >= rows || c < 0 || c >= cols) return;
         snapshot({phase: "dfs", ocean: oceanName, cur: [r,c], lines: [9], narration: "Check whether the cell was visited or is below the previous height."});
@@ -885,13 +899,16 @@
           narration: "Reach <b>(" + r + "," + c + ")</b> with height <b>" + grid[r][c] + "</b> &ge; prev <b>" + (prev === -Infinity ? "-∞" : prev) + "</b>. Mark it reachable from the <b class='ocean-" + oceanName + "'>" + (oceanName === "pac" ? "Pacific" : "Atlantic") + "</b> ocean, then recurse into the 4 neighbors (only flows uphill)."
         });
         for (const [dr, dc] of dirs) {
+          objectLocals.dr = dr; objectLocals.dc = dc;
           snapshot({phase: "dfs", ocean: oceanName, cur: [r,c], lines: [11], narration: "Call DFS for the next neighboring cell. The reachability matrices stay unchanged until that call marks a cell."});
           dfs(r + dr, c + dc, ocean, grid[r][c], oceanName);
         }
+        } finally { objectLocals = previousLocals; objectOceanName = previousOcean; }
       };
 
       // Pacific = top row + left column ; Atlantic = bottom row + right column.
       for (let r = 0; r < rows; r++) {
+        objectLocals = {r};
         snapshot({
           phase: "seed",
           ocean: "pac",
@@ -910,6 +927,7 @@
         dfs(r, cols - 1, atl, -Infinity, "atl");
       }
       for (let c = 0; c < cols; c++) {
+        objectLocals = {c};
         snapshot({
           phase: "seed",
           ocean: "pac",
@@ -928,6 +946,7 @@
         dfs(rows - 1, c, atl, -Infinity, "atl");
       }
 
+      objectLocals = {};
       // Collect the intersection.
       const res = [];
       snapshot({
@@ -938,6 +957,7 @@
       });
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
+          objectLocals = {r, c};
           const both = pac[r][c] && atl[r][c];
           if (both) {
             res.push([r, c]);
@@ -955,6 +975,7 @@
         }
       }
 
+      objectLocals = {};
       snapshot({
         phase: "done",
         res: res,
@@ -1291,6 +1312,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":417,"title":"Pacific Atlantic Water Flow","topic":"Graphs","why":"Search backward from each ocean along nondecreasing heights; their intersection reaches both oceans.","meanings":{"heights":"The `rows x cols` matrix of cell elevations. Water flows from a cell to an equal-or-lower neighbor.","rows":"Number of rows, `heights.length`.","cols":"Number of columns, `heights[0].length`.","pac":"Boolean matrix; `pac[r][c]` is `true` once cell `(r,c)` can drain to the Pacific (top/left edges).","atl":"Boolean matrix; `atl[r][c]` is `true` once cell `(r,c)` can drain to the Atlantic (bottom/right edges).","dirs":"The four 4-directional moves `[[1,0],[-1,0],[0,1],[0,-1]]`.","dfs":"Reverse flood-fill `(r, c, ocean, prev)`: from an ocean border, walk **uphill** (only to neighbors `>= prev`) marking every reachable cell in `ocean`.","prev":"The height of the cell we came from; a neighbor is reachable only if its height is `>= prev`.","res":"The answer: every `[r, c]` with `pac[r][c] && atl[r][c]` — cells that drain to **both** oceans."},"entityClasses":["hud-item","legend-item","gcell","answerCells","cell"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(417, {...window.studyLessonSource.readAt(index), objectLocals: steps[index].objectLocals || {}, objectOceanName: steps[index].objectOceanName, objectOmit: steps[index].objectOmit || []}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({heights,  ...(steps[stepIndex] || {})}),

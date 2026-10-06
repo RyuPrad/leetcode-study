@@ -563,6 +563,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -848,7 +853,9 @@
       for (let r = 0; r < nVal; r++) available.push(r);
       let busy = []; // [endTime, room]
 
+      let objectLocals = {};
       function snap(line, narr, extra) {
+        const objectIndex = out.length;
         extra = extra || {};
         out.push({
           line: line,
@@ -861,23 +868,31 @@
           assignedRoom: extra.assignedRoom !== undefined ? extra.assignedRoom : null,
           best: extra.best !== undefined ? extra.best : null
         });
+        Object.defineProperties(out[objectIndex], {
+          objectLocals: {value: {...objectLocals}},
+          objectOmit: {value: ['start','end','room','freeTime','r'].filter(name => !(name in objectLocals))}
+        });
       }
 
       snap(2, "Sort meetings by start time, then initialize: count[] all 0, every room available, busy empty.", { meetingIdx: -1 });
 
       for (let mi = 0; mi < mtgs.length; mi++) {
         const start = mtgs[mi][0], end = mtgs[mi][1];
+        objectLocals = {start, end};
         snap(7, "Process meeting #" + mi + " = [" + start + ", " + end + "] (next in start order).", { meetingIdx: mi });
 
         while (busy.length > 0 && busy[0][0] <= start) {
           const room = busy.shift()[1];
+          objectLocals.room = room;
           available.push(room);
           available.sort((a, b) => a - b);
           snap(11, "A busy room frees at &le; " + start + ". Return room " + room + " to available (kept sorted).", { meetingIdx: mi });
         }
 
+        delete objectLocals.room;
         if (available.length > 0) {
           const room = available.shift();
+          objectLocals.room = room;
           count[room]++;
           busy.push([end, room]);
           busy.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -886,6 +901,7 @@
           busy.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
           const popped = busy.shift();
           const freeTime = popped[0], room = popped[1];
+          objectLocals.freeTime = freeTime; objectLocals.room = room;
           count[room]++;
           const newEnd = freeTime + (end - start);
           busy.push([newEnd, room]);
@@ -894,9 +910,11 @@
         }
       }
 
+      objectLocals = {};
       let best = 0;
       snap(26, "All meetings done. Find busiest room: start with best = 0 (count " + count[0] + ").", { best: 0 });
       for (let r = 1; r < nVal; r++) {
+        objectLocals = {r};
         if (count[r] > count[best]) {
           best = r;
           snap(28, "count[" + r + "] = " + count[r] + " is greater. New best room = " + r + ".", { best: best });
@@ -904,6 +922,7 @@
           snap(28, "count[" + r + "] = " + count[r] + " is not greater than count[" + best + "] = " + count[best] + ". Best stays " + best + ".", { best: best });
         }
       }
+      objectLocals = {};
       snap(30, "Finished! Busiest room (lowest index on tie) is room " + best + ". Return " + best + ".", { best: best });
       return out;
     }
@@ -1247,6 +1266,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":2402,"title":"Meeting Rooms III","topic":"Intervals","why":"Use an available room when possible; otherwise delay the meeting until the earliest room release while preserving duration.","meanings":{"n":"Number of meeting rooms, indexed `0 .. n-1`.","meetings":"Array of `[start, end]` meetings, sorted ascending by start time.","count":"`count[r]` = how many meetings room `r` has hosted (the booking counter).","available":"Sorted list of free room indices; lowest index is taken first.","busy":"List of `[endTime, room]` for rooms in use, kept sorted by end time (ties by room).","room":"The room chosen for the current meeting (freed, assigned, or waited for).","freeTime":"When the earliest-freeing busy room becomes available (used when all rooms are busy).","best":"Index of the busiest room so far; the final answer (lowest index wins ties).","r":"Loop index over rooms (initial fill and final scan for the busiest room)."},"entityClasses":["hud-item","mtg-chip","room-lane","room-count","pill","busy-pill","assignedRoom"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(2402, {...window.studyLessonSource.readAt(index), objectLocals: steps[index].objectLocals || {}, objectOmit: steps[index].objectOmit || ['start','end','room','freeTime','r']}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({n, meetings, ...(steps[stepIndex] || {})}),

@@ -29,6 +29,8 @@ for(const entry of catalog.entries.filter(e=>e.visualizerPath)){
   const bridge=existingBridge?'\n    '+existingBridge.replace(/spec: [^\r\n]+/,()=>`spec: ${JSON.stringify(spec)},`)+'\n':generatedBridge;
   const end=script.index+script[0].lastIndexOf('</script>');source=source.slice(0,end)+bridge+source.slice(end);
   if(!source.includes('../visualizer-ui/learning.js'))source=source.replace('<script defer src="../visualizer-ui/workspace.js"></script>','<script defer src="../visualizer-ui/workspace.js"></script>\n  <link rel="stylesheet" href="../visualizer-ui/learning.css" />\n  <script defer src="../visualizer-ui/learning.js"></script>');
+  if(!source.includes('../visualizer-ui/object-view.js'))source=source.replace('<script defer src="../visualizer-ui/workspace.js"></script>','<link rel="stylesheet" href="../visualizer-ui/object-view.css" />\n  <script defer src="../visualizer-ui/object-view.js"></script>\n  <script defer src="../visualizer-ui/object-state.js"></script>\n  <script defer src="../visualizer-ui/workspace.js"></script>');
+  if(!source.includes('../visualizer-ui/panel-layout.js'))source=source.replace('<script defer src="../visualizer-ui/workspace.js"></script>','<link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />\n  <script defer src="../visualizer-ui/panel-layout.js"></script>\n  <script defer src="../visualizer-ui/workspace.js"></script>');
   fs.writeFileSync(file,source);
   manifest.push({id:entry.id,path:entry.visualizerPath,...spec});
 }

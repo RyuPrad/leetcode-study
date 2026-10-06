@@ -138,7 +138,7 @@
         if(blocked){event.preventDefault();event.stopImmediatePropagation();if(blocked.id==='btn-next')void next();else if(blocked.id==='btn-prev')void seek(source.index()-1);else if(blocked.id==='btn-reset')void initialize(core.fresh(lesson,progress),true);return;}
         const target=targets.find(t=>t.el===event.target||t.el.contains(event.target));if(target){event.preventDefault();event.stopImmediatePropagation();choose(target.cp,target.optionId);}
       },true);
-      document.addEventListener('keydown',event=>{const target=targets.find(t=>t.el===event.target);if(target&&['Enter',' '].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();choose(target.cp,target.optionId);return;}if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.target.closest?.('input,textarea,select,[contenteditable="true"],[role="tablist"],[role="separator"]')&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();if(event.key==='ArrowRight')void next();else void seek(source.index()-1);}},true);
+      document.addEventListener('keydown',event=>{const target=targets.find(t=>t.el===event.target);if(target&&['Enter',' '].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();choose(target.cp,target.optionId);return;}if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.target.closest?.('input,textarea,select,[contenteditable="true"],[role="tablist"],[role="separator"],.study-panel-titlebar,.study-panels-bar')&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();if(event.key==='ArrowRight')void next();else void seek(source.index()-1);}},true);
       window.nextStep=()=>internal?originalNext():void next();window.prevStep=()=>internal?originalPrevious():void seek(source.index()-1);
       window.studyLessonAdapter={...underlying,next:()=>void next(),previous:()=>void seek(source.index()-1),seek:index=>seek(index),reset:()=>void initialize(core.fresh(lesson,progress),true),loadGuidedCase:()=>initialize(core.fresh(lesson,progress),true)};
       window.studyGuidedController={get lesson(){return lesson;},get progress(){return progress?structuredClone(progress):null;},get busy(){return busy;},get error(){return error;},pause,seek,next,restart:()=>initialize(core.fresh(lesson,progress),true)};
@@ -151,6 +151,7 @@
       document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
       window.addEventListener('pagehide',()=>{generation++;pause();clearTargets();window.nextStep=originalNext;window.prevStep=originalPrevious;});
       if(!embedded)window.addEventListener('blur',pause);
+      window.StudyPanelLayout.mountReference('learn');
       if(embedded)send({type:'guided:ready',lessonId:lesson.id,version:lesson.version,caseId:lesson.caseId});else await initialize(null);
     }catch(e){panel.replaceChildren(make('p','guided-error',e.message));panel.setAttribute('role','alert');}
   }

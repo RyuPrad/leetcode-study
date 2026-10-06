@@ -9,7 +9,7 @@ if(process.env.STUDY_TEST_EXE)env.PATH=`${process.env.SystemRoot}\\System32;${pr
 const launch=()=>electron.launch({...(process.env.STUDY_TEST_EXE?{executablePath:process.env.STUDY_TEST_EXE,args:[]}:{args:[ROOT]}),env,timeout:30000});
 let app=await launch(),page=await app.firstWindow(),frame;page.setDefaultTimeout(20000);const errors=[];
 const watch=()=>page.on('pageerror',e=>errors.push(e.message));watch();
-async function focus(){await app.evaluate(({BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.restore();win.show();win.focus();});}
+async function focus(){await app.evaluate(({BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];if(win.isMinimized())win.restore();win.show();win.focus();});await page.waitForFunction(()=>document.hasFocus());}
 async function open(number=1){
   if(await page.getByRole('button',{name:'Back to library',exact:true}).count())await page.getByRole('button',{name:'Back to library',exact:true}).click();
   await page.getByRole('searchbox',{name:'Search problems'}).fill(String(number));
@@ -22,7 +22,7 @@ async function open(number=1){
 }
 async function stored(id='leetcode:1'){return page.evaluate(async id=>(await window.study.bootstrap()).data.guided[id],id);}
 async function checkpoint(){await frame.getByRole('button',{name:'Next prediction',exact:true}).press('Enter');await frame.locator('.guided-question').waitFor();return frame.evaluate(()=>window.studyGuidedController.lesson.checkpoints.find(cp=>cp.beforeIndex===window.studyLessonSource.index()));}
-async function show(){await frame.getByRole('button',{name:'Show me',exact:true}).press('Enter');await frame.getByRole('button',{name:'Continue',exact:true}).waitFor();await frame.getByRole('button',{name:'Continue',exact:true}).press('Enter');}
+async function show(){await focus();await frame.getByRole('button',{name:'Show me',exact:true}).click();await frame.getByRole('button',{name:'Continue',exact:true}).waitFor();await frame.getByRole('button',{name:'Continue',exact:true}).click();}
 try{
   await page.locator('.problem-table').waitFor();await app.evaluate(({session})=>session.defaultSession.enableNetworkEmulation({offline:true}));await focus();await open();
   const cp=await checkpoint();await frame.getByRole('button',{name:'Hint',exact:true}).click();
@@ -57,10 +57,11 @@ try{
   }
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1));
   await frame.getByRole('button',{name:'Restart lesson',exact:true}).click();await frame.waitForFunction(()=>!window.studyGuidedController.busy);assert.equal((await stored()).previousCompletion.completedAt,completed.completedAt);
+  // Pair simulated lifecycle events so later playback starts in a resumed app.
   for(const action of ['blur','minimize','suspend']){
     await focus();await frame.getByRole('button',{name:'Play',exact:true}).click();
     await app.evaluate(({BrowserWindow,powerMonitor},action)=>{if(action==='suspend')powerMonitor.emit('suspend');else if(action==='minimize')BrowserWindow.getAllWindows()[0].minimize();else BrowserWindow.getAllWindows()[0].emit('blur');},action);
-    await frame.waitForFunction(()=>document.querySelector('.guided-controls button[aria-pressed]')?.getAttribute('aria-pressed')==='false');const pausedIndex=await frame.evaluate(()=>window.studyLessonSource.index());await page.waitForTimeout(150);assert.equal(await frame.evaluate(()=>window.studyLessonSource.index()),pausedIndex);await focus();
+    await frame.waitForFunction(()=>document.querySelector('.guided-controls button[aria-pressed]')?.getAttribute('aria-pressed')==='false');const pausedIndex=await frame.evaluate(()=>window.studyLessonSource.index());await page.waitForTimeout(150);assert.equal(await frame.evaluate(()=>window.studyLessonSource.index()),pausedIndex);await app.evaluate(({BrowserWindow,powerMonitor},action)=>{if(action==='suspend')powerMonitor.emit('resume');else if(action==='blur')BrowserWindow.getAllWindows()[0].emit('focus');},action);await focus();
   }
   const backup=path.join(profile,'guided-backup.json');await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});dialog.showMessageBox=async()=>({response:1,checkboxChecked:false});},backup);
   await page.getByRole('button',{name:'Settings and backup',exact:true}).click();await page.getByRole('button',{name:'Export backup',exact:true}).click();await page.getByText('Your backup was exported.',{exact:true}).waitFor();
@@ -72,5 +73,5 @@ try{
   await frame.getByRole('button',{name:'Play',exact:true}).focus();await page.keyboard.press('Control+k');await page.locator('.problem-table').waitFor();await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Search problems');assert.equal(await page.locator('.guided-container').count(),0);assert.deepEqual(errors,[]);
   console.log('PASS display scaling, focus/power pauses, backup restore, history/precomputed engines and navigation cleanup');
   fs.writeFileSync(path.join(ROOT,`test-results/guided-${process.env.STUDY_TEST_EXE?'packaged':'desktop'}.json`),JSON.stringify({passed:true,offline:true,profile,packaged:!!process.env.STUDY_TEST_EXE},null,2));
-}catch(error){await page.screenshot({path:path.join(ROOT,'test-results/guided-desktop-failure.png')}).catch(()=>{});console.error(await frame?.locator('.guided-panel').innerText().catch(()=>''));throw error;}
+}catch(error){await page.screenshot({path:path.join(ROOT,'test-results/guided-desktop-failure.png')}).catch(()=>{});console.error(await frame?.locator('.guided-panel').innerText().catch(()=>''));console.error(await app.evaluate(({BrowserWindow})=>({focused:BrowserWindow.getAllWindows()[0]?.isFocused(),visible:BrowserWindow.getAllWindows()[0]?.isVisible()})).catch(()=>null));console.error(await frame?.evaluate(()=>({hidden:document.hidden,focused:document.hasFocus(),index:studyLessonSource.index(),stage:studyWalkthrough.stage,playing:document.querySelector('.guided-controls button[aria-pressed]')?.getAttribute('aria-pressed'),busy:studyGuidedController.busy,error:studyGuidedController.error})).catch(()=>null));throw error;}
 finally{await app.close();}

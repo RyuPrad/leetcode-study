@@ -8,7 +8,7 @@ export function assetPath(urlString: string, root: string, catalog: Catalog): st
     const relative = decodeURIComponent(url.pathname).replace(/^\//, '');
     if (!relative || relative.includes('\\') || relative.includes('\0') || relative.split('/').some(s => s === '..' || s === '.')) return null;
     if (url.hostname === 'content') {
-      if (!catalog.visualizers.includes(relative) && !['visualizer-ui/workspace.js', 'visualizer-ui/workspace.css', 'visualizer-ui/numeric-input.js', 'visualizer-ui/learning.js', 'visualizer-ui/learning.css', 'visualizer-ui/operations.js', 'visualizer-ui/operation-rules.js', 'visualizer-ui/guided-core.js', 'visualizer-ui/guided.js', 'visualizer-ui/guided.css', 'visualizer-ui/guided-lessons.js'].includes(relative)) return null;
+      if (!catalog.visualizers.includes(relative) && !['visualizer-ui/panel-layout.js', 'visualizer-ui/panel-layout.css', 'visualizer-ui/workspace.js', 'visualizer-ui/workspace.css', 'visualizer-ui/numeric-input.js', 'visualizer-ui/learning.js', 'visualizer-ui/learning.css', 'visualizer-ui/object-view.js', 'visualizer-ui/object-view.css', 'visualizer-ui/object-state.js', 'visualizer-ui/operations.js', 'visualizer-ui/operation-rules.js', 'visualizer-ui/guided-core.js', 'visualizer-ui/guided.js', 'visualizer-ui/guided.css', 'visualizer-ui/guided-lessons.js'].includes(relative)) return null;
       return path.join(root, 'content', relative);
     }
     if (url.hostname === 'app' && (relative === 'index.html' || /^assets\/[a-zA-Z0-9_.-]+$/.test(relative))) {

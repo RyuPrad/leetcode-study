@@ -27,12 +27,12 @@ async function worker(){const page=await browser.newPage({viewport:{width:1360,h
     return {sameInitial:initial===restarted,sameForward:forward===sought,index,complete,changes,notes:document.querySelector('.study-why p')?.textContent,entities,overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert.ok(result.sameInitial,'seeking to the beginning restores actual state');assert.ok(result.sameForward,'seeking forward restores the same state');assert.ok(result.complete,'final seek reaches completion');assert.equal(result.notes,lesson.why);assert.equal(result.overflow,false,'workspace fits viewport');assert.ok(result.entities>0||lesson.number===2013,'diagram entities are identified');assert.deepEqual(errors,[]);
-  if(screenshots.has(lesson.number)){await page.locator('.study-view-tools').getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:path.join(ROOT,`test-results/lesson-${lesson.number}.png`)});await page.getByRole('button',{name:'Focus diagram',exact:true}).click();assert.ok(await page.locator('.study-code').isHidden());await page.getByRole('button',{name:'Show code',exact:true}).click();}
+  if(screenshots.has(lesson.number)){await page.locator('.study-view-tools').getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:path.join(ROOT,`test-results/lesson-${lesson.number}.png`)});await page.getByRole('button',{name:'Focus diagram',exact:true}).click();assert.ok(await page.locator('.study-code').isHidden());await page.locator('.study-view-tools').getByRole('button',{name:'Restore diagram',exact:true}).click();}
   if([94,144,145].includes(lesson.number)){
     const expected=lesson.number===94?[1,3,2]:lesson.number===144?[1,2,3]:[3,2,1];
     const actual=await page.evaluate(()=>{const source=window.studyLessonSource;source.jump(source.count()-1);return [...document.querySelectorAll('#trace-ui tbody tr')].map(row=>row.lastElementChild.textContent.trim());});
     assert.deepEqual(actual,expected.map((_,i)=>`[${expected.slice(0,i+1).join(', ')}]`),'traversal trace contains each visit once');
   }
-}catch(error){failures.push({number:lesson.number,error:String(error)});}finally{page.off('pageerror',onError);}count++;if(count%25===0)console.log(`Teaching checks ${count}/250, ${failures.length} failures`);}await page.close();}
+}catch(error){failures.push({number:lesson.number,error:String(error)});}finally{page.off('pageerror',onError);}count++;if(count%25===0)console.log(`Teaching checks ${count}/${manifest.length}, ${failures.length} failures`);}await page.close();}
 try{await Promise.all(Array.from({length:4},worker));}finally{await browser.close();}
 fs.writeFileSync(path.join(ROOT,'test-results/lessons.json'),JSON.stringify({count,failures},null,2));console.log(JSON.stringify({count,failures},null,2));if(failures.length)process.exitCode=1;

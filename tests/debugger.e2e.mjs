@@ -15,6 +15,10 @@ const focus=()=>app.evaluate(({BrowserWindow})=>{const win=BrowserWindow.getAllW
 const control=name=>page.locator('.debug-controls').getByRole('button',{name:new RegExp(name)});
 const paused=()=>page.waitForFunction(()=>document.querySelector('.debug-status.paused'));
 const index=()=>page.locator('.debug-timeline>span').innerText();
+async function moreControls(open){const more=page.getByRole('button',{name:'More controls',exact:true});if(await more.isVisible()&&(await more.getAttribute('aria-expanded')==='true')!==open)await more.click();}
+async function clickControl(name){await moreControls(true);const button=control(name);await button.scrollIntoViewIfNeeded();await button.click();await moreControls(false);}
+async function clickToolbar(name){await moreControls(true);const button=page.locator('.debug-toolbar').getByRole('button',{name});await button.scrollIntoViewIfNeeded();await button.click();await moreControls(false);}
+async function selectDebug(label,value){await moreControls(true);const select=page.getByLabel(label,{exact:true});await select.scrollIntoViewIfNeeded();await select.selectOption(value);await moreControls(false);}
 async function open(number){
   if(await page.getByRole('button',{name:'Back to library',exact:true}).count())await page.getByRole('button',{name:'Back to library',exact:true}).click();
   await page.getByRole('searchbox',{name:'Search problems'}).fill(String(number));
@@ -26,11 +30,11 @@ async function code(source){
   await page.evaluate(text=>{const clipboardData=new DataTransfer();clipboardData.setData('text/plain',text);document.activeElement.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));},source);
   await page.waitForFunction(async text=>(await window.study.bootstrap()).data.drafts['leetcode:'+document.querySelector('.description-body h2').textContent.split('.')[0]]?.source===text,source);
 }
-async function start(source){await code(source);await focus();await page.getByRole('button',{name:'Debug',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.debug-status.paused,.debug-result'));}
-async function step(name){const before=await index();await control(name).click();await page.waitForFunction(before=>document.querySelector('.debug-status.paused')&&document.querySelector('.debug-timeline>span').textContent!==before,before);}
+async function start(source){await code(source);await focus();await page.getByRole('button',{name:'Debug',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.debug-status.paused,.debug-result'));if(await page.locator('.viz-frame').count()){assert.ok(await page.locator('[data-study-panel=objects]').isVisible());assert.ok(await page.locator('[data-object-view-index]').isVisible());await page.evaluate(()=>document.querySelector('.debug-panel-workspace').studyPanelLayout.show('diagram'));}}
+async function step(name){const before=await index();await clickControl(name);await page.waitForFunction(before=>document.querySelector('.debug-status.paused')&&document.querySelector('.debug-timeline>span').textContent!==before,before);}
 async function breakpoint(line){const editor=page.locator('.debug-source .monaco-editor');const number=editor.locator('.line-numbers').filter({hasText:new RegExp(`^${line}$`)});const row=await number.boundingBox(),box=await editor.boundingBox();assert.ok(row&&box);await page.mouse.click(box.x+10,row.y+row.height/2);}
-async function close(){await page.locator('.debug-toolbar').getByRole('button',{name:/Stop \/ edit|Back to code/}).click();await page.locator('.debug-workspace').waitFor({state:'detached'});await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='JavaScript solution');}
-async function finish(){await control('Continue').click();await page.locator('.debug-result').waitFor({timeout:30000});assert.match(await page.locator('.debug-result strong').innerText(),/matches expected/);}
+async function close(){const immediate=page.getByRole('button',{name:'Close debugger and return to code',exact:true});if(await immediate.isVisible())await immediate.click();else await clickToolbar(/Stop \/ edit|Back to code/);await page.locator('.debug-workspace').waitFor({state:'detached'});await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='JavaScript solution');}
+async function finish(){await clickControl('Continue');await page.locator('.debug-result').waitFor({timeout:30000});assert.match(await page.locator('.debug-result strong').innerText(),/matches expected/);}
 const source=`function twoSum(nums,target) {
   const seen = new Map();
   function remember(value,index) {
@@ -46,7 +50,7 @@ try{
   await page.locator('.problem-table').waitFor();await app.evaluate(({session})=>session.defaultSession.enableNetworkEmulation({offline:true}));
   await open(1);await start(source);await paused();
   const frozen=await index();await page.waitForTimeout(200);assert.equal(await index(),frozen);
-  await breakpoint(9);await page.locator('.debug-breakpoint:not(.pending)').waitFor();await control('Continue').click();await page.waitForFunction(()=>document.querySelector('.debug-status')?.textContent==='Breakpoint');
+  await breakpoint(9);await page.locator('.debug-breakpoint:not(.pending)').waitFor();await clickControl('Continue');await page.waitForFunction(()=>document.querySelector('.debug-status')?.textContent==='Breakpoint');
   assert.match(await page.locator('.viz-explanation').innerText(),/LINE 9/);
   await step('Step Into');assert.equal(await page.locator('.viz-stack>button').count(),2);
   await step('Step Out');assert.equal(await page.locator('.viz-stack>button').count(),1);
@@ -54,21 +58,24 @@ try{
   await breakpoint(9);await page.locator('.debug-breakpoint').waitFor({state:'detached'});
   await page.getByRole('textbox',{name:'Debug source',exact:true}).focus();await page.keyboard.insertText('SHOULD_NOT_EDIT');
   assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source,source);
-  await page.getByRole('slider',{name:'Debug history'}).fill('0');assert.ok(await control('Step Into').isDisabled());await page.getByRole('button',{name:'Return to live',exact:true}).click();
-  await control('Play').click();await page.getByLabel('Debug playback speed').selectOption('4');await page.waitForTimeout(350);await control('Pause').click();await paused();
+  await page.getByRole('slider',{name:'Debug history'}).fill('0');await moreControls(true);assert.ok(await control('Step Into').isDisabled());await moreControls(false);await page.getByRole('button',{name:'Return to live',exact:true}).click();
+  await clickControl('Play');await selectDebug('Debug playback speed','4');await page.waitForTimeout(350);await clickControl('Pause');await paused();
   const stopped=await index();await page.waitForTimeout(350);assert.equal(await index(),stopped);
   console.log('PASS real suspension, source breakpoints, Into/Out, read-only source, history, Play/speed/Pause');
 
   for(const zoom of [1,1.25,1.5]){
     await app.evaluate(({BrowserWindow},zoom)=>{const win=BrowserWindow.getAllWindows()[0];win.setContentSize(1440,900);win.webContents.setZoomFactor(zoom);},zoom);await page.waitForTimeout(150);
-    assert.ok(await page.locator('.debug-controls').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})),`Debug controls fit at ${zoom}`);
+    await moreControls(true);
+    assert.ok(await page.locator('.debug-controls').isVisible(),`Debug controls are reachable at ${zoom}`);
+    assert.ok(await page.locator('.debug-controls').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})),`Debug controls fit at ${zoom}`);
     const png=await app.evaluate(async({BrowserWindow})=>(await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));fs.writeFileSync(path.join(ROOT,`test-results/debugger-${zoom}.png`),Buffer.from(png,'base64'));
+    await moreControls(false);
   }
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1));
-  await page.getByLabel('Debug test case').selectOption('1');await paused();await step('Step Over');
-  await page.getByRole('button',{name:'Focus diagram',exact:true}).click();assert.ok(await page.locator('.debug-source').isHidden());await page.getByRole('button',{name:'Focus diagram',exact:true}).click();
+  await selectDebug('Debug test case','1');await paused();await step('Step Over');
+  await clickToolbar('Focus diagram');assert.ok(await page.locator('.debug-source').isHidden());await clickToolbar('Focus diagram');
   for(const [pauseName,pauseAction] of [['tab',async()=>{await page.getByRole('tab',{name:'Notes',exact:true}).click();}],['minimize',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].minimize());}],['blur event',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].emit('blur'));}],['suspend',async()=>{await app.evaluate(({powerMonitor})=>powerMonitor.emit('suspend'));}]]){
-    console.log('Testing pause',pauseName);await page.locator('.debug-toolbar').getByRole('button',{name:/Restart/}).click();await paused();await focus();await control('Play').click();await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'JavaScript solution','Code tab must not focus the covered solution during Debug');
+    console.log('Testing pause',pauseName);await clickToolbar(/Restart/);await paused();await focus();await clickControl('Play');await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'JavaScript solution','Code tab must not focus the covered solution during Debug');
   }
   await finish();const state=await page.evaluate(()=>window.study.bootstrap());assert.equal(state.data.submissions.length,0);assert.notEqual(await page.getByLabel('Problem progress').inputValue(),'completed');await close();
   await page.keyboard.insertText(' // resumed');
@@ -78,9 +85,9 @@ try{
 
   await page.getByRole('tab',{name:'Test cases',exact:true}).click();await page.getByRole('radio',{name:'Custom cases',exact:true}).check();await page.getByLabel('Custom test cases').fill('[[[4,5,9],9]]');await start(definitions.find(p=>p.number===1).reference);await finish();await close();
   for(const [bad,diagnostic] of [['async function twoSum(){}',/synchronous/],['function twoSum( {',/Unexpected token/],['function twoSum(){throw Error("debug test");}',/debug test/]]){
-    await start(bad);if(await page.locator('.debug-status.paused').count()){await control('Continue').click();}await page.locator('.debug-result').waitFor();assert.match(await page.locator('.debug-result').innerText(),diagnostic);await close();
+    await start(bad);if(await page.locator('.debug-status.paused').count()){await clickControl('Continue');}await page.locator('.debug-result').waitFor();assert.match(await page.locator('.debug-result').innerText(),diagnostic);await close();
   }
-  await start('function twoSum(){while(true){}}');await control('Continue').click();await page.waitForTimeout(150);await close();await start(source);await page.locator('.debug-toolbar').getByRole('button',{name:/Restart/}).click();await paused();await finish();await close();
+  await start('function twoSum(){while(true){}}');await clickControl('Continue');await page.waitForTimeout(150);await close();await start(source);await clickToolbar(/Restart/);await paused();await finish();await close();
   console.log('PASS custom case, diagnostics, exception, Stop infinite loop, restart and recovery');
 
   for(const number of [64,133,700,933]){await open(number);await start(definitions.find(p=>p.number===number).reference);if(number===64)assert.ok(await page.locator('.viz-matrix').count());else if(number===133){for(let i=0;i<20&&await page.locator('.viz-node-graph path[marker-end]').count()<8;i++)await step('Step Into');assert.ok(await page.locator('.viz-node-graph path[marker-end]').count()>=8);}else if(number===700){assert.ok(await page.locator('.viz-node-graph').count());}await finish();await close();}

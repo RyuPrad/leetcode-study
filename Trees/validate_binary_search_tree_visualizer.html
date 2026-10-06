@@ -511,6 +511,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -839,13 +844,27 @@
     function originalInstructionBuilder() {
       steps = [];
       root = buildTree(treeArr);
+      const objectNodeIds = new WeakMap();
+      (function identifyObjectNode(node, path) {
+        if (!node) return;
+        objectNodeIds.set(node, path);
+        identifyObjectNode(node.left, path + '.left');
+        identifyObjectNode(node.right, path + '.right');
+      })(root, 'root');
+      function pushObjectStep(snapshot, node, active = true) {
+        Object.defineProperties(snapshot, {
+          objectNodeId: { value: node ? objectNodeIds.get(node) : null },
+          objectNodeActive: { value: active }
+        });
+        steps.push(snapshot);
+      }
       const trace = [];
       let answer = null;
 
       pushInit();
 
       function pushInit() {
-        steps.push({
+        pushObjectStep({
           line: [8],
           node: root ? root.val : null,
           low: -Infinity,
@@ -859,11 +878,11 @@
           note: root
             ? "Call <code>valid(root, -Infinity, Infinity)</code>. Each node must satisfy <b>low &lt; node.val &lt; high</b>; the bounds tighten as we descend."
             : "An empty tree is a valid BST. Return <b>true</b>."
-        });
+        }, root, false);
       }
 
       if (!root) {
-        steps.push({
+        pushObjectStep({
           line: [3],
           node: null,
           low: -Infinity,
@@ -875,7 +894,7 @@
           ans: true,
           trace: [],
           note: "✓ <code>!node</code> is true. Return <b>true</b> — an empty tree is a valid BST."
-        });
+        }, null);
         return;
       }
 
@@ -901,7 +920,7 @@
           ok
         });
 
-        steps.push({
+        pushObjectStep({
           line: [4],
           node: node.val,
           low,
@@ -915,12 +934,12 @@
           note: ok
             ? "Check <b>" + node.val + "</b>: is <code>" + fmtBound(low) + " &lt; " + node.val + " &lt; " + fmtBound(high) + "</code>? <b style=\"color:#6a9955\">Yes</b> — within bounds, keep going."
             : "Check <b>" + node.val + "</b>: is <code>" + fmtBound(low) + " &lt; " + node.val + " &lt; " + fmtBound(high) + "</code>? <b style=\"color:#e24b4a\">No</b> — <b>" + node.val + "</b> violates its bound, so the whole tree is not a BST."
-        });
+        }, node);
 
         if (!ok) {
           stopped = true;
           answer = false;
-          steps.push({
+          pushObjectStep({
             line: [4],
             node: node.val,
             low,
@@ -932,7 +951,7 @@
             ans: false,
             trace: trace.map(r => ({ ...r })),
             note: "✓ Return <b style=\"color:#e24b4a\">false</b> immediately. The <code>&&</code> chain short-circuits — node <b>" + node.val + "</b> broke the rule <code>" + fmtBound(low) + " &lt; val &lt; " + fmtBound(high) + "</code>."
-          });
+          }, node);
           return false;
         }
 
@@ -940,7 +959,7 @@
         validSet.push(node.val);
 
         // descend left then right (bounds update)
-        steps.push({
+        pushObjectStep({
           line: [5],
           node: node.val,
           low,
@@ -952,12 +971,12 @@
           ans: "pending",
           trace: trace.map(r => ({ ...r })),
           note: "<b>" + node.val + "</b> is OK. Recurse left with a tightened upper bound: <code>valid(left, " + fmtBound(low) + ", " + node.val + ")</code> — everything left must be &lt; " + node.val + "."
-        });
+        }, node);
 
         const leftOk = recurse(node.left, low, node.val);
         if (stopped) return false;
 
-        steps.push({
+        pushObjectStep({
           line: [6],
           node: node.val,
           low,
@@ -969,7 +988,7 @@
           ans: "pending",
           trace: trace.map(r => ({ ...r })),
           note: "Left subtree of <b>" + node.val + "</b> is valid. Recurse right with a tightened lower bound: <code>valid(right, " + node.val + ", " + fmtBound(high) + ")</code> — everything right must be &gt; " + node.val + "."
-        });
+        }, node);
 
         const rightOk = recurse(node.right, node.val, high);
         path.pop();
@@ -980,7 +999,7 @@
 
       if (!stopped) {
         answer = result;
-        steps.push({
+        pushObjectStep({
           line: [8],
           node: null,
           low: -Infinity,
@@ -992,7 +1011,7 @@
           ans: true,
           trace: trace.map(r => ({ ...r })),
           note: "✓ Every node satisfied its bounds. <code>valid(...)</code> returns <b style=\"color:#6a9955\">true</b> — this is a valid BST."
-        });
+        }, null, false);
       }
     }
 
@@ -1246,6 +1265,10 @@
       }
       if (frames.length && frames[0].executedLine !== null) {
         const ready = {...frames[0], executedLine: null};
+        for (const key of ['objectNodeId', 'objectNodeActive']) {
+          const descriptor = Object.getOwnPropertyDescriptor(frames[0], key);
+          if (descriptor) Object.defineProperty(ready, key, descriptor);
+        }
         for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
         if (Array.isArray(ready.highlight)) ready.highlight = [];
         if (Array.isArray(ready.hl)) ready.hl = [];
@@ -1261,6 +1284,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":98,"title":"Validate Binary Search Tree","topic":"Trees","why":"Each node must satisfy bounds inherited from all its ancestors, not just its immediate parent.","meanings":{"root":"root node of the tree being validated","node":"current node in the `valid` recursion","low":"exclusive lower bound the node must exceed","high":"exclusive upper bound the node must stay under","ans":"boolean result: is this a valid BST"},"entityClasses":["hud-item","tnode","nodes","badNode","node"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(98, {...window.studyLessonSource.readAt(index), objectNodeId: steps[index].objectNodeId, objectNodeActive: steps[index].objectNodeActive === true}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({treeArr, root, ...(steps[stepIndex] || {})}),

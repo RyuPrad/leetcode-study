@@ -652,6 +652,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -927,6 +932,7 @@
     function originalInstructionBuilder(points, k) {
       const steps = [];
       let trace = [];
+      let objectLocals = {};
 
       function snap(extra) {
         const base = {
@@ -941,6 +947,7 @@
           phase: "init"
         };
         steps.push(Object.assign(base, extra));
+        Object.defineProperty(steps.at(-1), 'objectLocals', {value: {...objectLocals}});
       }
 
       // initial
@@ -960,6 +967,7 @@
       // PUSH PHASE
       for (let idx = 0; idx < points.length; idx++) {
         const [x, y] = points[idx];
+        objectLocals = {x, y};
         const dist = x * x + y * y;
         const tuple = [dist, x, y];
 
@@ -1028,6 +1036,7 @@
 
       // res = []
       const res = [];
+      objectLocals = {};
       snap({
         heap: heap.data.map(t => [...t]),
         res: [],
@@ -1039,6 +1048,7 @@
 
       // POP PHASE
       for (let i = 0; i < k; i++) {
+        objectLocals = {i, dist: undefined, x: undefined, y: undefined};
         snap({
           heap: heap.data.map(t => [...t]),
           res: res.map(p => [...p]),
@@ -1090,6 +1100,7 @@
 
         const popped = heap.pop();
         recorder = null;
+        objectLocals = {i, dist: popped[0], x: popped[1], y: popped[2]};
         res.push([popped[1], popped[2]]);
 
         trace.push({
@@ -1110,6 +1121,7 @@
         });
       }
 
+      objectLocals = {};
       snap({
         heap: heap.data.map(t => [...t]),
         res: res.map(p => [...p]),
@@ -1531,6 +1543,11 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":973,"title":"K Closest Points to Origin","topic":"Heap","why":"Squared distance preserves distance ordering, so square roots are unnecessary when selecting nearby points.","meanings":{"points":"Input list of `[x, y]` coordinates.","k":"How many closest points to return.","heap":"Min-heap of `[dist, x, y]` tuples, compared by `el[0]` (squared distance).","dist":"Squared distance `x*x + y*y` of the current point (no `sqrt` needed for ordering).","res":"Result list collecting the `k` popped (closest) points.","i":"Loop counter for the `k` pops."},"entityClasses":["hud-item","cell","tree-node","node-sub","pill-box","pill"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => {
+        const source = window.studyLessonSource, snapshot = steps[index], objectLocals = Object.fromEntries(Object.entries(snapshot.objectLocals || {}).map(([name, value]) => [name, value === undefined ? StudyObjectView.special('not initialized') : value]));
+        const objectOmit = ['i', 'dist', 'x', 'y'].filter(name => !Object.hasOwn(objectLocals, name));
+        return StudyObjectState.frame(973, {...source.readAt(index), objectLocals, objectOmit}, source.spec);
+      },
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({recorder, points, k, ...(steps[stepIndex] || {})}),

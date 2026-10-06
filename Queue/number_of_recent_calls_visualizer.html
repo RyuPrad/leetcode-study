@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 933. Number of Recent Calls Visualizer</title>
+  <style>
+    :root { color-scheme:dark; font-family:system-ui,sans-serif; background:#1e1e1e; color:#d4d4d4; }
+    body { margin:0; padding:24px; } button,input { font:inherit; } button { cursor:pointer; }
+    .panel { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:16px; } h2 { font-size:16px; }
+    .layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .code-line { white-space:pre; font:14px/1.7 Consolas,monospace; padding:0 8px; }
+    .code-line.active { background:#34312a; border-left:3px solid #d7ba7d; } .kw { color:#c586c0; } .fn { color:#dcdcaa; }
+    .queue-row { display:flex; gap:10px; align-items:center; padding:40px 10px 20px; flex-wrap:wrap; }
+    .queue-cell { border:2px solid #569cd6; border-radius:6px; padding:15px; position:relative; } .queue-cell.expired { border-color:#d16969; } .queue-cell.active { border-color:#d7ba7d; }
+    .pointer { position:absolute; top:-25px; left:0; color:#d7ba7d; font-size:12px; } .console { white-space:pre-wrap; font:13px/1.7 Consolas,monospace; }
+    .result-value { color:#b5cea8; } #drag-container > div { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; } #custom-input { min-width:310px; }
+  </style>
+  <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
+  <script defer src="../visualizer-ui/workspace.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/learning.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <script defer src="../visualizer-ui/operation-rules.js"></script>
+  <script defer src="../visualizer-ui/operations.js"></script>
+  <script defer src="../visualizer-ui/learning.js"></script>
+  <script defer src="../visualizer-ui/guided-core.js"></script>
+  <script defer src="../visualizer-ui/guided.js"></script>
+</head>
+<body>
+  <h1 class="page-title">933. Number of Recent Calls</h1>
+  <div id="drag-container">
+    <div><button id="btn-prev" onclick="prevStep()">Back</button><button id="btn-next" onclick="nextStep()">Step Over</button><button id="btn-reset" onclick="init()">Reset</button><button id="btn-fullscreen" onclick="document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()">Fullscreen</button></div>
+    <div><button id="btn-ex-1" onclick="loadExample(1)">Inclusive window</button><button id="btn-ex-2" onclick="loadExample(2)">Large time gap</button><button id="btn-ex-3" onclick="loadExample(3)">Exact boundary</button></div>
+    <div><label for="custom-input">Operations</label><input id="custom-input" value="new; ping 1; ping 100; ping 3001; ping 3002" /><button onclick="loadCustom()">Load</button></div>
+  </div>
+  <div class="layout">
+    <div class="panel"><h2>Recent request queue</h2><div id="narration-ui"></div><div id="visual-ui"></div><div id="final-ui" class="result-value"></div></div>
+    <div class="panel code-panel"><h2>Live Debugger</h2><div id="reference-code">
+<div id="line-1" class="code-line"><span class="kw">class</span> RecentCounter {</div>
+<div id="line-2" class="code-line">  <span class="fn">constructor</span>() {</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.queue = [];</div>
+<div id="line-4" class="code-line">  }</div>
+<div id="line-5" class="code-line">  <span class="fn">ping</span>(t) {</div>
+<div id="line-6" class="code-line">    <span class="kw">this</span>.queue.<span class="fn">push</span>(t);</div>
+<div id="line-7" class="code-line">    <span class="kw">while</span> (<span class="kw">this</span>.queue.length &gt; 0 &amp;&amp; <span class="kw">this</span>.queue[0] &lt; t - 3000) {</div>
+<div id="line-8" class="code-line">      <span class="kw">this</span>.queue.<span class="fn">shift</span>();</div>
+<div id="line-9" class="code-line">    }</div>
+<div id="line-10" class="code-line">    <span class="kw">return this</span>.queue.length;</div>
+<div id="line-11" class="code-line">  }</div>
+<div id="line-12" class="code-line">}</div>
+    </div></div>
+    <div class="panel"><h2>Object View — nested JS object format (debugger-style)</h2><div id="object-view"></div></div>
+    <div class="panel"><h2>Variables & Outputs</h2><div id="console-ui" class="console"></div></div>
+    <div class="panel"><h2>Operation Trace</h2><div id="trace-ui"></div></div>
+  </div>
+  <script>
+    const examples={1:[1,100,3001,3002],2:[1,100,9001],3:[1,3001,6001]};
+    let ops=[{method:'new'},...examples[1].map(t=>({method:'ping',t}))],steps=[],stepIndex=0;
+    function identified(value,id){Object.defineProperty(value,'_studyId',{value:id});return value;}
+    function buildSteps(){
+      steps=[];let queue=[],initialized=false,instanceId=0;const trace=[],outputs=[];
+      const snap=(executedLine,phase,narration,t=undefined,result=undefined)=>{const copied=identified(queue.slice(),'recent-queue:'+instanceId),counter=identified(initialized?{queue:copied}:{},'recent-counter:'+instanceId);steps.push({counter,queue:copied,initialized,t,result,outputs:outputs.slice(),trace:trace.map(row=>({...row})),executedLine,lines:executedLine?[executedLine]:[],phase,narration,finished:false});};
+      snap(null,'ready','Construct a counter, then process requests in timestamp order.');
+      for(const op of ops){if(op.method==='new'){instanceId++;initialized=false;queue=[];snap(2,'constructor-entry','Enter the constructor for a new counter. Its queue field is not initialized yet.');initialized=true;outputs.push(null);trace.push({call:'new RecentCounter()',result:'null'});snap(3,'constructor','Create this.queue as an empty array.');continue;}
+        const t=op.t;snap(5,'ping-entry','Enter ping with the current timestamp t = '+t+'.',t);queue.push(t);snap(6,'append','Append timestamp '+t+' to the queue.',t);
+        while(true){const expired=queue.length>0&&queue[0]<t-3000;snap(7,'window-check',expired?'The oldest timestamp is before '+(t-3000)+'. Remove it next.':'The oldest timestamp is inside the inclusive window ['+(t-3000)+', '+t+'].',t);if(!expired)break;const removed=queue.shift();snap(8,'remove-expired','Remove timestamp '+removed+' from the front.',t);}
+        const result=queue.length;outputs.push(result);trace.push({call:'ping('+t+')',result:String(result)});snap(10,'return-count','Return '+result+', the number of requests in the inclusive time window.',t,result);
+      }
+      steps[steps.length-1].finished=true;
+    }
+    function init(){buildSteps();stepIndex=0;render();}
+    function nextStep(){if(stepIndex<steps.length-1){stepIndex++;render();}}
+    function prevStep(){if(stepIndex>0){stepIndex--;render();}}
+    function formatOps(values){return values.map(op=>op.method==='new'?'new':'ping '+op.t).join('; ');}
+    function loadExample(number){ops=[{method:'new'},...examples[number].map(t=>({method:'ping',t}))];document.getElementById('custom-input').value=formatOps(ops);init();}
+    function loadCustom(){
+      try{const pieces=document.getElementById('custom-input').value.split(';').map(text=>text.trim()).filter(Boolean);if(!pieces.length||pieces.length>200)throw Error('Use 1 to 200 operations, starting with new.');const parsed=[];let previous=0,constructed=false;
+        for(const text of pieces){if(/^new$/i.test(text)){parsed.push({method:'new'});previous=0;constructed=true;continue;}const match=text.match(/^ping\s+(\d+)$/i),t=match?Number(match[1]):NaN;if(!constructed||!Number.isSafeInteger(t)||t<=previous)throw Error('Start with new and use strictly increasing positive integer timestamps for each counter.');parsed.push({method:'ping',t});previous=t;}
+        ops=parsed;init();
+      }catch(error){alert(error.message);}
+    }
+    function render(){const state=steps[stepIndex];document.getElementById('btn-prev').disabled=stepIndex===0;document.getElementById('btn-next').disabled=stepIndex===steps.length-1;document.getElementById('btn-next').textContent=state.finished?'Finished!':'Step Over';document.querySelectorAll('.code-line').forEach(line=>line.classList.toggle('active',line.id==='line-'+state.executedLine));document.getElementById('narration-ui').textContent=state.narration;
+      const cutoff=state.t===undefined?null:state.t-3000;document.getElementById('visual-ui').innerHTML='<p>'+(cutoff===null?'Construct the queue.':'Inclusive window: ['+cutoff+', '+state.t+']')+'</p><div class="queue-row" data-study-motion-scope="recent-queue">'+(state.queue.length?state.queue.map((t,index)=>'<div class="queue-cell'+(cutoff!==null&&t<cutoff?' expired':'')+(index===0?' active':'')+'" data-id="timestamp:'+t+'">'+t+(index===0?'<span class="pointer" data-study-pointer="front" data-study-pointer-target="timestamp:'+t+'">front</span>':'')+'</div>').join(''):'<span class="queue-cell">[]</span>')+'</div>';
+      document.getElementById('console-ui').textContent='this.queue = '+(state.initialized?JSON.stringify(state.queue):'uninitialized')+(state.t===undefined?'':'\nt = '+state.t);document.getElementById('final-ui').textContent=state.finished?'outputs = '+JSON.stringify(state.outputs):state.result===undefined?'':'return '+state.result;
+      document.getElementById('trace-ui').innerHTML='<table><tbody>'+state.trace.map(row=>'<tr><td>'+row.call+'</td><td>'+row.result+'</td></tr>').join('')+'</tbody></table>';
+    }
+    init();
+    // STUDY LESSON BRIDGE START
+    window.studyLessonSource = {
+      spec:{number:933,title:'Number of Recent Calls',topic:'Queue',why:'After adding the current request, remove only timestamps strictly before t - 3000 so the inclusive boundary stays in the queue.',meanings:{queue:'recent request timestamps',t:'current request time'},entityClasses:['queue-cell'],entitySelectors:[],mode:'precomputed'},
+      index:()=>stepIndex,count:()=>steps.length,read:()=>steps[stepIndex],readAt:index=>steps[index],phases:()=>steps.map((state,index)=>({index,phase:state.phase})),
+      jump:index=>{stepIndex=Math.max(0,Math.min(steps.length-1,index));render();},
+      objectFrame(index=stepIndex){const state=steps[index],counter=state.initialized?state.counter:identified({queue:undefined},state.counter._studyId),roots=[{name:'this',scope:state.t===undefined?'RecentCounter.constructor':'RecentCounter.ping',value:counter}];if(state.t!==undefined)roots.push({name:'t',value:state.t});if(state.result!==undefined)roots.push({name:'return',scope:'Return value',value:state.result});const frame=StudyObjectView.capture(roots,{frameName:state.t===undefined?'RecentCounter.constructor':'RecentCounter.ping',idOf:object=>object._studyId});if(!state.initialized)frame.objects.find(object=>object.id===counter._studyId).entries.find(entry=>entry.key==='queue').value={special:'not initialized'};return frame;}
+    };
+    // STUDY LESSON BRIDGE END
+  </script>
+</body>
+</html>

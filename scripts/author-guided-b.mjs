@@ -258,6 +258,14 @@ add(698,'Split all input numbers into four groups with the same sum, using each 
 
 const {authorLate}=await import('./author-guided-b-late.mjs');
 authorLate(add);
+add(700,'Find a target value by following one path through a binary search tree.','Returning a found subtree means returning the existing node object, not copying its value or rebuilding the tree.',[
+[4,'The current node is 4 and the target is 2. Which side should the search follow?','The left child','The right child~Values smaller than 4 belong on its left.','Both children~The BST ordering rules out one whole side.','Compare the target with the current node value.','2 is smaller than 4, so the left subtree is the only possible location.'],
+[5,'After curr = curr.left, which existing object does curr reference?','The node with value 2','The node with value 4~The assignment follows its left child reference.','A new node with value 2~Following a reference does not create a node.','Read the left property of the previous current node.','The root node with value 4 has the existing node with value 2 as its left child.'],
+[8,'The target has been found. What does return curr return?','The existing subtree rooted at 2','The number 2 alone~The function returns a TreeNode, including its child references.','A copy of the whole tree~No copying or rebuilding instruction runs.','Look at curr and its left and right fields.','The returned object has val 2, left child 1, and right child 3.']]);
+add(933,'Count recent requests by retaining timestamps inside an inclusive 3000 millisecond window.','A timestamp equal to t - 3000 stays in the queue; only strictly earlier timestamps expire.',[
+[4,'When ping(1) arrives at an empty counter, what does push append?','The timestamp 1','The count 1~The queue stores timestamps, even when a count happens to have the same value.','The cutoff -2999~The cutoff is only used for the later comparison.','The argument t is the value supplied to push.','this.queue becomes [1] after appending t = 1.'],
+[13,'At ping(3001), the cutoff is 1. Does the timestamp 1 expire?','No, it is exactly on the inclusive boundary','Yes, the cutoff itself is too old~The condition is strictly less than the cutoff, not less than or equal.','Only if the queue has three items~Expiration depends on time, not queue size.','Compare 1 < 3001 - 3000.','1 < 1 is false, so the timestamp remains in [1, 100, 3001].'],
+[20,'At ping(3002), timestamp 1 has expired. How many requests are returned?','3','4~The expired timestamp 1 has already been removed.','2~The current request at 3002 also belongs in the window.','Count the queue after all expired front timestamps are removed.','The remaining timestamps are [100, 3001, 3002], so queue.length is 3.']]);
 const topicConcepts={
  'Array & Hashing':['indexing','maps','loops'], 'Sliding Window':['indexing','comparison','loops'],
  'Intervals':['comparison','loops','assignment'], 'Graphs':['references','sets','queue'],
@@ -267,7 +275,8 @@ const topicConcepts={
  'Trees':['references','recursion','functions'], 'Two Pointers':['indexing','comparison','loops'],
  'Binary Search':['indexing','comparison','loops'], 'Stack':['stack','assignment','loops'],
  'Backtracking':['recursion','assignment','comparison'], 'Greedy':['comparison','assignment','loops'],
- 'Math & Geometry':['indexing','assignment','loops'], 'Tries':['references','maps','loops']
+ 'Math & Geometry':['indexing','assignment','loops'], 'Tries':['references','maps','loops'],
+ 'BST':['references','comparison','loops'], 'Queue':['queue','comparison','loops']
 };
 const targetPlans={
  239:{0:[['cell:0',0,'Remove the older value 1'],['cell:1',2,'Remove the incoming value 3']]},

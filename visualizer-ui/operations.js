@@ -3,7 +3,7 @@
  const kinds={read:'Read',lookup:'Check',compare:'Compare',calculate:'Calculate',write:'Store',copy:'Copy',swap:'Swap',remove:'Remove',pointer:'Change reference',call:'Call',return:'Return',control:'Continue'};
  const plain=v=>v===undefined?'not set':v===null?'null':typeof v==='object'?('special'in v?v.special:'ref'in v?v.ref:JSON.stringify(v)):String(v);
  const make=(tag,cls,text)=>{const e=document.createElement(tag);e.className=cls||'';if(text!==undefined)e.textContent=text;return e;};
- function create({source,adapter,diagram,visual,onChange,getPendingInstruction,getCurrentTransition,getBeforeView}){
+ function create({source,adapter,diagram,visual,onChange,getPendingInstruction,getCurrentTransition,getBeforeView,onObjectIndex}){
   const rules=window.studyOperationRules.find(r=>r.id===`leetcode:${source.spec.number}`);
   if(!rules)throw Error('Missing operation rules for this lesson.');
   const params=new URLSearchParams(location.search),embedded=parent!==window,parentOrigin=params.get('parentOrigin')||'study://app';
@@ -74,6 +74,8 @@
   function render(){
    replay?.remove();replay=null;visual.classList.remove('operation-hidden');
    if(operation.committed&&stage<2&&!blocked){beforeVisual ||=getBeforeView?.();if(beforeVisual){replay=beforeVisual.cloneNode(true);replay.removeAttribute('id');replay.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));replay.classList.add('operation-replay');replay.classList.remove('operation-hidden');replay.inert=true;visual.after(replay);visual.classList.add('operation-hidden');}}
+   const objectIndex=mode==='detailed'&&operation.committed&&stage<2&&!blocked?operation.index:source.index();
+   onObjectIndex?.(objectIndex);
    clear();document.body.classList.add('walkthrough-enabled');select.value=mode;card.dataset.kind=operation.kind;card.dataset.moment=String(stage);visual.dataset.operationKind=operation.kind;
    badge.textContent=kinds[operation.kind]||'Step';position.textContent=blocked?'Prediction first':mode==='compact'?'Current operation':`${['Focus','Action','Result'][stage]} · ${stage+1}/3`;
    caption.textContent=blocked?'Answer the prediction to watch this operation.':operation[['focus','action','result'][stage]]||operation.focus;code.textContent=operation.code;

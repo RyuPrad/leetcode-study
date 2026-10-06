@@ -541,6 +541,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -825,12 +830,36 @@
 
     // Build the full precomputed steps[] for the divide-and-conquer merge.
     // Each step is a plain object describing a snapshot the renderer can draw.
+    // Semantic snapshots are separate from reviewed diagram/guided state.
+    let objectSteps = [];
     function buildSteps(rawLists) {
+      objectSteps = [];
+      let allocation = 0, collection = 0;
+      const memoryNodes = [];
+      const tagged = (value, id) => { Object.defineProperty(value, '_studyObjectId', { value: id }); return value; };
+      const makeMemoryNode = val => { const node = tagged({ val, next: null }, 'merge-k:node:' + allocation++); memoryNodes.push(node); return node; };
+      const makeMemoryList = values => { const nodes = values.map(makeMemoryNode); nodes.forEach((node, i) => node.next = nodes[i + 1] || null); return nodes[0] || null; };
+      let memoryLists = tagged(rawLists.map(makeMemoryList), 'merge-k:collection:' + collection++);
+      let memoryMerged, memoryI, outerL1, outerL2, inPair = false, helperMemory = null, memoryReturn;
+      function snapshotMemory() {
+        const copies = new Map(memoryNodes.map(node => [node, tagged({ val: node.val, next: null }, node._studyObjectId)]));
+        for (const node of memoryNodes) copies.get(node).next = copies.get(node.next) || null;
+        const copied = value => value === undefined ? undefined : value === null ? null : copies.get(value);
+        const copyCollection = values => tagged(values.map(copied), values._studyObjectId);
+        const roots = [{ id: 'outer:lists', name: 'lists', scope: 'mergeKLists', value: copyCollection(memoryLists) }];
+        if (memoryMerged !== undefined) roots.push({ id: 'outer:merged', name: 'merged', scope: 'mergeKLists', value: copyCollection(memoryMerged) });
+        if (memoryI !== undefined) roots.push({ id: 'outer:i', name: 'i', scope: 'mergeKLists', value: memoryI });
+        if (inPair) for (const [name, value] of [['l1', outerL1], ['l2', outerL2]]) roots.push({ id: 'outer:' + name, name, scope: 'mergeKLists', value: copied(value) });
+        if (helperMemory) for (const name of ['l1', 'l2', 'dummy', 'curr']) roots.push({ id: 'helper:' + name, name, scope: 'mergeTwo', value: copied(helperMemory[name]) });
+        if (memoryReturn !== undefined) roots.push({ id: 'return', name: 'return', scope: 'Return value', value: copied(memoryReturn) });
+        objectSteps.push(roots);
+      }
+
       const out=[],copy=ls=>ls.map(a=>[...a]);let lists=copy(rawLists),round=0,pair='-',pairIdx=null,l2Idx=null,l1=null,l2=null,curr=null,mergedSoFar=[],rowRoles=lists.map(()=>"idle"),result=null,currIndex=null;
-      const snap=(line,phase,narr,extra={})=>out.push({phase,executedLine:line,lines:line?[line]:[1],lists:copy(lists),round,pair,pairIdx,l2Idx,l1:l1?[...l1]:null,l2:l2?[...l2]:null,curr:curr?[...curr]:null,currIndex,mergedSoFar:mergedSoFar.map(v=>Array.isArray(v)?[...v]:v),rowRoles:[...rowRoles],result:result?[...result]:null,finished:false,narr,...extra});
-      snap(null,"START","Ready to merge the sorted lists.");if(lists.length===0){snap(2,"EMPTY","The list collection is empty. Return null.",{finished:true});return out;}snap(2,"START","The list collection is nonempty.");
-      while(true){snap(3,"ROUND_START","Check whether more than one list remains.");if(lists.length<=1)break;round++;const merged=[];mergedSoFar=[];snap(4,"ROUND_START","Create the next round's list collection.");let i=0;for(;i<lists.length;i+=2){pairIdx=i;l2Idx=i+1<lists.length?i+1:null;pair=l2Idx===null?'L'+i+' (alone)':'L'+i+' + L'+l2Idx;l1=l2=curr=null;currIndex=null;rowRoles=lists.map((_,idx)=>idx===i?'l1':idx===l2Idx?'l2':'idle');snap(5,"PAIR_PICK","Visit the next list pair.");const a=[...lists[i]],b=l2Idx===null?[]:[...lists[l2Idx]];let p1=0,p2=0;l1=[...a];snap(6,"PAIR_PICK","Read the first list pointer.");l2=l2Idx===null?null:[...b];snap(7,"PAIR_PICK","Read the second list pointer.");snap(8,"MERGE_INIT","Call mergeTwo for this pair.");const linked=[];mergedSoFar=[];snap(16,"MERGE_INIT","Create the dummy head.");curr=[];currIndex=-1;snap(17,"MERGE_INIT","Set curr to the dummy head.");while(true){snap(18,"MERGE_INIT","Check whether both source pointers have nodes.");if(p1>=a.length||p2>=b.length)break;const pickLeft=a[p1]<=b[p2];snap(19,"MERGE_INIT","Compare the two head values.");const picked=pickLeft?a[p1]:b[p2];linked.push(picked);mergedSoFar=[...linked];snap(pickLeft?20:23,pickLeft?'MERGE_PICK_L1':'MERGE_PICK_L2',"Link the selected node after curr.",{pickedFrom:pickLeft?'l1':'l2',pickedVal:picked});if(pickLeft){p1++;l1=a.slice(p1);snap(21,"MERGE_PICK_L1","Advance the first source pointer.");}else{p2++;l2=b.slice(p2);snap(24,"MERGE_PICK_L2","Advance the second source pointer.");}currIndex++;curr=linked.slice(0,currIndex+1);snap(26,"MERGE_INIT","Advance curr to the linked node.");}const tailFrom=p1<a.length?'l1':p2<b.length?'l2':'none',tailVals=p1<a.length?a.slice(p1):b.slice(p2);linked.push(...tailVals);mergedSoFar=[...linked];snap(28,"MERGE_TAIL","Link the remaining source tail.",{pickedFrom:tailFrom,tailVals:[...tailVals]});snap(29,"MERGE_TAIL","Return the list following the dummy head.");merged.push([...linked]);l1=l2=curr=null;currIndex=null;mergedSoFar=copy(merged);rowRoles=lists.map((_,idx)=>idx===i||idx===l2Idx?'done':'idle');snap(8,"PAIR_DONE","Append the returned list to this round.",{traceRow:{round,pair,merged:'['+linked.join(', ')+']'}});}pair='-';pairIdx=l2Idx=null;l1=l2=curr=null;currIndex=null;snap(5,"ROUND_END","This round's pairs are complete.");lists=copy(merged);mergedSoFar=[];rowRoles=lists.map(()=>"merged");snap(10,"ROUND_END","Replace lists with the merged collection.");}
-      result=[...lists[0]];snap(12,"RETURN","Return the single merged list.",{finished:true});return out;
+      const snap=(line,phase,narr,extra={})=>{out.push({phase,executedLine:line,lines:line?[line]:[1],lists:copy(lists),round,pair,pairIdx,l2Idx,l1:l1?[...l1]:null,l2:l2?[...l2]:null,curr:curr?[...curr]:null,currIndex,mergedSoFar:mergedSoFar.map(v=>Array.isArray(v)?[...v]:v),rowRoles:[...rowRoles],result:result?[...result]:null,finished:false,narr,...extra});snapshotMemory();};
+      snap(null,"START","Ready to merge the sorted lists.");if(lists.length===0){memoryReturn=null;snap(2,"EMPTY","The list collection is empty. Return null.",{finished:true});return out;}snap(2,"START","The list collection is nonempty.");
+      while(true){memoryMerged=undefined;memoryI=undefined;inPair=false;snap(3,"ROUND_START","Check whether more than one list remains.");if(lists.length<=1)break;round++;const merged=[];memoryMerged=tagged([],'merge-k:collection:'+collection++);mergedSoFar=[];snap(4,"ROUND_START","Create the next round's list collection.");let i=0;for(;i<lists.length;i+=2){memoryI=i;inPair=true;outerL1=outerL2=undefined;pairIdx=i;l2Idx=i+1<lists.length?i+1:null;pair=l2Idx===null?'L'+i+' (alone)':'L'+i+' + L'+l2Idx;l1=l2=curr=null;currIndex=null;rowRoles=lists.map((_,idx)=>idx===i?'l1':idx===l2Idx?'l2':'idle');snap(5,"PAIR_PICK","Visit the next list pair.");const a=[...lists[i]],b=l2Idx===null?[]:[...lists[l2Idx]];let p1=0,p2=0;l1=[...a];outerL1=memoryLists[i];snap(6,"PAIR_PICK","Read the first list pointer.");l2=l2Idx===null?null:[...b];outerL2=l2Idx===null?null:memoryLists[l2Idx];snap(7,"PAIR_PICK","Read the second list pointer.");helperMemory={l1:outerL1,l2:outerL2,dummy:undefined,curr:undefined};snap(8,"MERGE_INIT","Call mergeTwo for this pair.");const linked=[];mergedSoFar=[];helperMemory.dummy=makeMemoryNode(0);snap(16,"MERGE_INIT","Create the dummy head.");curr=[];currIndex=-1;helperMemory.curr=helperMemory.dummy;snap(17,"MERGE_INIT","Set curr to the dummy head.");while(true){snap(18,"MERGE_INIT","Check whether both source pointers have nodes.");if(p1>=a.length||p2>=b.length)break;const pickLeft=a[p1]<=b[p2];snap(19,"MERGE_INIT","Compare the two head values.");const picked=pickLeft?a[p1]:b[p2];linked.push(picked);mergedSoFar=[...linked];helperMemory.curr.next=pickLeft?helperMemory.l1:helperMemory.l2;snap(pickLeft?20:23,pickLeft?'MERGE_PICK_L1':'MERGE_PICK_L2',"Link the selected node after curr.",{pickedFrom:pickLeft?'l1':'l2',pickedVal:picked});if(pickLeft){p1++;l1=a.slice(p1);helperMemory.l1=helperMemory.l1.next;snap(21,"MERGE_PICK_L1","Advance the first source pointer.");}else{p2++;l2=b.slice(p2);helperMemory.l2=helperMemory.l2.next;snap(24,"MERGE_PICK_L2","Advance the second source pointer.");}currIndex++;curr=linked.slice(0,currIndex+1);helperMemory.curr=helperMemory.curr.next;snap(26,"MERGE_INIT","Advance curr to the linked node.");}const tailFrom=p1<a.length?'l1':p2<b.length?'l2':'none',tailVals=p1<a.length?a.slice(p1):b.slice(p2);linked.push(...tailVals);mergedSoFar=[...linked];helperMemory.curr.next=helperMemory.l1||helperMemory.l2;snap(28,"MERGE_TAIL","Link the remaining source tail.",{pickedFrom:tailFrom,tailVals:[...tailVals]});snap(29,"MERGE_TAIL","Return the list following the dummy head.");merged.push([...linked]);memoryMerged.push(helperMemory.dummy.next);helperMemory=null;l1=l2=curr=null;currIndex=null;mergedSoFar=copy(merged);rowRoles=lists.map((_,idx)=>idx===i||idx===l2Idx?'done':'idle');snap(8,"PAIR_DONE","Append the returned list to this round.",{traceRow:{round,pair,merged:'['+linked.join(', ')+']'}});}memoryI=i;inPair=false;pair='-';pairIdx=l2Idx=null;l1=l2=curr=null;currIndex=null;snap(5,"ROUND_END","This round's pairs are complete.");lists=copy(merged);memoryLists=memoryMerged;memoryI=undefined;mergedSoFar=[];rowRoles=lists.map(()=>"merged");snap(10,"ROUND_END","Replace lists with the merged collection.");}
+      result=[...lists[0]];memoryReturn=memoryLists[0];snap(12,"RETURN","Return the single merged list.",{finished:true});return out;
     }
 
     function loadExample(exNum) {
@@ -1214,6 +1243,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":23,"title":"Merge k Sorted Lists","topic":"LinkedList","why":"Each merge combines sorted streams while preserving the order within each original list.","meanings":{"lists":"array of the k sorted linked lists being merged","l1":"first list of the current pair passed to `mergeTwo`","l2":"second list of the current pair (or `null` when odd one out)","dummy":"sentinel head node used while merging a pair","curr":"tail pointer of the merged list being built in `mergeTwo`","merged":"array collecting the merged pair results for the current round"},"entityClasses":["hud-item","node","nodeClass","nodeClassFor"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = stepIndex) => { const roots = objectSteps[index]; const frame = StudyObjectView.capture(roots, { idOf: object => object._studyObjectId, frameName: 'mergeKLists / mergeTwo' }); for (let i = 0; i < roots.length; i++) if (roots[i].value === undefined) frame.stack[0].variables[i].value = { special: 'not initialized' }; return frame; },
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({exampleInputs, inputLists, ...(steps[stepIndex] || {})}),

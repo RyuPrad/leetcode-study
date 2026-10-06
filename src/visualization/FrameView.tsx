@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { VisualizationFrame, VisualObject, VisualValue, VisualLocation } from '../../shared/visualization';
 import { valueText } from '../../shared/visualization';
+import type { ObjectFocus } from '../../shared/object-view';
 import '../../visualizer-ui/learning.css';
+import ObjectView from './ObjectView';
+import {StudyPanel,usePanelLayout} from './PanelWorkspace';
 
 export function Legend(){return <div className="viz-legend" aria-label="Visual legend"><span className="active">● Active</span><span className="read">◉ Read</span><span className="changed">◆ Changed</span><span className="complete">✓ Result</span><span className="path">↗ Reference / path</span></div>;}
 function NodeGraph({nodes,frame,onSelect}:{nodes:VisualObject[];frame:VisualizationFrame;onSelect:(id:string)=>void}){
@@ -20,14 +23,27 @@ function HeapView({object,frame,onSelect}:{object:VisualObject;frame:Visualizati
   const point=(index:number)=>{const level=Math.floor(Math.log2(index+1)),offset=index-(2**level-1);return {x:(offset+.5)*width/(2**level),y:40+level*90};};
   return <svg className="viz-heap-graph" width={width} height={height} role="img" aria-label="Array viewed as a binary heap">{entries.slice(1).map(entry=>{const index=Number(entry.key),a=point((index-1)>>1),b=point(index);return <path key={entry.key} d={`M${a.x},${a.y+22}L${b.x},${b.y-22}`} stroke="#7892b5"/>;})}{entries.map(entry=>{const p=point(Number(entry.key)),changed=frame.changes.some(c=>c.objectId===object.id&&c.key===entry.key);return <g key={entry.key} className={`viz-graph-node ${changed?'changed':''}`} transform={`translate(${p.x},${p.y})`} data-object={object.id} data-entry={entry.key}><circle r="24"/><text textAnchor="middle" dy="5" onClick={()=>{if(entry.value&&typeof entry.value==='object'&&'ref'in entry.value)onSelect(entry.value.ref);}}>{valueText(entry.value)}</text><text textAnchor="middle" y="40" className="viz-node-id">[{entry.key}]</text></g>;})}</svg>;
 }
-export default function FrameView({frame,operationFrame=frame,moment=2,onSelectLocation}:{frame:VisualizationFrame;operationFrame?:VisualizationFrame;moment?:number;onSelectLocation?:(location:VisualLocation)=>void}){
+export default function FrameView({frame,previousFrame,operationFrame=frame,moment=2,onSelectLocation,onObjectFocusChange,objectTextSize,onObjectTextSizeChange}:{frame:VisualizationFrame;previousFrame?:VisualizationFrame;operationFrame?:VisualizationFrame;moment?:number;onSelectLocation?:(location:VisualLocation)=>void;onObjectFocusChange?:(focus:ObjectFocus|null)=>void;objectTextSize?:number;onObjectTextSizeChange?:(size:number)=>void}){
+  const layout=usePanelLayout();
+  const [layoutEpoch,setLayoutEpoch]=useState(0);
+  const [objectFocus,setObjectFocus]=useState<ObjectFocus|null>(null),[localObjectTextSize,setLocalObjectTextSize]=useState(16);
+  const [reducedMotion,setReducedMotion]=useState(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(()=>{const preference=matchMedia('(prefers-reduced-motion: reduce)'),change=()=>setReducedMotion(preference.matches);preference.addEventListener('change',change);return()=>preference.removeEventListener('change',change);},[]);
   const [selected,setSelected]=useState<string|null>(null),[stackId,setStackId]=useState<number|null>(null),[zoom,setZoom]=useState(1),[expanded,setExpanded]=useState(false),[views,setViews]=useState<Record<string,string>>({}),[pins,setPins]=useState<string[]>([]),[motion,setMotion]=useState(true),[flows,setFlows]=useState<{path:string;label:string}[]>([]);
-  const stage=useRef<HTMLDivElement>(null),scene=useRef<HTMLDivElement>(null),previous=useRef(new Map<string,DOMRect>()),pan=useRef<{x:number;y:number;left:number;top:number}|null>(null);
+  const frameHost=useRef<HTMLDivElement>(null),stage=useRef<HTMLDivElement>(null),scene=useRef<HTMLDivElement>(null),previous=useRef(new Map<string,DOMRect>()),pan=useRef<{x:number;y:number;left:number;top:number}|null>(null);
   useEffect(()=>{setStackId(null);},[frame.index]);
+  useEffect(()=>layout?.subscribe(()=>{previous.current.clear();setLayoutEpoch(value=>value+1);}),[layout]);
+  useEffect(()=>{const host=stage.current?.closest('.study-panels-host');host?.classList.toggle('study-no-motion',!motion);return()=>host?.classList.remove('study-no-motion');},[motion,layoutEpoch]);
   useLayoutEffect(()=>{
-    const animations:Animation[]=[];const next=new Map<string,DOMRect>();const reduced=!motion||matchMedia('(prefers-reduced-motion: reduce)').matches;
-    for(const element of stage.current?.querySelectorAll<HTMLElement>('[data-motion-key]')||[]){const key=element.dataset.motionKey!,rect=element.getBoundingClientRect(),old=previous.current.get(key);if(old&&!reduced&&(Math.abs(old.x-rect.x)>2||Math.abs(old.y-rect.y)>2))animations.push(element.animate([{translate:`${(old.x-rect.x)/zoom}px ${(old.y-rect.y)/zoom}px`},{translate:'0 0'}],{duration:240,easing:'ease-out'}));next.set(key,rect);}previous.current=next;return()=>animations.forEach(a=>a.cancel());
-  },[frame.index,zoom]);
+    const host=frameHost.current,tabs=host?.querySelector<HTMLElement>('.study-object-view-tabs');if(!host||!tabs)return;
+    const measure=()=>host.style.setProperty('--study-object-tabs-height',`${Math.ceil(tabs.getBoundingClientRect().height)}px`);
+    measure();const observer=new ResizeObserver(measure);observer.observe(tabs);return()=>observer.disconnect();
+  },[]);
+  useLayoutEffect(()=>{
+    const animations:Animation[]=[];const next=new Map<string,DOMRect>();
+    if(!motion||reducedMotion){previous.current.clear();return;}
+    for(const element of stage.current?.querySelectorAll<HTMLElement>('[data-motion-key]')||[]){const key=element.dataset.motionKey!,rect=element.getBoundingClientRect(),old=previous.current.get(key);if(old&&(Math.abs(old.x-rect.x)>2||Math.abs(old.y-rect.y)>2))animations.push(element.animate([{translate:`${(old.x-rect.x)/zoom}px ${(old.y-rect.y)/zoom}px`},{translate:'0 0'}],{duration:240,easing:'ease-out'}));next.set(key,rect);}previous.current=next;return()=>animations.forEach(a=>a.cancel());
+  },[frame.index,zoom,motion,reducedMotion,layoutEpoch]);
   useLayoutEffect(()=>{
     function draw(){
       if(!scene.current)return;const origin=scene.current.getBoundingClientRect(),paths:{path:string;label:string}[]=[];
@@ -36,19 +52,25 @@ export default function FrameView({frame,operationFrame=frame,moment=2,onSelectL
       setFlows(old=>JSON.stringify(old)===JSON.stringify(paths)?old:paths);
     }
     draw();const observer=new ResizeObserver(draw);if(scene.current)observer.observe(scene.current);return()=>observer.disconnect();
-  },[frame,operationFrame,moment,zoom,expanded,views]);
+  },[frame,operationFrame,moment,zoom,expanded,views,layoutEpoch]);
   const activeFrame=frame.stack.find(s=>s.id===stackId)||frame.stack.at(-1),objects=frame.objects.filter(o=>o.kind!=='function'),byId=new Map(frame.objects.map(o=>[o.id,o]));
   const variables=(activeFrame?.variables||[]).filter(v=>!(typeof v.value==='object'&&v.value&&('special'in v.value&&['not initialized','global object'].includes(v.value.special)||'ref'in v.value&&byId.get(v.value.ref)?.kind==='function')));
-  function select(id:string){setSelected(id);setExpanded(true);requestAnimationFrame(()=>stage.current?.querySelector<HTMLElement>(`[data-object-id="${id}"]`)?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}));}
+  function select(id:string){layout?.show('diagram');setSelected(id);setExpanded(true);requestAnimationFrame(()=>stage.current?.querySelector<HTMLElement>(`[data-object-id="${id}"]`)?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}));}
   const renderValue=(value:VisualValue)=>value!==null&&typeof value==='object'&&'ref'in value?<button className="viz-reference" onClick={()=>select(value.ref)} title={`Inspect ${value.ref}`}>↗ {byId.get(value.ref)?.kind==='function'?byId.get(value.ref)?.label:value.ref}</button>:<span>{valueText(value)}</span>;
   const graphNodes=objects.filter(o=>['tree','list','graph'].includes(o.kind)).slice(0,200);
   const displayObjects=expanded?objects:objects.slice(0,24);
   const aliases=(id:string)=>variables.filter(v=>v.value&&typeof v.value==='object'&&'ref'in v.value&&v.value.ref===id).map(v=>v.name).join(', ');
-  return <div className={`viz-frame ${motion?'':'study-no-motion'}`}>
-    <section className="viz-explanation" aria-label="Current operation"><div className="viz-eyebrow">{operationFrame.phase==='before'?'NEXT STATEMENT':'CHECKPOINT'} · LINE {operationFrame.location.line} · {['FOCUS','ACTION','RESULT'][moment]}</div>{operationFrame.operations?.length?<ul className="operation-observations">{operationFrame.operations.slice(0,8).map((op,i)=><li key={i} data-kind={op.kind}><button className="operation-source" onClick={()=>onSelectLocation?.(op.location)}>Line {op.location.line}</button> <b>{op.kind==='lookup'?'Check':op.kind==='write'?'Store':op.kind}</b> {op[moment===0?'focus':moment===1?'action':'result']}</li>)}{operationFrame.operations.length>8&&<li>{operationFrame.operations.length-8} further observations; inspect the values below.</li>}</ul>:<strong>{operationFrame.action}</strong>}<details className="viz-step-help"><summary>About this checkpoint</summary><p>{operationFrame.explanation}</p></details></section>
+  return <div ref={frameHost} className={`viz-frame viz-panel-frame ${motion?'':'study-no-motion'} ${objectFocus?'study-object-focus':''}`}>
+    <StudyPanel id="operation" title="Current Operation"><section className={`viz-explanation${objectFocus?' debug-object-instruction':''}`} aria-label="Current operation" title={objectFocus?(operationFrame.operations?.[0]?.[moment===0?'focus':moment===1?'action':'result']||operationFrame.action):undefined}><div className="viz-eyebrow">{operationFrame.phase==='before'?'NEXT STATEMENT':'CHECKPOINT'} · LINE {operationFrame.location.line} · {['FOCUS','ACTION','RESULT'][moment]}</div>{operationFrame.operations?.length?<ul className="operation-observations">{operationFrame.operations.slice(0,objectFocus?1:8).map((op,i)=><li key={i} data-kind={op.kind}><button className="operation-source" onClick={()=>onSelectLocation?.(op.location)}>Line {op.location.line}</button> <b>{op.kind==='lookup'?'Check':op.kind==='write'?'Store':op.kind}</b> {op[moment===0?'focus':moment===1?'action':'result']}</li>)}{!objectFocus&&operationFrame.operations.length>8&&<li>{operationFrame.operations.length-8} further observations; inspect the values below.</li>}</ul>:<strong>{operationFrame.action}</strong>}{!objectFocus&&<details className="viz-step-help"><summary>About this checkpoint</summary><p>{operationFrame.explanation}</p></details>}</section>
     <Legend/>
     {frame.changes.length>0&&<div className="viz-changes" aria-label="What changed">{frame.changes.slice(0,12).map((change,i)=><button key={`${frame.index}-${i}`} onClick={()=>change.objectId&&select(change.objectId)} className="viz-change"><b>{change.name}</b> {valueText(change.before)} <span>→</span> {valueText(change.after)}</button>)}{frame.changes.length>12&&<span>+{frame.changes.length-12} more changes in variables</span>}</div>}
-    <div className="viz-variables">{[...variables].sort((a,b)=>Number(pins.includes(b.id))-Number(pins.includes(a.id))).map(variable=><div key={variable.id} className={`viz-variable ${frame.changes.some(c=>c.name===variable.name)?'changed':''}`}><button aria-pressed={pins.includes(variable.id)} title="Pin variable" onClick={()=>setPins(p=>p.includes(variable.id)?p.filter(id=>id!==variable.id):[...p,variable.id])}>{pins.includes(variable.id)?'◆':'◇'}</button><b>{variable.name}</b>{renderValue(variable.value)}</div>)}</div>
+    </StudyPanel>
+    <StudyPanel id="variables" title="Variables"><div className="viz-variables">{[...variables].sort((a,b)=>Number(pins.includes(b.id))-Number(pins.includes(a.id))).map(variable=><div key={variable.id} className={`viz-variable ${frame.changes.some(c=>c.name===variable.name)?'changed':''}`}><button aria-pressed={pins.includes(variable.id)} title="Pin variable" onClick={()=>setPins(p=>p.includes(variable.id)?p.filter(id=>id!==variable.id):[...p,variable.id])}>{pins.includes(variable.id)?'◆':'◇'}</button><b>{variable.name}</b>{renderValue(variable.value)}</div>)}</div>
+    </StudyPanel>
+    <StudyPanel id="objects" title="Objects" bodyClassName="debug-visual-pane">
+    <div id="debug-objects-panel" role="region" aria-label="Debug objects"><ObjectView frame={frame} previousFrame={previousFrame} selectedFrameId={activeFrame?.id} active textSize={objectTextSize??localObjectTextSize} onTextSizeChange={onObjectTextSizeChange||setLocalObjectTextSize} onFocusChange={next=>{setObjectFocus(next);layout?.focus('objects',!!next);onObjectFocusChange?.(next);}} onSelectFrame={id=>{setStackId(id);const selected=frame.stack.find(call=>call.id===id);if(selected)onSelectLocation?.(selected.location);}}/></div>
+    </StudyPanel>
+    <StudyPanel id="diagram" title="Diagrams" bodyClassName="debug-visual-pane"><div id="debug-diagrams-panel" role="region" aria-label="Debug diagrams">
     <div className="viz-view-tools"><span>Memory & data structures</span><button onClick={()=>setZoom(z=>Math.max(.25,z-.15))} aria-label="Zoom out diagram">−</button><output>{Math.round(zoom*100)}%</output><button onClick={()=>setZoom(z=>Math.min(2,z+.15))} aria-label="Zoom in diagram">+</button><button onClick={()=>{setZoom(1);requestAnimationFrame(()=>{if(stage.current&&scene.current){setZoom(Math.max(.25,Math.min(1,(stage.current.clientWidth-30)/scene.current.scrollWidth)));stage.current.scrollTop=0;stage.current.scrollLeft=0;}});}}>Fit</button><button aria-pressed={motion} onClick={()=>setMotion(v=>!v)}>Motion {motion?'on':'off'}</button><small>Alt + drag to pan · Highlights mark reads and changes. Arrows show explicit relationships.</small></div>
     <div className="viz-stage" ref={stage} onPointerDown={e=>{if(!e.altKey&&e.target!==e.currentTarget&&e.target!==scene.current)return;e.preventDefault();pan.current={x:e.clientX,y:e.clientY,left:e.currentTarget.scrollLeft,top:e.currentTarget.scrollTop};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(pan.current){e.currentTarget.scrollLeft=pan.current.left+pan.current.x-e.clientX;e.currentTarget.scrollTop=pan.current.top+pan.current.y-e.clientY;}}} onPointerUp={()=>pan.current=null} onLostPointerCapture={()=>pan.current=null}>
       <div className="viz-scene" ref={scene} style={{zoom}}>
@@ -64,8 +86,12 @@ export default function FrameView({frame,operationFrame=frame,moment=2,onSelectL
         {!expanded&&objects.length>24&&<button className="viz-expand" onClick={()=>setExpanded(true)}>Show all {objects.length} structures</button>}
       </div>
     </div>
+    </div>
+    </StudyPanel>
+    <StudyPanel id="stack" title="Call Stack">
     {frame.truncated&&<p className="viz-truncation">This state exceeds the display limit. Omitted values are labeled; execution is unaffected.</p>}
     <section className="viz-stack"><h3>Call stack <small>Top frame first</small></h3>{[...frame.stack].reverse().map((item,i)=><button key={item.id} className={activeFrame?.id===item.id?'selected':''} onClick={()=>{setStackId(item.id);onSelectLocation?.(item.location);}}><span>{i===0?'▶':'↳'} {item.name}</span><small>Line {item.location.line}</small></button>)}</section>
-    {!!frame.logs.length&&<details className="viz-console"><summary>Console ({frame.logs.length})</summary><pre>{frame.logs.join('\n')}</pre></details>}
+    </StudyPanel>
+    {!!frame.logs.length&&<StudyPanel id="console" title="Console"><details className="viz-console" open><summary>Console ({frame.logs.length})</summary><pre>{frame.logs.join('\n')}</pre></details></StudyPanel>}
   </div>;
 }

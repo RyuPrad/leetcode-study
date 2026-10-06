@@ -360,6 +360,11 @@
         }
     </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -732,16 +737,19 @@ case "INIT_CURR":
             `;
         }
 
-        function addPointer(nodeEl, type, label) {
+        function addPointer(nodeEl, type, label, targetIdx) {
             const ptr = document.createElement('div');
             ptr.className = 'pointer ' + type;
             ptr.textContent = label;
+            ptr.dataset.studyPointer = label;
+            ptr.dataset.studyPointerTarget = String(targetIdx);
             nodeEl.appendChild(ptr);
         }
 
         function buildChainRow(label, labelClass, startIdx, chainClass, pointerName) {
             const row = document.createElement('div');
             row.className = 'list-row';
+            row.dataset.studyMotionScope = pointerName === 'prev' ? 'reversed' : 'remaining';
 
             const lab = document.createElement('div');
             lab.className = 'list-label ' + labelClass;
@@ -762,10 +770,10 @@ case "INIT_CURR":
                 node.className = 'node ' + chainClass;
                 node.textContent = values[idx];
                 if (pos === 0) {
-                    if (pointerName === 'prev') addPointer(node, 'ptr-prev', 'prev');
-                    if (pointerName === 'curr') addPointer(node, 'ptr-curr', 'curr');
+                    if (pointerName === 'prev') addPointer(node, 'ptr-prev', 'prev', idx);
+                    if (pointerName === 'curr') addPointer(node, 'ptr-curr', 'curr', idx);
                 }
-                if (idx === nextIdx) addPointer(node, 'ptr-next', 'next');
+                if (idx === nextIdx) addPointer(node, 'ptr-next', 'next', idx);
                 row.appendChild(node);
 
                 const arrow = document.createElement('div');
@@ -785,6 +793,7 @@ case "INIT_CURR":
         function buildMemoryRow() {
             const row = document.createElement('div');
             row.className = 'list-row';
+            row.dataset.studyMotionScope = 'memory';
 
             const lab = document.createElement('div');
             lab.className = 'list-label memory';
@@ -803,10 +812,10 @@ case "INIT_CURR":
                 const node = document.createElement('div');
                 node.className = 'node memory';
                 node.textContent = val;
-                if (idx === headIdx && showMemoryLabels) addPointer(node, 'ptr-head', 'head');
-                if (idx === prevIdx) { node.classList.add('previous'); if (showMemoryLabels) addPointer(node, 'ptr-prev', 'prev'); }
-                if (idx === currIdx) { node.classList.add('current'); if (showMemoryLabels) addPointer(node, 'ptr-curr', 'curr'); }
-                if (idx === nextIdx) { node.classList.add('next-saved'); if (showMemoryLabels) addPointer(node, 'ptr-next', 'next'); }
+                if (idx === headIdx && showMemoryLabels) addPointer(node, 'ptr-head', 'head', idx);
+                if (idx === prevIdx) { node.classList.add('previous'); if (showMemoryLabels) addPointer(node, 'ptr-prev', 'prev', idx); }
+                if (idx === currIdx) { node.classList.add('current'); if (showMemoryLabels) addPointer(node, 'ptr-curr', 'curr', idx); }
+                if (idx === nextIdx) { node.classList.add('next-saved'); if (showMemoryLabels) addPointer(node, 'ptr-next', 'next', idx); }
                 if (idx === lastChangedNode) node.classList.add('cut');
                 if ((execState === 'RETURN' || execState === 'END') && idx === prevIdx) node.classList.add('returned');
                 row.appendChild(node);
@@ -1115,6 +1124,12 @@ function pendingInstruction() {
       spec: {"number":206,"title":"Reverse linked list","topic":"LinkedList","why":"Save the next node before reversing the current link, then move the previous and current pointers forward.","meanings":{"head":"list head","prev":"previous node in reversed list","curr":"node being reversed","next":"saved original next pointer"},"entityClasses":["hud-item","node","obj-node","hl-node","lastChangedNode"],"entitySelectors":[],"mode":"history"},
       pendingInstruction,
       preview,
+      objectFrame: (index = window.studyLessonSource.index()) => {
+        const source = window.studyLessonSource;
+        if (!Number.isInteger(index) || index < 0 || index > source.index()) throw Error("Object checkpoint is not recorded.");
+        const raw = index === source.index() ? { ...source.read() } : { ...source.read(), ...historyStack[index] };
+        return StudyObjectState.frame(206, raw, source.spec);
+      },
       index: () => historyStack.length,
       count: () => null,
       read: () => ({values, nextMap, headIdx, prevIdx, currIdx, nextIdx, execState, lastChangedNode, showMemoryLabels, ...({})}),

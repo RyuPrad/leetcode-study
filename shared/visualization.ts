@@ -45,6 +45,8 @@ export interface VisualizationFrame {
 }
 export interface LessonAdapter {
   snapshot(): VisualizationFrame;
+  /** Pure semantic memory projection; authored teaching snapshots remain separate. */
+  objectSnapshot?(index?: number): VisualizationFrame;
   currentTransition?(): ReferenceTransition | null;
   next(): void;
   previous(): void;

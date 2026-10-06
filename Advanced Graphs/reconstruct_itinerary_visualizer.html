@@ -573,6 +573,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -848,7 +853,9 @@
       const res = [];
       const callStack = [];   // airports currently on the recursion stack
 
+      let objectLocals = {}, objectDestsAirport;
       function snap(extra) {
+        const objectIndex = built.length;
         built.push({
           adj: cloneAdj(adj),
           airportOrder: airportOrder.slice(),
@@ -867,11 +874,17 @@
           result: (extra.result === undefined) ? "pending" : extra.result,
           traceLen: traceRows.length
         });
+        Object.defineProperties(built[objectIndex], {
+          objectLocals: {value: {...objectLocals}},
+          objectDestsAirport: {value: objectDestsAirport},
+          objectOmit: {value: ['from','to','dests','airport','next'].filter(name => !(name in objectLocals) && !(name === 'dests' && objectDestsAirport !== undefined))}
+        });
       }
 
       snap({phase: "ready", lines: [], executedLine: null, narration: "Ready to build the itinerary graph."});
       snap({phase: "build", lines: [2], narration: "Create the empty adjacency map."});
       for (const [from, to] of tk) {
+        objectLocals = {from, to};
         if (!adj.has(from)) {
           adj.set(from, []);
           snap({phase: "build", lines: [3], airport: from, narration: "Create this departure airport's empty destination list."});
@@ -879,6 +892,7 @@
         adj.get(from).push(to);
         snap({phase: "build", lines: [3], airport: from, next: to, narration: "Append this ticket's destination to the departure list."});
       }
+      objectLocals = {};
       snap({
         phase: "build", lines: [3],
         narration: "Build <code>adj</code>: for each ticket <code>[from, to]</code> push <b>to</b> onto <code>adj.get(from)</code>."
@@ -886,9 +900,11 @@
       // Sort every destination list lexically (exactly like the solution),
       // so the recursion and every later snapshot see lexical order.
       for (const [airport, dests] of adj) {
+        objectDestsAirport = airport;
         dests.sort();
         snap({phase: "sort", airport, lines: [4], narration: "Sort this airport's destinations in lexical order."});
       }
+      objectDestsAirport = undefined;
       snap({
         phase: "sort", lines: [4],
         narration: "Sort every destination list lexically. Visiting alphabetically smallest first yields the smallest itinerary."
@@ -904,6 +920,8 @@
 
       // instrumented recursion
       function visit(airport) {
+        const previousLocals = objectLocals, previousDests = objectDestsAirport;
+        objectLocals = {airport}; objectDestsAirport = undefined;
         callStack.push(airport);
         snap({
           phase: "enter", airport, lines: [6],
@@ -911,6 +929,7 @@
         });
 
         const dests = adj.get(airport) || [];
+        objectDestsAirport = airport;
         snap({phase: "enter", airport, lines: [7], narration: "Read this airport's remaining destination list."});
         while (dests.length > 0) {
           snap({
@@ -918,6 +937,7 @@
             narration: "<code>dests.length = " + dests.length + " &gt; 0</code> for <b>" + airport + "</b>. The next (smallest) destination is <b>" + dests[0] + "</b>."
           });
           const next = dests.shift();   // mutate the real adjacency list
+          objectLocals.next = next;
           snap({
             phase: "shift", airport, next, shiftFrom: airport, lines: [8],
             narration: "<code>next = dests.shift() = \"" + next + "\"</code> — remove the edge <b>" + airport + " → " + next + "</b> (used exactly once) and recurse into it."
@@ -929,6 +949,7 @@
           });
         }
 
+        delete objectLocals.next;
         // post-order push
         res.push(airport);
         traceRows.push({ event: "push", airport, depth: callStack.length, res: res.slice() });
@@ -938,6 +959,7 @@
           narration: "<b>" + airport + "</b> has no remaining edges (dead end). <code>res.push(\"" + airport + "\")</code> records it in post-order, then this frame returns."
         });
         callStack.pop();
+        objectLocals = previousLocals; objectDestsAirport = previousDests;
       }
 
       visit("JFK");
@@ -1308,6 +1330,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":332,"title":"Reconstruct Itinerary","topic":"Advanced Graphs","why":"Consume tickets while constructing a route that uses every edge; lexical choices resolve valid alternatives.","meanings":{"tickets":"List of `[from, to]` airport pairs. Each ticket is a directed edge that must be used **exactly once**.","adj":"`Map` from an airport to its list of destinations. Built from `tickets`, then each list is sorted lexically.","dests":"The destination list `adj.get(airport)` for the airport currently being visited. `shift()` removes (consumes) the smallest unused edge.","res":"The route collected in **post-order** — an airport is pushed only after all of its outgoing edges are used. Reversed at the end to give the itinerary.","visit":"Recursive Hierholzer DFS. Drains an airport's edges, recursing greedily into the lexically smallest first.","airport":"The airport whose frame is currently on the call stack (argument to `visit`).","next":"The destination just `shift()`-ed off `dests`; the recursion target `visit(next)`.","from":"Origin airport of a ticket while building `adj`.","to":"Destination airport of a ticket while building `adj`."},"entityClasses":["hud-item","dest-pill","stack-frame","res-pill","poppingFrame"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(332, {...window.studyLessonSource.readAt(index), objectLocals: steps[index].objectLocals || {}, objectDestsAirport: steps[index].objectDestsAirport, objectOmit: steps[index].objectOmit || []}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({tickets,  _origInit, ...(steps[stepIndex] || {})}),

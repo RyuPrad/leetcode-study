@@ -58,7 +58,7 @@ async function worker(){
    assert.deepEqual(errors,[]);results.push({number:lesson.number,cases});
   }catch(error){failures.push({number:lesson.number,error:String(error)});console.log('FAIL',lesson.number,String(error));}
   finally{page.off('pageerror',onError);}
-  if((results.length+failures.length)%25===0)console.log(`Presets ${results.length+failures.length}/250; ${failures.length} failures`);
+  if((results.length+failures.length)%25===0)console.log(`Presets ${results.length+failures.length}/${lessons.length}; ${failures.length} failures`);
  }
  await page.close();
 }

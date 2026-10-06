@@ -538,6 +538,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -907,14 +912,21 @@
       const statusMain = {};
       const statusSub = {};
 
+      let objectTreeRefs = { kind: 'idle' };
       function pushStep(extra) {
-        steps.push(Object.assign({
+        const snapshot = Object.assign({
           statusMain: Object.assign({}, statusMain),
           statusSub: Object.assign({}, statusSub),
           trace: trace.map(r => Object.assign({}, r)),
           ans: answer,
           activeTrace: trace.length - 1
-        }, extra));
+        }, extra);
+        Object.defineProperties(snapshot, {
+          objectTreeRefs: { value: { ...objectTreeRefs } },
+          objectLayoutMain: { value: layoutMain },
+          objectLayoutSub: { value: layoutSub }
+        });
+        steps.push(snapshot);
       }
 
       function idMain(node, parent, side) { return realId(layoutMain, node, parent, side, nullMain); }
@@ -928,6 +940,7 @@
         // p is a node in MAIN tree, q is a node in SUB tree
         const pid = idMain(p, pParent, side);
         const qid = idSub(q, qParent, side);
+        objectTreeRefs = { kind: 'same', rootId: mainParentId, pId: p ? pid : null, qId: q ? qid : null };
         if (pid) statusMain[pid] = "comparing";
         if (qid) statusSub[qid] = "comparing";
         const pTxt = p ? p.val : "null";
@@ -975,6 +988,8 @@
       // ---- isSubtree ----
       function subtree(node, nodeParent, side, label) {
         const nid = idMain(node, nodeParent, side);
+        const objectCandidate = { kind: 'sub', rootId: node ? nid : null };
+        objectTreeRefs = objectCandidate;
         if (nid) statusMain[nid] = "current";
         const nTxt = node ? node.val : "null";
         pushStep({
@@ -997,6 +1012,7 @@
         // run same-tree check at this candidate
         pushStep({ line: [4], narr: "Run <code>isSameTree(node, subRoot)</code> at main node <b>" + nTxt + "</b> to test for an exact match here.", frame: { kind: "sub", nodeTxt: nTxt } });
         const same = sameTree(node, subTree, nodeParent, null, side, nid);
+        objectTreeRefs = objectCandidate;
         if (same) {
           // mark the whole matched region as found
           markFound(node);
@@ -1011,12 +1027,14 @@
         pushStep({ line: [5], narr: "No exact match at <b>" + nTxt + "</b>. Recurse: try the LEFT subtree, then the RIGHT (logical OR).", frame: { kind: "sub", nodeTxt: nTxt } });
 
         const leftFound = subtree(node.left, node, "left", label + ".L");
+        objectTreeRefs = objectCandidate;
         if (leftFound) {
           pushStep({ line: [5], narr: "Left side found a match, so <code>||</code> short-circuits to <b>true</b>.", found: true, frame: { kind: "sub", nodeTxt: nTxt } });
           return true;
         }
         pushStep({ line: [6], narr: "Left subtree had no match. Now try the RIGHT subtree of <b>" + nTxt + "</b>.", frame: { kind: "sub", nodeTxt: nTxt } });
         const rightFound = subtree(node.right, node, "right", label + ".R");
+        objectTreeRefs = objectCandidate;
         pushStep({ line: [5, 6], narr: "Node <b>" + nTxt + "</b> returns <b>" + (leftFound || rightFound) + "</b> (left || right).", frame: { kind: "sub", nodeTxt: nTxt } });
         return leftFound || rightFound;
       }
@@ -1038,6 +1056,7 @@
 
       const finalAns = subtree(rootTree, null, null, "root");
       answer = finalAns;
+      objectTreeRefs = { kind: 'idle' };
       pushStep({
         line: finalAns ? [4] : [3],
         narr: "&#10003; Done. <code>isSubtree</code> returns <b>" + finalAns + "</b> &mdash; subRoot " + (finalAns ? "IS" : "is NOT") + " a subtree of root.",
@@ -1273,6 +1292,10 @@
       }
       if (frames.length && frames[0].executedLine !== null) {
         const ready = {...frames[0], executedLine: null};
+        for (const key of ['objectTreeRefs', 'objectLayoutMain', 'objectLayoutSub']) {
+          const descriptor = Object.getOwnPropertyDescriptor(frames[0], key);
+          if (descriptor) Object.defineProperty(ready, key, descriptor);
+        }
         for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
         if (Array.isArray(ready.highlight)) ready.highlight = [];
         if (Array.isArray(ready.hl)) ready.hl = [];
@@ -1288,6 +1311,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":572,"title":"Subtree of Another Tree","topic":"Trees","why":"A candidate root must match the entire subtree's values and shape, not just its root value.","meanings":{"root":"root of the main tree being searched","subRoot":"root of the pattern tree we look for","node":"current candidate node in `root` where we test for an exact match","ans":"boolean result: is `subRoot` a subtree of `root`"},"entityClasses":["hud-item","tree-node","null-node","nodes","node","frame","nodeTxt"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(572, {...window.studyLessonSource.readAt(index), objectTreeRefs: steps[index].objectTreeRefs, objectLayoutMain: steps[index].objectLayoutMain, objectLayoutSub: steps[index].objectLayoutSub}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({arrRoot, arrSub, ...(steps[stepIndex] || {})}),

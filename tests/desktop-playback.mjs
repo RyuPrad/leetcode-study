@@ -12,6 +12,10 @@ export async function testDesktopPlayback(app, page) {
     active: [...document.querySelectorAll('.code-line.active')].map(el => el.id)
   }));
   const focus = () => app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.restore(); win.show(); win.focus(); });
+  const openExtraControls = async () => {
+    const extras = frame.locator('.study-extra-controls');
+    if (!await extras.evaluate(element => element.open)) await extras.locator(':scope>summary').click();
+  };
   const start = async () => {
     await frame.locator('#btn-reset').click();
     await frame.getByRole('button', { name: 'Play', exact: true }).click();
@@ -28,7 +32,9 @@ export async function testDesktopPlayback(app, page) {
   await child().waitForFunction(() => !document.getElementById('btn-prev').disabled);
   await frame.getByRole('button', { name: 'Pause', exact: true }).click();
   const stopped = await state(); await page.waitForTimeout(1100); assert.equal(await state(), stopped);
+  await openExtraControls();
   await frame.getByLabel('Playback speed', { exact: true }).selectOption('4');
+  await frame.locator('#btn-next').focus();
 
   for (const tab of ['Notes', 'History']) {
     await start(); await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click();
@@ -66,6 +72,7 @@ export async function testDesktopPlayback(app, page) {
     await app.evaluate(({ BrowserWindow }, zoom) => { const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(1280, 800); win.webContents.setZoomFactor(zoom); }, zoom);
     await page.waitForTimeout(100);
     assert.ok(await frame.locator('#study-play').isVisible());
+    await openExtraControls();
     assert.ok(await frame.locator('#study-speed').isVisible());
     assert.ok(await child().evaluate(() => {
       const toolbar = document.querySelector('.study-controls');
@@ -81,6 +88,7 @@ export async function testDesktopPlayback(app, page) {
   assert.equal(await page.locator('iframe').count(), 0);
   await page.getByRole('button', { name: 'Open Two Sum', exact: true }).click();
   assert.equal(await frame.getByLabel('Playback speed', { exact: true }).inputValue(), '1');
+  await openExtraControls();
   await assertStopped();
   console.log('PASS desktop playback, view/dialog/focus/power pauses, message validation and toolbar scaling');
 }

@@ -6,7 +6,7 @@ import '../visualizer-ui/guided-core.js';
 export function guidedLessons(root=ROOT){return ['a','b'].flatMap(shard=>JSON.parse(fs.readFileSync(path.join(root,`visualizer-ui/guided-content-${shard}.json`),'utf8'))).sort((a,b)=>Number(a.id.split(':')[1])-Number(b.id.split(':')[1]));}
 export function checkGuided(root=ROOT){
   const lessons=guidedLessons(root),catalog=collectCatalog(root),entries=catalog.entries.filter(e=>e.visualizerPath);
-  if(lessons.length!==250||entries.length!==lessons.length||new Set(lessons.map(l=>l.id)).size!==lessons.length)throw Error('Guided lessons must cover all 250 visualizers exactly once.');
+  if(entries.length!==lessons.length||new Set(lessons.map(l=>l.id)).size!==lessons.length)throw Error(`Guided lessons must cover all ${entries.length} visualizers exactly once.`);
   for(const lesson of lessons){
     const fail=reason=>{throw Error(`${lesson.id}: ${reason}`);},entry=entries.find(e=>e.id===lesson.id);
     if(!entry||!Number.isSafeInteger(lesson.version)||lesson.version<1||lesson.version>1000000||lesson.caseId!=='guided-default'||!lesson.expectedInput||lesson.checkpoints.length!==3)fail('Invalid lesson contract.');
@@ -33,4 +33,4 @@ export function buildGuided(root=ROOT){
   fs.writeFileSync(path.join(root,'visualizer-ui/guided-lessons.js'),`/* Generated from authored guided content. */\nwindow.studyGuidedLessons = ${JSON.stringify(lessons)};\n`);
   return lessons.length;
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===path.join(ROOT,'scripts/check-guided.mjs'))console.log(`Validated ${process.argv.includes('--build')?buildGuided():checkGuided().length} guided lessons and 750 checkpoints.`);
+if(process.argv[1]&&path.resolve(process.argv[1])===path.join(ROOT,'scripts/check-guided.mjs')){const count=process.argv.includes('--build')?buildGuided():checkGuided().length;console.log(`Validated ${count} guided lessons and ${count*3} checkpoints.`);}

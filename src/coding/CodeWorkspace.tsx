@@ -19,6 +19,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
   const [busy,setBusy]=useState<'run'|'submit'|null>(null),[progress,setProgress]=useState({completed:0,total:0}),[result,setResult]=useState<JudgeResult|null>(null),[resultMode,setResultMode]=useState('');
   const [panel,setPanel]=useState<'cases'|'results'|'submissions'>('cases'),[confirm,setConfirm]=useState<'reset'|Submission|null>(null),[preview,setPreview]=useState<Submission|null>(null),[line,setLine]=useState<number|null>(null);
   const [debugCases,setDebugCases]=useState<import('../../shared/coding').CodeCase[]|null>(null);
+  const [objectTextSize,setObjectTextSize]=useState(16);
   const [resultSource,setResultSource]=useState<string|null>(null);
   const [leftWidth,setLeftWidth]=useState(36),[bottomHeight,setBottomHeight]=useState(34);
   const workspace=useRef<HTMLDivElement>(null),right=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDialogElement>(null);
@@ -73,7 +74,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
     const end=()=>{element.removeEventListener('pointermove',move);element.removeEventListener('lostpointercapture',end);};element.addEventListener('pointermove',move);element.addEventListener('lostpointercapture',end);
   }
   return <div className="coding-workspace" hidden={!active} ref={workspace} style={{'--description-width':`${leftWidth}%`,'--results-height':`${bottomHeight}%`} as React.CSSProperties}>
-    {debugCases&&<Suspense fallback={<div className="editor-loading">Loading debugger?</div>}><DebugWorkspace problem={problem} source={source} cases={debugCases} active={active} onClose={()=>{setDebugCases(null);onRequestFocus();}}/></Suspense>}
+    {debugCases&&<Suspense fallback={<div className="editor-loading">Loading debugger?</div>}><DebugWorkspace problem={problem} source={source} cases={debugCases} active={active} objectTextSize={objectTextSize} onObjectTextSizeChange={setObjectTextSize} onClose={()=>{setDebugCases(null);onRequestFocus();}}/></Suspense>}
     <section className="code-description" aria-label="Problem description">
       <div className="code-section-label"><Code2 size={15}/>DESCRIPTION<span>JavaScript</span></div>
       <div className="description-body"><h2>{problem.number}. {problem.title}</h2><p>{problem.description}</p><div className="contract"><span>{problem.kind==='design'?'Class contract':'Function contract'}</span><code>{problem.kind==='design'?problem.entry:`${problem.entry}(${problem.parameters.filter(p=>![141,374].includes(problem.number)||!['pos','pick'].includes(p)).join(', ')})`}</code></div>

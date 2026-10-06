@@ -534,6 +534,11 @@
     }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
   <script defer src="../visualizer-ui/workspace.js"></script>
   <link rel="stylesheet" href="../visualizer-ui/learning.css" />
   <script defer src="../visualizer-ui/operation-rules.js"></script>
@@ -858,16 +863,21 @@
       const status = {};
       const badge = {};
       let pathStack = [];
+      let objectNodeId;
+      let objectLocals = {maxSoFar: undefined, newMax: undefined};
 
       function snapshot(extra) {
-        steps.push(Object.assign({
+        const step = Object.assign({
           status: Object.assign({}, status),
           badge: Object.assign({}, badge),
           pathStack: pathStack.map(p => Object.assign({}, p)),
           trace: trace.map(r => Object.assign({}, r)),
           activeTrace: trace.length - 1,
           count
-        }, extra));
+        }, extra);
+        Object.defineProperty(step, 'objectNodeId', {value: objectNodeId});
+        Object.defineProperty(step, 'objectLocals', {value: {...objectLocals}});
+        steps.push(step);
       }
 
       snapshot({ line: [1], narr: "Walk every root-to-node path with DFS, carrying <b>maxSoFar</b> = the largest value seen on the way down. A node is GOOD when <b>node.val &gt;= maxSoFar</b>. Press <b>Step Over</b>.", frame: { node: null, max: null } });
@@ -875,6 +885,9 @@
       snapshot({ line: [10], narr: "Start the DFS at the root with <b>maxSoFar = -Infinity</b> (so the root always counts).", frame: { node: null, max: null } });
 
       function dfs(node, maxSoFar, label) {
+        const previousLocals = objectLocals;
+        objectLocals = {maxSoFar, newMax: undefined};
+        objectNodeId = node ? node._id : null;
         // line 3 entry
         const nodeTxt = node ? node.val : "null";
         if (node) {
@@ -887,6 +900,7 @@
         // line 4: base case
         if (!node) {
           snapshot({ line: [4], narr: "node is <code>null</code> (empty child) &rarr; <b>return</b>, nothing to count.", frame: { node: nodeTxt, max: fmtMax(maxSoFar) } });
+          objectLocals = previousLocals;
           return;
         }
 
@@ -906,26 +920,31 @@
 
         // line 6: newMax
         const newMax = Math.max(maxSoFar, node.val);
+        objectLocals.newMax = newMax;
         snapshot({ line: [6], narr: "<b>newMax = Math.max(" + fmtMax(maxSoFar) + ", " + node.val + ") = " + newMax + "</b>. This is passed down to both children.", frame: { node: nodeTxt, max: newMax } });
 
         // mark node as onpath while we descend (keep good/notgood color by leaving it; but show path edges via stack)
         // line 7: recurse left
         snapshot({ line: [7], narr: "Recurse LEFT from <b>" + node.val + "</b> with maxSoFar = " + newMax + ".", frame: { node: nodeTxt, max: newMax } });
         dfs(node.left, newMax, label + ".L");
+        objectNodeId = node._id;
         // returning: re-mark current node as current briefly
         status[node._id] = isGood ? "good" : "notgood";
 
         // line 8: recurse right
         snapshot({ line: [8], narr: "Left subtree of <b>" + node.val + "</b> is done. Recurse RIGHT with maxSoFar = " + newMax + ".", frame: { node: nodeTxt, max: newMax } });
         dfs(node.right, newMax, label + ".R");
+        objectNodeId = node._id;
 
         // line 9: pop
         pathStack.pop();
         status[node._id] = isGood ? "good" : "notgood";
         snapshot({ line: [9], narr: "Both children of <b>" + node.val + "</b> processed. Return from this call (pop it off the stack).", frame: { node: nodeTxt, max: fmtMax(maxSoFar) } });
+        objectLocals = previousLocals;
       }
 
       dfs(root, -Infinity, "root");
+      objectNodeId = undefined;
 
       // line 11
       snapshot({ line: [11], narr: "DFS complete. <b>return count</b>.", frame: { node: null, max: null } });
@@ -1194,6 +1213,7 @@
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":1448,"title":"Count Good Nodes in Binary Tree","topic":"Trees","why":"Carry the maximum value on the root-to-node path; a node is good when it reaches or exceeds that maximum.","meanings":{"root":"root of the binary tree","node":"current node visited by the DFS","count":"running count of good nodes found so far","maxSoFar":"largest value seen on the path from `root` down to `node`; a node is good when `node.val >= maxSoFar`"},"entityClasses":["hud-item","tree-node","node-badge","pill","nodes","frame","node"],"entitySelectors":[],"mode":"precomputed"},
+      objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(1448, {...window.studyLessonSource.readAt(index), objectNodeId: steps[index].objectNodeId, objectLocals: steps[index].objectLocals, objectLayout: window._layout}, window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
       read: () => ({arr, ...(steps[stepIndex] || {})}),

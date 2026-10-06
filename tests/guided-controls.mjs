@@ -6,13 +6,18 @@ import {pathToFileURL} from 'node:url';
 import {ROOT} from '../scripts/content.mjs';
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:960},reducedMotion:'reduce'});
 const file=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).find(l=>l.number===1).path;
-async function fresh(){await page.goto(pathToFileURL(path.join(ROOT,file)).href+'?guided=1&walkthrough=compact');await page.waitForFunction(()=>window.studyGuidedController?.progress&&!window.studyGuidedController.busy);}
+async function fresh(){await page.goto(pathToFileURL(path.join(ROOT,file)).href+'?guided=1&walkthrough=compact');await page.waitForFunction(()=>window.studyGuidedController?.progress&&!window.studyGuidedController.busy);await page.getByRole('button',{name:'Reset layout',exact:true}).click();}
 try{
   await page.clock.install();await page.clock.pauseAt(Date.now()+1000);
   await fresh();const index=await page.evaluate(()=>window.studyLessonSource.index());
-  const splitter=page.getByRole('separator',{name:'Resize lesson diagram'});await splitter.focus();await page.keyboard.press('ArrowRight');assert.equal(await splitter.getAttribute('aria-valuenow'),'62');assert.equal(await page.evaluate(()=>window.studyLessonSource.index()),index);
+  const panel=page.locator('[data-study-panel=diagram]');
+  const oldWidth=await panel.evaluate(el=>el.getBoundingClientRect().width);
+  await panel.getByRole('button',{name:'Resize Diagram',exact:true}).click();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Enter');
+  assert.ok((await panel.boundingBox()).width<oldWidth);assert.equal(await page.evaluate(()=>window.studyLessonSource.index()),index);
   assert.equal(await page.getByRole('button',{name:'Focus diagram',exact:true}).count(),0);assert.ok(await page.locator('.study-code').isVisible());
-  await page.setViewportSize({width:900,height:700});const narrowWidth=(await page.locator('.study-diagram').boundingBox()).width;await splitter.focus();await page.keyboard.press('ArrowRight');assert.notEqual((await page.locator('.study-diagram').boundingBox()).width,narrowWidth,'resizing also changes the compact layout');assert.equal(await page.evaluate(()=>window.studyLessonSource.index()),index);await page.setViewportSize({width:1440,height:960});
+  await page.setViewportSize({width:900,height:700});await page.evaluate(()=>studyPanelLayout.show('diagram'));const narrowWidth=(await panel.boundingBox()).width;
+  await panel.getByRole('button',{name:'Resize Diagram',exact:true}).click();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Enter');
+  assert.ok((await panel.boundingBox()).width<narrowWidth,'resizing also changes the compact layout');assert.equal(await page.evaluate(()=>window.studyLessonSource.index()),index);await page.setViewportSize({width:1440,height:960});
   for(const finish of ['Next prediction','timeline']){
     await fresh();const lesson=await page.evaluate(()=>window.studyGuidedController.lesson);
     for(const cp of lesson.checkpoints){await page.getByRole('button',{name:'Next prediction',exact:true}).click();await page.waitForFunction(()=>!window.studyGuidedController.busy);await page.locator(`.guided-choice[data-option-id="${cp.correctOptionId}"]`).click();

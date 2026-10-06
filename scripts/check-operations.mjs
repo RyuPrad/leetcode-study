@@ -4,7 +4,7 @@ import {ROOT} from './content.mjs';
 export function checkOperations(){
  const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
  const operations=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/operations.json'),'utf8'));
- if(operations.length!==250||new Set(operations.map(o=>o.id)).size!==250)throw Error('Operation rules must cover all 250 lessons.');
+ if(operations.length!==lessons.length||new Set(operations.map(o=>o.id)).size!==lessons.length)throw Error(`Operation rules must cover all ${lessons.length} lessons.`);
  for(const lesson of lessons){const item=operations.find(o=>o.id===lesson.id);if(!item||item.mode!==lesson.mode||!Object.keys(item.lines).length)throw Error(`Missing operation rules: ${lesson.id}`);for(const [line,rule]of Object.entries(item.lines))if(!Number.isInteger(Number(line))||!rule.kind||!rule.code||!rule.focus||!rule.action)throw Error(`Invalid operation: ${lesson.id}:${line}`);for(const [phase,mapping]of Object.entries(item.phases||{})){const lines=Array.isArray(mapping)?mapping:[mapping];if(lines.length!==1)throw Error(`Split ${lesson.id}:${phase} into sequential single-line steps.`);if(!phase||lines.some(line=>!Number.isInteger(Number(line))||!item.lines[Number(line)]))throw Error(`Invalid phase mapping: ${lesson.id}:${phase}`);}}
  return operations;
 }

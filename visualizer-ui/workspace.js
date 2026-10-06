@@ -122,7 +122,11 @@
       });
       toolbar.append(custom);
     }
-    const options = [...controls.querySelectorAll('button[id*="toggle"],#labBtn,#layoutBtn,#objBtn')];
+    // The shared Objects inspector owns nested memory presentation. Keep the
+    // legacy anchors for original renderers and behavior fixtures, not controls
+    // that would change an invisible legacy projection.
+    for (const button of controls.querySelectorAll('#btn-raw-toggle,#cycle-toggle,#objBtn')) button.hidden = true;
+    const options = [...controls.querySelectorAll('button[id*="toggle"],#labBtn,#layoutBtn,#objBtn')].filter(button => !button.hidden);
     if (options.length) {
       const menu = document.createElement('details'); menu.className = 'study-input-menu';
       menu.innerHTML = '<summary>View options <span aria-hidden="true">⌄</span></summary><div class="study-input-popover"></div>';
@@ -175,7 +179,7 @@
       const button = document.createElement('button');
       button.id = `${panel.id}-tab`; button.textContent = label; button.setAttribute('role', 'tab'); button.setAttribute('aria-controls', panel.id);
       panel.setAttribute('aria-labelledby', button.id);
-      button.onclick = () => contents.forEach(item => { const selected = item.button === button; item.panel.hidden = !selected; item.button.setAttribute('aria-selected', String(selected)); item.button.tabIndex = selected ? 0 : -1; });
+      button.onclick = () => { contents.forEach(item => { const selected = item.button === button; item.panel.hidden = !selected; item.button.setAttribute('aria-selected', String(selected)); item.button.tabIndex = selected ? 0 : -1; }); workspace.classList.toggle('study-objects-selected',label==='Objects'); workspace.dispatchEvent(new CustomEvent('study:inspector-tab', {detail:{label}})); };
       contents.push({ button, panel }); tabs.append(button); inspector.append(panel);
     }
     const variables = document.getElementById('console-ui') || document.getElementById('console');
@@ -183,15 +187,30 @@
     // Some early pages place variables and code in the same panel; move only the variables node.
     if (variables) { const panel = document.createElement('div'); panel.append(variables); addTab('Variables', panel); }
     if (trace) { const panel = document.createElement('div'); panel.append(trace); addTab('Trace', panel); }
-    const objects = document.querySelector('#object-view,#obj,.obj-view-grid')?.closest('.panel');
-    if (objects && objects !== visualPanel && objects !== codePanel) addTab('Objects', objects);
+    const legacyObjects = document.querySelector('#object-view,#obj,.obj-view-grid')?.closest('.panel');
+    if (legacyObjects && legacyObjects !== visualPanel && legacyObjects !== codePanel) {
+      legacyObjects.hidden = true;
+      legacyObjects.dataset.studyLegacyObjects = 'true';
+    }
+    const objects = document.createElement('section');
+    objects.className = 'study-object-panel';
+    const objectHeading = document.createElement('h2');
+    objectHeading.textContent = 'Object View';
+    const objectDescription = document.createElement('small');
+    objectDescription.textContent = ' — nested JS object format (debugger-style)';
+    objectHeading.append(objectDescription);
+    const objectView = document.createElement('div');
+    objectView.id = 'study-object-view';
+    objects.append(objectHeading, objectView);
+    addTab('Objects', objects);
     const explanation = document.createElement('div');
     for (const panel of document.querySelectorAll('body > .container > .panel,body > .layout > .panel,body > .panel')) {
-      if (panel.children.length === 1 && panel.firstElementChild.tagName === 'H2') continue;
+      if (panel === legacyObjects) continue;
+      if (!panel.children.length || panel.children.length === 1 && panel.firstElementChild.tagName === 'H2') { panel.hidden = true; continue; }
       if (!panel.querySelector('#visual-ui,.code-panel') && panel.textContent.trim() && !/^(Iteration Trace|Step Trace|Variables\s*&\s*Outputs|Operation Trace|Recursion Trace|Column Trace|Union Trace)$/.test(panel.textContent.trim())) explanation.append(panel);
     }
     if (explanation.children.length) addTab('Guide', explanation);
-    contents[0]?.button.click();
+    contents.find(item => item.button.textContent === 'Objects')?.button.click();
     tabs.addEventListener('keydown', event => {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       event.stopPropagation(); event.preventDefault();
@@ -207,6 +226,11 @@
     const requestedOrigin = new URLSearchParams(location.search).get('parentOrigin');
     const parentOrigin = /^http:\/\/127\.0\.0\.1:\d+$/.test(requestedOrigin || '') ? requestedOrigin : 'study://app';
     attachPlayback(toolbar, steps, parentOrigin);
+    const extraControls=document.createElement('details');extraControls.className='study-extra-controls';extraControls.open=true;
+    const extraSummary=document.createElement('summary');extraSummary.textContent='Controls';extraSummary.setAttribute('aria-label','Additional visualization controls');
+    const extraPanel=document.createElement('div');extraPanel.className='study-extra-controls-panel';
+    for(const child of [...toolbar.children])if(child!==steps)extraPanel.append(child);
+    extraControls.append(extraSummary,extraPanel);toolbar.append(extraControls);
     let lastSent = -Infinity;
     const notifyActivity = () => {
       if (performance.now() - lastSent < 800) return;
@@ -220,12 +244,12 @@
         window.parent.postMessage({ type: 'study:search' }, parentOrigin);
         return;
       }
-      if (event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable="true"],[role="tablist"]')) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable="true"],[role="tablist"],.study-object-view,.study-extra-controls,.study-instruction-disclosure,.study-panel-titlebar,.study-panels-bar')) return;
       const id = event.key === 'ArrowRight' ? 'btn-next' : event.key === 'ArrowLeft' ? 'btn-prev' : null;
       if (id) { event.preventDefault(); document.getElementById(id)?.click(); }
     });
     document.addEventListener('pointerdown', event => {
-      for (const menu of toolbar.querySelectorAll('details[open]')) if (!menu.contains(event.target)) menu.open = false;
+      for (const menu of toolbar.querySelectorAll('details[open]')) if (!(menu===extraControls&&!workspace.classList.contains('study-object-focus'))&&!menu.contains(event.target)) menu.open = false;
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true }); else mount();
