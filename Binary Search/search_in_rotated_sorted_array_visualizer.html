@@ -729,7 +729,7 @@
         <label class="tiny-label" for="target-input">Target</label>
         <input id="target-input" type="number" value="0" />
       </div>
-      <button class="btn-small" onclick="loadCustom()">Set</button>
+      <button id="btn-set-target" class="btn-small" onclick="setTarget()" title="Search the currently loaded array with this target">Set</button>
     </div>
 
     <div class="btn-row">
@@ -968,7 +968,22 @@
       return "[" + arr.join(", ") + "]";
     }
 
-    function parseInput(text) { try { const [arrayText, targetText] = StudyNumericInput.optionalParameter(text, null, 'Numbers and target'); const numsResult = StudyNumericInput.list(arrayText, {minLength: 1, label: 'Numbers'}); const targetResult = targetText === null ? null : StudyNumericInput.integer(targetText, {label: 'Target'}); return {numsResult, targetResult}; } catch (error) { alert(error.message); return null; } }
+    function parseInput(text) {
+      try {
+        const [arrayText, targetText] = StudyNumericInput.optionalParameter(text, null, 'Numbers and target');
+        const numsResult = StudyNumericInput.list(arrayText, {minLength: 1, label: 'Numbers'});
+        // A distinct sorted array has at most one descending edge around its cycle.
+        const drops = numsResult.filter((n, i) => n > numsResult[(i + 1) % numsResult.length]).length;
+        if (new Set(numsResult).size !== numsResult.length || drops > 1) {
+          throw Error('Use distinct integers in ascending order, optionally rotated. Duplicates or other unsorted arrays are not supported.');
+        }
+        const targetResult = targetText === null ? null : StudyNumericInput.integer(targetText, {label: 'Target'});
+        return {numsResult, targetResult};
+      } catch (error) {
+        alert(error.message);
+        return null;
+      }
+    }
 
     function togglePin(vName) {
       pinned[vName] = !pinned[vName];
@@ -984,7 +999,45 @@
       init();
     }
 
-    function loadCustom() { const parsed = parseInput(document.getElementById('custom-input').value); if (!parsed) return false; try { const t = parsed.targetResult === null ? StudyNumericInput.integer(document.getElementById('target-input').value, {label: 'Target'}) : parsed.targetResult; nums = parsed.numsResult; target = t; document.getElementById('target-input').value = t; activeExample = 0; init(); return true; } catch (error) { alert(error.message); return false; } }
+    function loadCustom() {
+      const parsed = parseInput(document.getElementById('custom-input').value);
+      if (!parsed) return false;
+      try {
+        const nextTarget = parsed.targetResult === null
+          ? StudyNumericInput.integer(document.getElementById('target-input').value, {label: 'Target'})
+          : parsed.targetResult;
+        // Commit both values only after the complete input passes validation.
+        nums = parsed.numsResult;
+        target = nextTarget;
+        syncInputs();
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
+      }
+    }
+
+    function setTarget() {
+      try {
+        const nextTarget = StudyNumericInput.integer(document.getElementById('target-input').value, {label: 'Target'});
+        // Set changes only the loaded array's target, never a stale pipe value.
+        target = nextTarget;
+        syncInputs();
+        activeExample = 0;
+        init();
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
+      }
+    }
+
+    function syncInputs() {
+      document.getElementById('custom-input').value = nums.join(',') + ' | ' + target;
+      document.getElementById('target-input').value = String(target);
+    }
 
     function init() {
       left = 0;

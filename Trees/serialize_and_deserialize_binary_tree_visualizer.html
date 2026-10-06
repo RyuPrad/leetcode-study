@@ -853,17 +853,37 @@
       }
     }
     function buildTree(arr) {
-      if (arr.length === 0 || arr[0] === null) return null;
+      if (!Array.isArray(arr) || arr.some(v => v !== null && !Number.isFinite(v))) {
+        throw new Error("Use finite numbers and null for missing children.");
+      }
+      if (arr.length === 0) return null;
+      if (arr[0] === null) {
+        if (arr.slice(1).some(v => v !== null)) throw new Error("A non-null value has no parent.");
+        return null;
+      }
       const root = new TreeNode(arr[0]);
       const queue = [root];
       let i = 1;
-      while (queue.length && i < arr.length) {
-        const node = queue.shift();
-        if (i < arr.length && arr[i] !== null) { node.left = new TreeNode(arr[i]); queue.push(node.left); }
-        i++;
-        if (i < arr.length && arr[i] !== null) { node.right = new TreeNode(arr[i]); queue.push(node.right); }
-        i++;
+      for (let q = 0; q < queue.length && i < arr.length; q++) {
+        for (const side of ["left", "right"]) {
+          if (i >= arr.length) break;
+          if (arr[i] !== null) {
+            const child = new TreeNode(arr[i]);
+            queue[q][side] = child;
+            queue.push(child);
+          }
+          i++;
+        }
       }
+      // Trailing null padding is harmless; a value without a parent is not.
+      if (arr.slice(i).some(v => v !== null)) throw new Error("A non-null value has no parent.");
+      let idCounter = 0;
+      (function assignIds(n) {
+        if (!n) return;
+        n._id = idCounter++;
+        assignIds(n.left);
+        assignIds(n.right);
+      })(root);
       return root;
     }
 
@@ -873,13 +893,6 @@
       const edges = [];
       let order = 0;
       let maxDepth = 0;
-      let idCounter = 0;
-      (function assignIds(n) {
-        if (!n) return;
-        n._id = idCounter++;
-        assignIds(n.left);
-        assignIds(n.right);
-      })(root);
       (function walk(n, depth) {
         if (!n) return;
         walk(n.left, depth + 1);
@@ -933,6 +946,9 @@
     let treeArr = [];
     let rootNode = null;
     let layout = null;
+    let rebuiltRoot = null;
+    let rebuiltLayout = null;
+    let rebuiltIdToNode = {};
     let steps = [];
     let stepIndex = 0;
     let activeExample = 1;
@@ -961,10 +977,16 @@
     function loadCustom() {
       const raw = document.getElementById("custom-input").value.trim();
       let arr;
-      if (raw === "") arr = [];
-      else arr = raw.split(",").map(parseToken);
+      if (raw === "" || raw === "[]") arr = [];
+      else arr = raw.replace(/^\[/, "").replace(/\]$/, "").split(",").map(parseToken);
       if (arr.some(v => v !== null && Number.isNaN(v))) {
         alert("Enter a level-order array. Example: 1,2,3,null,null,4,5");
+        return;
+      }
+      try {
+        buildTree(arr);
+      } catch (err) {
+        alert("Not loaded: " + err.message);
         return;
       }
       treeArr = arr;
@@ -982,16 +1004,85 @@
       })(root);
     }
 
+    // Decode only the serialized string. Source-tree nodes and token metadata are
+    // deliberately unavailable here; every value allocates a fresh TreeNode.
+    function deserializeData(data, onStep = () => {}) {
+      if (typeof data !== "string" || data.length === 0) throw new Error("Serialized data must contain a root token.");
+      const vals = data.split(",");
+      const numberToken = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i;
+      if (vals.some(v => v !== "null" && (!numberToken.test(v) || !Number.isFinite(Number(v))))) {
+        throw new Error("Serialized data contains an invalid value token.");
+      }
+      let i = 0;
+      const created = [];
+      const frames = [];
+      const snapshotNodes = () => created.map(n => ({
+        _id: n._id, val: n.val,
+        left: n.left ? n.left._id : null,
+        right: n.right ? n.right._id : null
+      }));
+      function snap(extra) {
+        onStep(Object.assign({
+          cursor: i, i, curBuildId: null,
+          builtIds: created.map(n => n._id),
+          rebuiltNodes: snapshotNodes(), frames: frames.slice()
+        }, extra));
+      }
+      function dfs() {
+        if (i >= vals.length) throw new Error("Serialized data ended before both children were decoded.");
+        frames.push("dfs() @ i=" + i + " -> \"" + vals[i] + "\"");
+        if (vals[i] === "null") {
+          snap({ lines: [16], cursorTok: i, litNull: true,
+            note: "<code>vals[" + i + "] = \"null\"</code>. This subtree is empty: increment <code>i</code> and return null." });
+          i++;
+          snap({ lines: [16], cursorTok: i - 1,
+            note: "Consumed the null marker. <code>i</code> is now " + i + "." });
+          frames.pop();
+          return null;
+        }
+        const node = new TreeNode(Number(vals[i]));
+        node._id = created.length; // Stable preorder identity, independent of values.
+        created.push(node);
+        snap({ lines: [17], cursorTok: i, curBuildId: node._id,
+          note: "<code>vals[" + i + "] = \"" + vals[i] + "\"</code> is a value. Create <code>new TreeNode(" + vals[i] + ")</code> in the rebuilt tree." });
+        i++;
+        snap({ lines: [18], curBuildId: node._id,
+          note: "Advance <code>i</code> to " + i + ". Next, build this node's left subtree, then its right subtree." });
+        snap({ lines: [19], curBuildId: node._id,
+          note: "Recurse to build the LEFT child from the next tokens." });
+        node.left = dfs();
+        snap({ lines: [20], curBuildId: node._id,
+          note: "Recurse to build the RIGHT child from the next tokens." });
+        node.right = dfs();
+        snap({ lines: [21], curBuildId: node._id,
+          note: "Both children attached. Return node <b>" + node.val + "</b> to its parent." });
+        frames.pop();
+        return node;
+      }
+      const root = dfs();
+      if (i !== vals.length) throw new Error("Serialized data has extra tokens after the tree.");
+      return { root, consumed: i, nodes: snapshotNodes() };
+    }
+
+    function sameTree(a, b) {
+      if (!a || !b) return a === b;
+      return a.val === b.val && sameTree(a.left, b.left) && sameTree(a.right, b.right);
+    }
+
     // ===== Build precomputed steps for BOTH phases =====
     // tokens: array of { kind:'val'|'null', text, srcId (for val) }
     function buildSteps() {
       steps = [];
+      function pushStep(frame) {
+        frame.executedLine = frame.lines.length === 1 ? frame.lines[0] : null;
+        steps.push(frame);
+      }
       const tokens = [];           // serialized tokens (built during phase 1)
       const serEmitted = new Set(); // node ids whose value has been pushed
       const frames = [];
 
       function snapSer(extra) {
-        steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))(Object.assign({
+        pushStep((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))(Object.assign({
   phase: "serialize",
   tokens: tokens.map(t => ({
     ...t
@@ -1004,14 +1095,14 @@
   i: null,
   curBuildId: null,
   data: tokens.map(t => t.text).join(","),
-  rebuiltLevelOrder: [],
+  rebuiltLevelOrder: null,
   frames: frames.slice()
 }, extra)));
       }
 
       snapSer({lines:[],executedLine:null,ready:true,note:'Ready. Press Step Over to execute the first instruction.'});
       // ----- Phase 0: serialize init -----
-      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
+      pushStep((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
   phase: "serialize",
   tokens: [],
   serEmitted: [],
@@ -1021,7 +1112,7 @@
   i: null,
   curBuildId: null,
   data: "",
-  rebuiltLevelOrder: [],
+  rebuiltLevelOrder: null,
   frames: [],
   lines: [2],
   note: "PHASE 1 - serialize(root): preorder DFS. Push each node.val, and push <code>\"null\"</code> for every missing child. Start with res = []."
@@ -1059,128 +1150,52 @@
 
       // serialize done -> show final string
       const dataStr = tokens.map(t => t.text).join(",");
-      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
-  phase: "serialize",
-  tokens: tokens.map(t => ({
-    ...t
-  })),
-  serEmitted: Array.from(serEmitted),
-  builtIds: [],
-  curId: null,
-  cursor: null,
-  i: null,
-  curBuildId: null,
-  data: dataStr,
-  rebuiltLevelOrder: [],
-  frames: [],
-  lines: [10],
-  note: "Serialize complete. <code>res.join(\",\")</code> = <b>\"" + dataStr + "\"</b>. This string fully encodes the tree."
-}));
+      pushStep({
+        phase: "serialize",
+        tokens: tokens.map(t => ({ ...t })), serEmitted: Array.from(serEmitted), builtIds: [],
+        curId: null, cursor: null, i: null, curBuildId: null,
+        data: dataStr, rebuiltLevelOrder: null, frames: [],
+        lines: [10],
+        note: "Serialize complete. <code>res.join(\",\")</code> = <b>\"" + dataStr + "\"</b>. This string fully encodes the tree."
+      });
 
-      // ----- Phase 2: deserialize -----
-      const builtIds = new Set();
-      const frames2 = [];
-      let iPtr = 0;
+      // ----- Phase 2: deserialize the string into a separate, fresh tree -----
+      const referenceIds = tokens.filter(t => t.kind === "val").map(t => t.srcId);
+      pushStep({
+        phase: "deserialize",
+        tokens: tokens.map(t => ({ ...t })), serEmitted: referenceIds.slice(),
+        builtIds: [], rebuiltNodes: [], curId: null, cursor: null, i: null, curBuildId: null,
+        data: dataStr, rebuiltLevelOrder: null, frames: [],
+        lines: [13],
+        note: "PHASE 2 - deserialize(data): split the string into <code>vals</code>. Walk the tokens left-to-right rebuilding the same tree."
+      });
+      pushStep({ ...steps[steps.length - 1], cursor: 0, i: 0, lines: [14],
+        note: "Initialize the token cursor <code>i = 0</code>." });
+      const decoded = deserializeData(dataStr, state => {
+        pushStep(Object.assign({
+          phase: "deserialize",
+          tokens: tokens.map(t => ({ ...t })), serEmitted: referenceIds.slice(),
+          curId: null, data: dataStr, rebuiltLevelOrder: null
+        }, state));
+      });
+      rebuiltRoot = decoded.root;
+      rebuiltLayout = rebuiltRoot ? layoutTree(rebuiltRoot) : null;
+      rebuiltIdToNode = {};
+      if (rebuiltLayout) rebuiltLayout.nodes.forEach(n => { rebuiltIdToNode[n._id] = n; });
+      const roundTripVerified = sameTree(rootNode, rebuiltRoot);
 
-      function snapDe(extra) {
-        steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))(Object.assign({
-  phase: "deserialize",
-  tokens: tokens.map(t => ({
-    ...t
-  })),
-  serEmitted: tokens.filter(t => t.kind === "val").map(t => t.srcId),
-  builtIds: Array.from(builtIds),
-  curId: null,
-  cursor: iPtr,
-  i: iPtr,
-  curBuildId: null,
-  data: dataStr,
-  rebuiltLevelOrder: [],
-  frames: frames2.slice()
-}, extra)));
-      }
-
-      // deserialize init
-      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
-  phase: "deserialize",
-  tokens: tokens.map(t => ({
-    ...t
-  })),
-  serEmitted: tokens.filter(t => t.kind === "val").map(t => t.srcId),
-  builtIds: [],
-  curId: null,
-  cursor: 0,
-  i: 0,
-  curBuildId: null,
-  data: dataStr,
-  rebuiltLevelOrder: [],
-  frames: [],
-  lines: [13],
-  cursor: null,
-  i: null,
-  note: "PHASE 2 - deserialize(data): split the string into <code>vals</code> and set <code>i = 0</code>. Walk the tokens left-to-right rebuilding the same tree."
-}));
-
-      snapDe({lines:[14],note:'Initialize the token cursor i = 0.'});
-      // The deserialize DFS visits tokens in the SAME preorder as serialize,
-      // so the i-th 'val' token rebuilds the node with the matching preorder id.
-      function dfsDe() {
-        frames2.push("dfs() @ i=" + iPtr + " -> \"" + tokens[iPtr].text + "\"");
-        if (tokens[iPtr].kind === "null") {
-          snapDe({ lines: [16], cursorTok: iPtr, litNull: true,
-            note: "<code>vals[" + iPtr + "] = \"null\"</code>. This subtree is empty: increment <code>i</code> and return null." });
-          iPtr++;
-          snapDe({ lines: [16], cursorTok: iPtr - 1,
-            note: "Consumed the null marker. <code>i</code> is now " + iPtr + "." });
-          frames2.pop();
-          return null;
-        }
-        const srcId = tokens[iPtr].srcId;
-        builtIds.add(srcId);
-        snapDe({ lines: [17], cursorTok: iPtr, curBuildId: srcId,
-          note: "<code>vals[" + iPtr + "] = \"" + tokens[iPtr].text + "\"</code> is a value. Create <code>new TreeNode(" + tokens[iPtr].text + ")</code> in the rebuilt tree." });
-        iPtr++;
-        snapDe({ lines: [18], curBuildId: srcId,
-          note: "Advance <code>i</code> to " + iPtr + ". Next, build this node's left subtree, then its right subtree." });
-
-        snapDe({ lines: [19], curBuildId: srcId,
-          note: "Recurse to build the LEFT child from the next tokens." });
-        const node = idToNode[srcId];
-        // recurse left
-        dfsDe();
-
-        snapDe({ lines: [20], curBuildId: srcId,
-          note: "Recurse to build the RIGHT child from the next tokens." });
-        dfsDe();
-
-        snapDe({ lines: [21], curBuildId: srcId,
-          note: "Both children attached. Return node <b>" + node.val + "</b> to its parent." });
-        frames2.pop();
-        return node;
-      }
-
-      if (tokens.length > 0) {
-        dfsDe();
-      }
-
-      // final
-      steps.push((frame => ({...frame, executedLine:frame.lines.length === 1 ? frame.lines[0] : null}))({
-  phase: "deserialize",
-  tokens: tokens.map(t => ({
-    ...t
-  })),
-  serEmitted: tokens.filter(t => t.kind === "val").map(t => t.srcId),
-  builtIds: rootNode ? layout.nodes.map(n => n._id) : [],
-  curId: null,
-  cursor: iPtr,
-  i: iPtr,
-  curBuildId: null,
-  data: dataStr,
-  rebuiltLevelOrder: levelOrderOf(rootNode),
-  frames: [],
-  lines: [23],
-  note: "Done. deserialize rebuilt a tree identical to the original. Round-trip verified: the rebuilt level-order matches the input."
-}));
+      pushStep({
+        phase: "deserialize",
+        tokens: tokens.map(t => ({ ...t })), serEmitted: referenceIds.slice(),
+        builtIds: decoded.nodes.map(n => n._id), rebuiltNodes: decoded.nodes,
+        curId: null, cursor: decoded.consumed, i: decoded.consumed, curBuildId: null,
+        data: dataStr, rebuiltLevelOrder: levelOrderOf(rebuiltRoot), frames: [],
+        roundTripVerified,
+        lines: [23],
+        note: roundTripVerified
+          ? "Done. deserialize rebuilt a tree identical to the original. Round-trip verified: every value and child link matches, and all tokens were consumed."
+          : "Round-trip verification failed: the rebuilt tree differs from the original."
+      });
     }
 
     function init() {
@@ -1222,31 +1237,40 @@
       // mode: 'original' or 'rebuilt'
       const wrap = document.createElement("div");
       wrap.className = "tree-wrap";
+      wrap.setAttribute("data-tree", mode);
+      const tree = mode === "original" ? rootNode : rebuiltRoot;
+      const treeLayout = mode === "original" ? layout : rebuiltLayout;
 
-      if (!rootNode || !layout) {
+      if (!tree || !treeLayout || (mode === "rebuilt" && !state.builtIds.length)) {
         const empty = document.createElement("div");
         empty.className = "empty-tree";
-        empty.textContent = mode === "original" ? "root = null (empty tree)" : "rebuilt = null";
+        empty.textContent = mode === "original" ? "root = null (empty tree)"
+          : state.rebuiltLevelOrder === null ? "rebuilt = pending" : "rebuilt = null";
         wrap.appendChild(empty);
         return wrap;
       }
 
-      wrap.style.width = layout.width + "px";
-      wrap.style.height = layout.height + "px";
+      wrap.style.width = treeLayout.width + "px";
+      wrap.style.height = treeLayout.height + "px";
 
       const svgNS = "http://www.w3.org/2000/svg";
       const svg = document.createElementNS(svgNS, "svg");
       svg.setAttribute("class", "tree-svg");
-      svg.setAttribute("width", layout.width);
-      svg.setAttribute("height", layout.height);
+      svg.setAttribute("width", treeLayout.width);
+      svg.setAttribute("height", treeLayout.height);
 
       const shownSet = mode === "original"
-        ? new Set(layout.nodes.map(n => n._id))
+        ? new Set(treeLayout.nodes.map(n => n._id))
         : new Set(state.builtIds);
 
-      layout.edges.forEach(e => {
-        const a = layout.posById[e.from];
-        const b = layout.posById[e.to];
+      const nodeSnapshots = mode === "rebuilt" ? new Map((state.rebuiltNodes || []).map(n => [n._id, n])) : null;
+      treeLayout.edges.forEach(e => {
+        if (mode === "rebuilt") {
+          const parent = nodeSnapshots.get(e.from);
+          if (!parent || (parent.left !== e.to && parent.right !== e.to)) return;
+        }
+        const a = treeLayout.posById[e.from];
+        const b = treeLayout.posById[e.to];
         const line = document.createElementNS(svgNS, "line");
         line.setAttribute("x1", a.x);
         line.setAttribute("y1", a.y);
@@ -1257,16 +1281,21 @@
         if (mode === "original" && state.phase === "serialize" &&
             state.serEmitted.indexOf(e.from) !== -1 && state.serEmitted.indexOf(e.to) !== -1) cls += " active";
         line.setAttribute("class", cls);
+        line.setAttribute("data-from-id", e.from);
+        line.setAttribute("data-to-id", e.to);
         svg.appendChild(line);
       });
       wrap.appendChild(svg);
 
-      layout.nodes.forEach(n => {
+      treeLayout.nodes.forEach(n => {
+        if (mode === "rebuilt" && !nodeSnapshots.has(n._id)) return;
         const div = document.createElement("div");
         div.className = "tree-node";
+        div.id = mode + "-node-" + n._id;
+        div.setAttribute("data-node-id", n._id);
         div.style.left = n._px + "px";
         div.style.top = n._py + "px";
-        div.textContent = n.val;
+        div.textContent = mode === "rebuilt" ? nodeSnapshots.get(n._id).val : n.val;
 
         if (mode === "original") {
           if (state.phase === "serialize") {
@@ -1455,8 +1484,8 @@
       let nodeDisplay = '<span class="kw">-</span>';
       if (state.phase === "serialize" && state.curId !== null && idToNode[state.curId]) {
         nodeDisplay = '<span class="nm">' + idToNode[state.curId].val + '</span>';
-      } else if (state.phase === "deserialize" && state.curBuildId !== null && state.curBuildId !== undefined && idToNode[state.curBuildId]) {
-        nodeDisplay = '<span class="nm">' + idToNode[state.curBuildId].val + '</span>';
+      } else if (state.phase === "deserialize" && state.curBuildId !== null && state.curBuildId !== undefined && rebuiltIdToNode[state.curBuildId]) {
+        nodeDisplay = '<span class="nm">' + rebuiltIdToNode[state.curBuildId].val + '</span>';
       }
 
       document.getElementById("console-ui").innerHTML =
@@ -1469,7 +1498,7 @@
         createConsoleLine("node", "let", "node", nodeDisplay) +
         '<br><span class="cm">// Round-trip output</span><br>' +
         '<div class="console-line"><button class="pin-btn" disabled>INFO</button><span>rebuilt = [' +
-        (state.rebuiltLevelOrder.length ? state.rebuiltLevelOrder.map(v => v === null ? "null" : v).join(", ") : "...") + '];</span></div>';
+        (state.rebuiltLevelOrder === null ? "..." : state.rebuiltLevelOrder.map(v => v === null ? "null" : v).join(", ")) + '];</span></div>';
 
       const hudUi = document.getElementById("hud-ui");
       hudUi.innerHTML = "";
@@ -1493,14 +1522,37 @@
     treeArr = examples[1].slice();
     init();
 
+    // Object View consumes the same detached partial child links as the diagram.
+    // Rebuild only this checkpoint, never expose the completed future tree.
+    function codecObjectLocals(snapshot = {}) {
+      if (snapshot.phase !== "deserialize") return {};
+      const records = snapshot.rebuiltNodes || [];
+      const nodes = new Map(records.map(record => {
+        const node = { val: record.val, left: null, right: null };
+        Object.defineProperty(node, "_studyObjectId", { value: "tree:rebuilt:" + record._id });
+        return [record._id, node];
+      }));
+      for (const record of records) {
+        const node = nodes.get(record._id);
+        node.left = record.left === null ? null : nodes.get(record.left);
+        node.right = record.right === null ? null : nodes.get(record.right);
+      }
+      return {
+        objectLocals: {
+          root: records.length ? nodes.get(records[0]._id) : null,
+          node: snapshot.curBuildId === null ? null : nodes.get(snapshot.curBuildId)
+        }
+      };
+    }
+
     // STUDY LESSON BRIDGE START
     window.studyLessonSource = {
       spec: {"number":297,"title":"Serialize and Deserialize Binary Tree","topic":"Trees","why":"Record missing children as well as values so deserialization can reconstruct the original tree shape.","meanings":{"root":"root of the tree being serialized (and the tree rebuilt by deserialize)","res":"array collected during serialize: each `node.val` plus a `\"null\"` marker for every missing child","node":"current node during the preorder DFS of each phase","data":"the comma-joined serialized string passed from serialize to deserialize","vals":"`data.split(\",\")`, the token list consumed during deserialize","i":"index into `vals`; advances left-to-right as deserialize rebuilds the tree"},"entityClasses":["hud-item","tree-node","frame-pill","nodes","frames"],"entitySelectors":[],"mode":"precomputed"},
       objectFrame: (index = window.studyLessonSource.index()) => StudyObjectState.frame(297, window.studyLessonSource.readAt(index), window.studyLessonSource.spec),
       index: () => stepIndex,
       count: () => steps.length,
-      read: () => ({treeArr, rootNode, layout, idToNode, ...(steps[stepIndex] || {})}),
-      readAt: (studySnapshotIndex) => ({treeArr, rootNode, layout, idToNode, ...(steps[studySnapshotIndex] || {})}),
+      read: () => ({treeArr, rootNode, layout, idToNode, ...(steps[stepIndex] || {}), ...codecObjectLocals(steps[stepIndex])}),
+      readAt: (studySnapshotIndex) => ({treeArr, rootNode, layout, idToNode, ...(steps[studySnapshotIndex] || {}), ...codecObjectLocals(steps[studySnapshotIndex])}),
       phases: () => steps.map((s, i) => ({ index: i, phase: String([s.phase,s.execState,s.state,s.kind,s.action,s.stage,s.type].find(value=>typeof value==='string'&&value.length>0) || ('Line '+(s.line||(s.lines||s.hl||s.highlight||s.highlightLines||[])[0]||1))) })),
       jump: (index) => { stepIndex = Math.max(0, Math.min(steps.length - 1, index)); render(); },
     };

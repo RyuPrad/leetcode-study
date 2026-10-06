@@ -894,6 +894,7 @@
 
 snapshot({phase:'init',lines:[2],narration:'Allocate the minimum-coin table.'});dp[0]=0;snapshot({phase:'base',lines:[3],narration:'Amount zero requires zero coins.'});
  for(let a=1;a<=amt;a++){snapshot({a,phase:'outer',lines:[4],narration:'Compute this amount.'});let usedCoin=null,usedRead=null;for(const coin of coinArr){snapshot({a,coin,phase:'inner-loop',lines:[5],narration:'Try this coin.'});const readIdx=a-coin,old=dp[a];if(coin<=a){dp[a]=Math.min(dp[a],dp[readIdx]+1);usedCoin=coin;usedRead=readIdx;}snapshot({a,coin,readIdx:coin<=a?readIdx:null,phase:coin<=a?'inner':'skip',lines:[6],updated:old!==dp[a],narration:coin<=a?'Compare the current count with one coin plus the remaining amount.':'This coin is too large for the amount.'});}traceRows.push({a,coin:usedCoin===null?"�":usedCoin,read:usedRead===null?"�":"dp["+usedRead+"]",cand:dp[a]===Infinity?"&infin;":dp[a],dpa:dp[a]===Infinity?"&infin;":dp[a]});}
+ if (amt === 0) traceRows.push({ a: 0, coin: "—", read: "—", cand: "—", dpa: 0 });
  const final=dp[amt]===Infinity?-1:dp[amt];snapshot({a:amt,phase:'return',lines:[9],ans:final,result:final<0?'none':'ok',narration:'Return the minimum count, or -1 if this amount is unreachable.'});return {built,traceRows};
     }
 
@@ -907,25 +908,27 @@ snapshot({phase:'init',lines:[2],narration:'Allocate the minimum-coin table.'});
 
     function loadCustom() {
       const raw = document.getElementById("custom-input").value.trim();
-      if (raw.indexOf("|") === -1) {
-        alert("Use the format: coins | amount\nExample: 1, 2, 5 | 11");
+      const parts = raw.split("|");
+      if (parts.length !== 2) {
+        alert("Use exactly one '|' in the format: coins | amount\nExample: 1, 2, 5 | 11");
         return;
       }
-      const parts = raw.split("|");
       const coinStr = parts[0].trim();
       const amtStr = parts[1].trim();
-
-      let parsedCoins = [];
-      if (coinStr !== "") {
-        parsedCoins = coinStr.split(",").map(p => p.trim()).filter(p => p.length > 0).map(p => Number(p));
-      }
-      const parsedAmt = Number(amtStr);
-
-      if (parsedCoins.some(Number.isNaN) || parsedCoins.some(c => !Number.isInteger(c) || c <= 0)) {
-        alert("Coins must be positive integers separated by commas. Example: 1, 2, 5");
+      if (coinStr === "") {
+        alert("Enter at least one coin. Example: 1, 2, 5 | 11");
         return;
       }
-      if (Number.isNaN(parsedAmt) || !Number.isInteger(parsedAmt) || parsedAmt < 0) {
+      const coinParts = coinStr.split(",").map(p => p.trim());
+      const parsedCoins = coinParts.map(Number);
+      const parsedAmt = Number(amtStr);
+      const integerToken = /^[+-]?\d+$/;
+
+      if (coinParts.some(p => !integerToken.test(p)) || parsedCoins.some(c => !Number.isSafeInteger(c) || c <= 0)) {
+        alert("Coins must be positive safe integers separated by commas, with no empty entries. Example: 1, 2, 5");
+        return;
+      }
+      if (!integerToken.test(amtStr) || !Number.isSafeInteger(parsedAmt) || parsedAmt < 0) {
         alert("Amount must be a non-negative integer. Example: 11");
         return;
       }
@@ -933,11 +936,7 @@ snapshot({phase:'init',lines:[2],narration:'Allocate the minimum-coin table.'});
         alert("Please keep amount <= 60 so the dp array stays readable.");
         return;
       }
-      if (parsedCoins.length === 0) {
-        alert("Enter at least one coin. Example: 1, 2, 5 | 11");
-        return;
-      }
-
+      // Commit only after every field is valid, so a rejected load preserves playback.
       coins = parsedCoins;
       amount = parsedAmt;
       activeExample = 0;

@@ -869,23 +869,39 @@
 
     function loadCustom() {
       const raw = document.getElementById("custom-input").value.trim();
-      if (raw === "") {
-        tokens = [];
-      } else {
-        tokens = raw
-          .split(",")
-          .map(part => part.trim())
-          .filter(part => part.length > 0);
-      }
-
-      const valid = tokens.every(t => isOperator(t) || /^-?\d+$/.test(t));
-      if (!valid) {
-        alert("Use tokens separated by commas. Allowed: integers and + - * /. Example: 2, 1, +, 3, *");
+      const nextTokens = raw === "" ? [] : raw.split(",").map(part => part.trim());
+      const error = validateTokens(nextTokens);
+      if (error) {
+        alert(error);
         return;
       }
 
+      // Do not replace inputs or snapshots until the entire expression is valid.
+      tokens = nextTokens;
       activeExample = 0;
       init();
+    }
+
+    function validateTokens(candidateTokens) {
+      const values = [];
+      for (const t of candidateTokens) {
+        if (!isOperator(t)) {
+          if (!/^-?\d+$/.test(t) || !Number.isSafeInteger(Number(t))) {
+            return "Use comma-separated safe integers and + - * /, without missing tokens. Example: 2, 1, +, 3, *";
+          }
+          values.push(Number(t));
+          continue;
+        }
+        if (values.length < 2) return "Each operator needs two earlier operands.";
+        const b = values.pop();
+        const a = values.pop();
+        if (t === "/" && b === 0) return "Division by zero is not allowed.";
+        const result = t === "+" ? a + b : t === "-" ? a - b : t === "*" ? a * b : Math.trunc(a / b);
+        if (!Number.isSafeInteger(result)) return "Every intermediate result must be a safe integer.";
+        values.push(result);
+      }
+
+      return values.length === 1 ? null : "A valid RPN expression must leave exactly one value on the stack.";
     }
 
     function init() {

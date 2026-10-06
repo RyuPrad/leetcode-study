@@ -541,6 +541,23 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* Labels and help travel with the input into the shared workspace menu. */
+    .custom-input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-label { font-size: 12px; font-weight: bold; color: var(--cyan); }
+    .input-help { margin: 0; font-size: 11px; line-height: 1.4; color: #bbb; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--yellow);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
   </style>
   <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
   <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
@@ -559,7 +576,7 @@
 <body>
   <h1 class="page-title">Leetcode 67. Add Binary</h1>
 
-  <div class="floating-controls" id="drag-container">
+  <div class="floating-controls" id="drag-container" role="region" aria-label="Visualizer controls">
     <div class="drag-handle" id="drag-handle">⋮⋮ DRAG CONTROLS ⋮⋮</div>
     <div id="hud-ui" class="hud-container"></div>
 
@@ -576,15 +593,19 @@
       <button id="btn-ex-6" class="btn-ex" onclick="loadExample(6)">"1101" + "101"</button>
     </div>
 
-    <div class="custom-row">
-      <input id="custom-input" value="11 | 1" placeholder="Binary strings: 1010 | 1011" />
-      <button class="btn-small" onclick="loadCustom()">Load</button>
+    <div class="custom-input-group">
+      <label class="input-label" for="custom-input">Binary strings</label>
+      <div class="custom-row">
+        <input id="custom-input" aria-describedby="custom-input-help" value="11 | 1" placeholder="Binary strings: 1010 | 1011" />
+        <button class="btn-small" onclick="loadCustom()">Load</button>
+      </div>
+      <p class="input-help" id="custom-input-help">Enter two binary strings separated by |, for example 1010 | 1011. Use only 0 and 1.</p>
     </div>
 
     <div class="btn-row">
       <button class="btn-dock" onclick="dockControls('left')">Dock Left</button>
       <button class="btn-dock" onclick="dockControls('right')">Dock Right</button>
-      <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">Full Screen</button>
+      <button id="btn-fullscreen" class="btn-fullscreen" aria-pressed="false" onclick="toggleFullScreen()">Full Screen</button>
     </div>
 
     <div class="btn-row">
@@ -598,7 +619,7 @@
     <div class="panel" style="flex: 2; overflow-x: auto; min-height: 420px;">
       <h2>Column Addition (right to left)</h2>
       <div id="visual-ui" class="visual-stage"></div>
-      <div id="narration-ui" class="narration">Press <b>Step Over</b> to begin.</div>
+      <div id="narration-ui" class="narration" role="status" aria-live="polite" aria-atomic="true">Press <b>Step Over</b> to begin.</div>
     </div>
 
     <div class="panel" style="flex: 1.35;">
@@ -761,6 +782,7 @@
       const btn = document.getElementById("btn-fullscreen");
       if (!btn) return;
       btn.textContent = document.fullscreenElement ? "Exit Full" : "Full Screen";
+      btn.setAttribute("aria-pressed", String(Boolean(document.fullscreenElement)));
     }
 
     document.addEventListener("fullscreenchange", updateFullScreenButton);
@@ -855,8 +877,14 @@
       });
     }
 
+    let lastNarration = null;
     function narrate(text) {
-      document.getElementById("narration-ui").innerHTML = text;
+      // Compare source text, since browsers can normalize innerHTML differently.
+      // Pinning a variable must not announce the same algorithm step again.
+      if (lastNarration !== text) {
+        document.getElementById("narration-ui").innerHTML = text;
+        lastNarration = text;
+      }
     }
 
     function createConsoleLine(varKey, keyword, varName, varValue) {
@@ -865,7 +893,7 @@
       const btnText = isActive ? "HUD ON" : "HUD OFF";
       return `
         <div class="console-line">
-          <button class="${btnClass}" onclick="togglePin('${varKey}')">${btnText}</button>
+          <button id="pin-${varKey}" data-pin-key="${varKey}" class="${btnClass}" aria-label="Show ${varName} in HUD" aria-pressed="${Boolean(isActive)}" onclick="togglePin('${varKey}')">${btnText}</button>
           <span><span class="kw">${keyword}</span> ${varName} = ${varValue};</span>
         </div>
       `;
@@ -983,6 +1011,8 @@
     }
 
     function render() {
+      const focusedPin = document.activeElement;
+      const focusedPinId = focusedPin && focusedPin.hasAttribute("data-pin-key") ? focusedPin.id : null;
       const s = steps[stepIndex];
 
       // Buttons
@@ -995,10 +1025,16 @@
         document.getElementById("btn-next").textContent = "Step Over";
       }
 
-      document.querySelectorAll(".btn-ex").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".btn-ex").forEach(btn => {
+        btn.classList.remove("active");
+        btn.setAttribute("aria-pressed", "false");
+      });
       if (activeExample > 0) {
         const activeBtn = document.getElementById("btn-ex-" + activeExample);
-        if (activeBtn) activeBtn.classList.add("active");
+        if (activeBtn) {
+          activeBtn.classList.add("active");
+          activeBtn.setAttribute("aria-pressed", "true");
+        }
       }
 
       highlightLines(s.line);
@@ -1112,6 +1148,11 @@
           div.innerHTML = '<span>' + key + ':</span> <span class="hud-val">' + hudMap[key] + '</span>';
           hudUi.appendChild(div);
         }
+      }
+      // Console rows are rebuilt, so return keyboard focus to the same variable.
+      if (focusedPinId) {
+        const replacement = document.getElementById(focusedPinId);
+        if (replacement) replacement.focus({ preventScroll: true });
       }
     }
 

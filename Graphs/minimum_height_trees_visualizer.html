@@ -799,8 +799,43 @@
     let activeExample = 1;
     let positions = {};
 
+    // Bound snapshot/layout work and reject non-trees before leaf peeling.
+    function validateTree(N, edgeList) {
+      if (!Number.isSafeInteger(N) || N < 1 || N > 100) {
+        throw new Error("n must be an integer from 1 to 100 for this visualizer.");
+      }
+      if (!Array.isArray(edgeList) || edgeList.length !== N - 1) {
+        throw new Error("A tree on n nodes needs exactly n−1 edges.");
+      }
+      const adj = Array.from({ length: N }, () => []);
+      const unique = new Set();
+      for (const edge of edgeList) {
+        if (!Array.isArray(edge) || edge.length !== 2 ||
+            edge.some(v => !Number.isSafeInteger(v) || v < 0 || v >= N)) {
+          throw new Error("Each edge must contain two integer endpoints in 0..n−1.");
+        }
+        const [a, b] = edge;
+        const key = Math.min(a, b) + "," + Math.max(a, b);
+        if (a === b || unique.has(key)) {
+          throw new Error("A tree cannot contain self-loops or duplicate edges.");
+        }
+        unique.add(key);
+        adj[a].push(b);
+        adj[b].push(a);
+      }
+      const seen = new Set([0]);
+      const queue = [0];
+      for (let i = 0; i < queue.length; i++) {
+        for (const v of adj[queue[i]]) {
+          if (!seen.has(v)) { seen.add(v); queue.push(v); }
+        }
+      }
+      if (seen.size !== N) throw new Error("The edges must form one connected tree.");
+    }
+
     // ----- Canonical solution instrumented to push snapshots -----
     function buildSteps(N, edgeList) {
+      validateTree(N, edgeList);
       const built = [];
       const traceRows = [];
       const adj = Array.from({ length: N }, () => []);
@@ -873,6 +908,7 @@
       let remaining = N;
       let round = 0;
       while (remaining > 2) {
+        if (leaves.length === 0) throw new Error("Cannot peel a tree without a leaf frontier.");
         round++;
         snapshot({
           degree, leaves, remaining, round, lines: [14],
@@ -970,35 +1006,36 @@
 
     function loadCustom() {
       const raw = document.getElementById("custom-input").value.trim();
-      const parts = raw.split("|");
-      const N = Number(parts[0].trim());
-      if (!Number.isInteger(N) || N < 1) { alert("n must be a positive integer. Example: 4 | 1,0; 1,2; 1,3"); return; }
-      const edgesRaw = (parts[1] || "").trim();
-      const es = [];
-      if (edgesRaw !== "") {
-        const segs = edgesRaw.split(";").map(s => s.trim()).filter(s => s.length > 0);
-        for (const seg of segs) {
-          const ab = seg.split(",").map(x => Number(x.trim()));
-          if (ab.length !== 2 || !Number.isInteger(ab[0]) || !Number.isInteger(ab[1]) || ab[0] < 0 || ab[1] < 0 || ab[0] >= N || ab[1] >= N) {
-            alert("Each edge is a,b with 0 ≤ a,b < n. Bad edge: \"" + seg + "\"");
-            return;
-          }
-          es.push([ab[0], ab[1]]);
+      try {
+        const parts = raw.split("|");
+        if (parts.length !== 2 || parts[0].trim() === "") {
+          throw new Error("Format: n | a,b; c,d. Example: 4 | 1,0; 1,2; 1,3");
         }
+        const N = Number(parts[0].trim());
+        const edgesRaw = parts[1].trim();
+        const es = edgesRaw === "" ? [] : edgesRaw.split(";").map(seg => {
+          const parts = seg.split(",").map(v => v.trim());
+          if (parts.length !== 2 || parts.some(v => v === "")) {
+            throw new Error("Each edge must contain exactly two endpoints, such as 1,2.");
+          }
+          return parts.map(Number);
+        });
+        // Build everything locally; a rejected load leaves the current run intact.
+        const nextSteps = buildSteps(N, es);
+        const nextPositions = computePositions(N, es);
+        n = N;
+        edges = es;
+        positions = nextPositions;
+        activeExample = 0;
+        init(nextSteps);
+      } catch (err) {
+        alert(err.message);
       }
-      if (N > 1 && es.length !== N - 1) {
-        alert("A tree on n nodes needs exactly n−1 edges. Got " + es.length + ", expected " + (N - 1) + ".");
-        return;
-      }
-      n = N;
-      edges = es;
-      activeExample = 0;
-      init();
     }
 
-    function init() {
-      positions = computePositions(n, edges);
-      steps = buildSteps(n, edges);
+    function init(prebuiltSteps) {
+      if (!prebuiltSteps) positions = computePositions(n, edges);
+      steps = prebuiltSteps || buildSteps(n, edges);
       stepIndex = 0;
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";

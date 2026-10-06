@@ -919,8 +919,28 @@
 
     function distStr(v) { return v === INF ? "INF" : String(v); }
 
+    function validateInput(inp) {
+      const { times, n, k } = inp;
+      if (!Number.isSafeInteger(n) || n < 1 || n > 100 ||
+          !Number.isSafeInteger(k) || k < 1 || k > n) {
+        throw new Error("n must be an integer from 1 to 100, and k an integer from 1 to n.");
+      }
+      if (!Array.isArray(times) || times.length > 200) throw new Error("Use an array of at most 200 edges.");
+      for (const edge of times) {
+        if (!Array.isArray(edge) || edge.length !== 3 ||
+            !Number.isSafeInteger(edge[0]) || edge[0] < 1 || edge[0] > n ||
+            !Number.isSafeInteger(edge[1]) || edge[1] < 1 || edge[1] > n) {
+          throw new Error("Each edge must be [u,v,w], with integer endpoints in 1..n.");
+        }
+        if (!Number.isSafeInteger(edge[2]) || edge[2] < 0) {
+          throw new Error("Dijkstra requires nonnegative safe-integer weights.");
+        }
+      }
+    }
+
     // ----- Precompute the whole Dijkstra run as snapshots -----
     function buildSteps(inp) {
+      validateInput(inp);
       const { times, n, k } = inp;
       const built = [];
       const traceRows = [];
@@ -1008,6 +1028,7 @@
         }
         for (const [nei, w] of neighbors) {
           const cand = d + w;
+          if (!Number.isSafeInteger(cand)) throw new Error("Path distances must remain safe integers. Use smaller weights.");
           snapshot({
             lines: [45], node, d, nei, w, activeEdge: [node, nei],
             narration: "Relax edge <b>" + node + " → " + nei + "</b> (w=" + w + "). Candidate = <code>d + w = " + d + " + " + w + " = " + cand + "</code>. Compare with <code>dist[" + nei + "] = " + distStr(dist[nei]) + "</code>."
@@ -1104,35 +1125,26 @@
     function loadCustom() {
       const raw = document.getElementById("custom-input").value.trim();
       try {
-        const timesMatch = raw.match(/times\s*=\s*(\[[\s\S]*\])\s*;/i) || raw.match(/times\s*=\s*(\[[\s\S]*?\]\])/i);
-        const nMatch = raw.match(/n\s*=\s*(\d+)/i);
-        const kMatch = raw.match(/k\s*=\s*(\d+)/i);
-        if (!timesMatch || !nMatch || !kMatch) {
-          alert("Format: times=[[u,v,w],...]; n=4; k=2");
-          return;
+        const match = raw.match(/^times\s*=\s*(\[[\s\S]*\])\s*;\s*n\s*=\s*([^;]+)\s*;\s*k\s*=\s*([^;]+)\s*;?$/i);
+        if (!match || match[2].trim() === "" || match[3].trim() === "") {
+          throw new Error("Format: times=[[u,v,w],...]; n=4; k=2");
         }
-        const times = JSON.parse(timesMatch[1]);
-        const n = Number(nMatch[1]);
-        const k = Number(kMatch[1]);
-        if (!Array.isArray(times) || n < 1 || k < 1 || k > n) {
-          alert("Invalid input. n must be >= 1 and 1 <= k <= n.");
-          return;
-        }
-        for (const e of times) {
-          if (!Array.isArray(e) || e.length !== 3) { alert("Each edge must be [u, v, w]."); return; }
-          if (e[0] < 1 || e[0] > n || e[1] < 1 || e[1] > n) { alert("Edge endpoints must be in 1.." + n + "."); return; }
-        }
-        input = { times, n, k };
+        const nextInput = { times: JSON.parse(match[1]), n: Number(match[2].trim()), k: Number(match[3].trim()) };
+        // Invalid input or unsafe arithmetic must not replace the current run.
+        const nextSteps = buildSteps(nextInput);
+        const nextPositions = computeNodePositions(nextInput.n);
+        input = nextInput;
+        nodePositions = nextPositions;
         activeExample = 0;
-        init();
+        init(nextSteps);
       } catch (err) {
-        alert("Could not parse input. Example: times=[[2,1,1],[2,3,1],[3,4,1]]; n=4; k=2");
+        alert(err instanceof SyntaxError ? "Could not parse times. Example: times=[[2,1,1],[2,3,1]]; n=3; k=2" : err.message);
       }
     }
 
-    function init() {
-      steps = buildSteps(input);
-      nodePositions = computeNodePositions(input.n);
+    function init(prebuiltSteps) {
+      steps = prebuiltSteps || buildSteps(input);
+      if (!prebuiltSteps) nodePositions = computeNodePositions(input.n);
       stepIndex = 0;
       document.getElementById("btn-next").disabled = false;
       document.getElementById("btn-next").textContent = "Step Over";

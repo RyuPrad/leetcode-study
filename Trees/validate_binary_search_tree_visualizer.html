@@ -735,17 +735,32 @@
       }
     }
     function buildTree(arr) {
-      if (arr.length === 0 || arr[0] === null) return null;
+      if (!Array.isArray(arr) || arr.some(v => v !== null && !Number.isFinite(v))) {
+        throw new Error("Use finite numbers and null for missing children.");
+      }
+      if (arr.length === 0) return null;
+      if (arr[0] === null) {
+        if (arr.slice(1).some(v => v !== null)) throw new Error("A non-null value has no parent.");
+        return null;
+      }
       const root = new TreeNode(arr[0]);
+      root._id = "n0";
       const queue = [root];
       let i = 1;
-      while (queue.length && i < arr.length) {
-        const node = queue.shift();
-        if (i < arr.length && arr[i] !== null) { node.left = new TreeNode(arr[i]); queue.push(node.left); }
-        i++;
-        if (i < arr.length && arr[i] !== null) { node.right = new TreeNode(arr[i]); queue.push(node.right); }
-        i++;
+      for (let q = 0; q < queue.length && i < arr.length; q++) {
+        for (const side of ["left", "right"]) {
+          if (i >= arr.length) break;
+          if (arr[i] !== null) {
+            const child = new TreeNode(arr[i]);
+            child._id = "n" + i;
+            queue[q][side] = child;
+            queue.push(child);
+          }
+          i++;
+        }
       }
+      // Trailing null padding is harmless; a value without a parent is not.
+      if (arr.slice(i).some(v => v !== null)) throw new Error("A non-null value has no parent.");
       return root;
     }
 
@@ -827,6 +842,12 @@
         alert("Please enter numbers (use null for missing children). Example: 5,1,4,null,null,3,6");
         return;
       }
+      try {
+        buildTree(arr);
+      } catch (err) {
+        alert("Not loaded: " + err.message);
+        return;
+      }
       treeArr = arr;
       activeExample = 0;
       init();
@@ -867,6 +888,7 @@
         pushObjectStep({
           line: [8],
           node: root ? root.val : null,
+          nodeId: root ? root._id : null,
           low: -Infinity,
           high: Infinity,
           path: [],
@@ -885,6 +907,7 @@
         pushObjectStep({
           line: [3],
           node: null,
+          nodeId: null,
           low: -Infinity,
           high: Infinity,
           path: [],
@@ -906,7 +929,7 @@
         if (stopped) return false;
         if (!node) return true;
 
-        path.push(node.val);
+        path.push(node._id);
 
         // visit: check bounds
         const okLow = node.val > low;
@@ -915,6 +938,7 @@
 
         trace.push({
           node: node.val,
+          nodeId: node._id,
           low: fmtBound(low),
           high: fmtBound(high),
           ok
@@ -923,11 +947,12 @@
         pushObjectStep({
           line: [4],
           node: node.val,
+          nodeId: node._id,
           low,
           high,
           path: [...path],
           validSet: [...validSet],
-          badNode: ok ? null : node.val,
+          badNode: ok ? null : node._id,
           finished: false,
           ans: "pending",
           trace: trace.map(r => ({ ...r })),
@@ -942,11 +967,12 @@
           pushObjectStep({
             line: [4],
             node: node.val,
+            nodeId: node._id,
             low,
             high,
             path: [...path],
             validSet: [...validSet],
-            badNode: node.val,
+            badNode: node._id,
             finished: true,
             ans: false,
             trace: trace.map(r => ({ ...r })),
@@ -956,12 +982,13 @@
         }
 
         // mark this node valid (it passed its own check)
-        validSet.push(node.val);
+        validSet.push(node._id);
 
         // descend left then right (bounds update)
         pushObjectStep({
           line: [5],
           node: node.val,
+          nodeId: node._id,
           low,
           high,
           path: [...path],
@@ -979,6 +1006,7 @@
         pushObjectStep({
           line: [6],
           node: node.val,
+          nodeId: node._id,
           low,
           high,
           path: [...path],
@@ -1002,6 +1030,7 @@
         pushObjectStep({
           line: [8],
           node: null,
+          nodeId: null,
           low: -Infinity,
           high: Infinity,
           path: [],
@@ -1093,8 +1122,10 @@
             line.setAttribute("x2", child.px);
             line.setAttribute("y2", child.py);
             line.setAttribute("class", "edge-line");
-            const pi = step.path.indexOf(n.val);
-            if (pi !== -1 && step.path[pi + 1] === child.val) line.classList.add("path");
+            line.setAttribute("data-from-id", n._id);
+            line.setAttribute("data-to-id", child._id);
+            const pi = step.path.indexOf(n._id);
+            if (pi !== -1 && step.path[pi + 1] === child._id) line.classList.add("path");
             svg.appendChild(line);
           });
         });
@@ -1105,22 +1136,24 @@
         layout.nodes.forEach(n => {
           const el = document.createElement("div");
           el.className = "tnode";
+          el.id = "bst-node-" + n._id;
+          el.setAttribute("data-node-id", n._id);
           el.style.left = n.px + "px";
           el.style.top = n.py + "px";
           el.textContent = n.val;
 
-          if (step.badNode !== null && n.val === step.badNode) {
+          if (step.badNode !== null && n._id === step.badNode) {
             el.classList.add("invalid");
-          } else if (n.val === step.node && !step.finished) {
+          } else if (n._id === step.nodeId && !step.finished) {
             el.classList.add("current");
-          } else if (validSet.has(n.val)) {
+          } else if (validSet.has(n._id)) {
             el.classList.add("valid");
           }
 
           // bounds tag for the current node
-          if (n.val === step.node && step.node !== null) {
+          if (n._id === step.nodeId && step.node !== null) {
             const tag = document.createElement("div");
-            tag.className = "bounds-tag" + (step.badNode === n.val ? " bad" : "");
+            tag.className = "bounds-tag" + (step.badNode === n._id ? " bad" : "");
             tag.textContent = fmtBound(step.low) + " < " + n.val + " < " + fmtBound(step.high);
             el.appendChild(tag);
           }
