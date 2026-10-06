@@ -70,10 +70,10 @@ function treeNodes(h, mode) {
 }
 function buildIndependent(values) {
   if (!values.length || values[0] === null) return null;
-  const root = {val: values[0], id: 'n0', left: null, right: null}, queue = [root]; let i = 1;
+  const root = {val: values[0], id: 'root', left: null, right: null}, queue = [root]; let i = 1;
   for (let q = 0; q < queue.length && i < values.length; q++) for (const side of ['left', 'right']) {
     if (i >= values.length) break;
-    if (values[i] !== null) { const node = {val: values[i], id: `n${i}`, left: null, right: null}; queue[q][side] = node; queue.push(node); } i++;
+    if (values[i] !== null) { const node = {val: values[i], id: `${queue[q].id}.${side}`, left: null, right: null}; queue[q][side] = node; queue.push(node); } i++;
   }
   return root;
 }
@@ -167,9 +167,9 @@ for (const values of codecCases) test(`fresh round-trip / rendered links ${JSON.
 test('duplicate example flags only the first violating node and correct path', () => {
   const h = load('bst'); h.click('btn-ex-4'); h.seek(h.exec('steps.length - 1'));
   const byId = new Map(treeNodes(h).map(n => [n.attributes['data-node-id'], n]));
-  assert.ok(byId.get('n0').classList.contains('valid')); assert.ok(byId.get('n1').classList.contains('invalid'));
-  assert.equal(byId.get('n2').className, 'tnode'); assert.deepEqual(h.json('steps[stepIndex].path'), ['n0', 'n1']);
-  assert.deepEqual(h.json('steps[stepIndex].trace.map(r => r.nodeId)'), ['n0', 'n1']);
+  assert.ok(byId.get('root').classList.contains('valid')); assert.ok(byId.get('root.left').classList.contains('invalid'));
+  assert.equal(byId.get('root.right').className, 'tnode'); assert.deepEqual(h.json('steps[stepIndex].path'), ['root', 'root.left']);
+  assert.deepEqual(h.json('steps[stepIndex].trace.map(r => r.nodeId)'), ['root', 'root.left']);
 });
 test('decoder works without original nodes, assigns fresh IDs, and isolates calls', () => {
   const h = load('codec'); h.exec('rootNode = null; idToNode = {}; layout = null;');
@@ -332,16 +332,51 @@ test('codec: real shared Object View captures partial fresh trees at arbitrary h
     }
   }
 });
-test('bst: current source-owned Object View identity metadata survives duplicate-node repairs', () => {
-  const h = load('bst'); enableObjectView(h); validLoad(h,[2,2,2]);
-  for (let i=0;i<h.exec('steps.length');i++) {
-    const frame = h.json(`window.studyLessonSource.objectFrame(${i})`);
-    const active = h.exec(`steps[${i}].objectNodeActive`);
-    const node = frame.stack[0].variables.find(v => v.name === 'node');
-    if (active) {
-      assert.ok(node); const id = h.exec(`steps[${i}].nodeId`);
-      if (id !== null) assert.equal(node.value.ref, 'tree:'+id);
-    } else assert.equal(node,undefined);
+test('bst: diagram and Object View retain source-owned path aliases through pure reads, Back and seek', () => {
+  const cases = [...bstCases, [3,1,5,null,2,3,7], [1,null,1]];
+  const metadata = ['objectNodeId', 'objectNodeActive'];
+  for (const values of cases) {
+    const h = load('bst'); enableObjectView(h); validLoad(h, values);
+    const input = buildIndependent(values), oracle = bstOracle(input);
+    const frames = [], before = h.state(), beforeDom = h.dom();
+    for (let i = 0; i < h.exec('steps.length'); i++) {
+      const frame = h.json(`window.studyLessonSource.objectFrame(${i})`);
+      const step = h.exec(`steps[${i}]`), vars = Object.fromEntries(frame.stack[0].variables.map(v => [v.name, v.value]));
+      const field = (ref, name) => frame.objects.find(o => o.id === ref?.ref)?.entries.find(e => e.key === name)?.value;
+      const shape = ref => ref === null ? null : [field(ref, 'val'), shape(field(ref, 'left')), shape(field(ref, 'right'))];
+      assert.deepEqual(shape(vars.root), treeShape(input));
+      for (const name of metadata) {
+        assert.equal(h.exec(`Object.hasOwn(window.studyLessonSource.readAt(${i}), '${name}')`), false);
+        assert.equal(Object.getOwnPropertyDescriptor(step, name).enumerable, false);
+      }
+      for (const object of frame.objects) assert.ok(!object.entries.some(e => [...metadata, '_id', 'px', 'py'].includes(e.key)));
+      for (const value of Object.values(vars)) assert.notEqual(value?.special, 'not recorded at this checkpoint');
+      if (step.objectNodeActive) {
+        assert.deepEqual(vars.node, step.objectNodeId === null ? null : {ref: `tree:${step.objectNodeId}`});
+        assert.equal(step.nodeId, step.objectNodeId, 'diagram and inspector use the same source-owned identity');
+        if (step.objectNodeId !== null) {
+          const alias = step.objectNodeId.split('.').slice(1).reduce((ref, side) => field(ref, side), vars.root);
+          assert.deepEqual(vars.node, alias, 'current node aliases its original position, even with equal values');
+          assert.equal(field(vars.node, 'val'), step.node);
+        }
+        for (const name of ['low', 'high']) assert.deepEqual(vars[name], Number.isFinite(step[name]) ? step[name] : {special: String(step[name])});
+      } else for (const name of ['node', 'low', 'high']) assert.equal(vars[name], undefined);
+      if (step.finished && step.ans === false) assert.equal(vars.node.ref, `tree:${oracle.checks.at(-1).nodeId}`);
+      assert.deepEqual(h.json(`window.studyLessonSource.objectFrame(${i})`), frame);
+      assert.equal(h.state(), before, 'historical Object View reads never navigate or mutate the lesson');
+      assert.equal(h.dom(), beforeDom);
+      frames.push(frame);
+    }
+    h.seek(frames.length - 1);
+    for (let i = frames.length - 1; i >= 0; i--) {
+      assert.deepEqual(h.json('window.studyLessonSource.objectFrame()'), frames[i]);
+      const step = h.exec('steps[stepIndex]');
+      assert.deepEqual(treeNodes(h).filter(n => n.classList.contains('invalid')).map(n => n.attributes['data-node-id']), step.badNode === null ? [] : [step.badNode]);
+      if (i) h.click('btn-prev');
+    }
+    for (const i of new Set([frames.length - 1, Math.floor(frames.length / 2), 1, 0])) {
+      h.seek(i); assert.deepEqual(h.json('window.studyLessonSource.objectFrame()'), frames[i]);
+    }
   }
 });
 test('tree: current single-instruction metadata is complete after the merge', () => {
