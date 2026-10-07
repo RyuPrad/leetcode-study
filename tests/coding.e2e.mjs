@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { ROOT } from '../scripts/content.mjs';
+import { actWhileCodeRuns } from './helpers/running-code-action.mjs';
 const problems=JSON.parse(fs.readFileSync(path.join(ROOT,'coding/problems.json'),'utf8'));
 fs.mkdirSync(path.join(ROOT,'.test-data'),{recursive:true});fs.mkdirSync(path.join(ROOT,'test-results'),{recursive:true});
 const directory=fs.mkdtempSync(path.join(ROOT,'.test-data/coding-e2e-'));
@@ -55,7 +56,8 @@ try{
   await run('function twoSum(){throw new Error("location");}','run','Runtime error');
   await page.getByRole('button',{name:'Go to error line',exact:true}).first().click();await solutionFocused();
   await run('function twoSum(){while(true){}}','run','Time limit exceeded');
-  await code('function twoSum(){while(true){}}');await page.getByRole('button',{name:'Run',exact:true}).click();await page.getByRole('button',{name:'Stop',exact:true}).click();await page.getByText('Cancelled',{exact:true}).waitFor();
+  await code('function twoSum(){while(true){}}');await actWhileCodeRuns(page,'Run','Stop');await page.getByText('Cancelled',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Stop',exact:true}).count(),0,'Stop terminates the running job');
   await run(reference);
   console.log('PASS wrong answers, syntax/runtime errors, timeout, Stop, and recovery');
   await page.getByRole('tab',{name:'Test cases',exact:true}).click();await page.getByRole('radio',{name:'Custom cases',exact:true}).check();await page.getByLabel('Custom test cases').fill('[[[4,5,9],9]]');
@@ -71,7 +73,7 @@ try{
   await page.getByRole('button',{name:'Settings and backup',exact:true}).click();await page.getByRole('button',{name:'Export backup',exact:true}).click();await page.getByText('Your backup was exported.',{exact:true}).waitFor();
   const backup=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.equal(backup.version,3);assert.equal(backup.drafts['leetcode:1'].source.replace(/\r\n/g,'\n'),reference);assert.equal(backup.submissions.length,2);
   await page.getByRole('button',{name:'Restore backup',exact:true}).click();await page.locator('.problem-table').waitFor();await open(1);const imported=await page.evaluate(()=>window.study.bootstrap());assert.equal(imported.data.drafts['leetcode:1'].source,backup.drafts['leetcode:1'].source);assert.deepEqual(imported.data.submissions,backup.submissions);
-  await code('function twoSum(){while(true){}}');await page.getByRole('button',{name:'Submit',exact:true}).click();await open(933);await page.waitForFunction(async()=>{const {data}=await window.study.bootstrap();return data.submissions.at(-1)?.result.verdict==='Cancelled';});
+  await code('function twoSum(){while(true){}}');await actWhileCodeRuns(page,'Submit','Back to library');await page.locator('.problem-table').waitFor();await open(933);await page.waitForFunction(async()=>{const {data}=await window.study.bootstrap();return data.submissions.at(-1)?.result.verdict==='Cancelled';});
   console.log('PASS native backup export/restore includes drafts/submissions and navigation cancels running code');
   for(const n of [2,48,133,138,146,297,374,700,933,1095]){await open(n);await run(problems.find(p=>p.number===n).reference,'submit');}
   console.log('PASS list/tree/graph/design/in-place/API problems including 700 and 933');
