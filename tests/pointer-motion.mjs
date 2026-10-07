@@ -210,7 +210,10 @@ try{
       await page.getByRole('button',{name:'Motion off',exact:true}).click();
       await active();
       await page.emulateMedia({reducedMotion:'reduce'});
-      await page.waitForTimeout(20);
+      // MediaQueryList change delivery is asynchronous and can exceed one frame
+      // on a busy runner. Require cancellation: natural completion is 'finished',
+      // not 'idle', so waiting cannot hide a missing reduced-motion listener.
+      await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches&&savedPointerAnimations.every(animation=>animation.playState==='idle'),null,{timeout:5000});
       assert.ok(await page.evaluate(()=>savedPointerAnimations.every(animation=>animation.playState==='idle')),'switching reduced motion cancels active slides');
       await move(page,'next',{settle:true,label:'reduced motion instruction'});
       assert.deepEqual(errors,[]);
