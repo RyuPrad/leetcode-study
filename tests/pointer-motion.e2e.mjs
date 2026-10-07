@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {ROOT} from '../scripts/content.mjs';
+import {armNativeMotionPlayback} from './helpers/native-motion-playback.mjs';
 
 // Run sequentially with other native tests: playback needs real OS focus.
 // Set STUDY_TEST_EXE to verify the executable extracted from an installer.
@@ -165,21 +166,19 @@ try{
    await move(frame,'reset',{settle:true});
    await frame.getByLabel('Playback speed',{exact:true}).selectOption('4');
    await focus();
-   await frame.evaluate(()=>{
-    window.nativeMotionPlayback=[];window.nativeMotionPrevious=nativePointerProbe.sample();
-    window.nativeMotionUnsubscribe=studyLessonAdapter.subscribe(()=>{
-     const after=nativePointerProbe.sample();
-     if(after.index!==nativeMotionPrevious.index){nativeMotionPlayback.push({before:nativeMotionPrevious,after});nativeMotionPrevious=after;}
-    });
-   });
+   await frame.evaluate(armNativeMotionPlayback,{minimum:12,timeout:30000});
    try{
     await frame.getByRole('button',{name:'Play',exact:true}).click();
-    await frame.waitForFunction(()=>nativeMotionPlayback.length>=12,null,{timeout:30000});
-    await frame.getByRole('button',{name:'Pause',exact:true}).click();
+    const paused=await frame.evaluate(()=>nativeMotionCompletion);
+    assert.equal(paused.error,null,'native Play reaches the observation target and Pause succeeds');
+    assert.ok(paused.recorded>=12,'native Play records at least twelve transitions');
+    assert.equal(paused.finished,false,'native Pause is exercised before the example finishes');
+    assert.equal(paused.playing,'false','native Pause clears the playing state');
     const recordings=await frame.evaluate(()=>nativeMotionPlayback);
     for(const recording of recordings)compare(recording.before,recording.after,{label:`${number} ${mode} native Play`});
-    const index=await frame.evaluate(()=>studyLessonSource.index());
-    await page.waitForTimeout(600);
+    const index=paused.index;
+    // Detailed mode needs three 500 ms moments per instruction at 4x speed.
+    await page.waitForTimeout(mode==='detailed'?1800:600);
     assert.equal(await frame.evaluate(()=>studyLessonSource.index()),index,'native Pause stops playback');
    }catch(error){
     console.error('Native playback state',await frame.evaluate(()=>({index:studyLessonSource.index(),mode:studyWalkthrough.mode,stage:studyWalkthrough.stage,recorded:nativeMotionPlayback.length,playing:document.getElementById('study-play').getAttribute('aria-pressed'),speed:document.getElementById('study-speed').value,hidden:document.hidden,focused:document.hasFocus(),finished:document.getElementById('btn-next').disabled})));
