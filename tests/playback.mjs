@@ -40,7 +40,9 @@ async function sweep() {
     while (cursor < selected.length) {
       const file = selected[cursor++]; errors.length = 0;
       try {
-        await page.goto(pathToFileURL(path.join(ROOT, file)).href+'?walkthrough=compact');
+        // Parallel playback can load slowly on a busy Windows runner. Keep the
+        // full load event and all playback checks; only navigation gets more time.
+        await page.goto(pathToFileURL(path.join(ROOT, file)).href+'?walkthrough=compact', { waitUntil: 'load', timeout: 90000 });
         assert.equal(await page.locator('#study-play:visible').count(), 1);
         assert.equal(await page.locator('.btn-play:visible,.btn-pause:visible,#speed-input:visible').count(), 0);
         assert.equal(await page.locator('#study-speed').inputValue(), '1');
@@ -86,7 +88,7 @@ async function interactions() {
   try {
     const entry = catalog.entries.find(entry => entry.number === 1);
     const url = pathToFileURL(path.join(ROOT, entry.visualizerPath)).href+'?walkthrough=compact';
-    await page.goto(url);
+    await page.goto(url, { waitUntil: 'load', timeout: 90000 });
     const initial = await page.evaluate(snapshot);
     await click(page, '#btn-next'); const first = await page.evaluate(snapshot);
     await click(page, '#btn-next'); const second = await page.evaluate(snapshot);
@@ -125,7 +127,7 @@ async function interactions() {
     await click(page, '#study-play');
     await page.evaluate(() => window.dispatchEvent(new Event('blur'))); await paused(page);
     await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await paused(page);
-    await page.goto(url); assert.equal(await page.locator('#study-speed').inputValue(), '1'); await paused(page);
+    await page.goto(url, { waitUntil: 'load', timeout: 90000 }); assert.equal(await page.locator('#study-speed').inputValue(), '1'); await paused(page);
     assert.deepEqual(errors, []);
     console.log('PASS speeds, pause/resume, rapid toggles, manual controls, inputs and speed lifetime');
   } finally { await page.close(); }
@@ -145,7 +147,7 @@ async function mutatedInputs() {
   try {
     for (const [number, input, selector, expected] of cases) {
       const file = catalog.entries.find(entry => entry.number === number).visualizerPath;
-      await page.goto(pathToFileURL(path.join(ROOT, file)).href+'?walkthrough=compact');
+      await page.goto(pathToFileURL(path.join(ROOT, file)).href+'?walkthrough=compact', { waitUntil: 'load', timeout: 90000 });
       await page.locator('#custom-input').evaluate((field, value) => { field.value = value; }, input);
       await click(page, '.study-custom-menu button[onclick="loadCustom()"]');
       const initial = await page.evaluate(snapshot);
