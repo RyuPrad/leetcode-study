@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { ROOT } from '../scripts/content.mjs';
 import { cardFor, settle, expectedColumns, presentation, assertPresentation, checkIndependentScroll, checkFocusRestore } from './object-view-interactions.mjs';
+import { waitForReadableObject } from './helpers/object-readability.mjs';
 
 fs.mkdirSync(path.join(ROOT, '.test-data'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
@@ -72,14 +73,9 @@ async function inspect(host, item, name, last, neighbor, frameId) {
   await visibleControls(host, container);
   await checkFocusRestore(host, container, name, { frameId });
   await opener.click(); await settle(host);
-  const focus = await card.locator('.study-object-body').evaluate(body => {
-    const region = body.getBoundingClientRect(), frame = body.closest('.study-object-view').getBoundingClientRect();
-    let top = 0, bottom = innerHeight;
-    for (let ancestor = body.parentElement; ancestor; ancestor = ancestor.parentElement) if (['auto','scroll','hidden','clip'].includes(getComputedStyle(ancestor).overflowY)) { const box = ancestor.getBoundingClientRect(); top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
-    const style = getComputedStyle(body);
-    return { height: body.clientHeight, visibleHeight: Math.min(region.bottom, bottom) - Math.max(region.top, top), padding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom), lineHeight: parseFloat(style.lineHeight), width: body.clientWidth, focusedWidth: frame.width, fullyVisible: region.top >= top - 1 && region.bottom <= bottom + 1, ownsViewport: [.1,.5,.9].every(portion => body.contains(document.elementFromPoint(region.left + region.width / 2, region.top + region.height * portion))) };
-  });
   const minimumLines = item.name === 'default' && item.zoom === 1 ? 12 : 8;
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const focus = await waitForReadableObject(host, card.locator('.study-object-body'), viewport, minimumLines);
   assert.ok(focus.fullyVisible && focus.ownsViewport && focus.visibleHeight - focus.padding >= focus.lineHeight * minimumLines - 1, `Expanded Object View must show ${minimumLines} complete lines in its real available viewport: ${JSON.stringify(focus)}`);
   const mode = await container.getAttribute('data-object-view-mode');
   const focusScreenshot = `object-view-readability-${mode}-focus-${item.name}-${Math.round(item.zoom * 100)}.png`;
