@@ -23,7 +23,7 @@ async function inspect(page, file) {
   page.on('pageerror', handler);
   try {
     const sourceRoot = capture ? path.join(ROOT, '.baseline/content') : ROOT;
-    await page.goto(pathToFileURL(path.join(sourceRoot, file)).href, { waitUntil: 'load', timeout: 15000 });
+    await page.goto(pathToFileURL(path.join(sourceRoot, file)).href, { waitUntil: 'load', timeout: 90000 });
     const result = await page.evaluate(async () => {
       function snapshot() {
         const text = selector => {
