@@ -38,7 +38,8 @@ try {
   await assetFrame.waitForFunction(() => window.studyLessonAdapter?.objectSnapshot && document.querySelector('.study-object-card'));
   await assetFrame.waitForLoadState('load');
   for (const entry of entries) {
-    await assetFrame.goto(`study://content/${entry.visualizerPath.split('/').map(encodeURIComponent).join('/')}?embedded=1&parentOrigin=${encodeURIComponent('study://app')}`, { waitUntil: 'load' });
+    // Give offline navigation headroom on busy Windows runners; retain full load readiness.
+    await assetFrame.goto(`study://content/${entry.visualizerPath.split('/').map(encodeURIComponent).join('/')}?embedded=1&parentOrigin=${encodeURIComponent('study://app')}`, { waitUntil: 'load', timeout: 90000 });
     await assetFrame.waitForFunction(() => window.studyLessonAdapter?.objectSnapshot && document.querySelector('.study-object-card'));
     const evidence = await assetFrame.evaluate(() => {
       if (!window.StudyObjectView || !window.StudyObjectState) throw Error('Shared Object View scripts are missing from the offline payload');
