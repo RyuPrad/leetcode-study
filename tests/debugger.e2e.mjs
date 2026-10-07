@@ -32,6 +32,12 @@ async function code(source){
 }
 async function start(source){await code(source);await focus();await page.getByRole('button',{name:'Debug',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.debug-status.paused,.debug-result'));if(await page.locator('.viz-frame').count()){assert.ok(await page.locator('[data-study-panel=objects]').isVisible());assert.ok(await page.locator('[data-object-view-index]').isVisible());await page.evaluate(()=>document.querySelector('.debug-panel-workspace').studyPanelLayout.show('diagram'));}}
 async function step(name){const before=await index();await clickControl(name);await page.waitForFunction(before=>document.querySelector('.debug-status.paused')&&document.querySelector('.debug-timeline>span').textContent!==before,before);}
+async function playCheckpoint(){
+  const before=await index();await clickControl('Play');
+  // A click can return before the worker's running/frame messages. Do not accept
+  // the previous checkpoint's paused class as acknowledgement of a native pause.
+  await page.waitForFunction(before=>{const timeline=document.querySelector('.debug-timeline>span');return !!timeline&&document.querySelector('.debug-status')?.textContent==='Playing'&&!document.querySelector('.debug-status.paused')&&timeline.textContent!==before;},before);
+}
 async function breakpoint(line){const editor=page.locator('.debug-source .monaco-editor');const number=editor.locator('.line-numbers').filter({hasText:new RegExp(`^${line}$`)});const row=await number.boundingBox(),box=await editor.boundingBox();assert.ok(row&&box);await page.mouse.click(box.x+10,row.y+row.height/2);}
 async function close(){const immediate=page.getByRole('button',{name:'Close debugger and return to code',exact:true});if(await immediate.isVisible())await immediate.click();else await clickToolbar(/Stop \/ edit|Back to code/);await page.locator('.debug-workspace').waitFor({state:'detached'});await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='JavaScript solution');}
 async function finish(){await clickControl('Continue');await page.locator('.debug-result').waitFor({timeout:30000});assert.match(await page.locator('.debug-result strong').innerText(),/matches expected/);}
@@ -75,7 +81,7 @@ try{
   await selectDebug('Debug test case','1');await paused();await step('Step Over');
   await clickToolbar('Focus diagram');assert.ok(await page.locator('.debug-source').isHidden());await clickToolbar('Focus diagram');
   for(const [pauseName,pauseAction] of [['tab',async()=>{await page.getByRole('tab',{name:'Notes',exact:true}).click();}],['minimize',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].minimize());}],['blur event',async()=>{await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].emit('blur'));}],['suspend',async()=>{await app.evaluate(({powerMonitor})=>powerMonitor.emit('suspend'));}]]){
-    console.log('Testing pause',pauseName);await clickToolbar(/Restart/);await paused();await focus();await clickControl('Play');await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'JavaScript solution','Code tab must not focus the covered solution during Debug');
+    console.log('Testing pause',pauseName);await clickToolbar(/Restart/);await paused();await focus();await playCheckpoint();await pauseAction();await paused();const stopped=await index();await page.waitForTimeout(300);assert.equal(await index(),stopped);await page.getByRole('tab',{name:'Code',exact:true}).click();await focus();assert.equal(await index(),stopped);assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'JavaScript solution','Code tab must not focus the covered solution during Debug');
   }
   await finish();const state=await page.evaluate(()=>window.study.bootstrap());assert.equal(state.data.submissions.length,0);assert.notEqual(await page.getByLabel('Problem progress').inputValue(),'completed');await close();
   await page.keyboard.insertText(' // resumed');
