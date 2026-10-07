@@ -8,7 +8,9 @@ import {testSingleLineHighlights} from './single-line-highlights.mjs';
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const browser=await chromium.launch({headless:true}),failures=[];let cursor=0,checked=0,steps=0;
 async function worker(){const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});while(cursor<lessons.length){const lesson=lessons[cursor++],errors=[];const onError=e=>errors.push(e.message);page.on('pageerror',onError);try{
- await page.goto(pathToFileURL(path.join(ROOT,lesson.path)).href);await page.waitForFunction(()=>window.studyWalkthrough);
+ // Four concurrent walkthroughs can load slowly on a busy Windows runner.
+ // Keep waiting for load and readiness; only navigation gets a larger budget.
+ await page.goto(pathToFileURL(path.join(ROOT,lesson.path)).href,{timeout:90000});await page.waitForFunction(()=>window.studyWalkthrough);
  const result=await page.evaluate(async()=>{
   const a=studyLessonAdapter,w=studyWalkthrough,s=studyLessonSource;let count=0;
   while(!document.getElementById('btn-next').disabled&&count<(s.count()??50000)){
@@ -21,6 +23,9 @@ async function worker(){const page=await browser.newPage({viewport:{width:1440,h
    if(JSON.stringify(actual)!==JSON.stringify(want)||JSON.stringify(reported)!==JSON.stringify(want))throw Error(`Wrong code highlight for ${phase}: expected ${want}, operation ${reported}, rendered ${actual}`);
    for(const n of want){const line=document.getElementById(`line-${n}`)||document.getElementById(`l${n}`);if(!line||getComputedStyle(line).backgroundColor!=='rgb(39, 73, 108)')throw Error(`Operation source highlight ${n} is not visible`);}
    count++;
+   // Long reference traces must not monopolize the renderer in one JS task.
+   // Yield only after checking the current transition, without skipping steps.
+   if(count%25===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
   return {count,complete:document.getElementById('btn-next').disabled};
  });
