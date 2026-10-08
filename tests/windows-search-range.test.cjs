@@ -315,10 +315,83 @@ test('34: Guided expected input and all checkpoints match the complete productio
 });
 
 
-test('34: modeled default text snapshots retain the reviewed baseline contract', async () => {
+test('34: chart captions distinguish excluded boundary candidates from compared elements without advancing state', async () => {
+  const h = fixture(root), frames = trace(h);
+  const note = visual => visual.querySelector('.boundary-note').textContent;
+  const find = predicate => {
+    const frame = frames.find(item => predicate(item.raw));
+    assert.ok(frame, 'expected real instruction checkpoint exists');
+    return frame;
+  };
+  const lowerEquality = find(raw => raw.execState === 'LOWER_MOVE_RIGHT' && raw.currentValue === raw.target);
+  const lowerMoved = frames[lowerEquality.index + 1];
+  assert.match(note(h.source.preview(lowerEquality.index)), /lower boundary may still be n = 6/,
+    'caption describes the current window before the pending right assignment');
+  const lowerVisual = h.source.preview(lowerMoved.index);
+  assert.equal(lowerMoved.raw.right, 3);
+  assert.ok(lowerVisual.querySelector('.cell.right.discarded'), 'the excluded candidate is outside the active comparison window');
+  assert.match(note(lowerVisual), /Compare array elements in \[0, 3\)/);
+  assert.match(note(lowerVisual), /right = 3 is excluded from further comparisons, but is still a possible lower boundary/);
+  const upperMoved = find(raw => raw.phase === 'upper' && raw.left === 4 && raw.right === 5);
+  assert.match(note(h.source.preview(upperMoved.index)), /right = 5 .*still a possible upper boundary/);
+  const meeting = find(raw => raw.phase === 'lower' && raw.left === 3 && raw.right === 3);
+  assert.match(note(h.source.preview(meeting.index)), /meeting index is the lower boundary/);
+  assert.match(note(h.source.preview(meeting.index)), /empty search window does not mean the target is absent/);
+
+  const captions = frames.map(frame => {
+    const before = h.state(), index = h.source.index(), epoch = h.epoch();
+    const caption = note(h.source.preview(frame.index));
+    assert.equal(h.state(), before, 'caption projection cannot change raw state, history or pins');
+    assert.equal(h.source.index(), index); assert.equal(h.epoch(), epoch);
+    return caption;
+  });
+  for (const frame of frames) {
+    await h.adapter.seek(frame.index);
+    assert.equal(note(h.el('visual-ui')), captions[frame.index], 'seek uses the same caption as the detached checkpoint');
+  }
+  await h.adapter.seek(lowerMoved.index);
+  h.exec('prevStep()');
+  assert.equal(note(h.el('visual-ui')), note(h.source.preview(lowerEquality.index)), 'Back restores the previous candidate explanation');
+  h.exec('nextStep()');
+  assert.equal(note(h.el('visual-ui')), note(lowerVisual), 'replay restores the same explanation');
+});
+
+test('34: boundary captions handle n, empty windows and the partially reset upper search', () => {
+  const h = fixture(root);
+  for (const [nums, target] of [[[2, 2], 2], [[2, 2], 3], [[1, 3, 3, 5], 4], [[], 0]]) {
+    accepted(h, nums, target);
+    const frames = trace(h);
+    for (const frame of frames) {
+      const raw = frame.raw, caption = h.source.preview(frame.index).querySelector('.boundary-note').textContent;
+      if (!nums.length) {
+        assert.match(caption, /only boundary is n = 0/);
+        assert.match(caption, /no array element is read/);
+      } else if (raw.execState === 'RESET_RIGHT') {
+        assert.match(caption, new RegExp(`reset in progress: left is now 0.*next instruction resets right to n = ${nums.length}`));
+        assert.doesNotMatch(caption, /pointers meet|Compare array elements/, 'a half-reset window is not presented as the new search');
+      } else if (raw.left !== null && raw.right !== null && raw.phase !== 'result') {
+        if (raw.left === raw.right) {
+          assert.match(caption, new RegExp(`pointers meet at ${raw.left}`));
+          assert.match(caption, /empty search window does not mean the target is absent/);
+          if (raw.left === nums.length) assert.match(caption, /boundary is n, past the last array element/);
+        } else if (raw.right === nums.length) {
+          assert.match(caption, new RegExp(`boundary may still be n = ${nums.length}`));
+          assert.match(caption, /not an array element and is never read/);
+        }
+      } else {
+        assert.doesNotMatch(caption, /pointers meet|Compare array elements/, 'initializing and result states do not claim an active search');
+      }
+    }
+    assert.deepEqual(h.current().ans, oracle(nums, target));
+  }
+});
+
+test('34: modeled default text snapshots retain the reviewed correction or baseline contract', async () => {
   const file = 'Binary Search/find_first_and_last_position_of_element_in_sorted_array_visualizer.html';
-  const expected = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/visualizer-baseline.json'), 'utf8'))[file];
-  assert.ok(expected, 'new visualizer is registered in the default snapshot baseline');
+  const original = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/visualizer-baseline.json'), 'utf8'))[file];
+  const corrections = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/visualizer-corrections.json'), 'utf8'));
+  const expected = corrections[file]?.expected || original;
+  assert.ok(original, 'visualizer remains registered in the original snapshot baseline');
   const actual = await baseline(fixture(root));
   assert.deepEqual(actual.expected, expected);
   assert.deepEqual(actual.snapshots.initial, actual.snapshots.restarted);
