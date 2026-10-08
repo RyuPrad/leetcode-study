@@ -6,6 +6,38 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const TOPICS = ['Array & Hashing', 'Two Pointers', 'Sliding Window', 'Stack', 'Binary Search', 'LinkedList', 'Trees', 'BST', 'Tries', 'Heap', 'Backtracking', 'Graphs', 'Advanced Graphs', '1-D Dynamic Programming', '2-D Dynamic Programming', 'Greedy', 'Intervals', 'Math & Geometry', 'Bit Manipulation', 'Queue'];
 const REFERENCES = ['Leetcode Cheatsheet.md', 'Variable Naming Guide.md'];
 const iframe = /<iframe\b[\s\S]*?<\/iframe\s*>/gi;
+const TECHNIQUES_PATH = 'visualizer-ui/solution-techniques.json';
+const TECHNIQUE_KINDS = new Set(['algorithm', 'technique', 'data-structure']);
+
+// Curated against the bundled implementations, rather than guessed from topic names.
+export function validateSolutionTechniques(metadata, problemIds) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error('Solution techniques must be an object keyed by problem ID.');
+  const ids = new Set(problemIds), errors = [], result = {};
+  for (const id of ids) if (!Object.hasOwn(metadata, id)) errors.push(`Missing solution techniques for ${id}`);
+  for (const [id, methods] of Object.entries(metadata)) {
+    if (!ids.has(id)) { errors.push(`Unknown solution techniques problem ID: ${id}`); continue; }
+    if (!Array.isArray(methods) || methods.length === 0) { errors.push(`Solution techniques for ${id} must be a nonempty array`); continue; }
+    const names = new Set();
+    result[id] = [];
+    for (const [index, method] of methods.entries()) {
+      const location = `${id} solution technique ${index + 1}`;
+      if (!method || typeof method !== 'object' || Array.isArray(method)) { errors.push(`Invalid ${location}`); continue; }
+      if (Object.keys(method).some(key => !['name', 'kind', 'role'].includes(key))) errors.push(`Unexpected field in ${location}`);
+      const name = typeof method.name === 'string' ? method.name.trim() : '';
+      const role = typeof method.role === 'string' ? method.role.trim() : '';
+      if (!name) errors.push(`Missing name in ${location}`);
+      if (!role) errors.push(`Missing role in ${location}`);
+      if (!TECHNIQUE_KINDS.has(method.kind)) errors.push(`Invalid kind in ${location}: ${String(method.kind)}`);
+      const normalizedName = name.toLowerCase();
+      if (names.has(normalizedName)) errors.push(`Duplicate solution technique "${name}" for ${id}`);
+      names.add(normalizedName);
+      result[id].push({ name, kind: method.kind, role });
+    }
+  }
+  if (errors.length) throw new Error(errors.join('\n'));
+  return result;
+}
+
 export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   const entries = [], visualizers = [], errors = [];
   for (const topic of TOPICS) {
@@ -39,6 +71,17 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   for (const file of REFERENCES) {
     const markdown = fs.readFileSync(path.join(root, file), 'utf8').trim();
     entries.push({ id: file.startsWith('Leetcode') ? 'reference:cheatsheet' : 'reference:variables', title: file.replace('.md', ''), topic: 'Reference', notePath: file, markdown, searchText: `${file} ${markdown}`.toLowerCase() });
+  }
+  try {
+    const metadata = JSON.parse(fs.readFileSync(path.join(root, TECHNIQUES_PATH), 'utf8'));
+    const techniques = validateSolutionTechniques(metadata, entries.filter(entry => entry.number).map(entry => entry.id));
+    for (const entry of entries) {
+      if (!entry.number) continue;
+      entry.solutionTechniques = techniques[entry.id];
+      entry.searchText += ` ${entry.solutionTechniques.map(method => `${method.name} ${method.role}`).join(' ')}`.toLowerCase();
+    }
+  } catch (error) {
+    errors.push(`${TECHNIQUES_PATH}: ${error.message}`);
   }
   const ids = new Set();
   for (const entry of entries) {
