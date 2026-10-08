@@ -22,6 +22,7 @@ export const statements = Object.fromEntries(`
 26|Remove duplicates from sorted nums in place. Return k, the number of distinct values, and put those values in the first k positions in sorted order.
 27|Remove every occurrence of val from nums in place. Return the number k of retained values and put them in the first k positions. Their order may vary.
 33|Find target in a sorted array of distinct integers that has been rotated. Return its index, or -1 if absent.
+34|Return the first and last indices of target in nondecreasing nums, or [-1, -1] if it is absent. Duplicates and an empty array are allowed. Use O(log n) time.
 35|Return the index of target in sorted nums, or the index where it should be inserted to keep the array sorted.
 36|Return whether a partially filled 9 by 9 Sudoku board has no repeated digit in any row, column, or 3 by 3 box. Dots are empty cells; solving the board is unnecessary.
 39|Return unique combinations of positive candidates summing to target. A candidate may be reused any number of times.

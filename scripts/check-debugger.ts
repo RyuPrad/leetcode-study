@@ -22,7 +22,7 @@ for(const problem of (definitions as CodingProblem[]).filter(p=>!numbers.length|
     checked++;
   }
   problemCount++;
-  if(problemCount%25===0)console.log(`Debug parity: ${problemCount}/252 problems, ${checked} cases, ${failures.length} failures`);
+  if(problemCount%25===0)console.log(`Debug parity: ${problemCount}/253 problems, ${checked} cases, ${failures.length} failures`);
 }
 fs.mkdirSync('test-results',{recursive:true});fs.writeFileSync(`test-results/debug-parity${full?'-full':''}.json`,JSON.stringify({checked,problemCount,failures},null,2));
 console.log(JSON.stringify({checked,problemCount,failures},null,2));if(failures.length)process.exitCode=1;

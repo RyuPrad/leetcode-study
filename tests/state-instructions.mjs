@@ -37,7 +37,7 @@ try{
    return{failures,lines,phases,steps,raw:source.read()};
   });
   assert.deepEqual(errors,[],`${lesson.number}: browser errors`);assert.deepEqual(result.failures,[],`${lesson.number}: state and preview invariants`);
-  const setup={2:[1,2,3,4],3:[2,3,4],11:[2,3,4],15:[2,3],21:[2,3],26:[2,3],33:[2,3],35:[7,8],69:[2,3,4],74:[2,3,4,5],81:[2,3],88:[2,3,4],121:[2,3],125:[2,3],141:[2,3,5],143:[1,2,3,4],153:[2,3],167:[2,3],169:[2,3],206:[2,3],209:[2,3,4],344:[2,3],374:[2,3],410:[2,3,4],424:[2,3,4,5],567:[1,2,3,4,5,6],658:[2,3],680:[2,3],704:[7,8],875:[2,3,4],881:[2,3,4,5],1011:[2,3,4],1768:[2,3,4]};
+  const setup={2:[1,2,3,4],3:[2,3,4],11:[2,3,4],15:[2,3],21:[2,3],26:[2,3],33:[2,3],34:[7,8],35:[7,8],69:[2,3,4],74:[2,3,4,5],81:[2,3],88:[2,3,4],121:[2,3],125:[2,3],141:[2,3,5],143:[1,2,3,4],153:[2,3],167:[2,3],169:[2,3],206:[2,3],209:[2,3,4],344:[2,3],374:[2,3],410:[2,3,4],424:[2,3,4,5],567:[1,2,3,4,5,6],658:[2,3],680:[2,3],704:[7,8],875:[2,3,4],881:[2,3,4,5],1011:[2,3,4],1768:[2,3,4]};
   if(setup[lesson.number])assert.deepEqual(result.lines.slice(0,setup[lesson.number].length),setup[lesson.number],`${lesson.number}: source-order setup`);
   transitions+=result.steps;previews+=Math.floor(result.steps/5);page.removeAllListeners('pageerror');
  }

@@ -26,6 +26,20 @@ export function extraCase(n, seed) {
     case 26:return [v.flatMap(x=>[x+s,x+s])];
     case 27:return [[s,0,s,2,3,s,4],s];
     case 33:case 153:case 81:{ const x=v.map(x=>x+s); const r=s%len; const rot=x.slice(r).concat(x.slice(0,r));return n===153?[rot]:[n===81?rot.flatMap(x=>[x,x]):rot,s%2?s+1:100]; }
+    case 34:return [
+      [[1],1],
+      [[1],2],
+      [[2,2,2,2],1],
+      [[2,2,2,2],2],
+      [[1,1,2,3],1],
+      [[1,2,3,3],3],
+      [[-8,-4,-4,-4,0,7],-4],
+      [[-3,-1,0,0,0,2,9],0],
+      [[1,1,3,3,5],2],
+      [[-9,...Array(64).fill(7),12],7],
+      [[Number.MIN_SAFE_INTEGER,Number.MIN_SAFE_INTEGER,-1,0,Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER],Number.MIN_SAFE_INTEGER],
+      [[Number.MIN_SAFE_INTEGER,Number.MIN_SAFE_INTEGER,-1,0,Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER],Number.MAX_SAFE_INTEGER]
+    ][s-1];
     case 35:case 704:return [v.map(x=>x*2+s),s*2];
     case 36:{const b=grid(9,9,()=>'.');b[s%9][(s*2)%9]=String(1+s%9);b[(s+3)%9][(s*2)%9]=s%2?String(1+s%9):String(1+(s+1)%9);return [b];}
     case 39:return [[2,3,5+s],s+5];

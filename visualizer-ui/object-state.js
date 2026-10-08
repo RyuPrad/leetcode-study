@@ -265,6 +265,7 @@
     "26":{"names":["nums","left","right"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "27":{"names":["nums","val","k","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "33":{"names":["nums","target","left","right","mid"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "34":{"names":["nums","target","left","right","mid","first","afterLast","ans"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "35":{"names":["nums","target","left","right","mid"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "36":{"names":["board","rows","cols","boxes","r","c","val","b"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "39":{"names":["candidates","target","res","path","start","remain","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},

@@ -22,7 +22,7 @@ page.on('pageerror', error => errors.push(error.message));
 try {
   await page.waitForSelector('.problem-table');
   await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); });
-  assert.equal(await page.locator('.problem-table tbody tr').count(), 252);
+  assert.equal(await page.locator('.problem-table tbody tr').count(), 253);
   console.log('PASS bundled library opens without external services');
   await app.evaluate(({ session }) => session.defaultSession.enableNetworkEmulation({ offline: true }));
   await page.getByRole('searchbox', { name: 'Search problems' }).fill('Two Sum');

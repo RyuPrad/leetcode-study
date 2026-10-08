@@ -67,6 +67,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if (n===2 && a.some(v=>!v.length || v.some((d:any)=>d<0||d>9) || v.length>1&&v.at(-1)===0)) fail('Digit lists are nonempty, reversed, and have no leading zero.');
     if (n===21 && a.some(v=>!sorted(v)) || n===23 && a[0].some((v:any)=>!array(v)||!sorted(v))) fail('Input lists must be sorted.');
     if ([26,35,167,658,704].includes(n) && !sorted(a[0],[35,704].includes(n))) fail('The input array must be sorted (distinct values for binary search).');
+    if (n===34 && !sorted(a[0])) fail('nums must be sorted in nondecreasing order; duplicates are allowed.');
     if (n===4 && (a[0].length+a[1].length===0 || a.some(v=>!sorted(v)))) fail('Provide sorted arrays with at least one value in total.');
     if ([1,167].includes(n)) { let count=0; for(let i=0;i<a[0].length;i++) for(let j=i+1;j<a[0].length;j++) if(a[0][i]+a[0][j]===a[1]) count++; if(count!==1) fail('Exactly one pair must sum to target.'); }
     if ([11,15,18,45,53,55,84,121,122,134,135,136,152,153,169,198,213,215,238,239,287,300,309,312,416,473,494,698,735,739,746,763,767,846,860,875,877,881,912,918,973,978,1011,1046,1049,1140,1406,1834,1863,1929,2709].includes(n) && !a[0].length) fail('This input must be nonempty.');
