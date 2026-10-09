@@ -13,6 +13,18 @@ const test = require('node:test');
 const sourceAt = process.argv.indexOf('--source');
 const root = sourceAt < 0 ? path.resolve(__dirname, '..') : path.resolve(process.argv[sourceAt + 1]);
 const cases = {
+  coin: {
+    file: '1-D Dynamic Programming/coin_change_visualizer.html',
+    state: '({coins,amount,steps,stepIndex,activeExample,masterTrace})',
+    valid: '1,3,4 | 6',
+    invalid: ['1,2', '1,,2 | 4', '0,2 | 4', '1.5 | 4', 'Infinity | 4', '9007199254740992 | 4', '1 | ', '1 | 61', '1 | -1', '1 | 1.5', '1 | Infinity', '1 | 9007199254740992', Array(13).fill(1).join(',') + ' | 60'],
+  },
+  permutations: {
+    file: 'Backtracking/permutations_visualizer.html',
+    state: '({nums,steps,stepIndex,activeExample})',
+    valid: '-1,0,2',
+    invalid: ['1,,2', ',1', '1,', ',', '1,1', '0,-0', '1,Infinity', '1,-Infinity', '1,NaN', '1,1e309', '1,9007199254740992', '1,-9007199254740992', '1,2.5', '1,2.0', '1,0x2', '1,2,3,4,5,6'],
+  },
   combination: {
     file: 'Backtracking/combination_sum_visualizer.html',
     state: '({candidates,target,steps,stepIndex,activeExample})',
@@ -110,6 +122,7 @@ function fixture(key) {
   document = {
     body, documentElement, scrollingElement: documentElement, activeElement: null, readyState: 'loading', fullscreenElement: null,
     createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag), createComment: () => new Element('comment'),
+    createTextNode: text => { const element = new Element('text'); element.textContent = text; return element; },
     getElementById: id => elements.get(id) || documentElement.querySelector('#' + id),
     querySelector: selector => documentElement.querySelector(selector), querySelectorAll: selector => documentElement.querySelectorAll(selector),
     addEventListener: (type, callback) => { const list = events.get(type) || []; list.push(callback); events.set(type, list); },

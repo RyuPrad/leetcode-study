@@ -628,9 +628,10 @@
       <button id="btn-ex-5" class="btn-ex" onclick="loadExample(5)">[2,5,10,1], 27</button>
     </div>
 
-    <div class="custom-row">
-      <input id="custom-input" value="1, 2, 5 | 11" placeholder="coins | amount  e.g. 1, 2, 5 | 11" />
+    <div class="custom-row" style="flex-wrap: wrap;">
+      <input id="custom-input" value="1, 2, 5 | 11" placeholder="coins | amount  e.g. 1, 2, 5 | 11" aria-describedby="custom-input-help" />
       <button class="btn-small" onclick="loadCustom()">Load</button>
+      <small id="custom-input-help" style="width: 100%;">Use 1–12 positive safe integer coins and an amount from 0 to 60.</small>
     </div>
 
     <div class="btn-row">
@@ -846,6 +847,8 @@
     };
 
     const INF = "Infinity";
+    const MAX_COINS = 12;
+    const MAX_AMOUNT = 60;
 
     // ============================================================
     // STATE — index into a precomputed steps[] array.
@@ -869,6 +872,12 @@
     }
 
     function buildSteps(coinArr, amt) {
+      // Bound every entry point before allocating or recording any timeline frames.
+      if (!Array.isArray(coinArr) || coinArr.length < 1 || coinArr.length > MAX_COINS ||
+          Array.from(coinArr).some(coin => !Number.isSafeInteger(coin) || coin <= 0) ||
+          !Number.isSafeInteger(amt) || amt < 0 || amt > MAX_AMOUNT) {
+        throw new RangeError("Use 1–12 positive safe integer coins and an integer amount from 0 to 60.");
+      }
       const dp = new Array(amt + 1).fill(Infinity);
       const built = [];
       const traceRows = [];
@@ -911,36 +920,42 @@ snapshot({phase:'init',lines:[2],narration:'Allocate the minimum-coin table.'});
       const parts = raw.split("|");
       if (parts.length !== 2) {
         alert("Use exactly one '|' in the format: coins | amount\nExample: 1, 2, 5 | 11");
-        return;
+        return false;
       }
       const coinStr = parts[0].trim();
       const amtStr = parts[1].trim();
       if (coinStr === "") {
         alert("Enter at least one coin. Example: 1, 2, 5 | 11");
-        return;
+        return false;
       }
-      const coinParts = coinStr.split(",").map(p => p.trim());
-      const parsedCoins = coinParts.map(Number);
+      const coinParts = coinStr.split(",");
+      if (coinParts.length > MAX_COINS) {
+        alert("Please use at most 12 coins so the timeline stays responsive.");
+        return false;
+      }
+      const coinTokens = coinParts.map(p => p.trim());
+      const parsedCoins = coinTokens.map(Number);
       const parsedAmt = Number(amtStr);
       const integerToken = /^[+-]?\d+$/;
 
-      if (coinParts.some(p => !integerToken.test(p)) || parsedCoins.some(c => !Number.isSafeInteger(c) || c <= 0)) {
+      if (coinTokens.some(p => !integerToken.test(p)) || parsedCoins.some(c => !Number.isSafeInteger(c) || c <= 0)) {
         alert("Coins must be positive safe integers separated by commas, with no empty entries. Example: 1, 2, 5");
-        return;
+        return false;
       }
       if (!integerToken.test(amtStr) || !Number.isSafeInteger(parsedAmt) || parsedAmt < 0) {
         alert("Amount must be a non-negative integer. Example: 11");
-        return;
+        return false;
       }
-      if (parsedAmt > 60) {
+      if (parsedAmt > MAX_AMOUNT) {
         alert("Please keep amount <= 60 so the dp array stays readable.");
-        return;
+        return false;
       }
       // Commit only after every field is valid, so a rejected load preserves playback.
       coins = parsedCoins;
       amount = parsedAmt;
       activeExample = 0;
       init();
+      return true;
     }
 
     function init() {
