@@ -166,6 +166,7 @@ export const statements = Object.fromEntries(`
 424|Return the longest substring that can be made of one repeated uppercase letter by changing at most k characters.
 427|Build a quad tree for a square binary grid. A uniform region is a leaf; otherwise divide into topLeft, topRight, bottomLeft, bottomRight. Node(val,isLeaf,topLeft,topRight,bottomLeft,bottomRight) is provided.
 435|Return the fewest intervals to remove so the remaining half-open intervals do not overlap.
+437|Given a binary tree and an integer targetSum, return the number of nonempty paths whose node values add to targetSum. Each path follows parent-to-child edges downward; it may start or end at any node. Count different paths separately, even when they overlap or contain the same values.
 450|Delete key from a BST and return the new root. If absent, keep all values. Any valid BST with exactly the remaining values is accepted.
 460|Implement LFUCache(capacity), get(key), and put(key,value). Missing keys return -1. Evict the least frequently used key; break ties by least recently used. Reads and updates increment frequency; new keys start at frequency 1.
 463|Return the perimeter of the single island in a binary grid. Land cells share sides horizontally or vertically, and the island has no lakes.

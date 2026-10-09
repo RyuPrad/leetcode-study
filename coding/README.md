@@ -1,6 +1,6 @@
 # Offline coding contracts
 
-`problems.json` contains the 253 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
+`problems.json` contains the 254 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
 
 `statements.mjs` and `cases.mjs` maintain statements and deterministic additional cases. Run `npx tsx scripts/author-coding.ts` after editing them. This refreshes definitions, checks input contracts, runs each reference, and updates displayed example results. References and starter signatures are maintained directly in `problems.json`. The optional `scripts/import-coding.mjs` is a one-time import aid for extracted visualizer code, not part of a build or regeneration workflow.
 

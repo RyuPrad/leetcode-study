@@ -177,3 +177,29 @@ test('Search Range rejects single-match, exclusive-end, absent-target, and malfo
   }
   for(const actual of [[4,3],[3,5],[3],[3,4,4],3,null])assert.ok(!accepts(p,p.examples[0].input,actual,[3,4]));
 });
+
+test('Path Sum III preserves multiplicity, branch isolation and exact large prefixes in QuickJS',()=>{
+  const p=get(437);
+  assert.equal(p.entry,'pathSum');assert.deepEqual(p.parameters,['root','targetSum']);
+  const cases:[Json[],number][]=[[[[],0],0],[[[0],0],1],[[[0,0,0],0],5],[[[0,null,0,null,0],0],6],[[[1,1,1],0],0],[[[1,-1,-1],0],2],[[[1,null,1,null,1],2],2],[[[1000000000,1000000000,null,294967296,null,1000000000,null,1000000000],0],0]];
+  for(const [input,expected]of cases){assert.equal(validateInput(p,input),null);const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',result.error);assert.equal(result.actual,expected);}
+  const mutants=[
+    p.reference.replace('freq.set(0, 1);',''),
+    p.reference.replace('const matches = freq.get(need) || 0;','const matches = freq.has(need) ? 1 : 0;'),
+    p.reference.replace('freq.set(sum, freq.get(sum) - 1);',''),
+    p.reference.replace('freq.set(sum, freq.get(sum) - 1);','freq.delete(sum);'),
+    p.reference.replace('sum += node.val;','sum = (sum + node.val) | 0;'),
+  ];
+  for(const mutant of mutants)assert.ok(cases.some(([input,expected])=>{const result=evaluate(vm,p,mutant,input);return result.verdict!=='Accepted'||result.actual!==expected;}),'independent expected results reject the plausible defect');
+});
+
+test('Path Sum III official maximum-depth trees execute in the real QuickJS stack budget',()=>{
+  const p=get(437);
+  for(const side of ['left','right'])for(const value of [0,1000000000]){
+    const values:(number|null)[]=[value];for(let i=1;i<1000;i++)values.push(...(side==='left'?[value,null]:[null,value]));
+    while(values.at(-1)===null)values.pop();
+    const input:Json[]=[values,0];assert.equal(validateInput(p,input),null);
+    const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',`${side}/${value}: ${result.error}`);assert.equal(result.actual,value===0?500500:0);
+  }
+  for(const input of [[Array(1001).fill(0),0],[[1000000001],0],[[0],1001],[[9007199254740991,1,null,1],0]])assert.notEqual(validateInput(p,input),null);
+});

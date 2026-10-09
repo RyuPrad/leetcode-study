@@ -168,8 +168,8 @@ for (const restart of [false, true]) {
   try {
     const state = await read(handle.page);
     assert.equal(state.version, next.version);
-    assert.equal(state.catalog.entries.filter(entry => entry.number).length, 253);
-    assert.equal(state.catalog.visualizers.length, 253);
+    assert.equal(state.catalog.entries.filter(entry => entry.number).length, 254);
+    assert.equal(state.catalog.visualizers.length, 254);
     for (const number of [700, 933]) assert.ok(state.catalog.entries.find(entry => entry.number === number)?.visualizerPath, `New ${number} visualizer is packaged.`);
     retained(state.data, expected, restart ? 'Current package restart' : 'Current package startup');
     assert.equal(fingerprint(state.preferences), fingerprint(baseline.preferences), 'Every study.* renderer preference is retained.');

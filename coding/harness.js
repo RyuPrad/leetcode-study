@@ -20,7 +20,7 @@ export function executeCase(number, input, entry, deserializeFn) {
   const toTree = values => { if (!values.length || values[0] === null) return null; const root = new TreeNode(values[0]), queue = [root]; let i = 1; for (let q = 0; q < queue.length && i < values.length; q++) for (const key of ['left','right']) { if (i < values.length && values[i] !== null) { queue[q][key] = new TreeNode(values[i]); queue.push(queue[q][key]); } i++; } return root; };
   const fromTree = root => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
-  const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448];
+  const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,437,450,543,572,700,701,1325,1448];
   const lists = [19,25,92,143,206,2807];
   const design = [146,155,208,211,225,232,295,304,355,460,622,703,705,706,895,901,933,981,2013];
   if (design.includes(number)) {

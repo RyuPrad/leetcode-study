@@ -175,3 +175,15 @@ test('debug VM enforces its own memory and active-time limits',{timeout:60000},a
     const result=await debugEvaluate(await newQuickJSAsyncWASMModule(),problem,source,problem.examples[0],controller,hooks);assert.match(result.error||'',expected);
   }
 });
+
+test('Path Sum III live debugging retains recursive locals, numeric frequencies and reference parity',async()=>{
+  const p=(definitions as CodingProblem[]).find(item=>item.number===437)!;
+  let controller:DebugController;const frames:VisualizationFrame[]=[];
+  const hooks={started:()=>{},running:()=>{},frame:(frame:VisualizationFrame)=>{frames.push(frame);queueMicrotask(()=>controller.command('into'));}};
+  controller=new DebugController(hooks);
+  const result=await debugEvaluate(await newQuickJSAsyncWASMModule(),p,p.reference,{name:'Repeated zero prefixes',input:[[0,0,0],0]},controller,hooks);
+  assert.equal(result.error,undefined);assert.equal(result.actual,5);
+  assert.ok(frames.some(frame=>frame.stack.filter(call=>call.name==='dfs').length>=2),'nested calls keep their own local scope');
+  for(const frequency of [2,3])assert.ok(frames.some(frame=>frame.objects.some(object=>object.kind==='map'&&object.entries.some(entry=>entry.key==='number:0'&&entry.value===frequency))),`numeric prefix zero has frequency ${frequency}`);
+  assert.ok(frames.some(frame=>frame.stack.some(call=>call.variables.some(variable=>variable.name==='matches'&&variable.value===2))),'multiplicity remains visible in the live debugger');
+});

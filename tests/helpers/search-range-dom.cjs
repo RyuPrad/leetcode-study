@@ -17,7 +17,7 @@ const decode = text => text.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#\d+|#x[\da-f]
 // Enough DOM behavior for the production lifecycle and real Object View focus.
 // Layout APIs deliberately report no visible rectangles, excluding motion tests.
 function fixture(root = path.resolve(__dirname, '../..'), options = {}) {
-  const html = fs.readFileSync(path.join(root, 'Binary Search/find_first_and_last_position_of_element_in_sorted_array_visualizer.html'), 'utf8');
+  const html = fs.readFileSync(path.join(root, options.file || 'Binary Search/find_first_and_last_position_of_element_in_sorted_array_visualizer.html'), 'utf8');
   const elements = new Map(), events = new Map(), alerts = [], renders = [], resets = [];
   let document, exec, timerId = 0;
   class Element {

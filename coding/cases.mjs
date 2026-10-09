@@ -138,6 +138,7 @@ export function extraCase(n, seed) {
     case 410:return [pos,1+s%len];
     case 424:return [('AB'.repeat(s)+'CCCC'),s%5];
     case 427:return [grid(4,4,(r,c)=>s&(1<<((r*4+c)%8))?1:0)];
+    case 437:return [[[],0],[[0],0],[[7],7],[[7],0],[[-3],-3],[[0,0,0],0],[[0,null,0,null,0],0],[[1,1,1],0],[[1,-1,-1],0],[[1,null,1,null,1],2],[[2,null,-2,2,-2],0],[[1000000000,1000000000,null,294967296,null,1000000000,null,1000000000],0]][s-1];
     case 450:return [tree,s%2?s+4:s+100];
     case 463:return [grid(2+s%4,2+s%3,(r,c)=>r===0||c===0?1:0)];
     case 494:return [pos,s%2?s:0];

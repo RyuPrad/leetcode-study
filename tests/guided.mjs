@@ -8,7 +8,7 @@ const metadata=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.
 const content=['a','b'].flatMap(shard=>fs.existsSync(path.join(ROOT,`visualizer-ui/guided-content-${shard}.json`))?JSON.parse(fs.readFileSync(path.join(ROOT,`visualizer-ui/guided-content-${shard}.json`),'utf8')):[]);
 const semantics=JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures/guided-semantics.json'),'utf8'));
 const lessons=content.filter(l=>!process.argv[2]||process.argv.slice(2).includes(l.id.split(':')[1]));
-if(!process.argv[2])assert.equal(lessons.length,253);
+if(!process.argv[2])assert.equal(lessons.length,254);
 const browser=await chromium.launch({headless:true});let cursor=0,count=0,checkpoints=0;const failures=[];
 fs.mkdirSync(path.join(ROOT,'test-results'),{recursive:true});
 async function worker(){const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});page.setDefaultTimeout(15000);await page.clock.install();await page.clock.pauseAt(Date.now()+1000);

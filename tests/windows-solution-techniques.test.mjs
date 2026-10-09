@@ -77,7 +77,7 @@ test('offline content build bundles the curated metadata and fails on incomplete
 test('every real bundled problem has validated algorithms/techniques, all searchable offline', () => {
   const catalog = collectCatalog();
   const problems = catalog.entries.filter(entry => entry.number);
-  assert.equal(problems.length, 253);
+  assert.equal(problems.length, 254);
   for (const entry of problems) {
     assert.ok(entry.solutionTechniques.length > 0, entry.id);
     for (const method of entry.solutionTechniques) {

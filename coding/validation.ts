@@ -5,7 +5,7 @@ const integer = (x: any) => Number.isSafeInteger(x);
 const sorted = (a: number[], strict = false) => a.every((v,i) => !i || (strict ? v > a[i-1] : v >= a[i-1]));
 const unique = (a: unknown[]) => new Set(a).size === a.length;
 const matrix = (a: any) => array(a) && a.length > 0 && a.length <= 100 && a.every((r: any) => array(r) && r.length > 0 && r.length <= 100 && r.length === a[0].length);
-const treeIds = new Set([94,98,100,102,104,105,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448]);
+const treeIds = new Set([94,98,100,102,104,105,110,124,144,145,199,226,230,235,297,337,437,450,543,572,700,701,1325,1448]);
 function tree(values: any[]): boolean { let slots = 1; for (const value of values) { if (slots-- <= 0) return false; if (value !== null) { if (!integer(value)) return false; slots += 2; } } return true; }
 function bst(values: any[]): boolean { const queue: [number,number][] = [[-Infinity,Infinity]]; let i = 0; for (let q = 0; q < queue.length && i < values.length; q++) { const [lo,hi] = queue[q],v = values[i++]; if (v === null) continue; if (!integer(v) || v <= lo || v >= hi) return false; queue.push([lo,v],[v,hi]); } return i === values.length; }
 export function validateInput(problem: CodingProblem, input: unknown): string | null {
@@ -59,6 +59,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
       if (n===235 && (a[1]===a[2] || !a[0].includes(a[1]) || !a[0].includes(a[2]))) fail('p and q must be distinct values present in the tree.');
       if (n===701 && a[0].includes(a[1])) fail('val must not already be in the tree.');
     }
+    if (n===437 && (a[0].filter((v:any)=>v!==null).length>1000 || a[0].some((v:any)=>v!==null&&Math.abs(v)>1000000000) || Math.abs(a[1])>1000)) fail('Path Sum III allows at most 1,000 non-null nodes, node values in [-1,000,000,000, 1,000,000,000], and targetSum in [-1,000, 1,000].');
     if (n===105 && (a[0].length!==a[1].length || !unique(a[0]) || a[0].some((v:any)=>!a[1].includes(v)))) fail('Traversals must contain the same distinct values.');
     if ([19,25,92,143,2807].includes(n) && !a[0].length) fail('The list must be nonempty.');
     if ([19,25].includes(n) && (a[1]<1 || a[1]>a[0].length)) fail('n/k must be between 1 and the list length.');

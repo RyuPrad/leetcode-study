@@ -10,7 +10,7 @@ const start = source.indexOf('  for (const entry of entries) {');
 const end = source.indexOf("  await page.getByRole('button', { name: 'Back to library', exact: true }).click();", start);
 assert.ok(start >= 0 && end > start, 'Locate the production offline asset sweep.');
 const sweep = new Function('entries', 'assetFrame', 'assert', 'console', `return (async () => { const assets = []; ${source.slice(start, end)} return assets; })();`);
-const entries = Array.from({ length: 253 }, (_, index) => ({
+const entries = Array.from({ length: 254 }, (_, index) => ({
   number: index + 1,
   visualizerPath: `Two Pointers/lesson ${index + 1}_visualizer.html`,
 }));
@@ -64,10 +64,10 @@ function fixture(options = {}) {
   return { calls, events, run: (catalog = entries) => sweep(catalog, frame, assert, { log() {} }) };
 }
 
-test('slow successful offline navigation still inspects all 253 exact lessons', async () => {
+test('slow successful offline navigation still inspects all 254 exact lessons', async () => {
   const run = fixture({ loadMs: 60000 });
   const assets = await run.run();
-  assert.equal(assets.length, 253);
+  assert.equal(assets.length, 254);
   for (const [index, call] of run.calls.entries()) {
     assert.deepEqual(call, { url: expectedUrl(entries[index]), config: { waitUntil: 'load', timeout: 90000 } });
     assert.equal(assets[index].number, entries[index].number);
@@ -122,8 +122,8 @@ for (const [name, options, expected] of [
   });
 }
 
-test('an incomplete catalog cannot satisfy the 253-lesson coverage assertion', async () => {
-  await assert.rejects(fixture().run(entries.slice(0, 252)), /252 !== 253/);
+test('an incomplete catalog cannot satisfy the 254-lesson coverage assertion', async () => {
+  await assert.rejects(fixture().run(entries.slice(0, 253)), /253 !== 254/);
 });
 
 test('navigation headroom leaves operation timeouts and runtime errors strict', () => {

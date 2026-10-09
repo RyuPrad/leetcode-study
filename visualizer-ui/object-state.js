@@ -71,7 +71,7 @@
   };
   const classProblems=new Set([146,155,208,211,225,232,295,304,355,460,622,703,705,706,895,901,981,2013]);
   const dsuProblems=new Set([261,323,684,721,1489,2709]);
-  const treeProblems=new Set([94,98,100,102,104,105,110,124,144,145,199,226,230,235,297,337,427,450,543,572,701,1325,1448]);
+  const treeProblems=new Set([94,98,100,102,104,105,110,124,144,145,199,226,230,235,297,337,427,437,450,543,572,701,1325,1448]);
   const pathGet=(raw,path)=>path.split('.').reduce((value,key)=>value==null?undefined:value[key],raw);
   function rootsFor(number,raw,spec){
     const config=contracts[number];if(!config)throw Error(`Missing Object View contract for problem ${number}.`);
@@ -132,7 +132,7 @@
     if(number===2392&&raw.which)roots.conditions=raw.problem[`${raw.which}Conditions`];
     if(number===1094){const entry=raw.trips?.[raw.tripIdx];if(entry){roots.num=entry[0];roots.start=entry[1];roots.end=entry[2];}}
     if(number===1899){const entry=raw.triplets?.[raw.row];if(entry){roots.x=entry[0];roots.y=entry[1];roots.z=entry[2];}}
-    for(const name of config.maps){if(own(roots,name)&&!(roots[name] instanceof Map)&&typeof roots[name]!=='symbol'&&!isPlaceholder(roots[name]))roots[name]=dictionaryMap(roots[name],[560,846,895].includes(number));}
+    for(const name of config.maps){if(own(roots,name)&&!(roots[name] instanceof Map)&&typeof roots[name]!=='symbol'&&!isPlaceholder(roots[name]))roots[name]=dictionaryMap(roots[name],[437,560,846,895].includes(number));}
     for(const name of config.sets){if(own(roots,name)&&!(roots[name] instanceof Set)&&!isPlaceholder(roots[name]))roots[name]=new Set(Array.isArray(roots[name])?roots[name]:[]);}
     if(number===560)roots.freq=dictionaryMap(raw.freq,true);
     if(number===846)roots.count=dictionaryMap(raw.countSnap,true);
@@ -190,6 +190,7 @@
       if(raw.objectNodeActive)roots.node=model.get(raw.objectNodeId);
       else for(const name of ['node','low','high'])delete roots[name];
     }
+    else if(number===437){if(raw.nodeActive)roots.node=model.get(raw.nodeId);else for(const name of ['node','sum','need','matches'])delete roots[name];}
     else if(number===199){const active=Object.entries(raw.status||{}).find(([,status])=>status==='current')?.[0];roots.node=own(raw,'objectNodeId')?model.get(raw.objectNodeId):active?model.get(active):raw.frame?.node===null?absent():model.byValue(raw.frame?.node);roots.queue=(raw.queueIds||[]).map(model.get);}
     else if(number===1448){roots.node=own(raw,'objectNodeId')?model.get(raw.objectNodeId):raw.pathStack?.length?model.get(raw.pathStack.at(-1).id):absent();roots.maxSoFar=raw.frame?.max??absent();}
     else if(number===100){const p=treeLayout(raw.objectLayoutP,'tree:p')||tree(raw.rootP,'tree:p'),q=treeLayout(raw.objectLayoutQ,'tree:q')||tree(raw.rootQ,'tree:q');roots.p=raw.frame?(raw.frame.pTxt==='null'?null:p.get(raw.frame.idP)):p.root;roots.q=raw.frame?(raw.frame.qTxt==='null'?null:q.get(raw.frame.idQ)):q.root;delete roots.root;}
@@ -243,6 +244,7 @@
   }
   // Explicit names and collection kinds from each maintained reference solution.
   const contracts={
+    "437":{"names":["root","targetSum","node","sum","need","matches","freq","count"],"fields":[],"maps":["freq"],"sets":[],"heaps":{}},
     "1":{"names":["nums","target","seen","i","num","need"],"fields":[],"maps":["seen"],"sets":[],"heaps":{}},
     "2":{"names":["l1","l2","dummy","curr","carry","sum"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "3":{"names":["s","seen","left","ans","right"],"fields":[],"maps":[],"sets":["seen"],"heaps":{}},
