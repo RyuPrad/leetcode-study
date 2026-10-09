@@ -885,6 +885,13 @@
       let traceId = 0;
 
       function snap(extra) {
+        // The logs only grow during this build. Capture their lengths, not a
+        // complete copy for every instruction. Reading a snapshot materializes
+        // detached arrays/rows, so callers cannot mutate this or another run's
+        // history. Keep these enumerable fields for the standalone renderers,
+        // lesson bridge and JSON consumers; do not cache expanded prefixes.
+        const resLength = res.length;
+        const traceLength = trace.length;
         const base = {
           line: extra.line,
           phase: extra.phase,
@@ -892,8 +899,8 @@
           i: extra.i === undefined ? null : extra.i,
           path: [...path],
           used: [...used],
-          res: res.map(r => [...r]),
-          trace: trace.map(t => ({ ...t })),
+          get res() { return res.slice(0, resLength).map(r => [...r]); },
+          get trace() { return trace.slice(0, traceLength).map(t => ({ ...t })); },
           narration: extra.narration,
           activeRow: extra.activeRow === undefined ? null : extra.activeRow,
           justAdded: extra.justAdded === undefined ? null : extra.justAdded,
@@ -1428,7 +1435,9 @@
         if (frame.executedLine !== null) previousLine = frame.executedLine;
       }
       if (frames.length && frames[0].executedLine !== null) {
-        const ready = {...frames[0], executedLine: null};
+        // Preserve the history accessors on the ready frame as well.
+        const ready = Object.defineProperties({}, Object.getOwnPropertyDescriptors(frames[0]));
+        ready.executedLine = null;
         for (const key of ["lines", "codeLines", "line", "highlightLines"]) if (key in ready) ready[key] = [];
         if (Array.isArray(ready.highlight)) ready.highlight = [];
         if (Array.isArray(ready.hl)) ready.hl = [];

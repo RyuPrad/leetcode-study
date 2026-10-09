@@ -79,7 +79,7 @@ function fixture(root = path.resolve(__dirname, '../..'), options = {}) {
   const body = new Element('body'), documentElement = new Element('html');
   document = {
     body, documentElement, scrollingElement: documentElement, activeElement: null, readyState: 'loading', fullscreenElement: null,
-    createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag), createComment: () => new Element('comment'),
+    createElement: tag => new Element(tag), createTextNode: text => { const node = new Element("#text"); node.textContent = text; return node; }, createElementNS: (_, tag) => new Element(tag), createComment: () => new Element('comment'),
     getElementById: id => elements.get(id) || documentElement.querySelector('#' + id),
     querySelector: selector => documentElement.querySelector(selector), querySelectorAll: selector => documentElement.querySelectorAll(selector),
     addEventListener: (type, callback) => { const list = events.get(type) || []; list.push(callback); events.set(type, list); },
