@@ -1,3 +1,4 @@
+import './legacy-guided-write-disabled.mjs';
 import fs from 'node:fs';
 import { authored } from './author-guided-a.mjs';
 const catalogue=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8')).slice(0,125);
