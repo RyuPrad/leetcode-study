@@ -16,6 +16,12 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'study', privileges: { standard:
 let win: BrowserWindow;
 let store: StudyStore;
 let tracker: StudyTracker;
+// A renderer document belongs to one profile. Restoring retires that document's
+// writes before any late runner, editor, Guided, or navigation callback can land.
+let profileEpoch = 0;
+function assertProfile(epoch: unknown) {
+  if (epoch !== profileEpoch) throw new Error('This workspace was replaced by a restored backup. Reopen the workspace to continue.');
+}
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingDrafts: Record<string,CodeDraft> = {};
@@ -87,15 +93,18 @@ else {
         return fn(...args);
       });
     }
-    handle('study:bootstrap', () => ({ catalog, data: store.snapshot(), notice: store.notice, version: app.getVersion() }));
-    handle('study:progress', (id, patch) => { assertProblem(id); store.updateProgress(id, patch); sendData(); return store.snapshot(); });
-    handle('study:select', id => { if (id !== null) assertProblem(id); flushDrafts(); const state = tracker.select(id); sendData(); sendTimer(); return state; });
-    ipcMain.on('study:activity', event => { if (event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && trusted(event.senderFrame.url)) safe(() => tracker.activity()); });
-    handle('study:edit-session', (id, patch) => { tracker.edit(id, patch); sendData(); sendTimer(); return store.snapshot(); });
-    handle('study:delete-session', id => { tracker.delete(id); sendData(); sendTimer(); return store.snapshot(); });
-    handle('study:save-draft', (id,source,cases) => { assertProblem(id); pendingDrafts[id]=validateDraft({source,cases,updatedAt:new Date().toISOString()}); clearTimeout(draftTimer); draftTimer=setTimeout(()=>safe(flushDrafts),300); return new Promise<void>((resolve,reject)=>draftWaiters.push({resolve,reject})); });
-    handle('study:submission', (id,source,result) => { assertProblem(id); flushDrafts(); store.recordSubmission(id,source,result); sendData(); return store.snapshot(); });
-    handle('study:guided-progress', (id, progress) => {
+    function handleProfile(channel: string, fn: (...args: any[]) => unknown) {
+      handle(channel, (epoch, ...args) => { assertProfile(epoch); return fn(...args); });
+    }
+    handle('study:bootstrap', () => ({ catalog, data: store.snapshot(), notice: store.notice, version: app.getVersion(), profileEpoch }));
+    handleProfile('study:progress', (id, patch) => { assertProblem(id); store.updateProgress(id, patch); sendData(); return store.snapshot(); });
+    handleProfile('study:select', id => { if (id !== null) assertProblem(id); flushDrafts(); const state = tracker.select(id); sendData(); sendTimer(); return state; });
+    ipcMain.on('study:activity', (event, epoch) => { if (epoch === profileEpoch && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && trusted(event.senderFrame.url)) safe(() => tracker.activity()); });
+    handleProfile('study:edit-session', (id, patch) => { tracker.edit(id, patch); sendData(); sendTimer(); return store.snapshot(); });
+    handleProfile('study:delete-session', id => { tracker.delete(id); sendData(); sendTimer(); return store.snapshot(); });
+    handleProfile('study:save-draft', (id,source,cases) => { assertProblem(id); pendingDrafts[id]=validateDraft({source,cases,updatedAt:new Date().toISOString()}); clearTimeout(draftTimer); draftTimer=setTimeout(()=>safe(flushDrafts),300); return new Promise<void>((resolve,reject)=>draftWaiters.push({resolve,reject})); });
+    handleProfile('study:submission', (id,source,result) => { assertProblem(id); flushDrafts(); store.recordSubmission(id,source,result); sendData(); return store.snapshot(); });
+    handleProfile('study:guided-progress', (id, progress) => {
       assertProblem(id);
       const lesson = guidedLessons.get(id);
       if (!lesson) throw new Error('This problem does not have a guided lesson.');
@@ -104,22 +113,30 @@ else {
       sendData();
       return store.snapshot();
     });
-    handle('study:export', async () => {
+    handle('study:export', async epoch => {
+      assertProfile(epoch);
       flushDrafts(); tracker.tick(); tracker.checkpoint();
       const result = await dialog.showSaveDialog(win, { title: 'Export study backup', defaultPath: `LeetCode-Study-backup-${new Date().toISOString().slice(0, 10)}.json`, filters: [{ name: 'Study backup', extensions: ['json'] }] });
       if (result.canceled || !result.filePath) return false;
+      assertProfile(epoch);
       fs.writeFileSync(result.filePath, JSON.stringify(store.snapshot(), null, 2));
       return true;
     });
-    handle('study:import', async () => {
+    handle('study:import', async epoch => {
+      assertProfile(epoch);
       const result = await dialog.showOpenDialog(win, { title: 'Restore study backup', properties: ['openFile'], filters: [{ name: 'Study backup', extensions: ['json'] }] });
       if (result.canceled || !result.filePaths[0]) return false;
+      assertProfile(epoch);
       const file = result.filePaths[0];
       if (fs.statSync(file).size > 50 * 1024 * 1024) throw new Error('The backup is too large (50 MB maximum).');
       const data = validateData(JSON.parse(fs.readFileSync(file, 'utf8')));
       const answer = await dialog.showMessageBox(win, { type: 'question', title: 'Restore backup', message: `Restore ${Object.keys(data.progress).length} progress records, ${data.sessions.length} sessions, ${Object.keys(data.drafts).length} drafts, ${data.submissions.length} submissions, and ${Object.keys(data.guided).length} guided lessons?`, detail: 'This replaces your current history, progress, drafts, submissions, and guided learning progress. A copy of the current data will be saved in the application data folder.', buttons: ['Cancel', 'Restore backup'], defaultId: 0, cancelId: 0 });
       if (answer.response !== 1) return false;
-      flushDrafts(); tracker.end(); store.restore(data); sendData(); sendTimer(); return true;
+      assertProfile(epoch);
+      flushDrafts(); tracker.restore(data);
+      profileEpoch++;
+      store.notice = 'Your backup was restored.';
+      pausePlayback(); sendTimer(); return true;
     });
     handle('study:external', async raw => { const url = new URL(String(raw)); if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Only web links can be opened.'); await shell.openExternal(url.href); });
     heartbeat = setInterval(() => safe(() => { tracker.tick(); sendTimer(); }), 1000);
