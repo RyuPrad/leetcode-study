@@ -204,6 +204,7 @@ export const statements = Object.fromEntries(`
 763|Partition s into as many consecutive parts as possible so that no character appears in multiple parts. Return their lengths.
 767|Rearrange every character of s so no adjacent characters are equal. Return any valid string or an empty string if impossible.
 778|Each square grid elevation is a distinct integer from 0 through n*n-1. At time t you may enter cells of elevation at most t. Return the earliest time a path connects top-left to bottom-right.
+785|Given an undirected graph as a zero-based adjacency list, return whether its vertices can be assigned to two groups so every edge joins vertices in different groups. The graph may be disconnected and may contain isolated vertices. Each edge appears in both endpoint rows; there are no self edges or duplicate neighbors.
 787|Return the cheapest flight cost from src to dst using at most k intermediate stops, or -1 if impossible.
 846|Return whether all cards can be partitioned into groups of groupSize consecutive integer values.
 853|Cars at distinct positions drive toward target at their given speeds. Cars cannot pass and merge into fleets when they catch up. Return how many fleets reach target.

@@ -203,3 +203,23 @@ test('Path Sum III official maximum-depth trees execute in the real QuickJS stac
   }
   for(const input of [[Array(1001).fill(0),0],[[1000000001],0],[[0],1001],[[9007199254740991,1,null,1],0]])assert.notEqual(validateInput(p,input),null);
 });
+
+test('Is Graph Bipartite executes all official 100-vertex boundaries in the real QuickJS budget',()=>{
+  const p=get(785),empty=()=>Array.from({length:100},()=>[] as number[]);
+  const fromEdges=(edges:number[][])=>{const graph=empty();for(const [u,v]of edges){graph[u].push(v);graph[v].push(u);}return graph;};
+  const chainEdges=Array.from({length:99},(_,i)=>[i,i+1]);
+  const cases:[string,number[][],boolean][]=[
+    ['100 isolates',empty(),true],
+    ['100-vertex path',fromEdges(chainEdges),true],
+    ['100-vertex even cycle',fromEdges([...chainEdges,[99,0]]),true],
+    ['99-vertex odd cycle plus isolate',fromEdges([...chainEdges.slice(0,98),[98,0]]),false],
+    ['complete bipartite K50,50',fromEdges(Array.from({length:50},(_,u)=>Array.from({length:50},(_,v)=>[u,v+50])).flat()),true],
+    ['complete K100',fromEdges(Array.from({length:100},(_,u)=>Array.from({length:99-u},(_,v)=>[u,u+v+1])).flat()),false],
+    ['97-vertex path followed by a triangle',fromEdges([...chainEdges.slice(0,96),[97,98],[98,99],[99,97]]),false],
+  ];
+  for(const [name,graph,expected]of cases){
+    const input:Json[]=[graph],original=JSON.stringify(graph);assert.equal(graph.length,100);assert.equal(validateInput(p,input),null,name);
+    const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',name+': '+result.error);assert.equal(result.actual,expected,name);assert.equal(JSON.stringify(graph),original,name+': input preserved');
+  }
+  assert.notEqual(validateInput(p,[[]]),null);assert.notEqual(validateInput(p,[Array.from({length:101},()=>[])]),null);
+});

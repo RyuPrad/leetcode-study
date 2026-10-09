@@ -84,6 +84,14 @@
       else if(value==='pending')value=absent();
       roots[name]=value;
     }
+    if(number===785){
+      roots.graph=identify(raw.graph.map((row,index)=>identify(row.slice(),'graph:row:'+index)),'graph:input');
+      if(raw.color!=='pending')roots.color=identify(raw.color.slice(),'solution:color');
+      if(raw.componentActive){if(raw.queue!=='pending')roots.queue=identify(raw.queue.slice(),'solution:queue:'+raw.start);}
+      else for(const name of ['queue','head'])delete roots[name];
+      if(!raw.nodeActive)for(const name of ['node','i'])delete roots[name];
+      if(!raw.neighborActive)delete roots.neighbor;
+    }
     if(names.has('dirs'))roots.dirs=raw.DIRS||dirs;
     if(!own(raw,'n')&&names.has('n')){const input=raw.nums??raw.s??raw.cost??raw.piles??raw.stones??raw.stoneValue??raw.ratings;if(input!==undefined)roots.n=input.length;}
     if(!own(raw,'m')&&names.has('m')){const input=raw.word1??raw.s??raw.s1??raw.text1??raw.num1??raw.matrix??raw.grid;if(input!==undefined)roots.m=input.length;}
@@ -244,6 +252,7 @@
   }
   // Explicit names and collection kinds from each maintained reference solution.
   const contracts={
+    "785":{"names":["graph","n","color","start","queue","head","node","i","neighbor"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "437":{"names":["root","targetSum","node","sum","need","matches","freq","count"],"fields":[],"maps":["freq"],"sets":[],"heaps":{}},
     "1":{"names":["nums","target","seen","i","num","need"],"fields":[],"maps":["seen"],"sets":[],"heaps":{}},
     "2":{"names":["l1","l2","dummy","curr","carry","sum"],"fields":[],"maps":[],"sets":[],"heaps":{}},

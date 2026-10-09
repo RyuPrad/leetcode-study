@@ -29,7 +29,7 @@ test('437: catalog, maintained coding cases, original reference and techniques h
   const {collectCatalog}=await import('../scripts/content.mjs');const catalog=collectCatalog(root),entry=catalog.entries.find(item=>item.number===437);
   assert.equal(entry.id,'leetcode:437');assert.equal(entry.visualizerPath,file);assert.equal(entry.topic,'Trees');
   assert.deepEqual(entry.solutionTechniques.map(item=>item.name),['Depth-first search','Prefix sums','Backtracking','Frequency Map']);
-  assert.equal(catalog.entries.filter(item=>item.number).length,254);assert.equal(catalog.visualizers.length,254);
+  assert.equal(catalog.entries.filter(item=>item.number).length,255);assert.equal(catalog.visualizers.length,255);
   const {extraCase}=await import('../coding/cases.mjs'),{statements}=await import('../coding/statements.mjs');
   assert.equal(definition.description,statements[437]);assert.equal(definition.tests.length,12);
   definition.tests.forEach((item,index)=>assert.deepEqual(item.input,extraCase(437,index+1)));

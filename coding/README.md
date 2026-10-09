@@ -1,6 +1,6 @@
 # Offline coding contracts
 
-`problems.json` contains the 254 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
+`problems.json` contains the 255 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
 
 `statements.mjs` and `cases.mjs` maintain statements and deterministic additional cases. Run `npx tsx scripts/author-coding.ts` after editing them. This refreshes definitions, checks input contracts, runs each reference, and updates displayed example results. References and starter signatures are maintained directly in `problems.json`. The optional `scripts/import-coding.mjs` is a one-time import aid for extracted visualizer code, not part of a build or regeneration workflow.
 
@@ -17,3 +17,7 @@ Each suite has 12 additional checks. Inputs vary independently of the visible pr
 Snapshots contain plain data with stable object IDs. Descriptor inspection avoids user accessors; snapshot serialization also avoids inherited `toJSON` hooks. History is bounded independently of the 64 MiB VM. The debugger's 10-second active-time clock excludes suspension and Play delays. Continue samples intermediate checkpoints and retains final local values; Step/Play and breakpoints suspend the actual VM. Browsing history never rewinds execution. A dedicated worker is terminated on Stop, Restart, problem navigation, or close.
 
 `npm run check:debugger` compares every example and submission case against the normal runner. `npm run test:debugger` exercises live desktop controls, source immutability, data diagrams, history, case selection, pause events, limits, cleanup and zoom. The QuickJS version is pinned because disposal currently includes a scoped workaround for its host-reference finalizer order; debugger tests also exercise cyclic closure cleanup.
+
+## Is Graph Bipartite? (785)
+
+The graph argument is a symmetric zero-based adjacency list with 1–100 vertices, distinct integer neighbors, and no self edges. Isolated vertices and disconnected components are valid. The original reference uses +1/-1 labels and an array queue with a head index. Three visible examples and twelve additional cases cover even/odd cycles, a later failing component, shared neighbors, isolated vertices, and neighbor-order independence. The teaching diagram separately caps input at 16 vertices.

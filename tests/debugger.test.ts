@@ -187,3 +187,22 @@ test('Path Sum III live debugging retains recursive locals, numeric frequencies 
   for(const frequency of [2,3])assert.ok(frames.some(frame=>frame.objects.some(object=>object.kind==='map'&&object.entries.some(entry=>entry.key==='number:0'&&entry.value===frequency))),`numeric prefix zero has frequency ${frequency}`);
   assert.ok(frames.some(frame=>frame.stack.some(call=>call.variables.some(variable=>variable.name==='matches'&&variable.value===2))),'multiplicity remains visible in the live debugger');
 });
+
+test('Is Graph Bipartite live debugging exposes source locals and labels before queue insertion',async()=>{
+  const p=(definitions as CodingProblem[]).find(item=>item.number===785)!;
+  let controller:DebugController;const frames:VisualizationFrame[]=[];
+  const hooks={started:()=>{},running:()=>{},frame:(frame:VisualizationFrame)=>{frames.push(frame);queueMicrotask(()=>controller.command('into'));}};
+  controller=new DebugController(hooks);
+  const result=await debugEvaluate(await newQuickJSAsyncWASMModule(),p,p.reference,{name:'Later triangle',input:[[[],[2],[1],[],[5,6],[4,6],[4,5]]]},controller,hooks);
+  assert.equal(result.error,undefined);assert.equal(result.actual,false);
+  const local=(frame:VisualizationFrame,name:string)=>frame.stack.flatMap(call=>call.variables).find(variable=>variable.name===name)?.value;
+  const array=(frame:VisualizationFrame,name:string)=>{const value=local(frame,name);if(!value||typeof value!=='object'||!('ref'in value))return undefined;return frame.objects.find(object=>object.id===value.ref)?.entries.filter(entry=>/^(0|[1-9][0-9]*)$/.test(entry.key)).map(entry=>entry.value);};
+  const enqueue=frames.find(frame=>frame.location.line===18&&local(frame,'node')===4&&local(frame,'neighbor')===5);
+  assert.ok(enqueue,'source line18 suspends after assigning the label and before enqueueing');
+  assert.equal(local(enqueue,'start'),4);assert.equal(local(enqueue,'head'),1);assert.equal(local(enqueue,'i'),0);
+  assert.deepEqual(array(enqueue,'queue'),[4]);assert.deepEqual(array(enqueue,'color'),[1,1,-1,1,1,-1,0]);
+  const conflict=frames.find(frame=>frame.location.line===20&&local(frame,'node')===5&&local(frame,'neighbor')===6);
+  assert.ok(conflict,'source line20 exposes the exact conflicting endpoints before return');
+  assert.equal(local(conflict,'head'),2);assert.deepEqual(array(conflict,'queue'),[4,5,6]);assert.deepEqual(array(conflict,'color'),[1,1,-1,1,1,-1,-1]);
+  assert.equal(frames.at(-1)?.phase,'exit');
+});
