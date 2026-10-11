@@ -26,7 +26,7 @@ self.onmessage=async({data}:MessageEvent<DebugCommand>)=>{
     const hooks={started:(executableLines:number[])=>send({type:'started',sessionId,executableLines}),frame:(frame:any,paused:boolean,reason:string)=>send({type:'frame',sessionId,frame,paused,reason}),running:()=>send({type:'running',sessionId})};
     controller=new DebugController(hooks,data.breakpoints);
     const module=await newQuickJSAsyncWASMModuleFromVariant(newVariant(RELEASE_ASYNC,{wasmLocation:asyncWasm}));
-    const result=await debugEvaluate(module,problem,data.source,data.test,controller,hooks);
+    const result=await debugEvaluate(module,problem,data.source,data.test,controller,hooks,data.language);
     if(result.error){send({type:'finished',sessionId,...result});return;}
     const referenceModule=await newQuickJSWASMModuleFromVariant(newVariant(RELEASE_SYNC,{wasmLocation:syncWasm}));
     const reference=evaluate(referenceModule,problem,problem.reference,data.test.input);

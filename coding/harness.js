@@ -9,6 +9,8 @@ export function installEnvironment() {
       this.isLeaf = second; this.topLeft = topLeft; this.topRight = topRight; this.bottomLeft = bottomLeft; this.bottomRight = bottomRight;
     }
   };
+  // TypeScript signatures name this class _Node, as LeetCode's do, to avoid the DOM Node type.
+  globalThis._Node = globalThis.Node;
 }
 
 export function executeCase(number, input, entry, deserializeFn) {

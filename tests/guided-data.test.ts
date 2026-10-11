@@ -34,8 +34,12 @@ test('schema 2 migration preserves the exact original and every existing record'
   const bytes = `  ${JSON.stringify(legacy, null, 3)}\n`;
   fs.writeFileSync(store.file, bytes);
   const migrated = new StudyStore(dir), data = migrated.snapshot();
-  assert.equal(data.version, 3); assert.deepEqual(data.guided, {});
-  for (const key of ['progress', 'sessions', 'drafts', 'submissions'] as const) assert.deepEqual(data[key], legacy[key]);
+  assert.equal(data.version, 4); assert.deepEqual(data.guided, {});
+  for (const key of ['progress', 'sessions'] as const) assert.deepEqual(data[key], legacy[key]);
+  // Version 4 keeps one draft per language; earlier drafts and submissions were JavaScript.
+  const draft = legacy.drafts['leetcode:1'];
+  assert.deepEqual(data.drafts, { 'leetcode:1': { language: 'javascript', sources: { javascript: draft.source }, cases: draft.cases, updatedAt: draft.updatedAt } });
+  assert.deepEqual(data.submissions, legacy.submissions.map(s => ({ ...s, language: 'javascript' })));
   const archive = fs.readdirSync(dir).find(file => file.includes('.v2-'));
   assert.ok(archive); assert.equal(fs.readFileSync(path.join(dir, archive), 'utf8'), bytes);
   const saved = fs.readFileSync(store.file, 'utf8'); new StudyStore(dir); assert.equal(fs.readFileSync(store.file, 'utf8'), saved);
@@ -45,7 +49,7 @@ test('schema 2 migration preserves the exact original and every existing record'
 test('schema 2 recovery migration archives the recovered original as well as corrupt primary', t => {
   const { dir, store } = fixture(t), bytes = JSON.stringify({ version: 2, progress: {}, sessions: [], drafts: {}, submissions: [] });
   fs.writeFileSync(store.file, '{broken'); fs.writeFileSync(`${store.file}.bak`, bytes);
-  const restored = new StudyStore(dir); assert.equal(restored.snapshot().version, 3); assert.match(restored.notice!, /recovery backup/);
+  const restored = new StudyStore(dir); assert.equal(restored.snapshot().version, 4); assert.match(restored.notice!, /recovery backup/);
   const files = fs.readdirSync(dir); assert.ok(files.some(file => file.includes('.corrupt-')));
   assert.equal(fs.readFileSync(path.join(dir, files.find(file => file.includes('.v2-'))!), 'utf8'), bytes);
 });
@@ -62,7 +66,7 @@ test('guided answers, hints, revealed results and earlier completion survive res
   const target = fixture(t).store; target.restore(reopened.snapshot());
   assert.deepEqual(target.snapshot(), reopened.snapshot());
   target.restore({ version: 1, progress: {}, sessions: [] }); assert.deepEqual(target.snapshot().guided, {});
-  target.restore({ version: 2, progress: {}, sessions: [], drafts: {}, submissions: [] }); assert.equal(target.snapshot().version, 3);
+  target.restore({ version: 2, progress: {}, sessions: [], drafts: {}, submissions: [] }); assert.equal(target.snapshot().version, 4);
 });
 
 test('invalid guided writes and backups leave current data untouched and remove arbitrary properties', t => {
@@ -76,7 +80,7 @@ test('invalid guided writes and backups leave current data untouched and remove 
   assert.equal(fs.readFileSync(store.file, 'utf8'), bytes);
   const cleaned = validateGuidedProgress({ ...complete(), executable: 'never', answers: { 'prediction-1': { attempts: 1, hintLevel: 0, correct: true, revealed: false, choiceId: 'yes', executable: 'never' } } });
   assert.ok(!('executable' in cleaned)); assert.ok(!('executable' in cleaned.answers['prediction-1']));
-  assert.throws(() => validateData({ ...emptyData(), version: 4 }));
+  assert.throws(() => validateData({ ...emptyData(), version: 5 }));
 });
 
 test('live guided writes validate bundled lesson identity and cannot skip unresolved predictions', () => {

@@ -2,20 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Progress, StudySession, UserData } from '../shared/types';
-import type { CodeDraft, JudgeResult } from '../shared/coding';
-import { CODE_LIMIT } from '../shared/coding';
+import type { CodeDraft, JudgeResult, Language } from '../shared/coding';
+import { CODE_LIMIT, isLanguage } from '../shared/coding';
 import { validateDraft, validateResult } from './coding-data';
 import type { GuidedProgress } from '../shared/guided';
 import { validateGuidedProgress } from './guided-data';
 
-export const emptyData = (): UserData => ({ version: 3, progress: {}, sessions: [], drafts: {}, submissions: [], guided: {} });
+export const emptyData = (): UserData => ({ version: 4, progress: {}, sessions: [], drafts: {}, submissions: [], guided: {} });
 const statuses = new Set(['not-started', 'in-progress', 'completed']);
 const outcomes = new Set(['studied', 'solved', 'needs-review']);
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const problemId = (value: unknown) => typeof value === 'string' && /^leetcode:[1-9]\d*$/.test(value);
 export function validateData(value: unknown): UserData {
-  if (!isObject(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3) || !isObject(value.progress) || !Array.isArray(value.sessions) || value.version!==1 && (!isObject(value.drafts) || !Array.isArray(value.submissions)) || value.version===3 && !isObject(value.guided)) throw new Error('This is not a supported LeetCode Study backup (versions 1, 2 and 3).');
+  if (!isObject(value) || ![1,2,3,4].includes(value.version as number) || !isObject(value.progress) || !Array.isArray(value.sessions) || value.version!==1 && (!isObject(value.drafts) || !Array.isArray(value.submissions)) || value.version as number>=3 && !isObject(value.guided)) throw new Error('This is not a supported LeetCode Study backup (versions 1 to 4).');
   for (const [id, p] of Object.entries(value.progress)) {
     if (!problemId(id) || !isObject(p) || !statuses.has(String(p.status)) || typeof p.bookmarked !== 'boolean' || typeof p.needsReview !== 'boolean' || !date(p.updatedAt)) throw new Error('The backup contains invalid progress records.');
   }
@@ -26,12 +26,12 @@ export function validateData(value: unknown): UserData {
   }
   // Reconstruct known fields; never carry executable or arbitrary object properties into the store.
   return {
-    version: 3,
+    version: 4,
     progress: Object.fromEntries(Object.entries(value.progress).map(([id, p]) => { const v = p as unknown as Progress; return [id, { status: v.status, bookmarked: v.bookmarked, needsReview: v.needsReview, updatedAt: v.updatedAt }]; })),
     sessions: value.sessions.map(s => ({ id: s.id, problemId: s.problemId, startedAt: s.startedAt, endedAt: s.endedAt, updatedAt: s.updatedAt, durationMs: s.durationMs, outcome: s.outcome, reflection: s.reflection })),
     drafts: value.version===1 ? {} : Object.fromEntries(Object.entries(value.drafts as Record<string,unknown>).map(([id,draft])=>{if(!problemId(id))throw new Error('Invalid draft problem.');return [id,validateDraft(draft)];})),
-    submissions: value.version===1 ? [] : (value.submissions as any[]).map(s=>{if(!isObject(s)||typeof s.id!=='string'||!/^[\w-]{1,100}$/.test(s.id)||ids.has(s.id)||!problemId(s.problemId)||!date(s.createdAt)||typeof s.source!=='string'||s.source.length>CODE_LIMIT)throw new Error('Invalid submission.');ids.add(s.id);return {id:s.id,problemId:s.problemId as string,source:s.source,createdAt:s.createdAt as string,result:validateResult(s.result)};}),
-    guided: value.version!==3 ? {} : Object.fromEntries(Object.entries(value.guided as Record<string, unknown>).map(([id, progress]) => { if (!problemId(id)) throw new Error('Invalid guided lesson problem.'); return [id, validateGuidedProgress(progress)]; }))
+    submissions: value.version===1 ? [] : (value.submissions as any[]).map(s=>{if(!isObject(s)||typeof s.id!=='string'||!/^[\w-]{1,100}$/.test(s.id)||ids.has(s.id)||!problemId(s.problemId)||!date(s.createdAt)||typeof s.source!=='string'||s.source.length>CODE_LIMIT||!(s.language===undefined&&value.version!==4||isLanguage(s.language)))throw new Error('Invalid submission.');ids.add(s.id);return {id:s.id,problemId:s.problemId as string,language:s.language??'javascript',source:s.source,createdAt:s.createdAt as string,result:validateResult(s.result)};}),
+    guided: (value.version as number)<3 ? {} : Object.fromEntries(Object.entries(value.guided as Record<string, unknown>).map(([id, progress]) => { if (!problemId(id)) throw new Error('Invalid guided lesson problem.'); return [id, validateGuidedProgress(progress)]; }))
   };
 }
 export class StudyStore {
@@ -41,12 +41,12 @@ export class StudyStore {
   constructor(directory: string) {
     fs.mkdirSync(directory, { recursive: true });
     this.file = path.join(directory, 'study-data.json');
-    let migrated: 1 | 2 | undefined;
+    let migrated: 1 | 2 | 3 | undefined;
     if (fs.existsSync(this.file)) {
-      try { const raw=JSON.parse(fs.readFileSync(this.file, 'utf8')); this.data = validateData(raw); migrated=raw.version===1 || raw.version===2 ? raw.version : undefined; }
+      try { const raw=JSON.parse(fs.readFileSync(this.file, 'utf8')); this.data = validateData(raw); migrated=[1,2,3].includes(raw.version) ? raw.version : undefined; }
       catch {
         fs.copyFileSync(this.file, `${this.file}.corrupt-${Date.now()}`);
-        try { const raw=JSON.parse(fs.readFileSync(`${this.file}.bak`, 'utf8')); this.data = validateData(raw); migrated=raw.version===1 || raw.version===2 ? raw.version : undefined; this.notice = 'Your last recovery backup was restored. The unreadable file was preserved.'; }
+        try { const raw=JSON.parse(fs.readFileSync(`${this.file}.bak`, 'utf8')); this.data = validateData(raw); migrated=[1,2,3].includes(raw.version) ? raw.version : undefined; this.notice = 'Your last recovery backup was restored. The unreadable file was preserved.'; }
         catch { throw new Error('Your study data and recovery backup could not be read. Both files have been preserved. Restore a valid backup before continuing.'); }
       }
     }
@@ -103,10 +103,11 @@ export class StudyStore {
     for(const [id,draft] of Object.entries(drafts)) { if(!problemId(id))throw new Error('Invalid draft problem.');next.drafts[id]=validateDraft(draft); }
     this.commit(next);
   }
-  recordSubmission(problem: string, source: string, result: JudgeResult) {
-    if(!problemId(problem)||typeof source!=='string'||source.length>CODE_LIMIT)throw new Error('Invalid submission source.');
+  draft(id: string): CodeDraft | undefined { const draft = this.data.drafts[id]; return draft && structuredClone(draft); }
+  recordSubmission(problem: string, language: Language, source: string, result: JudgeResult) {
+    if(!problemId(problem)||!isLanguage(language)||typeof source!=='string'||source.length>CODE_LIMIT)throw new Error('Invalid submission source.');
     const next=this.snapshot(), now=new Date().toISOString(), clean=validateResult(result);
-    next.submissions.push({id:randomUUID(),problemId:problem,source,createdAt:now,result:clean});
+    next.submissions.push({id:randomUUID(),problemId:problem,language,source,createdAt:now,result:clean});
     if(clean.verdict==='Accepted')next.progress[problem]={...(next.progress[problem]??{bookmarked:false,needsReview:false}),status:'completed',updatedAt:now};
     this.commit(next);
   }

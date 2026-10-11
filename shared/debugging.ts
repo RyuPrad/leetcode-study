@@ -1,8 +1,8 @@
-import type { CodeCase, Json } from './coding';
+import type { CodeCase, Json, Language } from './coding';
 import type { VisualizationFrame } from './visualization';
 export type DebugMotion = 'continue' | 'into' | 'over' | 'out' | 'play';
 export type DebugCommand =
-  | { type: 'start'; sessionId: string; problemId: string; source: string; test: CodeCase; breakpoints: number[] }
+  | { type: 'start'; sessionId: string; problemId: string; language: Language; source: string; test: CodeCase; breakpoints: number[] }
   | { type: 'motion'; sessionId: string; motion: DebugMotion; speed?: number; presentation?: 'detailed'|'compact' }
   | { type: 'presented'; sessionId: string; index: number }
   | { type: 'pause'; sessionId: string }

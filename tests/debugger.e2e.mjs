@@ -28,7 +28,7 @@ async function open(number){
 async function code(source){
   await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).focus();await page.keyboard.press('Control+A');
   await page.evaluate(text=>{const clipboardData=new DataTransfer();clipboardData.setData('text/plain',text);document.activeElement.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));},source);
-  await page.waitForFunction(async text=>(await window.study.bootstrap()).data.drafts['leetcode:'+document.querySelector('.description-body h2').textContent.split('.')[0]]?.source===text,source);
+  await page.waitForFunction(async text=>(await window.study.bootstrap()).data.drafts['leetcode:'+document.querySelector('.description-body h2').textContent.split('.')[0]]?.sources?.javascript===text,source);
 }
 async function start(source){await code(source);await focus();await page.getByRole('button',{name:'Debug',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.debug-status.paused,.debug-result'));if(await page.locator('.viz-frame').count()){assert.ok(await page.locator('[data-study-panel=objects]').isVisible());assert.ok(await page.locator('[data-object-view-index]').isVisible());await page.evaluate(()=>document.querySelector('.debug-panel-workspace').studyPanelLayout.show('diagram'));}}
 async function step(name){const before=await index();await clickControl(name);await page.waitForFunction(before=>document.querySelector('.debug-status.paused')&&document.querySelector('.debug-timeline>span').textContent!==before,before);}
@@ -63,7 +63,7 @@ try{
   await page.getByLabel('View object-1 as',{exact:true}).selectOption('heap');assert.equal(await page.locator('.viz-heap-graph path').count(),3);await page.getByLabel('View object-1 as',{exact:true}).selectOption('array');
   await breakpoint(9);await page.locator('.debug-breakpoint').waitFor({state:'detached'});
   await page.getByRole('textbox',{name:'Debug source',exact:true}).focus();await page.keyboard.insertText('SHOULD_NOT_EDIT');
-  assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source,source);
+  assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].sources.javascript,source);
   await page.getByRole('slider',{name:'Debug history'}).fill('0');await moreControls(true);assert.ok(await control('Step Into').isDisabled());await moreControls(false);await page.getByRole('button',{name:'Return to live',exact:true}).click();
   await clickControl('Play');await selectDebug('Debug playback speed','4');await page.waitForTimeout(350);await clickControl('Pause');await paused();
   const stopped=await index();await page.waitForTimeout(350);assert.equal(await index(),stopped);
@@ -85,8 +85,8 @@ try{
   }
   await finish();const state=await page.evaluate(()=>window.study.bootstrap());assert.equal(state.data.submissions.length,0);assert.notEqual(await page.getByLabel('Problem progress').inputValue(),'completed');await close();
   await page.keyboard.insertText(' // resumed');
-  for(let attempt=0;attempt<100;attempt++){if((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source===source+' // resumed')break;await page.waitForTimeout(50);}
-  assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].source,source+' // resumed','Stop/edit resumes at the solution cursor without focusing it in the test');
+  for(let attempt=0;attempt<100;attempt++){if((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].sources.javascript===source+' // resumed')break;await page.waitForTimeout(50);}
+  assert.equal((await page.evaluate(()=>window.study.bootstrap())).data.drafts['leetcode:1'].sources.javascript,source+' // resumed','Stop/edit resumes at the solution cursor without focusing it in the test');
   console.log('PASS case switching, focus, zoom, tab/native pauses, expected result, Stop/edit caret restoration and no submission side effects');
 
   await page.getByRole('tab',{name:'Test cases',exact:true}).click();await page.getByRole('radio',{name:'Custom cases',exact:true}).check();await page.getByLabel('Custom test cases').fill('[[[4,5,9],9]]');await start(definitions.find(p=>p.number===1).reference);await finish();await close();

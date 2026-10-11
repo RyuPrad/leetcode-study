@@ -21,9 +21,23 @@ import 'monaco-editor/editor/contrib/wordOperations/browser/wordOperations.js';
 import 'monaco-editor/editor/contrib/tokenization/browser/tokenization.js';
 import * as typescript from 'monaco-editor/languages/features/typescript/register.js';
 import 'monaco-editor/languages/definitions/javascript/register.js';
+import 'monaco-editor/languages/definitions/typescript/register.js';
+import 'monaco-editor/languages/definitions/java/register.js';
+import 'monaco-editor/languages/definitions/cpp/register.js';
+import type { Language } from '../../shared/coding';
 import {language as javascriptTokens} from 'monaco-editor/languages/definitions/javascript/javascript.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import TypeScriptWorker from 'monaco-editor/language/typescript/ts.worker.js?worker';
+// TypeScript type errors are advisory: they appear here, while Run/Submit only reject syntax errors.
+// Without DOM globals, solution names such as close() or find() cannot collide with browser APIs.
+typescript.typescriptDefaults.setCompilerOptions({target:typescript.ScriptTarget.ESNext,lib:['esnext'],strict:true,noImplicitAny:false,allowNonTsExtensions:true});
+typescript.typescriptDefaults.addExtraLib(`declare class ListNode { val: number; next: ListNode | null; constructor(val?: number, next?: ListNode | null); }
+declare class TreeNode { val: number; left: TreeNode | null; right: TreeNode | null; constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null); }
+declare class _Node { val: any; next: _Node | null; random: _Node | null; neighbors: _Node[]; isLeaf: boolean; topLeft: _Node | null; topRight: _Node | null; bottomLeft: _Node | null; bottomRight: _Node | null; constructor(val?: any, second?: any, topLeft?: _Node | null, topRight?: _Node | null, bottomLeft?: _Node | null, bottomRight?: _Node | null); }
+interface MountainArray { get(index: number): number; length(): number; }
+declare function guess(num: number): number;
+declare var console: { log(...data: any[]): void; info(...data: any[]): void; warn(...data: any[]): void; error(...data: any[]): void; debug(...data: any[]): void; };`,'study://types/leetcode.d.ts');
+const models:Record<Language,{id:string;extension:string;label:string}>={javascript:{id:'javascript',extension:'js',label:'JavaScript solution'},typescript:{id:'typescript',extension:'ts',label:'TypeScript solution'},java:{id:'java',extension:'java',label:'Java solution'},c:{id:'c',extension:'c',label:'C solution'}};
 (self as any).MonacoEnvironment={getWorker:(_id: string,label: string)=>label==='typescript'||label==='javascript'?new TypeScriptWorker():new EditorWorker()};
 // Load the existing lexer synchronously so navigation also works on the first keypress.
 monaco.languages.setMonarchTokensProvider('javascript',javascriptTokens);
@@ -31,7 +45,7 @@ typescript.javascriptDefaults.setDiagnosticsOptions({noSemanticValidation:true,n
 typescript.javascriptDefaults.setCompilerOptions({target:typescript.ScriptTarget.ESNext,allowNonTsExtensions:true,allowJs:true,checkJs:false});
 typescript.javascriptDefaults.addExtraLib('declare class ListNode { val: number; next: ListNode | null; constructor(val?: number, next?: ListNode | null); }\ndeclare class TreeNode { val: number; left: TreeNode | null; right: TreeNode | null; constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null); }\ndeclare function guess(n: number): number;\ndeclare class Node { val: any; next: Node | null; random: Node | null; neighbors: Node[]; isLeaf: boolean; topLeft: Node | null; topRight: Node | null; bottomLeft: Node | null; bottomRight: Node | null; constructor(val?: any, second?: any, topLeft?: any, topRight?: any, bottomLeft?: any, bottomRight?: any); }','study-structures.d.ts');
 monaco.editor.defineTheme('study',{base:'vs-dark',inherit:true,rules:[],colors:{'editor.background':'#101722','editor.lineHighlightBackground':'#172235','editorLineNumber.foreground':'#536783','editorCursor.foreground':'#a3c3ff','editor.selectionBackground':'#30496b'}});
-export default function CodeEditor({source,onChange,problemId,active,line,focusRequest=null,readOnly=false,tabOutEnabled=false,traceLocation=null,breakpoints=[],executableLines=[],onBreakpointsChange}:{source:string;onChange:(value:string)=>void;problemId:string;active:boolean;line:number|null;focusRequest?:EditorFocusRequest|null;readOnly?:boolean;tabOutEnabled?:boolean;traceLocation?:VisualLocation|null;breakpoints?:number[];executableLines?:number[];onBreakpointsChange?:(lines:number[])=>void}) {
+export default function CodeEditor({source,onChange,problemId,language='javascript',active,line,focusRequest=null,readOnly=false,tabOutEnabled=false,traceLocation=null,breakpoints=[],executableLines=[],onBreakpointsChange}:{source:string;onChange:(value:string)=>void;problemId:string;language?:Language;active:boolean;line:number|null;focusRequest?:EditorFocusRequest|null;readOnly?:boolean;tabOutEnabled?:boolean;traceLocation?:VisualLocation|null;breakpoints?:number[];executableLines?:number[];onBreakpointsChange?:(lines:number[])=>void}) {
   const host=useRef<HTMLDivElement>(null), editor=useRef<monaco.editor.IStandaloneCodeEditor|null>(null), change=useRef(onChange);
   change.current=onChange;
   const debugRef=useRef({breakpoints,onBreakpointsChange});debugRef.current={breakpoints,onBreakpointsChange};
@@ -40,8 +54,8 @@ export default function CodeEditor({source,onChange,problemId,active,line,focusR
   const savedView=useRef<monaco.editor.ICodeEditorViewState|null>(null);
   useLayoutEffect(()=>{
     savedView.current=null;
-    const model=monaco.editor.createModel(source,'javascript',monaco.Uri.parse(`study://solution/${problemId.replace(':','-')}.js`));
-    const instance=monaco.editor.create(host.current!,{model,theme:'study',automaticLayout:true,minimap:{enabled:false},fontSize:13,fontFamily:'Consolas, monospace',lineNumbersMinChars:3,scrollBeyondLastLine:false,padding:{top:16,bottom:16},tabSize:2,insertSpaces:true,wordWrap:'on',ariaLabel:readOnly?'Debug source':'JavaScript solution',accessibilitySupport:'auto',fixedOverflowWidgets:true,readOnly,glyphMargin:!!onBreakpointsChange});
+    const kind=models[language],model=monaco.editor.createModel(source,kind.id,monaco.Uri.parse(`study://solution/${problemId.replace(':','-')}.${kind.extension}`));
+    const instance=monaco.editor.create(host.current!,{model,theme:'study',automaticLayout:true,minimap:{enabled:false},fontSize:13,fontFamily:'Consolas, monospace',lineNumbersMinChars:3,scrollBeyondLastLine:false,padding:{top:16,bottom:16},tabSize:language==='java'||language==='c'?4:2,insertSpaces:true,wordWrap:'on',ariaLabel:readOnly?'Debug source':kind.label,accessibilitySupport:'auto',fixedOverflowWidgets:true,readOnly,glyphMargin:!!onBreakpointsChange});
     editor.current=instance;
     tabOut.current=installTabOut(instance,tabOutEnabled&&!readOnly);
     const listener=model.onDidChangeContent(()=>change.current(model.getValue()));
@@ -50,7 +64,7 @@ export default function CodeEditor({source,onChange,problemId,active,line,focusR
     const mouse=instance.onMouseDown(event=>{if(event.target.type===monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN&&event.target.position)toggle(event.target.position.lineNumber);});
     const key=instance.onKeyDown(event=>{if(event.keyCode===monaco.KeyCode.F9&&debugRef.current.onBreakpointsChange){event.preventDefault();toggle(instance.getPosition()?.lineNumber||1);}});
     return ()=>{listener.dispose();mouse.dispose();key.dispose();tabOut.current?.dispose();tabOut.current=null;instance.dispose();model.dispose();editor.current=null;};
-  },[problemId]);
+  },[problemId,language]);
   useLayoutEffect(()=>{const model=editor.current?.getModel();if(model&&model.getValue()!==source){savedView.current=null;model.setValue(source);}},[source]);
   useLayoutEffect(()=>{
     const instance=editor.current;
@@ -69,7 +83,7 @@ export default function CodeEditor({source,onChange,problemId,active,line,focusR
       // Monaco retains the model/undo stack; snapshot the view before hidden layout.
       if(!readOnly&&editor.current===instance)savedView.current=instance.saveViewState();
     };
-  },[active,focusRequest,problemId,readOnly]);
+  },[active,focusRequest,problemId,language,readOnly]);
   useEffect(()=>{if(line&&active&&editor.current){savedView.current=null;editor.current.revealLineInCenter(line);editor.current.setPosition({lineNumber:line,column:1});editor.current.focus();}},[line]);
   useEffect(()=>{editor.current?.updateOptions({readOnly});},[readOnly]);
   useEffect(()=>{tabOut.current?.setEnabled(tabOutEnabled&&!readOnly);},[tabOutEnabled,readOnly]);

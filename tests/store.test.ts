@@ -54,21 +54,36 @@ test('snapshot changes cannot mutate the store and unknown backup fields are rem
 test('version 1 profiles migrate atomically with an exact archived original', t=>{
   const {dir,store}=fixture(t), legacy={version:1,progress:{},sessions:[session()]};
   const bytes=JSON.stringify(legacy);fs.writeFileSync(store.file,bytes);
-  const migrated=new StudyStore(dir);assert.equal(migrated.snapshot().version,3);assert.deepEqual(migrated.snapshot().drafts,{});assert.deepEqual(migrated.snapshot().submissions,[]);assert.deepEqual(migrated.snapshot().guided,{});
+  const migrated=new StudyStore(dir);assert.equal(migrated.snapshot().version,4);assert.deepEqual(migrated.snapshot().drafts,{});assert.deepEqual(migrated.snapshot().submissions,[]);assert.deepEqual(migrated.snapshot().guided,{});
   const archive=fs.readdirSync(dir).find(f=>f.includes('.v1-'))!;assert.ok(archive);assert.equal(fs.readFileSync(path.join(dir,archive),'utf8'),bytes);
-  assert.equal(JSON.parse(fs.readFileSync(store.file,'utf8')).version,3);
+  assert.equal(JSON.parse(fs.readFileSync(store.file,'utf8')).version,4);
   assert.equal(new StudyStore(dir).snapshot().sessions[0].reflection,session().reflection);
 });
 test('drafts and immutable submissions survive restart and backup restore; only Accepted completes',t=>{
   const {dir,store}=fixture(t),source='function twoSum(nums, target) { return [0,1]; }';
   store.updateProgress('leetcode:1',{bookmarked:true,needsReview:true});
-  store.saveDrafts({'leetcode:1':{source,cases:'[[[2,7],9]]',updatedAt:session().updatedAt}});
+  store.saveDrafts({'leetcode:1':{language:'javascript',sources:{javascript:source,java:'class Solution {}'},cases:'[[[2,7],9]]',updatedAt:session().updatedAt}});
   const wrong={verdict:'Wrong answer' as const,passed:0,total:1,durationMs:1,cases:[{name:'Case 1',input:[[2,7],9],actual:[0,0],expected:[0,1],verdict:'Wrong answer' as const,logs:[],durationMs:1}]};
-  store.recordSubmission('leetcode:1',source,wrong);assert.notEqual(store.snapshot().progress['leetcode:1'].status,'completed');
-  store.recordSubmission('leetcode:1',source,{...wrong,verdict:'Accepted',passed:1,cases:[{...wrong.cases[0],actual:[0,1],verdict:'Accepted'}]});
-  store.recordSubmission('leetcode:1','changed',wrong);
-  const data=new StudyStore(dir).snapshot();assert.equal(data.progress['leetcode:1'].status,'completed');assert.ok(data.progress['leetcode:1'].bookmarked&&data.progress['leetcode:1'].needsReview);assert.equal(data.submissions[0].source,source);assert.equal(data.drafts['leetcode:1'].source,source);
+  store.recordSubmission('leetcode:1','javascript',source,wrong);assert.notEqual(store.snapshot().progress['leetcode:1'].status,'completed');
+  store.recordSubmission('leetcode:1','javascript',source,{...wrong,verdict:'Accepted',passed:1,cases:[{...wrong.cases[0],actual:[0,1],verdict:'Accepted'}]});
+  store.recordSubmission('leetcode:1','java','changed',wrong);
+  const data=new StudyStore(dir).snapshot();assert.equal(data.progress['leetcode:1'].status,'completed');assert.ok(data.progress['leetcode:1'].bookmarked&&data.progress['leetcode:1'].needsReview);assert.equal(data.submissions[0].source,source);assert.equal(data.drafts['leetcode:1'].sources.javascript,source);assert.equal(data.drafts['leetcode:1'].sources.java,'class Solution {}');assert.equal(data.submissions[2].language,'java');
   const copy=fixture(t).store;copy.restore(data);assert.deepEqual(copy.snapshot(),data);
-  assert.throws(()=>store.recordSubmission('leetcode:1',source,{...wrong,verdict:'Accepted'}),/Inconsistent/);
-  assert.throws(()=>store.saveDrafts({'leetcode:1':{source:'x'.repeat(262145),cases:'[]',updatedAt:session().updatedAt}}));
+  assert.throws(()=>store.recordSubmission('leetcode:1','javascript',source,{...wrong,verdict:'Accepted'}),/Inconsistent/);
+  assert.throws(()=>store.saveDrafts({'leetcode:1':{language:'c',sources:{c:'x'.repeat(262145)},cases:'[]',updatedAt:session().updatedAt}}));
+});
+
+test('version 3 drafts and submissions migrate to per-language version 4 with an exact archive',t=>{
+  const {dir,store}=fixture(t),updatedAt=session().updatedAt,source='function twoSum(){return [0,1];}';
+  const result={verdict:'Accepted',passed:1,total:1,durationMs:1,cases:[{name:'Case 1',input:[[2,7],9],actual:[0,1],expected:[0,1],verdict:'Accepted',logs:[],durationMs:1}]};
+  const v3={version:3,progress:{},sessions:[],drafts:{'leetcode:1':{source,cases:'[]',updatedAt}},submissions:[{id:'s1',problemId:'leetcode:1',source,createdAt:updatedAt,result}],guided:{}};
+  const bytes=JSON.stringify(v3);fs.writeFileSync(store.file,bytes);
+  const data=new StudyStore(dir).snapshot();
+  assert.equal(data.version,4);
+  assert.deepEqual(data.drafts['leetcode:1'],{language:'javascript',sources:{javascript:source},cases:'[]',updatedAt});
+  assert.equal(data.submissions[0].language,'javascript');
+  const archive=fs.readdirSync(dir).find(f=>f.includes('.v3-'))!;assert.ok(archive);assert.equal(fs.readFileSync(path.join(dir,archive),'utf8'),bytes);
+  assert.throws(()=>store.saveDrafts({'leetcode:1':{language:'rust' as any,sources:{},cases:'[]',updatedAt}}),/Invalid code draft/);
+  assert.throws(()=>store.saveDrafts({'leetcode:1':{language:'c',sources:{rust:'fn main(){}'} as any,cases:'[]',updatedAt}}),/Invalid code draft/);
+  assert.throws(()=>store.recordSubmission('leetcode:1','rust' as any,source,result as any),/Invalid submission/);
 });

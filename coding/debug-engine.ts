@@ -1,5 +1,5 @@
 import type { QuickJSAsyncWASMModule } from 'quickjs-emscripten';
-import type { CodingProblem, CodeCase, Json } from '../shared/coding';
+import type { CodingProblem, CodeCase, Json, Language } from '../shared/coding';
 import type { DebugMotion } from '../shared/debugging';
 import { DEBUG_TIME_LIMIT } from '../shared/debugging';
 import type { VisualizationFrame } from '../shared/visualization';
@@ -70,9 +70,9 @@ export class DebugController {
   }
   recordExit(frame:VisualizationFrame){frame.changes=frameChanges(this.previous,frame);frame.operations=observedOperations(frame,this.previous);this.previous=frame;this.hooks.frame(frame,false,'Function exited');}
 }
-export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:CodingProblem,source:string,test:CodeCase,controller:DebugController,hooks:DebugHooks) {
+export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:CodingProblem,source:string,test:CodeCase,controller:DebugController,hooks:DebugHooks,language:Language='javascript') {
   const invalid=validateInput(problem,test.input);if(invalid)throw new Error(invalid);
-  const transformed=instrument(source);hooks.started(transformed.executableLines);
+  const transformed=instrument(source,language);hooks.started(transformed.executableLines);
   const runtime=module.newRuntime();runtime.setMemoryLimit(64*1024*1024);runtime.setMaxStackSize(1024*1024);runtime.setInterruptHandler(()=>controller.interrupted());
   const vm=runtime.newContext(),logs:string[]=[];let actual:Json|undefined,error:string|undefined,logBytes=0;
   const decision=vm.newFunction('__studyDecision',(site,depth,index)=>vm.newNumber(controller.decision(transformed.sites[vm.getNumber(site)],vm.getNumber(depth),vm.getNumber(index))?1:controller.skipInterval()));

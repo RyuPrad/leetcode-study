@@ -2,11 +2,14 @@ import { parse } from '@babel/parser';
 import traverseImport, { type NodePath } from '@babel/traverse';
 import generateImport from '@babel/generator';
 import * as t from '@babel/types';
+import type { Language } from '../shared/coding';
+import { parseTypeScript, stripTypesFromAst } from './typescript';
 const traverse = (traverseImport as any).default || traverseImport;
 const generate = (generateImport as any).default || generateImport;
 export interface DebugSite { line: number; column: number; endLine: number; endColumn: number; kind: string; text: string; name?: string; }
-export function instrument(source: string) {
-  const ast=parse(source,{sourceType:'script'}), sites: DebugSite[]=[], lines=new Set<number>();
+export function instrument(source: string, language: Language = 'javascript') {
+  // TypeScript is stripped on the AST so every site keeps its location in the user's TypeScript.
+  const ast=language==='typescript'?stripTypesFromAst(parseTypeScript(source)):parse(source,{sourceType:'script'}), sites: DebugSite[]=[], lines=new Set<number>();
   let helper=t.identifier('_studyDebug'),nodeCount=0,capturedBindings=0;
   const fail=(path:NodePath,message:string):never=>{throw new Error(`Debugging unavailable at line ${path.node.loc?.start.line || 1}: ${message}`);};
   traverse(ast,{

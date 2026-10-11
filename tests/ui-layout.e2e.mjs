@@ -79,8 +79,8 @@ try {
     await window.study.editSession(timer.sessionId, { durationMs: 450000, outcome: 'needs-review', reflection: 'Long reflection to exercise wrapping and independent scrolling. '.repeat(35) });
     await window.study.selectProblem(null);
     await window.study.setProgress('leetcode:1', { bookmarked: true, needsReview: true, status: 'in-progress' });
-    await window.study.saveDraft('leetcode:1', source, '');
-    await window.study.recordSubmission('leetcode:1', source, { verdict: 'Accepted', passed: 1, total: 1, durationMs: 25, cases: [{ name: 'Layout fixture', input: [[2, 7], 9], actual: [0, 1], expected: [0, 1], verdict: 'Accepted', logs: [], durationMs: 25 }] });
+    await window.study.saveDraft('leetcode:1', 'javascript', source, '');
+    await window.study.recordSubmission('leetcode:1', 'javascript', source, { verdict: 'Accepted', passed: 1, total: 1, durationMs: 25, cases: [{ name: 'Layout fixture', input: [[2, 7], 9], actual: [0, 1], expected: [0, 1], verdict: 'Accepted', logs: [], durationMs: 25 }] });
   }, source);
   for (const item of cases) {
     label = `${item.name}-${Math.round(item.zoom * 100)}`; console.log(`UI audit ${label}`);

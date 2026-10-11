@@ -5,7 +5,11 @@ import type { Catalog } from '../shared/types';
 import { StudyStore, validateData } from './store';
 import { StudyTracker } from './tracker';
 import { assetPath, rendererPolicy, contentPolicy } from './protocol';
-import type { CodeDraft } from '../shared/coding';
+import type { CodeDraft, CodingProblem, NativeRunRequest } from '../shared/coding';
+import { CODE_LIMIT, isLanguage, isNativeLanguage } from '../shared/coding';
+import codingProblems from '../coding/problems.json';
+import { validateInput } from '../coding/validation';
+import { nativeAvailable, runNative } from './native-runner';
 import { validateDraft } from './coding-data';
 import type { GuidedLessonIdentity } from '../shared/guided';
 import { validateCurrentGuidedProgress } from './guided-data';
@@ -20,6 +24,20 @@ let heartbeat: ReturnType<typeof setInterval> | undefined;
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingDrafts: Record<string,CodeDraft> = {};
 let draftWaiters: {resolve:()=>void;reject:(error:unknown)=>void}[] = [];
+// Java/C jobs run as native processes; at most one runs, and Stop, navigation and close abort it.
+const nativeJobs = new Map<string, AbortController>();
+const abortNativeJobs = () => { for (const job of nativeJobs.values()) job.abort(); nativeJobs.clear(); };
+const nativePaths = () => app.isPackaged
+  ? { toolchains: path.join(process.resourcesPath, 'toolchains'), native: path.join(process.resourcesPath, 'native') }
+  : { toolchains: path.join(app.getAppPath(), 'toolchains'), native: path.join(app.getAppPath(), 'dist', 'native') };
+function validateNativeRun(request: unknown): { request: NativeRunRequest; problem: CodingProblem } {
+  const r = request as NativeRunRequest;
+  if (!r || typeof r !== 'object' || typeof r.jobId !== 'string' || !/^[\w-]{1,100}$/.test(r.jobId) || !isNativeLanguage(r.language) || typeof r.source !== 'string' || r.source.length > CODE_LIMIT || !Array.isArray(r.inputs) || r.inputs.length > 100) throw new Error('Invalid native run.');
+  const problem = (codingProblems as CodingProblem[]).find(p => p.id === r.problemId);
+  if (!problem) throw new Error('Unknown problem.');
+  for (const input of r.inputs) { const invalid = Array.isArray(input) ? validateInput(problem, input) : 'Invalid case.'; if (invalid) throw new Error(invalid); }
+  return { request: { jobId: r.jobId, problemId: r.problemId, language: r.language, source: r.source, inputs: r.inputs }, problem };
+}
 function flushDrafts() {
   clearTimeout(draftTimer);
   if(!Object.keys(pendingDrafts).length)return;
@@ -75,6 +93,7 @@ else {
     win.on('blur', () => { pausePlayback(); safe(() => { tracker.setFocused(false); sendTimer(); }); });
     win.on('minimize', () => { pausePlayback(); safe(() => { tracker.setFocused(false); sendTimer(); }); });
     win.on('close', event => {
+      abortNativeJobs();
       try { flushDrafts(); tracker.end(); } catch (error) { event.preventDefault(); report(error); dialog.showMessageBox(win, { type: 'error', message: 'Your latest study data could not be saved.', detail: 'Free some disk space or export a backup, then try closing again.' }); }
     });
     const suspend = () => { pausePlayback(); safe(() => { tracker.setSuspended(true); sendTimer(); }); };
@@ -93,8 +112,22 @@ else {
     ipcMain.on('study:activity', event => { if (event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && trusted(event.senderFrame.url)) safe(() => tracker.activity()); });
     handle('study:edit-session', (id, patch) => { tracker.edit(id, patch); sendData(); sendTimer(); return store.snapshot(); });
     handle('study:delete-session', id => { tracker.delete(id); sendData(); sendTimer(); return store.snapshot(); });
-    handle('study:save-draft', (id,source,cases) => { assertProblem(id); pendingDrafts[id]=validateDraft({source,cases,updatedAt:new Date().toISOString()}); clearTimeout(draftTimer); draftTimer=setTimeout(()=>safe(flushDrafts),300); return new Promise<void>((resolve,reject)=>draftWaiters.push({resolve,reject})); });
-    handle('study:submission', (id,source,result) => { assertProblem(id); flushDrafts(); store.recordSubmission(id,source,result); sendData(); return store.snapshot(); });
+    handle('study:save-draft', (id,language,source,cases) => { assertProblem(id); if(!isLanguage(language))throw new Error('Unsupported language.'); const previous=pendingDrafts[id]??store.draft(id); pendingDrafts[id]=validateDraft({language,sources:{...previous?.sources,[language]:source},cases,updatedAt:new Date().toISOString()}); clearTimeout(draftTimer); draftTimer=setTimeout(()=>safe(flushDrafts),300); return new Promise<void>((resolve,reject)=>draftWaiters.push({resolve,reject})); });
+    handle('study:submission', (id,language,source,result) => { assertProblem(id); flushDrafts(); store.recordSubmission(id,language,source,result); sendData(); return store.snapshot(); });
+    handle('study:native-available', () => ({ java: nativeAvailable(nativePaths(), 'java'), c: nativeAvailable(nativePaths(), 'c') }));
+    handle('study:native-run', async raw => {
+      const { request, problem } = validateNativeRun(raw);
+      if (!nativeAvailable(nativePaths(), request.language)) throw new Error(`The ${request.language === 'java' ? 'Java' : 'C'} toolchain is not included in this build.`);
+      abortNativeJobs();
+      const controller = new AbortController(); nativeJobs.set(request.jobId, controller);
+      try {
+        return await runNative(problem, request.language, request.source, request.inputs, {
+          ...nativePaths(), tempRoot: app.getPath('temp'), signal: controller.signal,
+          onProgress: completed => { if (!win.isDestroyed()) win.webContents.send('study:native-progress', { jobId: request.jobId, completed }); }
+        });
+      } finally { if (nativeJobs.get(request.jobId) === controller) nativeJobs.delete(request.jobId); }
+    });
+    handle('study:native-cancel', jobId => { nativeJobs.get(String(jobId))?.abort(); nativeJobs.delete(String(jobId)); });
     handle('study:guided-progress', (id, progress) => {
       assertProblem(id);
       const lesson = guidedLessons.get(id);
@@ -128,4 +161,5 @@ else {
   }).catch(error => { console.error(error); dialog.showErrorBox('LeetCode Study could not start', error instanceof Error ? error.message : String(error)); app.quit(); });
 }
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', abortNativeJobs);
 app.on('will-quit', () => { if (heartbeat) clearInterval(heartbeat); });

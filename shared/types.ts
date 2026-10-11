@@ -1,4 +1,4 @@
-import type { CodeDraft, JudgeResult, Submission } from './coding';
+import type { CodeDraft, JudgeResult, Language, NativeLanguage, NativeRunRequest, NativeRunResult, Submission } from './coding';
 import type { GuidedProgress } from './guided';
 export type ProblemStatus = 'not-started' | 'in-progress' | 'completed';
 export type Outcome = 'studied' | 'solved' | 'needs-review';
@@ -12,7 +12,7 @@ export interface StudySession {
   id: string; problemId: string; startedAt: string; endedAt: string | null;
   updatedAt: string; durationMs: number; outcome: Outcome; reflection: string;
 }
-export interface UserData { version: 3; progress: Record<string, Progress>; sessions: StudySession[]; drafts: Record<string, CodeDraft>; submissions: Submission[]; guided: Record<string, GuidedProgress>; }
+export interface UserData { version: 4; progress: Record<string, Progress>; sessions: StudySession[]; drafts: Record<string, CodeDraft>; submissions: Submission[]; guided: Record<string, GuidedProgress>; }
 export interface TimerState { problemId: string | null; sessionId: string | null; durationMs: number; running: boolean; reason: 'running' | 'away' | 'idle' | 'suspended' | 'inactive'; }
 export interface DesktopApi {
   bootstrap(): Promise<{ catalog: Catalog; data: UserData; notice: string | null; version: string }>;
@@ -21,8 +21,12 @@ export interface DesktopApi {
   activity(): void;
   editSession(id: string, patch: Pick<StudySession, 'durationMs' | 'outcome' | 'reflection'>): Promise<UserData>;
   deleteSession(id: string): Promise<UserData>;
-  saveDraft(id: string, source: string, cases: string): Promise<void>;
-  recordSubmission(problemId: string, source: string, result: JudgeResult): Promise<UserData>;
+  saveDraft(id: string, language: Language, source: string, cases: string): Promise<void>;
+  recordSubmission(problemId: string, language: Language, source: string, result: JudgeResult): Promise<UserData>;
+  nativeAvailability(): Promise<Record<NativeLanguage, boolean>>;
+  runNative(request: NativeRunRequest): Promise<NativeRunResult>;
+  cancelNative(jobId: string): Promise<void>;
+  onNativeProgress(callback: (progress: { jobId: string; completed: number }) => void): () => void;
   saveGuidedProgress(problemId: string, progress: GuidedProgress): Promise<UserData>;
   exportBackup(): Promise<boolean>;
   importBackup(): Promise<boolean>;

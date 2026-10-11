@@ -38,7 +38,7 @@ function Notes({ entry, entries, onNavigate, onError }: { entry: Entry; entries:
 }
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [data, setData] = useState<UserData>({ version: 3, progress: {}, sessions: [], drafts: {}, submissions: [], guided: {} });
+  const [data, setData] = useState<UserData>({ version: 4, progress: {}, sessions: [], drafts: {}, submissions: [], guided: {} });
   const [timer, setTimer] = useState(emptyTimer);
   const [view, setView] = useState<View>('library');
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -120,7 +120,7 @@ try {
   const holder={values,rows};
   return [0,1];
 }`;
-  await page.evaluate(source => window.study.saveDraft('leetcode:1', source, '[]'), source);
+  await page.evaluate(source => window.study.saveDraft('leetcode:1', 'javascript', source, '[]'), source);
   await open(1); await page.getByRole('tab', { name: 'Code', exact: true }).click();
   await page.getByRole('textbox', { name: 'JavaScript solution', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Debug', exact: true }).click(); await page.waitForFunction(() => document.querySelector('.debug-status.paused'));

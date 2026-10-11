@@ -1,5 +1,5 @@
 import type { QuickJSWASMModule } from 'quickjs-emscripten';
-import type { CodingProblem, Json, Verdict, CodeCase, JudgeResult, CaseResult } from '../shared/coding';
+import type { CodingProblem, Json, Verdict, CodeCase, JudgeResult, CaseResult, NativeRunResult, ReferenceOutcome } from '../shared/coding';
 import { CASE_TIMEOUT, JOB_TIMEOUT, CODE_LIMIT } from '../shared/coding';
 import { installEnvironment, executeCase } from './harness.js';
 import { accepts } from './compare';
@@ -59,4 +59,36 @@ export async function judge(QuickJS: QuickJSWASMModule, problem: CodingProblem, 
     await new Promise(resolve => setTimeout(resolve,0));
   }
   return {verdict:results.find(r=>r.verdict!=='Accepted')?.verdict || 'Accepted',passed:results.filter(r=>r.verdict==='Accepted').length,total:cases.length,durationMs:Math.round(performance.now()-start),cases:results};
+}
+
+/** A run that stops before any case, e.g. on a compile error. */
+export function compileFailure(message: string, total: number): JudgeResult {
+  return {verdict:'Syntax error',passed:0,total,durationMs:0,cases:[{name:'Compiler',input:[],verdict:'Syntax error',error:message.slice(0,8000),logs:[],durationMs:0}]};
+}
+
+/** Expected results for a Java/C job, from the JavaScript reference as for JavaScript solutions. */
+export function referenceOutcomes(QuickJS: QuickJSWASMModule, problem: CodingProblem, source: string, cases: CodeCase[]): ReferenceOutcome[] {
+  return cases.map(test => {
+    const invalid = source.length > CODE_LIMIT ? 'Source exceeds 256 KiB.' : validateInput(problem,test.input);
+    if (invalid) return {invalid};
+    const reference = evaluate(QuickJS,problem,problem.reference,test.input);
+    return reference.verdict === 'Accepted' ? {expected:reference.actual} : {invalid:`The reference could not evaluate this case: ${reference.error}`};
+  });
+}
+/** Combines native results for the valid cases with the reference outcomes, as judge() reports. */
+export function assembleNative(problem: CodingProblem, cases: CodeCase[], references: ReferenceOutcome[], run: NativeRunResult, durationMs: number): JudgeResult {
+  if ('compileError' in run) return {...compileFailure(run.compileError,cases.length),durationMs};
+  const results: CaseResult[] = [];
+  let next = 0;
+  for (let i = 0; i < cases.length; i++) {
+    const test = cases[i], reference = references[i];
+    if (reference.invalid) { results.push({...test,verdict:'Invalid input',error:reference.invalid,logs:[],durationMs:0}); continue; }
+    const native = run.cases[next++];
+    if (!native) break;
+    const verdict = native.verdict === 'Accepted' && !accepts(problem,test.input,native.actual,reference.expected) ? 'Wrong answer' : native.verdict;
+    results.push({...test,...native,verdict,expected:reference.expected});
+    if (['Time limit exceeded','Memory limit exceeded','Syntax error','Cancelled'].includes(verdict)) break;
+  }
+  const total = cases.length;
+  return {verdict:results.find(r=>r.verdict!=='Accepted')?.verdict || (results.length===total?'Accepted':'Runtime error'),passed:results.filter(r=>r.verdict==='Accepted').length,total,durationMs,cases:results};
 }
