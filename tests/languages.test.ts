@@ -6,6 +6,9 @@ import { compileFailure, judge } from '../coding/engine';
 import { instrument } from '../coding/instrument';
 import { contract, contractLine, starter } from '../coding/languages';
 import { stripTypes, TypeScriptSyntaxError } from '../coding/typescript';
+import { solutionPath } from '../coding/solutions';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { CodingProblem } from '../shared/coding';
 
 const problems = definitions as CodingProblem[];
@@ -102,4 +105,11 @@ test('every problem has TypeScript, Java and C starters; TypeScript starters run
   assert.match(starter(problem(15), 'c'), /int\*\* threeSum\(int\* nums, int numsSize, int\* returnSize, int\*\* returnColumnSizes\)/);
   assert.match(starter(problem(146), 'c'), /int lRUCacheGet\(LRUCache\* obj, int key\)/);
   assert.match(starter(problem(15), 'java'), /public List<List<Integer>> threeSum\(int\[\] nums\)/);
+});
+
+test('every problem has a reference solution in TypeScript, Java and C', () => {
+  for (const p of problems) for (const language of ['typescript', 'java', 'c'] as const) {
+    const file = path.join(import.meta.dirname, '..', solutionPath(p.number, language));
+    assert.ok(fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim().length > 20, `${language} ${p.number}`);
+  }
 });

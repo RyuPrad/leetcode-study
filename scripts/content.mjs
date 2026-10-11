@@ -6,8 +6,28 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const TOPICS = ['Array & Hashing', 'Two Pointers', 'Sliding Window', 'Stack', 'Binary Search', 'LinkedList', 'Trees', 'BST', 'Tries', 'Heap', 'Backtracking', 'Graphs', 'Advanced Graphs', '1-D Dynamic Programming', '2-D Dynamic Programming', 'Greedy', 'Intervals', 'Math & Geometry', 'Bit Manipulation', 'Queue'];
 const REFERENCES = ['Leetcode Cheatsheet.md', 'Variable Naming Guide.md'];
 const iframe = /<iframe\b[\s\S]*?<\/iframe\s*>/gi;
+// The bundled note ends with the reference solution in every language. Maintained notes stay
+// unchanged; JavaScript comes from coding/problems.json and the rest from coding/solutions.
+const SOLUTION_LANGUAGES = [['JavaScript', 'js', null], ['TypeScript', 'ts', 'typescript'], ['Java', 'java', 'java'], ['C', 'c', 'c']];
+function solutionsSection(root, number, references, errors) {
+  const blocks = [];
+  for (const [label, fence, folder] of SOLUTION_LANGUAGES) {
+    let code = folder ? null : references.get(number);
+    if (folder) {
+      const file = path.join(root, 'coding', 'solutions', folder, `${number}.${fence}`);
+      if (fs.existsSync(file)) code = fs.readFileSync(file, 'utf8');
+    }
+    if (!code) { errors.push(`Missing ${label} solution for problem ${number}`); continue; }
+    blocks.push(`### ${label}\n\n\`\`\`${fence}\n${code.trim()}\n\`\`\``);
+  }
+  return `\n\n## Solutions\n\n${blocks.join('\n\n')}`;
+}
 export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   const entries = [], visualizers = [], errors = [];
+  const problemsFile = path.join(root, 'coding', 'problems.json');
+  // Historical comparison checkouts predate the coding workspace and have no solutions.
+  const references = fs.existsSync(path.join(root, 'coding', 'solutions')) && fs.existsSync(problemsFile)
+    ? new Map(JSON.parse(fs.readFileSync(problemsFile, 'utf8')).map(p => [p.number, p.reference])) : null;
   for (const topic of TOPICS) {
     const folder = path.join(root, topic);
     for (const file of fs.readdirSync(folder).sort()) {
@@ -33,7 +53,9 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
         }
       }
       const markdown = source.replace(iframe, '').trim();
-      entries.push({ id: `leetcode:${Number(match[1])}`, number: Number(match[1]), title: match[2], topic, notePath: relative, markdown, searchText: `${match[1]} ${match[2]} ${topic} ${markdown}`.toLowerCase(), ...(visualizerPath ? { visualizerPath } : {}) });
+      const number = Number(match[1]);
+      const solutions = references ? solutionsSection(root, number, references, errors) : '';
+      entries.push({ id: `leetcode:${number}`, number, title: match[2], topic, notePath: relative, markdown: markdown + solutions, searchText: `${match[1]} ${match[2]} ${topic} ${markdown}`.toLowerCase(), ...(visualizerPath ? { visualizerPath } : {}) });
     }
   }
   for (const file of REFERENCES) {
@@ -44,7 +66,8 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   for (const entry of entries) {
     if (ids.has(entry.id)) errors.push(`Duplicate problem ID: ${entry.id}`);
     ids.add(entry.id);
-    for (const link of entry.markdown.matchAll(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]+)?\]\]/g)) {
+    // Fenced code is never a wiki link, e.g. [[time, id]] in a solution.
+    for (const link of entry.markdown.replace(/```[\s\S]*?```/g, '').matchAll(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]+)?\]\]/g)) {
       const target = link[1].replace(/\.md$/i, '');
       if (!entries.some(e => e.title === target || e.notePath.replace(/\.md$/i, '') === target || path.basename(e.notePath, '.md') === target)) errors.push(`Unresolved wiki link ${target} in ${entry.notePath}`);
     }

@@ -132,8 +132,21 @@ try{
   await page.getByRole('button',{name:'Stop',exact:true}).click();await page.locator('.judge-summary strong').waitFor();
   assert.equal(await page.locator('.judge-summary strong').innerText(),'Cancelled');assert.ok(performance.now()-stopped<1500);
   await run(fixture('c/1.c'),'run','Accepted','c');
+  // The reference solution is revealed on request in the selected language and can become the draft.
+  await page.getByRole('button',{name:'Solution',exact:true}).click();
+  await page.getByRole('button',{name:'Show solution',exact:true}).click();
+  const solutionText=await page.getByLabel('C reference solution',{exact:true}).innerText();
+  assert.match(solutionText,/int\* twoSum\(int\* nums, int numsSize, int target, int\* returnSize\)/);
+  await page.getByRole('button',{name:'Use as draft',exact:true}).click();
+  await page.getByRole('dialog',{name:'Use reference solution'}).getByRole('button',{name:'Use as draft',exact:true}).click();
+  await waitDraft(solutionText,'c');
+  await page.getByRole('button',{name:'Submit',exact:true}).click();await page.locator('.judge-summary strong').waitFor({timeout:40000});
+  assert.equal(await page.locator('.judge-summary strong').innerText(),'Accepted');
+  await page.getByRole('tab',{name:'Notes',exact:true}).click();
+  assert.match(await page.locator('.markdown').innerText(),/Solutions[\s\S]*TypeScript[\s\S]*Java[\s\S]*class Solution[\s\S]*\bC\b/);
+  await page.getByRole('tab',{name:'Code',exact:true}).click();await page.getByRole('textbox',{name:'C solution',exact:true}).waitFor();
   saved=(await page.evaluate(()=>window.study.bootstrap())).data;
-  assert.deepEqual(saved.submissions.filter(s=>s.problemId==='leetcode:1').slice(-2).map(s=>s.language),['java','c']);
+  assert.deepEqual(saved.submissions.filter(s=>s.problemId==='leetcode:1').slice(-3).map(s=>s.language),['java','c','c']);
   await language().selectOption('javascript');await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).waitFor();
   console.log('PASS Java and C native Submit, compile error line, crash output, Stop and submission languages');
   await open(1);
@@ -144,7 +157,7 @@ try{
   // A final edit closes immediately, before the 300 ms main-process debounce.
   await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).focus();await page.keyboard.press('Control+End');await page.keyboard.insertText(' immediately');
   await app.close();app=await launch();page=await app.firstWindow();page.setDefaultTimeout(20000);await page.locator('.problem-table').waitFor();await open(1);
-  const restored=await page.evaluate(()=>window.study.bootstrap());assert.ok(restored.data.drafts['leetcode:1'].sources.javascript.endsWith('// persists at close immediately'));assert.ok(restored.data.submissions.length>=15);assert.equal(restored.data.drafts['leetcode:206'].sources.typescript.replace(/\r\n/g,'\n'),typed);
+  const restored=await page.evaluate(()=>window.study.bootstrap());assert.ok(restored.data.drafts['leetcode:1'].sources.javascript.endsWith('// persists at close immediately'));assert.ok(restored.data.submissions.length>=16);assert.equal(restored.data.drafts['leetcode:206'].sources.typescript.replace(/\r\n/g,'\n'),typed);
   assert.equal(await tabout().getAttribute('aria-pressed'),'false','TabOut preference persists after restart');
   assert.deepEqual(errors,[]);console.log('PASS 100/125/150% scale, restart persistence, and no renderer errors');
   fs.writeFileSync(path.join(ROOT,`test-results/coding-${process.env.STUDY_TEST_EXE?'packaged':'e2e'}.json`),JSON.stringify({passed:true,profile:directory,packaged:!!process.env.STUDY_TEST_EXE,submissions:restored.data.submissions.length},null,2));
