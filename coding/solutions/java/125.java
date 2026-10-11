@@ -4,8 +4,8 @@ class Solution {
         int right = s.length() - 1;
 
         while (left < right) {
-            while (left < right && !Character.isLetterOrDigit(s.charAt(left))) left++;
-            while (left < right && !Character.isLetterOrDigit(s.charAt(right))) right--;
+            while (left < right && !isAlphaNumeric(s.charAt(left))) left++;
+            while (left < right && !isAlphaNumeric(s.charAt(right))) right--;
 
             if (Character.toLowerCase(s.charAt(left)) != Character.toLowerCase(s.charAt(right))) {
                 return false;
@@ -16,5 +16,11 @@ class Solution {
         }
 
         return true;
+    }
+
+    private boolean isAlphaNumeric(char c) {
+        return (c >= 'a' && c <= 'z') ||
+               (c >= 'A' && c <= 'Z') ||
+               (c >= '0' && c <= '9');
     }
 }

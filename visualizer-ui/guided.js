@@ -63,7 +63,7 @@
       function check(assertions,label){if(!core.matches(state(),assertions))throw Error(`This lesson's ${label} no longer matches the animation. Restart the lesson or use the Visualizer tab.`);}
       function clearTargets(){for(const item of targets){item.el.classList.remove('guided-target');for(const [key,value]of Object.entries(item.attrs))value===null?item.el.removeAttribute(key):item.el.setAttribute(key,value);}targets=[];document.querySelectorAll('.guided-code-focus').forEach(el=>el.classList.remove('guided-code-focus'));}
       function renderControls(){const index=source.index();for(const el of [playButton,nextButton,previousButton,jumpButton,restartButton,select,range])el.disabled=!initialized||busy||!active||!!error;restartButton.disabled=busy||!active;previousButton.disabled ||=index===0;nextButton.disabled ||=index>=terminal;playButton.disabled ||=index>=terminal;playButton.textContent=playing?'Pause':'Play';playButton.setAttribute('aria-pressed',String(playing));range.value=String(index);position.textContent=`Step ${index+1} · ${lesson.checkpoints.filter(cp=>core.resolved(progress?.answers[cp.id])).length}/3 predictions explored`;range.setAttribute('aria-valuetext',position.textContent);window.studyWalkthrough.setGate({canAdvance:!!progress&&!currentCheckpoint(),active:initialized&&active&&!busy&&!error,isPlaying:playing,nextStep:()=>next(true)});}
-      function basics(cp){const details=make('details','guided-basics');details.append(make('summary','','Explain the code'),make('p','',cp.basics));const labels=cp.codeLines.join(', ');details.append(make('small','',`Look at reference ${cp.codeLines.length===1?'line':'lines'} ${labels}.`));return details;}
+      function basics(cp){const details=make('details','guided-basics'),view=window.studyCodeLanguage?.basics(cp);details.append(make('summary','','Explain the code'),make('p','',view?.text??cp.basics));const labels=cp.codeLines.join(', ');details.append(make('small','',view?`Look at ${view.label}.`:`Look at reference ${cp.codeLines.length===1?'line':'lines'} ${labels}.`));return details;}
       function render(){
         clearTargets();renderControls();panel.replaceChildren();
         if(error){panel.append(make('p','guided-error',error));panel.setAttribute('role','alert');return;}
@@ -142,6 +142,8 @@
       window.nextStep=()=>internal?originalNext():void next();window.prevStep=()=>internal?originalPrevious():void seek(source.index()-1);
       window.studyLessonAdapter={...underlying,next:()=>void next(),previous:()=>void seek(source.index()-1),seek:index=>seek(index),reset:()=>void initialize(core.fresh(lesson,progress),true),loadGuidedCase:()=>initialize(core.fresh(lesson,progress),true)};
       window.studyGuidedController={get lesson(){return lesson;},get progress(){return progress?structuredClone(progress):null;},get busy(){return busy;},get error(){return error;},pause,seek,next,restart:()=>initialize(core.fresh(lesson,progress),true)};
+      // "Explain the code" quotes the reference language the learner picked (code-language.js).
+      window.addEventListener('study:code-language',()=>{if(initialized&&!busy)render();});
       window.addEventListener('message',event=>{if(!embedded||event.source!==parent||event.origin!==parentOrigin)return;const message=event.data;
         if(message?.type==='study:pause'){pause();return;}
         if(message?.session!==session||message.lessonId!==lesson.id)return;

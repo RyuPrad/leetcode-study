@@ -1,4 +1,6 @@
 import './visualization/walkthrough-mode';
+import { showCodeLanguage } from './visualization/code-language';
+import { preferredLanguage } from './coding/language-preference';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -80,6 +82,8 @@ export default function App() {
   const entry = catalog?.entries.find(e => e.id === selectedId);
   useEffect(() => { if (catalog) void window.study.selectProblem(view === 'problem' && entry?.number ? entry.id : null).then(setTimer).catch(onError); }, [view, selectedId, Boolean(catalog)]);
   useEffect(() => { if (view !== 'problem' || tab !== 'visualizer' || settings || editing) pauseVisualizer(); }, [view, tab, settings, editing]);
+  // Reference code in the Visualizer and Learn tabs starts in the language this problem's Code tab opens with.
+  useEffect(() => { if (view === 'problem' && entry?.number) showCodeLanguage(entry.id, data.drafts[entry.id]?.language ?? preferredLanguage()); }, [view, selectedId]);
   useEffect(() => { if (notice && !notice.error) { const id = setTimeout(() => setNotice(null), 6500); return () => clearTimeout(id); } }, [notice]);
   function openEntry(next: Entry) { setReferenceObjectFocus(false); setSelectedId(next.id); setCodeOpened(null); setLearnOpened(null); setTab(next.visualizerPath ? 'visualizer' : 'notes'); setReady(false); setView('problem'); }
   function library(nextFilter: Filter = 'all', nextTopic = 'all') { setReferenceObjectFocus(false); setView('library'); setFilter(nextFilter); setTopic(nextTopic); setQuery(''); }

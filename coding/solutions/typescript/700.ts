@@ -1,4 +1,14 @@
 function searchBST(root: TreeNode | null, val: number): TreeNode | null {
-  while (root && root.val !== val) root = val < root.val ? root.left : root.right;
-  return root;
+  let curr = root;
+  while (curr !== null) {
+    if (curr.val === val) {
+      return curr;
+    }
+    if (val < curr.val) {
+      curr = curr.left;
+    } else {
+      curr = curr.right;
+    }
+  }
+  return null;
 }

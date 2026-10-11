@@ -149,6 +149,21 @@ try{
   assert.deepEqual(saved.submissions.filter(s=>s.problemId==='leetcode:1').slice(-3).map(s=>s.language),['java','c','c']);
   await language().selectOption('javascript');await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).waitFor();
   console.log('PASS Java and C native Submit, compile error line, crash output, Stop and submission languages');
+  // The Visualizer and Learn tabs show reference code in the Code tab's language; their picker changes it back.
+  await language().selectOption('java');await page.getByRole('textbox',{name:'Java solution',exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Visualizer',exact:true}).click();
+  const visual=page.frameLocator('iframe[title="Two Sum visualizer"]'),picker=frame=>frame.getByRole('combobox',{name:'Reference code language',exact:true});
+  await visual.getByRole('region',{name:'Java reference code',exact:true}).waitFor();assert.equal(await picker(visual).inputValue(),'java');
+  assert.match(await visual.getByRole('region',{name:'Java reference code',exact:true}).innerText(),/public int\[\] twoSum\(int\[\] nums, int target\)/);
+  await visual.locator('#btn-next').click();await visual.locator('.study-mirror-line.active').first().waitFor();
+  assert.ok(await visual.locator('.study-mirror-line.active').count()>=1,'the stepped line is highlighted in Java');assert.equal(await visual.locator('.study-code-original').isVisible(),false);
+  await picker(visual).selectOption('c');await visual.getByRole('region',{name:'C reference code',exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Code',exact:true}).click();await page.getByRole('textbox',{name:'C solution',exact:true}).waitFor();assert.equal(await language().inputValue(),'c','the visualizer picker changes the Code tab');
+  await page.getByRole('tab',{name:/Learn/}).click();const lesson=page.frameLocator('iframe[title="Two Sum guided lesson"]');
+  await lesson.getByRole('region',{name:'C reference code',exact:true}).waitFor();assert.equal(await picker(lesson).inputValue(),'c');
+  await page.getByRole('tab',{name:'Code',exact:true}).click();await language().selectOption('javascript');await page.getByRole('textbox',{name:'JavaScript solution',exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Visualizer',exact:true}).click();await visual.locator('.study-code-original').waitFor();assert.equal(await picker(visual).inputValue(),'javascript');
+  console.log('PASS Visualizer and Learn reference code follow the Code tab language, and their picker changes it');
   await open(1);
   for(const scale of [1,1.25,1.5]){await app.evaluate(({BrowserWindow},factor)=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(factor),scale);await page.waitForTimeout(200);assert.ok(await page.locator('.run-actions').evaluate(el=>{const r=el.getBoundingClientRect();return r.right<=innerWidth&&r.bottom<=innerHeight;}),`Run controls fit at ${scale}`);assert.ok(await tabout().evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;}),`TabOut fits at ${scale}`);assert.ok(await page.getByRole('button',{name:'Run',exact:true}).isVisible());assert.ok(await page.getByRole('button',{name:'Submit',exact:true}).isVisible());const screenshot=await app.evaluate(async({BrowserWindow})=>(await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));fs.writeFileSync(path.join(ROOT,`test-results/coding-${scale}.png`),Buffer.from(screenshot,'base64'));}
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1));

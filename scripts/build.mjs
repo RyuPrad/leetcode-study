@@ -7,6 +7,7 @@ import { ROOT, buildContent } from './content.mjs';
 import { checkLessons } from './check-lessons.mjs';
 import { buildGuided } from './check-guided.mjs';
 import { buildOperations } from './check-operations.mjs';
+import { buildCodeLanguages } from './code-maps.mjs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 // Compiles the Java judge with the bundled JDK (scripts/fetch-toolchains.mjs). The classes live
@@ -24,6 +25,7 @@ export async function buildDesktop() {
   checkLessons();
   buildGuided();
   buildOperations();
+  buildCodeLanguages();
   buildContent();
   buildNative();
   await build({ entryPoints: ['desktop/main.ts', 'desktop/preload.ts'], outdir: 'dist/desktop', outExtension: { '.js': '.cjs' }, bundle: true, platform: 'node', format: 'cjs', target: 'node24', external: ['electron'], sourcemap: true });

@@ -1,7 +1,40 @@
+class MinHeap {
+  heap: number[][] = [];
+  size(): number { return this.heap.length; }
+  push(item: number[]): void {
+    const h = this.heap;
+    h.push(item);
+    let i = h.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (h[p][0] <= h[i][0]) break;
+      [h[p], h[i]] = [h[i], h[p]];
+      i = p;
+    }
+  }
+  pop(): number[] {
+    const h = this.heap;
+    const top = h[0];
+    const last = h.pop()!;
+    if (h.length > 0) {
+      h[0] = last;
+      let i = 0;
+      while (true) {
+        let l = 2 * i + 1, r = 2 * i + 2, s = i;
+        if (l < h.length && h[l][0] < h[s][0]) s = l;
+        if (r < h.length && h[r][0] < h[s][0]) s = r;
+        if (s === i) break;
+        [h[s], h[i]] = [h[i], h[s]];
+        i = s;
+      }
+    }
+    return top;
+  }
+}
 function minCostConnectPoints(points: number[][]): number {
   const n = points.length;
   const inMST: boolean[] = new Array(n).fill(false);
-  const heap = new Heap<[number, number]>((a, b) => a[0] < b[0]);
+  const heap = new MinHeap();
   heap.push([0, 0]);
   let total = 0, count = 0;
   while (heap.size() > 0 && count < n) {
@@ -18,46 +51,4 @@ function minCostConnectPoints(points: number[][]): number {
     }
   }
   return total;
-}
-
-class Heap<T> {
-  private items: T[] = [];
-
-  constructor(private before: (a: T, b: T) => boolean) {}
-
-  size(): number {
-    return this.items.length;
-  }
-
-  peek(): T {
-    return this.items[0];
-  }
-
-  push(value: T): void {
-    const items = this.items;
-    items.push(value);
-    for (let i = items.length - 1; i > 0;) {
-      const parent = (i - 1) >> 1;
-      if (!this.before(items[i], items[parent])) break;
-      [items[parent], items[i]] = [items[i], items[parent]];
-      i = parent;
-    }
-  }
-
-  pop(): T {
-    const items = this.items, top = items[0], last = items.pop()!;
-    if (items.length) {
-      items[0] = last;
-      for (let i = 0; ;) {
-        const left = 2 * i + 1, right = left + 1;
-        let best = i;
-        if (left < items.length && this.before(items[left], items[best])) best = left;
-        if (right < items.length && this.before(items[right], items[best])) best = right;
-        if (best === i) break;
-        [items[best], items[i]] = [items[i], items[best]];
-        i = best;
-      }
-    }
-    return top;
-  }
 }

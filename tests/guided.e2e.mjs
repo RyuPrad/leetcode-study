@@ -65,7 +65,7 @@ try{
   }
   const backup=path.join(profile,'guided-backup.json');await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});dialog.showMessageBox=async()=>({response:1,checkboxChecked:false});},backup);
   await page.getByRole('button',{name:'Settings and backup',exact:true}).click();await page.getByRole('button',{name:'Export backup',exact:true}).click();await page.getByText('Your backup was exported.',{exact:true}).waitFor();
-  const saved=JSON.parse(fs.readFileSync(backup,'utf8'));assert.equal(saved.version,3);assert.equal(saved.guided['leetcode:1'].previousCompletion.completedAt,completed.completedAt);
+  const saved=JSON.parse(fs.readFileSync(backup,'utf8'));assert.equal(saved.version,4);assert.equal(saved.guided['leetcode:1'].previousCompletion.completedAt,completed.completedAt);
   await page.getByRole('button',{name:'Restore backup',exact:true}).click();await page.locator('.problem-table').waitFor();await open(143);await checkpoint();await show();assert.equal(await frame.evaluate(()=>window.studyGuidedController.error),'');
   await open(70);await checkpoint();await show();assert.equal(await frame.evaluate(()=>window.studyGuidedController.error),'');
   await app.evaluate(({ipcMain})=>{globalThis.guidedActivityCount=0;ipcMain.on('study:activity',()=>globalThis.guidedActivityCount++);});

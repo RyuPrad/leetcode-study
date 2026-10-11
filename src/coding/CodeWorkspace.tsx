@@ -8,6 +8,7 @@ import type { CodeCase, ReferenceOutcome } from '../../shared/coding';
 import { assembleNative } from '../../coding/engine';
 import { contractLine, starter } from '../../coding/languages';
 import { preferredLanguage, setPreferredLanguage } from './language-preference';
+import { codeLanguageFor, onCodeLanguage, showCodeLanguage } from '../visualization/code-language';
 import { loadSolution } from './solutions';
 import JudgeWorker from './judge.worker?worker';
 import {setTabOutEnabled,useTabOutEnabled} from './editor-preferences';
@@ -21,7 +22,7 @@ const errorLine=/(?:solution\.(?:js|c)|\b[A-Z]\w*\.java):(\d+)/;
 export default function CodeWorkspace({problemId,draft,submissions,active,focusRequest,onRequestFocus}:{problemId:string;draft?:CodeDraft;submissions:Submission[];active:boolean;focusRequest:EditorFocusRequest|null;onRequestFocus:()=>void}) {
   const problem=(definitions as CodingProblem[]).find(p=>p.id===problemId)!;
   const tabOutEnabled=useTabOutEnabled();
-  const [language,setLanguage]=useState<Language>(()=>draft?.language??preferredLanguage());
+  const [language,setLanguage]=useState<Language>(()=>codeLanguageFor(problemId)??draft?.language??preferredLanguage());
   const [sources,setSources]=useState<CodeDraft['sources']>(()=>draft?.sources??{});
   const source=sources[language]??starter(problem,language);
   const [cases,setCases]=useState(draft?.cases??pretty(problem.examples.map(t=>t.input)));
@@ -60,7 +61,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
   };},[]);
   useEffect(()=>{if(confirm)dialog.current?.showModal();},[confirm]);
   useEffect(()=>{if(preview)previewDialog.current?.showModal();},[preview]);
-  useEffect(()=>{if(!revision.current&&draft){setSources(draft.sources);setLanguage(draft.language);setCases(draft.cases);}},[draft]);
+  useEffect(()=>{if(!revision.current&&draft){setSources(draft.sources);setLanguage(codeLanguageFor(problemId)??draft.language);setCases(draft.cases);}},[draft]);
   // Main owns the debounce: every edit crosses IPC immediately, so closing/navigation
   // can flush the latest revision without waiting for a renderer timer.
   function persist(nextSource:string,nextCases:string){
@@ -76,6 +77,10 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
     current.current={...current.current,language:next,source:nextSource};
     persist(nextSource,current.current.cases);
   }
+  // The Visualizer and Learn tabs show reference code in this language, and their picker changes it.
+  const switchLanguage=useRef(changeLanguage);switchLanguage.current=changeLanguage;
+  useEffect(()=>{showCodeLanguage(problemId,language);},[language]);
+  useEffect(()=>onCodeLanguage(()=>{const next=codeLanguageFor(problemId);if(next&&next!==current.current.language)switchLanguage.current(next);}),[]);
   function replaceSource(target:Language,value:string){if(target!==current.current.language)changeLanguage(target);changeSource(value);}
   function changeCases(value:string){setCases(value);current.current.cases=value;persist(current.current.source,value);}
   function start(mode:'run'|'submit'){

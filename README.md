@@ -6,10 +6,10 @@ Browse and search the bundled library, step through algorithms, inspect live var
 
 ## Using the app
 
-Install `LeetCode-Study-0.7.0-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
+Install `LeetCode-Study-0.10.0-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
 
 - **Library:** search by number, title, topic, or note text; filter by progress; browse bookmarks and the review queue.
-- **Learn:** all 252 visualizers have a fixed guided example with three authored predictions (756 in total). Read the question beside the diagram and reference code, choose an answer or an outlined diagram item, ask for either of two hints, or choose Show me. Watch each intervening instruction in order and read why it works. Basics explanations cover the actual JavaScript being used. Answers and position save automatically; returning starts paused. Guided completion is separate from solving the coding problem.
+- **Learn:** all 252 visualizers have a fixed guided example with three authored predictions (756 in total). Read the question beside the diagram and reference code, choose an answer or an outlined diagram item, ask for either of two hints, or choose Show me. Watch each intervening instruction in order and read why it works. Basics explanations cover the actual code being used, in the reference language you choose. Answers and position save automatically; returning starts paused. Guided completion is separate from solving the coding problem.
 - **Visualizer:** all 252 lessons include a problem-specific explanation, before/after changes, consistent colors and symbols, movement animations, and timeline seeking. Drag panel title bars to move Diagram, Reference Code, Objects, Variables, Trace, and Guide independently. Drag an edge or corner to resize; each panel keeps its own scrollable content. The starting layout places Diagram and Reference Code above Objects. Diagram focus, zoom/Fit, and Alt-drag panning remain available. Precomputed lessons expose the full timeline; stateful lessons build their timeline as you step or play. The Objects panel contains a separate dark card and colored variable badge for each input, local, working structure, and result. Nested, syntax-colored JavaScript preserves actual property names. Cards arrange in three columns at wide sizes, two at medium sizes, and one on narrow panes. Each card keeps its variable name visible while its object scrolls independently. Object text starts at 16px; A− / A+ changes it without enlarging the app. Expand opens a variable in a focused reading view with execution controls available; Back to objects or Escape restores the cards and their scroll positions. In small windows, Controls and the current-instruction disclosure keep playback options accessible. Shared and circular references retain identities; large branches can be expanded. Variables, Trace, examples, custom inputs, reset, fullscreen, and pinned variables remain available. Each executed instruction highlights one source line and records its actual intermediate state. Back, seeking, and changing walkthrough detail restore the same instruction and result. In Remove Duplicates, advancing `left` and copying the array value are separate steps, each with its own highlight and diagram change. Motion can be disabled and follows Windows reduced-motion preferences.
 - **Playback:** Play advances from the current step; Pause keeps your place. Choose 0.5×, 1×, 2×, or 4×; Compact mode advances once per second at 1×; Detailed mode holds each explanation moment for two seconds. At completion, Replay restarts the current example. Manual steps, reset, input changes, switching views, opening dialogs, and leaving/minimizing the app pause playback. Press Play to resume. Speed stays selected until you close that visualizer; reopening starts at 1×.
 - **Code:** write JavaScript, TypeScript, Java or C in the offline Monaco editor. Each language keeps its own draft, and new problems open in the language you used last. **Solution** reveals the reference solution in the selected language (after asking), with Copy and Use as draft; each note also ends with the solution in JavaScript, TypeScript, Java and C. Run examples or custom JSON cases; Submit checks the bundled local suite. Stop cancels execution. Drafts save automatically, and submission history preserves the source and results of each attempt. Reset and reopening a submission ask before replacing the current draft. Switching to Code pauses the reference visualizer.
@@ -52,6 +52,10 @@ Open a problem and select **Learn**. The question, diagram, and reference code h
 
 The timeline can review earlier states. Restart creates a fresh attempt while preserving previous completion. Lesson progress stores attempts, hints, revealed answers, and the paused position in your local profile and backups. Updated lesson content restarts that walkthrough and retains any earlier completion. The Visualizer tab provides other presets and custom inputs; guided lessons use one authored example. All 252 problems have a guided lesson and reference visualizer.
 
+## Reference code in your language
+
+Visualizer and Learn show the reference code in the language selected in the problem's **Code** tab: JavaScript, TypeScript, Java or C. Each step highlights the matching line of that language's reference solution, and the walkthrough's code line and **Explain the code** quote it too. The diagram, objects and animation are the same in every language, because the JavaScript reference still runs each step. Change the language with the **Language** menu above the reference code; the Code tab switches with it. A few JavaScript lines have no counterpart in another language (for example a class wrapper that C does not use); those steps show no line highlight.
+
 ## Detailed walkthroughs
 
 Learn, Visualizer, and Debug open in **Detailed walkthrough** mode. An operation is presented as **Focus**, **Action**, and **Result**. Play advances automatically with a two-second dwell per moment at 1x; the speed selector scales that delay. Pause freezes the current moment, and Previous/Next moment review it without executing the instruction again. Whole-step controls and Next prediction remain available.
@@ -93,6 +97,7 @@ npm run check:content
 npm run check:signatures
 npm run check:native
 npm run check:solutions
+npm run check:code-maps
 npm test
 npm run test:visualizers
 npm run test:lessons
@@ -100,6 +105,7 @@ npm run test:objects
 npm run test:motion
 npm run test:guided
 npm run test:operations
+npm run test:code-languages
 npm run test:instructions
 npm run test:presets
 npm run test:oracles
@@ -130,7 +136,7 @@ The installer is written to `release/`. The Windows CI workflow runs validation 
 - `shared/`: catalog, progress, sessions, coding, and desktop API contracts.
 - `coding/`: all 252 maintained problem definitions, test suites, guest adapters, input validation, and result comparators. See [coding contracts](coding/README.md).
 - Topic folders: source Markdown and visualizers, with portable relative iframe references.
-- `visualizer-ui/`: shared design and adapters used by all 252 visualizers, including in a standalone browser.
+- `visualizer-ui/`: shared design and adapters used by all 252 visualizers, including in a standalone browser. `code-maps.json` maps their reference lines to the TypeScript, Java and C solutions.
 - `scripts/content.mjs`: validates and bundles the library. Add notes/visualizers to a topic folder and rebuild. IDs derive from problem numbers, so renames do not lose progress.
 
 Installed content is read-only; update source files and rebuild to distribute changes. Notes support GitHub-flavored Markdown and wiki links. External web links open in the system browser.
@@ -156,6 +162,8 @@ For isolated testing, `STUDY_DATA_DIR` selects another data directory and `STUDY
 Original behavior fixtures are checked in under `tests/fixtures/`. The optional `--baseline` capture mode expects an untouched original checkout in `.baseline/content`; it is for deliberate fixture maintenance. `scripts/migrate-content.mjs` is the idempotent original-vault migration.
 
 `npm run smoke` runs the three small legacy checks. `npm run capture:outputs` produces detailed HUD/console/narration reports in `reports/`; this longer diagnostic command uses the catalog to exclude app and build files.
+
+`npm run test:code-languages` steps all 252 visualizers to completion in TypeScript, Java and C and checks that every highlight (current line, walkthrough line, and guided focus) lands on exactly the mapped lines, that walkthrough code and Explain the code quote the chosen language, and that JavaScript restores the original panel. Standalone pages accept `?codeLanguage=java`.
 
 `npm run test:guided` traverses all 756 authored checkpoints, verifies actual before/after values, correct and incorrect answers, hints, reveals, navigation barriers, code references, clickable targets, and restart behavior. Focused controls tests cover forward-seek completion, keyboard resizing, error recovery, and lesson-version changes. The desktop suite checks saved progress, offline operation, backups, focus/power pauses, keyboard search, and scaling.
 

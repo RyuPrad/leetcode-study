@@ -113,3 +113,15 @@ test('every problem has a reference solution in TypeScript, Java and C', () => {
     assert.ok(fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim().length > 20, `${language} ${p.number}`);
   }
 });
+
+test('every highlighted visualizer line maps to a reviewed line of each solution', async () => {
+  const { checkMaps, sources } = await import('../scripts/code-maps.mjs');
+  const maps = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'visualizer-ui/code-maps.json'), 'utf8'));
+  const list = sources();
+  assert.equal(list.length, 252);
+  assert.deepEqual(checkMaps(maps, list), []);
+  // Two Sum: the map lookup and the store land on the hash table operations in C.
+  const twoSum = list.find((s: { number: number }) => s.number === 1)!;
+  assert.match(twoSum.solutions.c[maps[1].c[8] - 1], /HASH_FIND_INT\(seen, &need, entry\)/);
+  assert.match(twoSum.solutions.java[maps[1].java[1] - 1], /public int\[\] twoSum/);
+});

@@ -78,7 +78,7 @@
    onObjectIndex?.(objectIndex);
    clear();document.body.classList.add('walkthrough-enabled');select.value=mode;card.dataset.kind=operation.kind;card.dataset.moment=String(stage);visual.dataset.operationKind=operation.kind;
    badge.textContent=kinds[operation.kind]||'Step';position.textContent=blocked?'Prediction first':mode==='compact'?'Current operation':`${['Focus','Action','Result'][stage]} · ${stage+1}/3`;
-   caption.textContent=blocked?'Answer the prediction to watch this operation.':operation[['focus','action','result'][stage]]||operation.focus;code.textContent=operation.code;
+   caption.textContent=blocked?'Answer the prediction to watch this operation.':operation[['focus','action','result'][stage]]||operation.focus;code.textContent=window.studyCodeLanguage?.expression(operation.locations||[operation.location.line],operation.code)??operation.code;
    previous.disabled=!enabled||playing||blocked||stage===0;next.disabled=!enabled||playing||blocked||document.getElementById('btn-next').disabled&&!(operation.committed&&stage<2);controls.hidden=mode==='compact';
    if(!blocked){for(const selector of operation.targets)visual.querySelectorAll(selector).forEach(e=>e.classList.add('operation-target'));for(const line of operation.locations||[operation.location.line])(document.getElementById(`line-${line}`)||document.getElementById(`l${line}`))?.classList.add('operation-code');}
    // Two Sum previously calculated has() in its renderer before the check ran.
@@ -97,6 +97,8 @@
   adapter.subscribe(()=>{if(!committing)restore();});
   const api={get mode(){return mode;},get operation(){return operation;},get stage(){return stage;},get links(){return stage===2&&!blocked?operation.links:[];},next:nextMoment,refresh,setMode,restoreLiveView(){replay?.remove();replay=null;visual.classList.remove('operation-hidden');},setGate({canAdvance,active=true,isPlaying=false,nextStep}){blocked=!canAdvance;enabled=active;playing=isPlaying;if(nextStep)advance=nextStep;render();},cancel(){pause();refresh();}};
   window.addEventListener('message',event=>{if(embedded&&event.source===parent&&event.origin===parentOrigin&&event.data?.type==='study:walkthrough-mode')setMode(event.data.mode);});
+  // The code line follows the reference language the learner picked (code-language.js).
+  window.addEventListener('study:code-language',()=>{if(operation)render();});
   restore();if(embedded)parent.postMessage({type:'study:walkthrough-ready'},parentOrigin);return api;
  }
  window.StudyOperations={create};
