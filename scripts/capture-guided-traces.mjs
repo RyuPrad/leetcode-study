@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT} from './content.mjs';
+import{workers}from'./workers.mjs';
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).filter(l=>!process.argv[2]||process.argv.slice(2).includes(String(l.number)));
 const out=path.join(ROOT,'.test-data/guided-authoring');fs.mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({headless:true});let cursor=0;
@@ -30,4 +31,4 @@ async function worker(){const page=await browser.newPage({reducedMotion:'reduce'
   fs.writeFileSync(path.join(out,`${lesson.number}.json`),JSON.stringify({...lesson,...trace}));
   console.log(`${lesson.number}: ${trace.steps.length} states${trace.finished?'':' (not terminal)'}`);
 }await page.close();}
-try{await Promise.all(Array.from({length:4},worker));}finally{await browser.close();}
+try{await Promise.all(Array.from({length:workers()},worker));}finally{await browser.close();}

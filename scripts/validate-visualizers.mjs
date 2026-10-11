@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
 import { ROOT, collectCatalog } from './content.mjs';
+import { workers } from './workers.mjs';
 const capture = process.argv.includes('--baseline');
 const catalog = collectCatalog();
 const selected = process.env.VISUALIZER_FILTER ? catalog.visualizers.filter(f => f.includes(process.env.VISUALIZER_FILTER)) : catalog.visualizers;
@@ -76,7 +77,7 @@ async function worker() {
   }
   await page.close();
 }
-await Promise.all(Array.from({ length: 4 }, worker));
+await Promise.all(Array.from({ length: workers() }, worker));
 clearInterval(heartbeat);
 await browser.close();
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });

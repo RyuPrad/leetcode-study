@@ -4,6 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT,collectCatalog} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const catalog=collectCatalog();
@@ -47,7 +48,7 @@ async function worker(){
   await page.close();
 }
 try{
-  await Promise.all(Array.from({length:4},worker));
+  await Promise.all(Array.from({length:workers()},worker));
   const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
   const open=async number=>{await page.goto(pathToFileURL(path.join(ROOT,lessons.find(l=>l.number===number).path)).href);await page.waitForFunction(()=>window.studyLessonAdapter);};
   for(const number of [1,3,21,51,133,138,146,206,208,211,212,460,700,933,2707]){

@@ -9,6 +9,7 @@ import { starter } from '../coding/languages';
 import { runNative, nativeAvailable, type NativeLanguage } from '../desktop/native-runner';
 import type { CodingProblem } from '../shared/coding';
 import { ROOT } from './content.mjs';
+import { workers } from './workers.mjs';
 
 const problems = JSON.parse(fs.readFileSync(path.join(ROOT, 'coding/problems.json'), 'utf8')) as CodingProblem[];
 const args = process.argv.slice(2);
@@ -28,7 +29,7 @@ for (const language of languages.length ? languages : ['java', 'c'] as NativeLan
   const selected = problems.filter(p => !numbers.size || numbers.has(p.number));
   let next = 0;
   // A few jobs at once; each is its own process.
-  await Promise.all(Array.from({ length: Math.min(4, os.cpus().length) }, async () => {
+  await Promise.all(Array.from({ length: workers({ perWorkerMB: 250 }) }, async () => {
     while (next < selected.length) {
       const p = selected[next++];
       const result = await runNative(p, language, starter(p, language), p.examples.map(e => e.input), options);

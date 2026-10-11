@@ -127,6 +127,20 @@ npm run test:guided:desktop
 npm run dist:win
 ```
 
+### Running everything faster
+
+`npm run test:all` builds once, writes the generated lesson data once, then runs every suite above except `dist:win`. Browser and Node suites overlap on a budget of pages sized to the machine's cores and free memory; desktop suites follow, two at a time, each in its own profile. A desktop suite that fails beside another is retried alone and reported as flaky if it then passes. Logs go to `test-results/logs/`, and each run's timings are saved so the next one starts the slowest suites first.
+
+```powershell
+npm run test:all                         # everything
+npm run test:all -- --skip-desktop       # browser and Node suites only
+npm run test:all -- --only=guided,test:coding
+npm run test:all -- --serial             # one at a time, for a baseline or debugging
+npm run test:all -- --jobs=12 --desktop-jobs=1
+```
+
+Suites that spread their own work (`test:visualizers`, `test:lessons`, `test:guided`, `test:code-languages`, `check:native`, `check:solutions` and others) size themselves the same way when run alone; set `STUDY_TEST_WORKERS=N` to fix the number of pages or processes.
+
 The installer is written to `release/`. The Windows CI workflow runs validation and uploads an installer artifact; it does not publish releases. `npm start` launches the most recent build.
 
 ## Project structure

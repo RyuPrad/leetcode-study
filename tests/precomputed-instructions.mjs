@@ -6,6 +6,7 @@ import {chromium} from 'playwright';
 import {parse} from '@babel/parser';
 import traverse from '@babel/traverse';
 import {ROOT} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).filter(lesson=>lesson.mode==='precomputed');
 const browser=await chromium.launch();
@@ -45,7 +46,7 @@ async function worker(){
   await page.close();
 }
 try{
-  await Promise.all(Array.from({length:3},worker));
+  await Promise.all(Array.from({length:workers()},worker));
   const page=await browser.newPage();
   for(const id of [4,18,22,25,36,67,150,394,860,981,1834,1871]){
     await page.goto(pathToFileURL(path.join(ROOT,lessons.find(lesson=>lesson.number===id).path)).href);

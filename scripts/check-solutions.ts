@@ -11,6 +11,7 @@ import { stripTypes } from '../coding/typescript';
 import { nativeAvailable, runNative } from '../desktop/native-runner';
 import type { CodingProblem, JudgeResult } from '../shared/coding';
 import { ROOT } from './content.mjs';
+import { workers } from './workers.mjs';
 
 const problems = JSON.parse(fs.readFileSync(path.join(ROOT, 'coding/problems.json'), 'utf8')) as CodingProblem[];
 const args = process.argv.slice(2);
@@ -33,7 +34,7 @@ for (const language of chosen.length ? chosen : ['typescript', 'java', 'c'] as c
   if (language !== 'typescript' && !nativeAvailable(options, language)) throw new Error(`The ${language} toolchain is missing. Run npm run fetch:toolchains and npm run build.`);
   const selected = problems.filter(p => !numbers.size || numbers.has(p.number));
   let next = 0;
-  await Promise.all(Array.from({ length: language === 'typescript' ? 1 : Math.min(4, os.cpus().length) }, async () => {
+  await Promise.all(Array.from({ length: language === 'typescript' ? 1 : workers({ perWorkerMB: 250 }) }, async () => {
     while (next < selected.length) {
       const problem = selected[next++], file = path.join(ROOT, solutionPath(problem.number, language));
       checked++;

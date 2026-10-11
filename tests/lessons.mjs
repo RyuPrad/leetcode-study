@@ -4,6 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
 import {ROOT} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const browser=await chromium.launch({headless:true});const failures=[],screenshots=new Set([1,21,70,94,133,208,46,155,56,191,752]);let count=0,cursor=0;
 async function worker(){const page=await browser.newPage({viewport:{width:1360,height:940},reducedMotion:'reduce'});while(cursor<manifest.length){const lesson=manifest[cursor++],errors=[];const onError=error=>errors.push(error.message);page.on('pageerror',onError);try{
@@ -34,5 +35,5 @@ async function worker(){const page=await browser.newPage({viewport:{width:1360,h
     assert.deepEqual(actual,expected.map((_,i)=>`[${expected.slice(0,i+1).join(', ')}]`),'traversal trace contains each visit once');
   }
 }catch(error){failures.push({number:lesson.number,error:String(error)});}finally{page.off('pageerror',onError);}count++;if(count%25===0)console.log(`Teaching checks ${count}/${manifest.length}, ${failures.length} failures`);}await page.close();}
-try{await Promise.all(Array.from({length:4},worker));}finally{await browser.close();}
+try{await Promise.all(Array.from({length:workers()},worker));}finally{await browser.close();}
 fs.writeFileSync(path.join(ROOT,'test-results/lessons.json'),JSON.stringify({count,failures},null,2));console.log(JSON.stringify({count,failures},null,2));if(failures.length)process.exitCode=1;

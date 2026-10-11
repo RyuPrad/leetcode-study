@@ -117,7 +117,7 @@ async function test(name, work) { await work(); groups++; console.log('PASS', na
 const inlineAssets = text => [...text.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"[^>]*>/g)].map(match => match[1]);
 await test('only shared playback, timeline and bridge are used', () => {
   assert.ok(script); assert.ok(!/stepCursor|togglePlayback|setPlaybackSpeed|copy-motion-layer/.test(html));
-  assert.equal(inlineAssets(html).length, 14);
+  assert.equal(inlineAssets(html).length, 17);
   assert.ok(inlineAssets(html).every(asset => asset.startsWith('../visualizer-ui/')));
   assert.match(script, /index: \(\) => historyStack.length/);
   assert.match(script, /return StudyObjectState.frame\(1929, raw, source.spec\)/);

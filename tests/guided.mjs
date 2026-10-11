@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 const metadata=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const content=['a','b'].flatMap(shard=>fs.existsSync(path.join(ROOT,`visualizer-ui/guided-content-${shard}.json`))?JSON.parse(fs.readFileSync(path.join(ROOT,`visualizer-ui/guided-content-${shard}.json`),'utf8')):[]);
 const semantics=JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures/guided-semantics.json'),'utf8'));
@@ -73,5 +74,5 @@ async function worker(){const page=await browser.newPage({viewport:{width:1440,h
     finally{page.off('pageerror',onError);}count++;if(count%25===0)console.log(`Guided lessons ${count}/${lessons.length}; ${checkpoints} checkpoints; ${failures.length} failures`);
   }await page.close();
 }
-try{await Promise.all(Array.from({length:4},worker));}finally{await browser.close();}
+try{await Promise.all(Array.from({length:workers()},worker));}finally{await browser.close();}
 const result={lessons:count,checkpoints,failures};fs.writeFileSync(path.join(ROOT,process.argv[2]?'test-results/guided-selected.json':'test-results/guided.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));if(failures.length)process.exitCode=1;

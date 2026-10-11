@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 import {testSingleLineHighlights} from './single-line-highlights.mjs';
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const browser=await chromium.launch({headless:true}),failures=[];let cursor=0,checked=0,steps=0;
@@ -31,7 +32,7 @@ async function worker(){const page=await browser.newPage({viewport:{width:1440,h
  });
  assert.ok(result.complete,'whole walkthrough reaches completion');steps+=result.count;assert.deepEqual(errors,[]);checked++;
  }catch(error){failures.push({number:lesson.number,error:String(error)});console.log('FAIL',lesson.number,String(error));}finally{page.off('pageerror',onError);}if((checked+failures.length)%25===0)console.log(`Operations ${checked+failures.length}/${lessons.length}; ${steps} transitions; ${failures.length} failures`);}await page.close();}
-try{await Promise.all(Array.from({length:4},worker));
+try{await Promise.all(Array.from({length:workers()},worker));
  const removeDuplicates=await browser.newPage();await removeDuplicates.goto(pathToFileURL(path.join(ROOT,lessons.find(l=>l.number===26).path)).href);await removeDuplicates.waitForFunction(()=>window.studyWalkthrough);
  const writeTrace=await removeDuplicates.evaluate(()=>{document.getElementById('custom-input').value='1,1,3';window.loadCustom();const events=[];for(let count=0;count<30&&!document.getElementById('btn-next').disabled;count++){studyLessonAdapter.next();const op=studyWalkthrough.operation,raw=studyLessonSource.read();if(['COMPARE','ADVANCE_LEFT','WRITE'].includes(op.phase))events.push({phase:op.phase,line:op.location.line,locations:op.locations,code:op.code,kind:op.kind,highlight:[...document.querySelectorAll('.operation-code')].map(el=>el.id),left:raw.left,right:raw.right,equal:raw.lastCompareEqual,nums:raw.nums});}return events;});
  assert.ok(writeTrace.some(event=>event.phase==='ADVANCE_LEFT'&&event.line===6&&JSON.stringify(event.locations)==='[6]'&&event.highlight.join(',')==='line-6'&&event.code==='left++;'&&event.left===1),'left advances in its own highlighted step');

@@ -4,6 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT} from '../scripts/content.mjs';
+import{workers}from'../scripts/workers.mjs';
 
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
 const browser=await chromium.launch({headless:true});
@@ -62,7 +63,7 @@ async function worker(){
  }
  await page.close();
 }
-try{await Promise.all(Array.from({length:3},worker));}finally{await browser.close();}
+try{await Promise.all(Array.from({length:workers()},worker));}finally{await browser.close();}
 const summary={lessons:results.length,presets:results.reduce((n,result)=>n+result.cases.length,0),transitions:results.reduce((n,result)=>n+result.cases.reduce((sum,c)=>sum+c.steps,0),0),results,failures};
 fs.writeFileSync(path.join(ROOT,'test-results/preset-instructions.json'),JSON.stringify(summary,null,2));
 console.log(JSON.stringify({lessons:summary.lessons,presets:summary.presets,transitions:summary.transitions,failures},null,2));
