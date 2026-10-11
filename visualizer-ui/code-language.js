@@ -54,14 +54,16 @@
     return built[target] = data[target].lines.map((text, i) => {
       const row = make('div', 'study-mirror-line');
       row.dataset.line = String(i + 1);
-      if (text) paint(row, text, words, state); else row.append(' ');
+      // Blank lines stay empty, as on the original panel; a wrapped line continues four
+      // columns past its own indentation.
+      if (text.trim()) { paint(row, text, words, state); row.style.setProperty('--hang', `${text.match(/^ */)[0].length + 4}ch`); }
       return row;
     });
   }
-  // Keeps the highlighted line visible inside the scrolling code panel.
+  // Keeps the highlighted line visible below the language bar inside the scrolling code panel.
   function reveal(row) {
-    const r = row.getBoundingClientRect(), p = panel.getBoundingClientRect();
-    if (r.top < p.top || r.bottom > p.bottom) panel.scrollTop += r.top - p.top - p.height / 3;
+    const r = row.getBoundingClientRect(), p = panel.getBoundingClientRect(), top = Math.max(p.top, bar.getBoundingClientRect().bottom);
+    if (r.top < top || r.bottom > p.bottom) panel.scrollTop += r.top - top - (p.bottom - top) / 3;
   }
   function sync() {
     if (language === 'javascript') return;
@@ -71,7 +73,10 @@
       for (const [n, el] of rows) if (el.classList.contains(cls) && map[n]) targets.add(map[n]);
       lines.forEach((row, i) => row.classList.toggle(cls, targets.has(i + 1)));
     }
-    const active = mirror.querySelector('.study-mirror-line.active,.study-mirror-line.operation-code');
+    // The highlight the learner sees: the walkthrough's line replaces the current line while
+    // the walkthrough is on, and the guided lesson's focus counts too.
+    const shown = document.body.classList.contains('walkthrough-enabled') ? 'operation-code' : 'active';
+    const active = mirror.querySelector(`.study-mirror-line.${shown},.study-mirror-line.guided-code-focus`);
     if (active && active !== lastActive) reveal(active);
     lastActive = active;
   }

@@ -6,7 +6,7 @@ Browse and search the bundled library, step through algorithms, inspect live var
 
 ## Using the app
 
-Install `LeetCode-Study-0.10.0-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
+Install `LeetCode-Study-0.10.1-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
 
 - **Library:** search by number, title, topic, or note text; filter by progress; browse bookmarks and the review queue.
 - **Learn:** all 252 visualizers have a fixed guided example with three authored predictions (756 in total). Read the question beside the diagram and reference code, choose an answer or an outlined diagram item, ask for either of two hints, or choose Show me. Watch each intervening instruction in order and read why it works. Basics explanations cover the actual code being used, in the reference language you choose. Answers and position save automatically; returning starts paused. Guided completion is separate from solving the coding problem.
@@ -54,7 +54,7 @@ The timeline can review earlier states. Restart creates a fresh attempt while pr
 
 ## Reference code in your language
 
-Visualizer and Learn show the reference code in the language selected in the problem's **Code** tab: JavaScript, TypeScript, Java or C. Each step highlights the matching line of that language's reference solution, and the walkthrough's code line and **Explain the code** quote it too. The diagram, objects and animation are the same in every language, because the JavaScript reference still runs each step. Change the language with the **Language** menu above the reference code; the Code tab switches with it. A few JavaScript lines have no counterpart in another language (for example a class wrapper that C does not use); those steps show no line highlight.
+Visualizer and Learn show the reference code in the language selected in the problem's **Code** tab: JavaScript, TypeScript, Java or C. Each step highlights the matching line of that language's reference solution, and the walkthrough's code line and **Explain the code** quote it too. The diagram, objects and animation are the same in every language, because the JavaScript reference still runs each step. Change the language with the **Language** menu above the reference code; the Code tab switches with it. A few JavaScript lines have no counterpart in another language (for example a class wrapper that C does not use); those steps show no line highlight. The translated code uses the same type and highlights as the JavaScript panel (with the walkthrough on, only the walkthrough's line is highlighted); long Java and C lines wrap under their own indentation, and the Language menu stays pinned while the panel follows the highlighted line.
 
 ## Detailed walkthroughs
 
