@@ -113,6 +113,33 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
   }
   console.log('PASS restart persistence and 100%, 125%, 150% display scaling');
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.webContents.setZoomFactor(1); win.focus(); });
+  const beforeTyping = (await page.evaluate(() => window.study.bootstrap())).data;
+  await page.getByRole('button', { name: 'Typing practice', exact: true }).click();
+  await page.locator('.breadcrumb strong').filter({ hasText: 'Typing practice' }).waitFor();
+  assert.equal(await page.getByLabel('Problems to type').inputValue(), 'started');
+  await page.locator('.typing-snippet-head strong').waitFor();
+  await page.waitForFunction(() => document.activeElement?.classList.contains('typing-input'));
+  await page.keyboard.type('abc');
+  assert.equal(await page.locator('.typing-line .ok, .typing-line .bad').count(), 3);
+  assert.equal((await page.evaluate(() => window.study.bootstrap())).data.sessions.length, beforeTyping.sessions.length, 'the Typing page is not study time for a problem');
+  await page.getByRole('button', { name: 'LeetCode Study home', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search problems' }).fill('Two Sum');
+  await page.getByRole('button', { name: 'Open Two Sum', exact: true }).click();
+  await page.getByRole('tab', { name: 'Type', exact: true }).click();
+  await page.getByText('Reveal the solution?').waitFor();
+  assert.equal(await page.locator('.typing-text').count(), 0);
+  await page.getByRole('button', { name: 'Show solution and type it', exact: true }).click();
+  await page.waitForFunction(() => document.activeElement?.classList.contains('typing-input'));
+  await page.keyboard.type('fun');
+  assert.equal(await page.locator('.typing-tab .typing-line .ok, .typing-tab .typing-line .bad').count(), 3);
+  await page.getByRole('tab', { name: 'Notes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Type', exact: true }).click();
+  await page.waitForFunction(() => document.activeElement?.classList.contains('typing-input'));
+  assert.equal(await page.locator('.typing-tab .typing-line .ok, .typing-tab .typing-line .bad').count(), 3, 'a paused run survives switching tabs');
+  const afterTyping = (await page.evaluate(() => window.study.bootstrap())).data;
+  for (const key of ['progress', 'drafts', 'submissions', 'guided']) assert.deepEqual(afterTyping[key], beforeTyping[key], `typing practice leaves ${key} unchanged`);
+  console.log('PASS typing practice page and Type tab without changing study records');
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(ROOT, 'test-results/desktop.json'), JSON.stringify({ passed: true, cases: ['offline library', 'visualizer and custom inputs', 'playback and lifecycle pauses', 'playback message validation', 'isolated visualizer', 'progress and bookmarks', 'notes and reference links', 'history editing', 'backup restore and validation', 'restart persistence', 'display scaling'] }, null, 2));
+  fs.writeFileSync(path.join(ROOT, 'test-results/desktop.json'), JSON.stringify({ passed: true, cases: ['offline library', 'visualizer and custom inputs', 'playback and lifecycle pauses', 'playback message validation', 'isolated visualizer', 'progress and bookmarks', 'notes and reference links', 'history editing', 'backup restore and validation', 'restart persistence', 'display scaling', 'typing practice'] }, null, 2));
 } finally { await app.close(); }
