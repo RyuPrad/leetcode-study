@@ -10,6 +10,15 @@ test('every problem is catalogued with a stable ID and portable visualizer refer
   assert.equal(catalog.entries.filter(e => e.number).length, 252); assert.equal(catalog.visualizers.length, 252); assert.equal(new Set(catalog.entries.map(e => e.id)).size, 254);
   for (const entry of catalog.entries) { assert.ok(!entry.markdown.includes('<iframe')); if (entry.number) assert.equal(entry.id, `leetcode:${entry.number}`); if (entry.visualizerPath) { const source = fs.readFileSync(path.join(ROOT, entry.notePath), 'utf8'); assert.ok(!source.includes('file:///')); assert.ok(fs.readFileSync(path.join(ROOT, entry.visualizerPath), 'utf8').includes('../visualizer-ui/workspace.js')); } }
 });
+test('every problem carries its LeetCode difficulty and every listed difficulty names a problem', () => {
+  const listed = JSON.parse(fs.readFileSync(path.join(ROOT, 'coding/difficulty.json'), 'utf8'));
+  const problems = catalog.entries.filter(e => e.number);
+  for (const entry of problems) assert.ok(['Easy', 'Medium', 'Hard'].includes(entry.difficulty!), `${entry.id} difficulty`);
+  assert.deepEqual(Object.keys(listed).map(Number).sort((a, b) => a - b), problems.map(e => e.number).sort((a, b) => a! - b!));
+  assert.equal(catalog.entries.filter(e => !e.number && e.difficulty).length, 0);
+  // Spot checks against LeetCode, one per level.
+  assert.deepEqual(['leetcode:1', 'leetcode:3', 'leetcode:4'].map(id => catalog.entries.find(e => e.id === id)?.difficulty), ['Easy', 'Medium', 'Hard']);
+});
 test('every problem has a visualizer and both reference guides remain accessible', () => {
   assert.deepEqual(catalog.entries.filter(e => e.number && !e.visualizerPath).map(e => e.number), []); assert.equal(catalog.entries.filter(e => e.topic === 'Reference').length, 2);
 });

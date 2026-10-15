@@ -2,8 +2,9 @@ import type { CodeDraft, JudgeResult, Language, NativeLanguage, NativeRunRequest
 import type { GuidedProgress } from './guided';
 export type ProblemStatus = 'not-started' | 'in-progress' | 'completed';
 export type Outcome = 'studied' | 'solved' | 'needs-review';
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export interface Entry {
-  id: string; number?: number; title: string; topic: string;
+  id: string; number?: number; title: string; topic: string; difficulty?: Difficulty;
   notePath: string; markdown: string; searchText: string; visualizerPath?: string;
 }
 export interface Catalog { version: 1; entries: Entry[]; topics: string[]; visualizers: string[]; }

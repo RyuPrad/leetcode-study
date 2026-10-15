@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TOPICS = ['Array & Hashing', 'Two Pointers', 'Sliding Window', 'Stack', 'Binary Search', 'LinkedList', 'Trees', 'BST', 'Tries', 'Heap', 'Backtracking', 'Graphs', 'Advanced Graphs', '1-D Dynamic Programming', '2-D Dynamic Programming', 'Greedy', 'Intervals', 'Math & Geometry', 'Bit Manipulation', 'Queue'];
 const REFERENCES = ['Leetcode Cheatsheet.md', 'Variable Naming Guide.md'];
+export const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const iframe = /<iframe\b[\s\S]*?<\/iframe\s*>/gi;
 // The bundled note ends with the reference solution in every language. Maintained notes stay
 // unchanged; JavaScript comes from coding/problems.json and the rest from coding/solutions.
@@ -28,6 +29,9 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   // Historical comparison checkouts predate the coding workspace and have no solutions.
   const references = fs.existsSync(path.join(root, 'coding', 'solutions')) && fs.existsSync(problemsFile)
     ? new Map(JSON.parse(fs.readFileSync(problemsFile, 'utf8')).map(p => [p.number, p.reference])) : null;
+  // LeetCode's official difficulty for each problem; historical checkouts have none.
+  const difficultyFile = path.join(root, 'coding', 'difficulty.json');
+  const difficulties = fs.existsSync(difficultyFile) ? JSON.parse(fs.readFileSync(difficultyFile, 'utf8')) : null;
   for (const topic of TOPICS) {
     const folder = path.join(root, topic);
     for (const file of fs.readdirSync(folder).sort()) {
@@ -55,7 +59,9 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
       const markdown = source.replace(iframe, '').trim();
       const number = Number(match[1]);
       const solutions = references ? solutionsSection(root, number, references, errors) : '';
-      entries.push({ id: `leetcode:${number}`, number, title: match[2], topic, notePath: relative, markdown: markdown + solutions, searchText: `${match[1]} ${match[2]} ${topic} ${markdown}`.toLowerCase(), ...(visualizerPath ? { visualizerPath } : {}) });
+      const difficulty = difficulties?.[number];
+      if (difficulties && !DIFFICULTIES.includes(difficulty)) errors.push(`Missing difficulty for problem ${number}`);
+      entries.push({ id: `leetcode:${number}`, number, title: match[2], topic, notePath: relative, markdown: markdown + solutions, searchText: `${match[1]} ${match[2]} ${topic} ${markdown}`.toLowerCase(), ...(difficulty ? { difficulty } : {}), ...(visualizerPath ? { visualizerPath } : {}) });
     }
   }
   for (const file of REFERENCES) {
@@ -72,6 +78,7 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
       if (!entries.some(e => e.title === target || e.notePath.replace(/\.md$/i, '') === target || path.basename(e.notePath, '.md') === target)) errors.push(`Unresolved wiki link ${target} in ${entry.notePath}`);
     }
   }
+  if (difficulties) for (const number of Object.keys(difficulties)) if (!entries.some(e => e.number === Number(number))) errors.push(`Difficulty listed for unknown problem ${number}`);
   const linked = new Set(entries.map(e => e.visualizerPath).filter(Boolean));
   for (const file of visualizers) if (!linked.has(file)) errors.push(`Unlinked visualizer: ${file}`);
   if (errors.length) throw new Error(errors.join('\n'));
