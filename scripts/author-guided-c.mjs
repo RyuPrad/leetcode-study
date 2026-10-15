@@ -263,4 +263,88 @@ add(1963,'Track the largest excess of "]" over "[" in any prefix; each swap fixe
 [4,'The first character is "]". What is extraClose?','1','-1~A closing bracket increases extraClose.','0~extraClose was 0 before.','"]" adds one.','0 + 1 = 1.'],
 [8,'Next comes "[". What is extraClose?','0','1~An opening bracket decreases it.','2~"[" cancels the earlier "]".','"[" subtracts one.','1 - 1 = 0.'],
 [19,'maxClose = 1. What is returned?','1','0~One unmatched "]" still needs a swap.','2~One swap fixes up to two unmatched brackets.','floor((maxClose + 1) / 2).','floor(2 / 2) = 1.']]);
+add(2439,'Each prefix keeps its total, so the best maximum for it is the total shared evenly, rounded up.','Averaging the whole array ignores that value can only move left, so a large early value cannot be spread to the right.',[
+[5,'prefix = 3 over 1 slot. What is res?','3','0~res takes ceil(3 / 1) = 3.','1~The first slot keeps its whole value.','res = max(res, ceil(prefix / (i + 1))).','ceil(3 / 1) = 3.'],
+[9,'prefix = 10 over 2 slots. What is res?','5','10~The 10 can be shared by two slots.','4~ceil(10 / 2) = 5.','Divide prefix by i + 1 and round up.','max(3, 5) = 5.'],
+[20,'What is returned?','5','6~ceil(17 / 4) = 5.','4~The first two values force at least 5.','res is the largest prefix bound.','The prefix [3, 7] already needs 5.']]);
+add(1423,'Start with all k cards on the left, then trade the innermost left card for the next right card, one at a time.','Taking the larger end card each time is greedy in the wrong way: a small card can hide large ones behind it.',[
+[11,'After taking the first 3 cards, what is total?','6','3~Three cards are taken: 1 + 2 + 3.','10~Only the left cards 1, 2 and 3 are taken.','Sum cardPoints[0..2].','1 + 2 + 3 = 6.'],
+[17,'Swap left card 2 (value 3) for the last card (value 1). What is total?','4','6~The swap changes the total by 1 - 3.','7~The left card is dropped, not kept.','total += cardPoints[6] - cardPoints[2].','6 + 1 - 3 = 4.'],
+[26,'Taking 6, 5 and 1 from the right gives total = 12. What is res?','12','8~12 is larger than the previous best.','6~res keeps the best total.','res = max(res, total).','max(8, 12) = 12.']]);
+add(1921,'Compute when each monster arrives, sort, and shoot the earliest arrival each minute.','Sorting by distance alone ignores speed: a far but fast monster can arrive first.',[
+[4,'Monster 0 is 1 away at speed 1. What is pushed?','1','0~It reaches the city at minute 1.','2~ceil(1 / 1) = 1.','ceil(dist / speed).','1 / 1 = 1.'],
+[16,'Minute 0: arrival[0] = 1. Is the monster shot in time?','Yes','No~1 > 0, so it has not arrived yet.','Only if speed is 1~Only the arrival minute matters.','Lose when arrival[minute] <= minute.','1 <= 0 is false.'],
+[25,'What is returned?','3','2~Monster 2 arrives at minute 4, after the shot at minute 2.','0~No monster arrives before its shot.','Every monster was shot in time.','Return arrival.length.']]);
+add(1029,'Sort people by how much cheaper city a is, then send the first half to a and the rest to b.','Sending each person to their own cheaper city can put more than half of them in one city.',[
+[1,'After sorting by costs[i][0] - costs[i][1], which person comes first?','[30, 200]','[10, 20]~Its difference is -10; [30, 200] has -170.','[400, 50]~Its difference, 350, is the largest, so it is last.','Smallest difference first.','30 - 200 = -170.'],
+[6,'i = 0: person 0 goes to a and person 2 goes to b. What is res?','50','230~Person 0 pays costs[0][0] = 30, not 200.','60~Person 2 pays costs[2][1] = 20.','costs[0][0] + costs[2][1].','30 + 20 = 50.'],
+[12,'What is returned?','110','50~Two more people are added at i = 1.','160~Person 3 goes to b and pays 50.','res = 50 + 10 + 50.','10 + 50 more for the second pair.']]);
+add(646,'Sort pairs by right end and take every pair that starts after the chain ends.','Sorting by left end lets a long early pair block many short ones.',[
+[4,'The chain is empty (end = -Infinity). Can [1, 2] start it?','Yes','No~Any left value is larger than -Infinity.','Only after sorting again~The pairs are already sorted.','Compare left > end.','1 > -Infinity.'],
+[8,'end = 2 and the next pair is [2, 3]. Can it follow?','No','Yes~It must start strictly after 2.','Yes, and end becomes 3~2 is not greater than 2.','Compare 2 > 2.','The pairs would share the value 2.'],
+[14,'What is returned?','2','3~[2, 3] overlaps [1, 2].','1~[3, 4] starts after 2.','The chain is [1, 2] then [3, 4].','Two pairs.']]);
+add(1647,'Count each letter, then lower any frequency that is already taken until it is free or zero.','Deleting every letter of a clashing frequency is too much; only enough to reach a free frequency is needed.',[
+[23,'"a" has frequency 3, which is free. What is used after the claim?','{3}','{}~The frequency is claimed.','{3, 3}~A set holds each value once.','used.add(3).','used = {3}.'],
+[26,'"b" also has frequency 3, which is taken. What is freq after one deletion?','2','3~One "b" is deleted.','0~Deletions stop once the frequency is free.','freq--.','3 - 1 = 2.'],
+[36,'What is returned?','2','1~"c" also needs a deletion: 2 is taken by "b".','3~"b" needs only one deletion.','One "b" and one "c" are deleted.','Frequencies 3, 2 and 1.']]);
+add(1288,'Sort by start (longer first on ties); an interval is covered when it ends no later than the farthest end seen so far.','Sorting by start alone lets a shorter interval with the same start come first, so the longer one that covers it is counted too.',[
+[1,'After sorting by start, longer first on ties, what is the order?','[1, 4], [2, 8], [3, 6]','[1, 4], [3, 6], [2, 8]~Sort by start: 2 comes before 3.','[2, 8], [1, 4], [3, 6]~Start 1 comes first.','Sort by start ascending.','Starts 1, 2, 3.'],
+[9,'[2, 8) ends at 8 > maxEnd = 4. What is res?','2','1~It is not covered, so it counts.','3~Only two intervals have been checked.','res++ when end > maxEnd.','[1, 4) and [2, 8) remain.'],
+[12,'[3, 6) ends at 6 and maxEnd = 8. Is it covered?','Yes, it is skipped','No, res becomes 3~[2, 8) covers it.','No, maxEnd becomes 6~maxEnd never shrinks.','Compare 6 > 8.','2 <= 3 and 6 <= 8.']]);
+add(352,'Keep the numbers in a set; to report, walk them in order and either extend the last interval or start a new one.','Storing intervals and merging them on every addNum is easy to get wrong when a number joins two intervals at once.',[
+[4,'addNum(1). What does this.values hold?','{1}','{}~1 is added.','{1, 1}~A set holds each value once.','this.values.add(1).','values = {1}.'],
+[52,'sorted = [1, 2, 3, 7], res = [[1, 1]] and value = 2. What is res?','[[1, 2]]','[[1, 1], [2, 2]]~2 = 1 + 1 continues the run.','[[1, 1]]~The last interval is extended.','res[res.length - 1][1] = 2.','1 and 2 are consecutive.'],
+[80,'res = [[1, 3], [6, 6]] and value = 7. What is res?','[[1, 3], [6, 7]]','[[1, 3], [6, 6], [7, 7]]~7 = 6 + 1 extends the last interval.','[[1, 7]]~4 and 5 are missing.','Check res[last][1] + 1 === 7.','6 + 1 = 7.']]);
+add(1523,'Count the odd numbers from 0 to high, then subtract those below low.','Computing (high - low) / 2 is off by one whenever both ends are odd.',[
+[1,'How many odd numbers are in [0, 7]?','4','3~1, 3, 5 and 7 are all odd.','8~Only every other number is odd.','floor((7 + 1) / 2).','1, 3, 5, 7.'],
+[2,'How many odd numbers are below low = 3?','1','2~Only 1 is odd in [0, 2].','0~1 is odd and below 3.','floor(3 / 2).','Just 1.'],
+[3,'What is returned?','3','4~1 is below the range.','5~Count only odd numbers.','upToHigh - belowLow.','3, 5 and 7.']]);
+add(1572,'Add the two diagonal cells of every row, skipping the second when it is the same cell.','Adding both diagonals in full counts the center of an odd matrix twice.',[
+[7,'Row 0 adds mat[0][0] = 1, then mat[0][2] = 3. What is res?','4','3~res already held 1.','1~The secondary cell is a different cell in row 0.','res += mat[0][2].','1 + 3 = 4.'],
+[11,'Row 1: n - 1 - i = 1 = i. Is mat[1][1] added a second time?','No','Yes~It is the center cell, counted once.','Only for even n~Here n = 3 is odd.','Check i !== n - 1 - i.','1 === 1, so skip it.'],
+[19,'What is returned?','25','30~The center 5 is counted once.','15~Both diagonals are added.','1 + 3 + 5 + 7 + 9.','The sum is 25.']]);
+add(149,'Fix an anchor point and group the later points by their slope from it; each group is one line.','Comparing slopes from two different anchors mixes up parallel lines with the same slope.',[
+[8,'Anchor (1, 1) and point (2, 2): dx = 1, dy = 1. What is slope?','1','0~dy is not 0.','Infinity~dx is not 0.','dy / dx.','1 / 1 = 1.'],
+[15,'Point (3, 3) also has slope 1 from the anchor. What is count for slope 1?','3','2~A second point joins the same line.','1~The anchor plus two points.','count.get(1) + 1.','The line holds (1, 1), (2, 2) and (3, 3).'],
+[37,'What is returned?','3','2~All three points share slope 1 from (1, 1).','1~Lines through two or more points were found.','res is the largest count.','All points lie on y = x.']]);
+add(59,'Fill the top row, right column, bottom row and left column of the unfilled rectangle, shrinking it after each side.','Not moving a boundary after its side is filled makes the next side overwrite the corner.',[
+[7,'Top row, c = 0. What is written to matrix[0][0]?','1','0~value starts at 1.','2~value++ writes 1 and then increments.','matrix[top][c] = value++.','matrix[0][0] = 1; value becomes 2.'],
+[16,'The top row is full. What is top after top++?','1','0~The filled row leaves the rectangle.','2~top moves down one row.','top++.','The unfilled rectangle now starts at row 1.'],
+[44,'Only matrix[1][1] is left. What is written there?','9','10~value is 9 before the increment.','8~8 went to matrix[1][0].','The last cell gets n × n.','3 × 3 = 9.']]);
+add(9,'Move digits from the end of x onto reversed until reversed is at least x, then compare the halves.','Reversing the whole number can overflow, and comparing strings is not allowed here.',[
+[4,'x = 121. What is reversed after taking the last digit?','1','121~Only one digit moves per step.','12~The last digit is 1.','reversed * 10 + x % 10.','0 * 10 + 1 = 1.'],
+[8,'reversed = 12 after the second move. What is x after dropping that digit?','1','12~The last digit is removed from x.','0~12 / 10 rounds down to 1.','x = floor(x / 10).','floor(12 / 10) = 1.'],
+[10,'x = 1 and reversed = 12. What is returned?','true','false~The middle digit is dropped: floor(12 / 10) = 1.','12~The function returns a boolean.','Compare x with floor(reversed / 10).','1 === 1.']]);
+add(263,'Divide out every factor of 2, 3 and 5; an ugly number is left with 1.','Forgetting that n can be 0 or negative makes the loop run forever on 0.',[
+[4,'n = 6 and p = 2 divides it. What is n?','3','6~n is divided by 2.','2~6 / 2 = 3.','n /= p.','6 / 2 = 3.'],
+[8,'p = 3 divides n = 3. What is n?','1','3~n is divided by 3.','0~3 / 3 = 1.','n /= p.','3 / 3 = 1.'],
+[13,'What is returned?','true','false~Only 1 is left.','1~The function returns a boolean.','Check n === 1.','6 = 2 × 3.']]);
+add(1260,'Treat the grid as one row-major list; the cell at position i moves to (i + k) % total.','Shifting one step at a time k times is slow, and k can exceed the grid size.',[
+[5,'i = 0 and k = 1 in a 3 × 3 grid. What is target?','1','0~Each cell moves k = 1 place.','9~target wraps with % total.','(i + k) % total.','(0 + 1) % 9 = 1.'],
+[6,'target = 1 is row 0, column 1. What is res after the move?','[[0, 1, 0], [0, 0, 0], [0, 0, 0]]','[[1, 0, 0], [0, 0, 0], [0, 0, 0]]~The value lands at position 1, not 0.','[[0, 0, 0], [1, 0, 0], [0, 0, 0]]~Position 1 is in row floor(1 / 3) = 0.','Row floor(1 / 3), column 1 % 3.','res[0][1] = grid[0][0] = 1.'],
+[37,'i = 8 is the last cell. What is target?','0','9~(8 + 1) % 9 wraps around to 0.','8~The cell still moves one place.','(i + k) % total.','The last cell moves to res[0][0].']]);
+add(12,'Try the values from largest to smallest and write each symbol while it fits.','Leaving out the subtractive pairs like CM and IV produces forms such as DCCCC instead of CM.',[
+[7,'3749 >= 1000. What is res?','"M"','"MMM"~One symbol is written per step.','""~M fits, so it is written.','res += symbols[0].','res = "M".'],
+[22,'num = 749 and 500 fits. What is res?','"MMMD"','"MMMDCC"~Only one symbol is written per step.','"MMMCM"~749 is less than 900.','res += "D".','D is 500.'],
+[69,'What is returned?','"MMMDCCXLIX"','"MMMDCCXXXXVIIII"~40 and 9 use XL and IX.','"MMMDCCIL"~49 is XL plus IX.','3000 + 700 + 40 + 9.','MMM, DCC, XL, IX.']]);
+add(1041,'Run the instructions once: the robot is bounded if it returns to the origin or ends facing a new direction.','Simulating many passes and checking the distance is slow and needs a guess of how many passes are enough.',[
+[6,'Facing north (d = 0), "G" moves by dirs[0] = [0, 1]. What is y?','1','0~North increases y by 1.','2~One step per G.','y += dirs[0][1].','0 + 1 = 1.'],
+[14,'"L" while facing north (d = 0). What is d?','3','1~1 is east; turning left from north faces west.','2~One left turn is a quarter turn.','d = (d + 3) % 4.','(0 + 3) % 4 = 3: west.'],
+[28,'After one pass the robot is at (0, 0) facing south. What is returned?','true','false~It is back at the origin.','2~The function returns a boolean.','Check x === 0 && y === 0 first.','It repeats the same loop forever.']]);
+add(6,'Send each character to a row, moving the row down to the bottom and back up to the top.','Computing each output position with a formula is easy to get wrong for the diagonal characters.',[
+[10,'c = "A" goes to row 1. What is rows?','["P", "A", ""]','["PA", "", ""]~row moved to 1 after "P".','["P", "", "A"]~step = 1 moves one row down.','rows[row] += c with row = 1.','"A" starts row 1.'],
+[18,'row = 2 is the bottom row. What is step?','-1','1~At the bottom the direction reverses.','0~The row keeps moving.','step = -1 at numRows - 1.','The zigzag goes back up.'],
+[78,'What is returned?','"PAHNAPLSIIGYIR"','"PAHNAPLSIIGRIY"~Each row keeps its placement order.','"PAYPALISHIRING"~That is s itself.','Join "PAHN", "APLSIIG" and "YIR".','rows.join("").']]);
+add(2028,'The mean fixes the total of the missing rolls; spread it as evenly as possible if it fits between n and 6n.','Filling the missing rolls with 6s first can leave a remainder that no die can show.',[
+[2,'mean = 4 over 2 + 4 rolls. What is missing before subtracting?','24','16~All n + m = 6 rolls count.','8~The total of all rolls is fixed first.','mean × (n + m).','4 × 6 = 24.'],
+[10,'After subtracting 3, 2, 4 and 3, what is missing?','12','24~The observed rolls are subtracted.','15~The last 3 is subtracted too.','24 - 12.','The missing rolls must add up to 12.'],
+[16,'What is returned?','[6, 6]','[]~2 <= 12 <= 12 is possible.','[4, 8]~Each die shows 1 to 6.','12 / 2 = 6 each, nothing left over.','Two sixes.']]);
+add(1470,'Pack each pair as x × 1024 + y in the first half, then unpack from the right into the final positions.','Writing the interleaved values directly in place overwrites x values that are still needed.',[
+[3,'Pack x = 2 with y = 3. What is nums[0]?','2051','2~The pair is packed into one number.','5~Packing shifts x; it does not add the values.','(2 << 10) | 3.','2 × 1024 + 3 = 2051.'],
+[15,'Unpack nums[2] = 1031. What is y?','7','1~y is the low 10 bits.','1031~& 1023 keeps only the low 10 bits.','1031 & 1023.','1031 - 1024 = 7.'],
+[32,'Pair 0 is x = 2, y = 3. What is nums after writing x?','[2, 3, 5, 4, 1, 7]','[2051, 3, 5, 4, 1, 7]~nums[0] is overwritten by x.','[3, 2, 5, 4, 1, 7]~x comes before y.','nums[j - 1] = x with j = 1.','x1, y1, x2, y2, x3, y3.']]);
+add(989,'Add from the last digit, folding the carry into k, until both num and k are used up.','Converting num to a number overflows for long arrays.',[
+[6,'k = 34 + num[3] = 34. What is pushed?','4','34~Only the last digit is pushed.','3~k % 10 = 4.','res.push(k % 10).','The ones digit is 4.'],
+[7,'What is k after the carry step?','3','4~The digit 4 was written; k keeps the rest.','0~34 / 10 rounds down to 3.','k = floor(k / 10).','floor(34 / 10) = 3.'],
+[28,'res = [4, 3, 2, 1]. What is returned?','[1, 2, 3, 4]','[4, 3, 2, 1]~res holds the least significant digit first.','1234~The answer is an array of digits.','Reverse res.','1200 + 34 = 1234.']]);
 }

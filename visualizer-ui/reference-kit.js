@@ -44,10 +44,12 @@
       trace,
       log(row) { trace.push(row); },
       snap(line, phase, narration, extra = {}) {
-        const { returned, ...fields } = extra, scope = read(), state = { ...clone(scope), ...fields, trace: trace.map(row => ({ ...row })), executedLine: line, lines: line ? [line] : [], phase, narration, finished: false };
+        // view holds page-only drawing hints (pointers, marks); it is hidden from the walkthrough's state diff.
+        const { returned, view, ...fields } = extra, scope = read(), state = { ...clone(scope), ...fields, trace: trace.map(row => ({ ...row })), executedLine: line, lines: line ? [line] : [], phase, narration, finished: false };
         Object.defineProperty(state, '_names', { value: Object.keys(scope) });
         // The return value is kept apart from the locals.
         if (Object.hasOwn(extra, 'returned')) Object.defineProperty(state, 'returned', { value: clone(returned) });
+        Object.defineProperty(state, 'view', { value: view ? clone(view) : {} });
         steps.push(state);
         return state;
       },

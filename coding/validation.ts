@@ -41,6 +41,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
         if (n===303 && i && (args[i][0]<0 || args[i][1]<args[i][0] || args[i][1]>=args[0][0].length)) fail('Require 0 <= left <= right < nums.length.');
         if (n===1603 && !i && args[0].some((x:any)=>x<0||x>1000)) fail('Space counts are in [0, 1000].');
         if (n===1603 && i && ![1,2,3].includes(args[i][0])) fail('carType is 1, 2 or 3.');
+        if (n===352 && method==='addNum' && (args[i][0]<0 || args[i][0]>10000)) fail('value is in [0, 10000].');
         if (n===2013 && i && (!array(args[i][0]) || args[i][0].length!==2 || args[i][0].some((v:any)=>!integer(v)||v<0||v>1000))) fail('Points must have two integer coordinates in [0,1000].');
       }
       if (n===380) { const set=new Set<number>(); for (let i=1;i<ops.length;i++) { const v=args[i][0]; if (ops[i]==='insert') set.add(v); else if (ops[i]==='remove') set.delete(v); else if (!set.size) fail('getRandom requires a nonempty set.'); } }
@@ -102,7 +103,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if ([46,47,78,90,1863].includes(n) && a[0].length>12 || [39,40,131,473,698].includes(n) && a[0].length>16 || n===140&&a[0].length>20) fail('This backtracking input is too large (12 elements, 16 for partition/combination problems, 20 for Word Break II).');
     if ([46,78].includes(n) && !unique(a[0])) fail('All values must be distinct.');
     if (n===77 && (a[0]<1||a[0]>16||a[1]<1||a[1]>a[0])) fail('Require 1 <= k <= n <= 16.');
-    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],118:[1,30],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
+    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],9:[-2147483648,2147483647],12:[1,3999],59:[1,20],263:[-2147483648,2147483647],118:[1,30],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
     if (scalarBounds[n] && (a[0]<scalarBounds[n][0]||a[0]>scalarBounds[n][1])) fail(`Value must be in [${scalarBounds[n].join(', ')}].`);
     if (n===374 && (a[0]<1||a[0]>2147483647||a[1]<1||a[1]>a[0])) fail('Require 1 <= pick <= n <= 2^31 - 1.');
     if (n===1095) { const v=a[1],p=v.indexOf(Math.max(...v)); if(v.length<3||p===0||p===v.length-1||!sorted(v.slice(0,p+1),true)||!sorted(v.slice(p).reverse(),true)) fail('arr must strictly rise then strictly fall, with an interior peak.'); }
@@ -181,6 +182,22 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===2483 && !/^[YN]+$/.test(a[0])) fail('customers uses Y and N only.');
     if(n===68 && (!a[0].length || a[1]<1 || a[0].some((w:any)=>!w.length||w.length>a[1]||/\s/.test(w)))) fail('Words are nonempty, contain no spaces, and fit in maxWidth.');
     if(n===2306 && (a[0].length<2 || !unique(a[0]) || a[0].some((w:any)=>!/^[a-z]+$/.test(w)))) fail('ideas holds at least two distinct lowercase words.');
+    if(n===2439 && (a[0].length<2 || a[0].some((x:any)=>x<0||x>1e9))) fail('nums has at least 2 values in [0, 10^9].');
+    if(n===1423 && (!a[0].length || a[0].some((x:any)=>x<1||x>10000) || a[1]<1 || a[1]>a[0].length)) fail('cardPoints values are in [1, 10^4]; 1 <= k <= cardPoints.length.');
+    if(n===1921 && (!a[0].length || a[0].length!==a[1].length || a[0].some((x:any)=>x<1||x>1e5) || a[1].some((x:any)=>x<1||x>1e5))) fail('dist and speed are nonempty, the same length, with values in [1, 10^5].');
+    if(n===1029 && (!a[0].length || a[0].length%2 || a[0].some((r:any)=>!Array.isArray(r)||r.length!==2||r.some((x:any)=>x<1||x>1000)))) fail('costs has an even number of [aCost, bCost] pairs with costs in [1, 1000].');
+    if(n===646 && (!a[0].length || a[0].some((p:any)=>!Array.isArray(p)||p.length!==2||p[0]>=p[1]||p.some((x:any)=>x<-1000||x>1000)))) fail('Each pair is [left, right] with -1000 <= left < right <= 1000.');
+    if(n===1647 && !/^[a-z]+$/.test(a[0])) fail('s is nonempty lowercase letters.');
+    if(n===1288 && (!a[0].length || a[0].some((p:any)=>!Array.isArray(p)||p.length!==2||p[0]<0||p[0]>=p[1]||p[1]>1e5) || new Set(a[0].map((p:any)=>p.join())).size!==a[0].length)) fail('intervals are distinct [l, r] with 0 <= l < r <= 10^5.');
+    if(n===1523 && (a[0]<0 || a[1]<a[0] || a[1]>1e9)) fail('Require 0 <= low <= high <= 10^9.');
+    if(n===1572 && (!a[0].length || a[0].length>100 || a[0].some((r:any)=>r.length!==a[0].length) || a[0].flat().some((x:any)=>x<1||x>100))) fail('mat is a nonempty square matrix with values in [1, 100].');
+    if(n===149 && (!a[0].length || a[0].length>300 || a[0].some((p:any)=>!Array.isArray(p)||p.length!==2||p.some((x:any)=>x<-1e4||x>1e4)) || new Set(a[0].map((p:any)=>p.join())).size!==a[0].length)) fail('points are 1 to 300 distinct [x, y] with coordinates in [-10^4, 10^4].');
+    if(n===1260 && (!a[0].length || a[0].length>50 || !a[0][0].length || a[0][0].length>50 || a[0].some((r:any)=>r.length!==a[0][0].length) || a[0].flat().some((x:any)=>x<-1000||x>1000) || a[1]<0 || a[1]>100)) fail('grid is a nonempty rectangle up to 50 x 50 with values in [-1000, 1000]; 0 <= k <= 100.');
+    if(n===1041 && (!/^[GLR]+$/.test(a[0]) || a[0].length>100)) fail('instructions uses G, L and R (1 to 100 characters).');
+    if(n===6 && (!/^[A-Za-z,.]+$/.test(a[0]) || a[0].length>1000 || a[1]<1 || a[1]>1000)) fail('s uses letters, commas and periods (1 to 1000 characters); 1 <= numRows <= 1000.');
+    if(n===2028 && (!a[0].length || a[0].some((x:any)=>x<1||x>6) || a[1]<1 || a[1]>6 || a[2]<1 || a[2]>1e5)) fail('rolls holds values 1 to 6; 1 <= mean <= 6; n >= 1.');
+    if(n===1470 && (a[1]<1 || a[1]>500 || a[0].length!==2*a[1] || a[0].some((x:any)=>x<1||x>1000))) fail('nums has 2n values in [1, 1000]; 1 <= n <= 500.');
+    if(n===989 && (!a[0].length || a[0].some((x:any)=>x<0||x>9) || a[0].length>1&&a[0][0]===0 || a[1]<1 || a[1]>10000)) fail('num is digits without leading zeros; 1 <= k <= 10^4.');
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;

@@ -24,7 +24,7 @@ export function executeCase(number, input, entry, deserializeFn) {
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
   const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448];
   const lists = [19,25,92,143,206,2807];
-  const design = [146,155,208,211,225,232,295,303,304,355,380,460,622,703,705,706,895,901,933,981,1396,1603,2013];
+  const design = [146,155,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,895,901,933,981,1396,1603,2013];
   if (design.includes(number)) {
     // RandomizedSet draws from a fixed sequence so the reference result is reproducible.
     if (number === 380) { let seed = 42; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }

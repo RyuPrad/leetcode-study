@@ -255,6 +255,27 @@ export function extraCase(n, seed) {
     case 2483:return ['YYNY'.repeat(1+s%3)+'N'.repeat(s%4)+'Y'.repeat(Math.floor(s/4))];
     case 68:return [['This','is','an','example','of','text','justification.'].slice(0,3+s%5).concat(s%2?['ok']:[]),14+s%6];
     case 2306:return [['coffee','donuts','time','toffee','tea','cash','dime'].slice(0,3+s%5).concat([word+'x'+'y'.repeat(s)])];
+    case 2439:return [pos.map(x=>x*s%11).concat([s])];
+    case 1423:return [pos.map(x=>x*s%13+1),1+s%len];
+    case 1921:return [pos.map(x=>x*s%9+1),pos.map((x,i)=>1+(x+i*s)%3)];
+    case 1029:return [v.concat(v).map((x,i)=>[1+(x*s+i*7)%50,1+(x*3+s*i)%50])];
+    case 646:return [v.concat(v.map(x=>x+len)).map((x,i)=>{const a=(x*s*7+i*3)%21-10;return [a,a+1+(x+s)%5];})];
+    case 1647:return [word.repeat(1+s%4)+'ab'.repeat(1+s%3)+'c'.repeat(s%5)+'d'.repeat(s%3)];
+    case 1288:{const seen=new Set(),r=[];for(const x of v.concat(v.map(y=>y+len))){const a=(x*s*3)%17,b=a+1+(x+s)%7,k=a+','+b;if(!seen.has(k)){seen.add(k);r.push([a,b]);}}return [r];}
+    case 352:return ops('SummaryRanges',[],[['addNum',s],['getIntervals'],['addNum',s+2],['getIntervals'],['addNum',s+1],['getIntervals'],['addNum',s*3%50],['addNum',s+7],['getIntervals'],['addNum',s+6],['addNum',s+2],['getIntervals']]);
+    case 1523:return [s*7%20,s%4===0?1000000000-s:s*7%20+s*3];
+    case 1572:return [grid(1+s%5,1+s%5,(r,c)=>(r*7+c*s+s*s)%100+1)];
+    case 149:{const r=v.map(x=>[x,(s%3)*x+1]);return [r.concat([[s%4+10,-s],[0,s+20]])];}
+    case 59:return [s];
+    case 9:return [s%5===0?-s*111:s%2?Number(String(s*37)+[...String(s*37)].reverse().join('')):s*37+s%3*1000];
+    case 263:return [s%4===0?-s:s%3===0?s*7:2**(s%5)*3**(s%3)*5**(s%2)];
+    case 1260:return [grid(1+s%3,1+s%4,(r,c)=>r*4+c+s),s*3%17];
+    case 12:return [(s*313)%3999+1];
+    case 1041:return ['G'.repeat(1+s%4)+'LR'[s%2].repeat(1+s%3)+'G'.repeat(s%5)];
+    case 6:return [word+'abcdefghij'.slice(0,s%10)+word.toUpperCase()+(s%3?'.':','),1+s%5];
+    case 2028:return [pos.map(x=>1+(x*s)%6),1+s%6,1+s%5];
+    case 1470:return [pos.concat(pos.map(x=>x*s%1000+1)),pos.length];
+    case 989:return [pos.map(x=>x%10),s*97%10000+1];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }
