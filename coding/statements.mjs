@@ -22,6 +22,7 @@ export const statements = Object.fromEntries(`
 26|Remove duplicates from sorted nums in place. Return k, the number of distinct values, and put those values in the first k positions in sorted order.
 27|Remove every occurrence of val from nums in place. Return the number k of retained values and put them in the first k positions. Their order may vary.
 33|Find target in a sorted array of distinct integers that has been rotated. Return its index, or -1 if absent.
+34|nums is sorted in nondecreasing order. Return [first, last], the first and last indices of target, or [-1, -1] if target is absent, in O(log n) time.
 35|Return the index of target in sorted nums, or the index where it should be inserted to keep the array sorted.
 36|Return whether a partially filled 9 by 9 Sudoku board has no repeated digit in any row, column, or 3 by 3 box. Dots are empty cells; solving the board is unnecessary.
 39|Return unique combinations of positive candidates summing to target. A candidate may be reused any number of times.
@@ -98,6 +99,7 @@ export const statements = Object.fromEntries(`
 152|Return the largest product of a nonempty contiguous subarray.
 153|Return the minimum value in a rotated sorted array of distinct integers.
 155|Implement a stack with push(val), pop(), top(), and getMin(). pop removes without returning a value; getMin returns the current minimum. Read/pop operations are called only on a nonempty stack.
+162|Return the index of any peak element: a value strictly greater than its neighbors, where positions outside the array count as negative infinity.
 167|In a sorted array, find the unique two values summing to target. Return their increasing one-based indices.
 168|Convert a positive integer into its Excel column name, where 1=A, 26=Z, and 27=AA.
 169|Return the value occurring more than floor(n/2) times. Such a value is guaranteed to exist.
@@ -156,6 +158,7 @@ export const statements = Object.fromEntries(`
 344|Reverse the array of characters in place.
 347|Return the k most frequent values. The set of answers is unique; order may vary.
 355|Implement Twitter: postTweet(userId,tweetId), getNewsFeed(userId), follow(followerId,followeeId), and unfollow(followerId,followeeId). A feed contains up to 10 newest tweets by the user and followed users, newest first. Tweet IDs are unique.
+367|Return whether num is the square of an integer, without using a built-in square root.
 371|Return the sum of two signed integers without using arithmetic plus or minus in your solution.
 374|Find the hidden integer in [1,n]. The supplied guess(value) returns 0 when correct, 1 when the hidden value is higher, and -1 when lower. Only n is passed to your function; pick configures the test.
 377|Count ordered sequences of positive nums whose sum is target. Values are distinct and may be reused.
@@ -168,6 +171,7 @@ export const statements = Object.fromEntries(`
 424|Return the longest substring that can be made of one repeated uppercase letter by changing at most k characters.
 427|Build a quad tree for a square binary grid. A uniform region is a leaf; otherwise divide into topLeft, topRight, bottomLeft, bottomRight. Node(val,isLeaf,topLeft,topRight,bottomLeft,bottomRight) is provided.
 435|Return the fewest intervals to remove so the remaining half-open intervals do not overlap.
+441|Build a staircase with n coins where row i holds exactly i coins. Return the number of complete rows.
 450|Delete key from a BST and return the new root. If absent, keep all values. Any valid BST with exactly the remaining values is accepted.
 456|Return whether nums has indices i < j < k with nums[i] < nums[k] < nums[j].
 460|Implement LFUCache(capacity), get(key), and put(key,value). Missing keys return -1. Evict the least frequently used key; break ties by least recently used. Reads and updates increment frequency; new keys start at frequency 1.
@@ -176,6 +180,7 @@ export const statements = Object.fromEntries(`
 494|Assign plus or minus to every nums value. Count assignments whose resulting sum is target.
 502|Starting with capital w, perform at most k projects. A project requires its capital threshold and adds its profit once. Return the maximum final capital.
 518|Count unordered combinations of coin denominations totaling amount. Denominations are distinct positive integers and may be reused.
+540|nums is sorted; every value appears exactly twice except one value that appears once. Return that value in O(log n) time.
 543|Return the greatest number of edges on any path between two nodes in the binary tree.
 560|Count contiguous, nonempty subarrays whose values sum to k.
 567|Return whether s2 contains any contiguous permutation of s1.
@@ -223,6 +228,7 @@ export const statements = Object.fromEntries(`
 946|pushed and popped contain the same distinct values. Return whether this pop order can result from pushing values in the pushed order onto an initially empty stack.
 953|Return whether words are lexicographically sorted according to the supplied permutation of the 26 lowercase letters. A shorter prefix comes first.
 973|Return k input points nearest to the origin by Euclidean distance. Any tied selection and any result order are accepted; preserve multiplicity.
+977|nums is sorted in nondecreasing order. Return the squares of its values, also sorted in nondecreasing order.
 978|Return the longest contiguous subarray whose adjacent comparisons strictly alternate greater-than and less-than. A single element is valid.
 981|Implement TimeMap.set(key,value,timestamp) and get(key,timestamp). get returns the value at the latest set time no greater than the query time, or an empty string. Set timestamps strictly increase.
 994|Each minute, rotten oranges (2) rot horizontally/vertically adjacent fresh oranges (1). Empty cells are 0. Return the time until no fresh oranges remain, or -1 if impossible.
@@ -237,6 +243,7 @@ export const statements = Object.fromEntries(`
 1140|Players alternately take the next 1 through 2*M piles, with M initially 1 and then max(M,taken). Both play optimally. Return the first player's maximum total stones.
 1143|Return the length of the longest subsequence shared by text1 and text2.
 1209|Repeatedly remove k adjacent equal letters from s until no such group remains. Return the final string; it is unique.
+1268|After each character of searchWord is typed, suggest up to three products that start with the typed prefix, in lexicographic order. Return the list of suggestion lists.
 1325|Delete every leaf with value target, repeating when deletion creates new target leaves. Return the remaining root or null.
 1343|Return how many contiguous subarrays of length k have an average of at least threshold.
 1405|Using at most a copies of a, b copies of b, and c copies of c, return any longest string with no three equal consecutive letters.
@@ -256,14 +263,17 @@ export const statements = Object.fromEntries(`
 1863|For every subset, XOR its elements, with the empty subset contributing zero. Return the sum of all subset XOR values.
 1871|Starting at index 0 of a binary string, jump between minJump and maxJump positions rightward, landing only on 0. Return whether the final index is reachable.
 1888|You may move the first character of the binary string s to its end any number of times, and flip any character. Return the minimum number of flips needed to make s alternating.
+1898|Remove the characters of s at removable[0..k-1]. Return the largest k such that p is still a subsequence of s.
 1899|You may combine two triplets by taking their coordinatewise maximum. Return whether some selection can produce target exactly.
 1929|Return the input array concatenated with itself.
 1968|nums holds distinct integers. Return any rearrangement in which no element (other than the first and last) equals the average of its two neighbors.
 1984|Choose k scores from nums. Return the minimum possible difference between the highest and lowest chosen score.
 2013|Implement DetectSquares.add(point) and count(point). Count axis-aligned positive-area squares having the query as one corner and three stored point occurrences as the others. Duplicate stored points multiply the count.
+2300|A spell and a potion succeed when the product of their strengths is at least success. For each spell, return how many potions it succeeds with.
 2390|Each * in s removes itself and the closest remaining non-star character to its left. Return the string after all stars are processed.
 2392|Place 1 through k once each in a k by k zero-filled matrix. Each row condition [a,b] puts a above b; each column condition puts a left of b. Return any valid matrix, or [] if impossible.
 2402|Assign meetings in start-time order to the lowest available room index. If all rooms are busy, delay until the earliest room frees, keeping duration; break ties by room index. Return the most-used room, breaking ties by smallest index.
+2616|Choose p pairs of distinct indices from nums (each index used at most once) to minimize the largest absolute difference within a pair. Return that minimum; it is 0 when p = 0.
 2707|Split s into nonoverlapping dictionary words and leftover characters. Return the minimum number of leftover characters. Dictionary words may be reused.
 2709|Indices are adjacent when their values have gcd greater than one. Return whether every index can reach every other index through such links.
 2807|Insert a node containing the greatest common divisor between each adjacent pair of list nodes. Return the head.

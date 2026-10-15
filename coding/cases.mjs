@@ -206,6 +206,16 @@ export function extraCase(n, seed) {
     case 456:return [nums.concat(s%2?[s]:[])];
     case 402:return [String(s*7919+10),1+s%3];
     case 904:return [seq(len+3,0).map(i=>(i*(s%3+1)+(i>>2)+Math.floor(s/6))%4)];
+    case 441:return [s%4===0?2147483647-s:s*s*7+s];
+    case 367:return [s===12?2147395600:s%2?(s*13)**2:(s*13)**2+1];
+    case 540:{const p=seq(len+1,1).map(x=>x*2+s);const one=s%(len+1);return [p.flatMap((x,i)=>i===one?[x]:[x,x])];}
+    case 162:return [s%3===0?seq(len+1,0).map(i=>i*s):seq(len+1,0).map(i=>i%2?s+10+i:i)];
+    case 2300:return [pos.map(x=>x+s),seq(len+2,1).map(x=>x*3%11+1),s*7];
+    case 2616:return [nums.map(x=>Math.abs(x)*s%17),s%(Math.floor(len/2)+1)];
+    case 34:return [v.flatMap(x=>Array(1+(x+s)%3).fill(x+s)),s%3===0?100:s+2];
+    case 1898:{const t=word+'abcacb'.repeat(1+s%2);return [t,'ab',seq(t.length,0).map(i=>(i*(s%5+1)+s)%t.length).filter((x,i,a)=>a.indexOf(x)===i).slice(0,3+s%3)];}
+    case 1268:return [['mobile','mouse','moneypot','monitor','mousepad',word+'mouse','mop'].slice(0,3+s%5),['mouse','mon','mob','zzz','mo'][s%5]+'abc'.slice(0,s%3)];
+    case 977:return [v.map(x=>x*(1+s%4)-len-Math.floor(s/2))];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

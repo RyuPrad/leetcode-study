@@ -96,7 +96,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if ([46,47,78,90,1863].includes(n) && a[0].length>12 || [39,40,131,473,698].includes(n) && a[0].length>16 || n===140&&a[0].length>20) fail('This backtracking input is too large (12 elements, 16 for partition/combination problems, 20 for Word Break II).');
     if ([46,78].includes(n) && !unique(a[0])) fail('All values must be distinct.');
     if (n===77 && (a[0]<1||a[0]>16||a[1]<1||a[1]>a[0])) fail('Require 1 <= k <= n <= 16.');
-    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
+    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
     if (scalarBounds[n] && (a[0]<scalarBounds[n][0]||a[0]>scalarBounds[n][1])) fail(`Value must be in [${scalarBounds[n].join(', ')}].`);
     if (n===374 && (a[0]<1||a[0]>2147483647||a[1]<1||a[1]>a[0])) fail('Require 1 <= pick <= n <= 2^31 - 1.');
     if (n===1095) { const v=a[1],p=v.indexOf(Math.max(...v)); if(v.length<3||p===0||p===v.length-1||!sorted(v.slice(0,p+1),true)||!sorted(v.slice(p).reverse(),true)) fail('arr must strictly rise then strictly fall, with an interior peak.'); }
@@ -144,6 +144,14 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===402 && (!/^(0|[1-9]\d*)$/.test(a[0]) || a[1]<1 || a[1]>a[0].length)) fail('num has no leading zeros; 1 <= k <= num.length.');
     if(n===1209 && (!/^[a-z]+$/.test(a[0]) || a[1]<2)) fail('s uses lowercase letters; k >= 2.');
     if(n===456 && !a[0].length) fail('nums must be nonempty.');
+    if(n===977 && (!a[0].length || !sorted(a[0]))) fail('nums must be nonempty and sorted.');
+    if(n===540){const c=new Map<number,number>();for(const x of a[0])c.set(x,(c.get(x)||0)+1);if(!sorted(a[0])||[...c.values()].filter(x=>x===1).length!==1||[...c.values()].some(x=>x>2))fail('nums must be sorted with one single value and every other value twice.');}
+    if(n===162 && (!a[0].length || a[0].some((x:number,i:number)=>i>0&&x===a[0][i-1]))) fail('nums is nonempty and neighbors differ.');
+    if(n===2300 && (!a[0].length || !a[1].length || a[0].concat(a[1]).some((x:number)=>x<1) || a[2]<1)) fail('spells and potions are nonempty and positive; success >= 1.');
+    if(n===2616 && (!a[0].length || a[0].some((x:number)=>x<0) || a[1]<0 || a[1]>Math.floor(a[0].length/2))) fail('nums is nonempty and nonnegative; 0 <= p <= nums.length / 2.');
+    if(n===34 && !sorted(a[0])) fail('nums must be sorted.');
+    if(n===1898){const [t,q,r]=a;if(!/^[a-z]+$/.test(t)||!/^[a-z]+$/.test(q)||!unique(r)||r.some((x:number)=>x<0||x>=t.length))fail('s and p use lowercase letters; removable holds distinct indices of s.');let j=0;for(const ch of t)if(ch===q[j])j++;if(j<q.length)fail('p must be a subsequence of s.');}
+    if(n===1268 && (!a[0].length || a[0].some((x:any)=>!/^[a-z]+$/.test(x)) || !unique(a[0]) || !/^[a-z]+$/.test(a[1]))) fail('products are distinct lowercase words; searchWord is lowercase.');
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;
