@@ -69,7 +69,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if ([26,35,167,658,704].includes(n) && !sorted(a[0],[35,704].includes(n))) fail('The input array must be sorted (distinct values for binary search).');
     if (n===4 && (a[0].length+a[1].length===0 || a.some(v=>!sorted(v)))) fail('Provide sorted arrays with at least one value in total.');
     if ([1,167].includes(n)) { let count=0; for(let i=0;i<a[0].length;i++) for(let j=i+1;j<a[0].length;j++) if(a[0][i]+a[0][j]===a[1]) count++; if(count!==1) fail('Exactly one pair must sum to target.'); }
-    if ([11,15,18,45,53,55,84,121,122,134,135,136,152,153,169,198,213,215,238,239,287,300,309,312,416,473,494,698,735,739,746,763,767,846,860,875,877,881,912,918,973,978,1011,1046,1049,1140,1406,1834,1863,1929,2709].includes(n) && !a[0].length) fail('This input must be nonempty.');
+    if ([11,15,18,45,53,55,84,121,122,134,135,136,152,153,169,198,213,215,238,239,287,300,309,312,416,473,494,698,735,739,746,763,767,846,860,875,877,881,912,918,973,978,1011,1046,1049,1140,1406,1834,1863,1929,2709,283].includes(n) && !a[0].length) fail('This input must be nonempty.');
     if ([33,81,153].includes(n)) { const v=a[0]; if(!v.length || n!==81&&!unique(v) || v.filter((x:number,i:number)=>x>v[(i+1)%v.length]).length>1) fail('nums must be a rotated sorted array (distinct unless problem 81).'); }
     const grids = [36,48,54,63,64,73,74,79,130,200,212,286,329,417,427,463,695,778,867,994,1631];
     if (grids.includes(n) && !matrix(a[0])) fail('Use a nonempty rectangular matrix, at most 100 by 100.');
@@ -129,6 +129,21 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===953 && (a[1].length!==26||!unique([...a[1]])||!/^[a-z]+$/.test(a[1])))fail('order must be a permutation of the lowercase alphabet.');
     if(n===371 && a.some(v=>v < -1000||v > 1000))fail('Both integers must be in [-1000,1000].');
     if(n===3133 && a[1]===0)fail('x must be positive.');
+    if(n===1984 && (!a[0].length || a[1]<1 || a[1]>a[0].length)) fail('nums is nonempty and k is between 1 and nums.length.');
+    if(n===80 && (!a[0].length || !sorted(a[0]))) fail('nums must be nonempty and sorted.');
+    if(n===1498 && (!a[0].length || a[0].some((v:any)=>v<1) || a[1]<1)) fail('nums is nonempty; values and target are positive.');
+    if(n===1968 && (a[0].length<3 || !unique(a[0]))) fail('nums needs at least three distinct values.');
+    if(n===1343 && (!a[0].length || a[0].some((v:any)=>v<1) || a[1]<1 || a[1]>a[0].length || a[2]<0)) fail('arr is nonempty and positive; 1 <= k <= arr.length; threshold >= 0.');
+    if(n===1838 && (!a[0].length || a[0].some((v:any)=>v<1) || a[1]<1)) fail('nums is nonempty and positive; k >= 1.');
+    if(n===904 && (!a[0].length || a[0].some((v:any)=>v<0||v>=a[0].length))) fail('fruits is nonempty with 0 <= fruits[i] < fruits.length.');
+    if(n===1456 && (!/^[a-z]+$/.test(a[0]) || a[1]<1 || a[1]>a[0].length)) fail('s uses lowercase letters; 1 <= k <= s.length.');
+    if(n===1888 && !/^[01]+$/.test(a[0])) fail('s is a nonempty binary string.');
+    if(n===1658 && (!a[0].length || a[0].some((v:any)=>v<1) || a[1]<1)) fail('nums is nonempty and positive; x >= 1.');
+    if(n===2390){if(!/^[a-z*]+$/.test(a[0]))fail('s uses lowercase letters and stars.');let kept=0;for(const c of a[0]){kept+=c==='*'?-1:1;if(kept<0)fail('Every star needs a letter to its left.');}}
+    if(n===946 && (a[0].length!==a[1].length || !a[0].length || !unique(a[0]) || JSON.stringify([...a[0]].sort((x:number,y:number)=>x-y))!==JSON.stringify([...a[1]].sort((x:number,y:number)=>x-y)))) fail('popped must be a permutation of the distinct values in pushed.');
+    if(n===402 && (!/^(0|[1-9]\d*)$/.test(a[0]) || a[1]<1 || a[1]>a[0].length)) fail('num has no leading zeros; 1 <= k <= num.length.');
+    if(n===1209 && (!/^[a-z]+$/.test(a[0]) || a[1]<2)) fail('s uses lowercase letters; k >= 2.');
+    if(n===456 && !a[0].length) fail('nums must be nonempty.');
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;

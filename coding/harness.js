@@ -72,8 +72,8 @@ export function executeCase(number, input, entry, deserializeFn) {
   if (number === 143) return fromList(args[0]);
   if ([105,226,450,700,701,1325].includes(number)) return fromTree(result);
   if (number === 235) { if (!result || result !== findNode(args[0], result.val)) throw new Error('Return an ancestor node from the input tree.'); return result.val; }
-  if ([26,27].includes(number)) { if (!Number.isInteger(result) || result < 0 || result > input[0].length) throw new Error('Return the number of retained elements.'); return { length: result, values: args[0].slice(0,result) }; }
-  if ([48,73,75,88,130,189,286,344].includes(number)) return args[0];
+  if ([26,27,80].includes(number)) { if (!Number.isInteger(result) || result < 0 || result > input[0].length) throw new Error('Return the number of retained elements.'); return { length: result, values: args[0].slice(0,result) }; }
+  if ([48,73,75,88,130,189,283,286,344].includes(number)) return args[0];
   if (number === 427) {
     const size = input[0].length, grid = Array.from({length:size}, () => Array(size).fill(0)), seen = new Set();
     function fill(node, r, c, n) { if (!node || seen.has(node) || n < 1) throw new Error('Invalid quad tree.'); seen.add(node); if (node.isLeaf) { if (![true,false,0,1].includes(node.val)) throw new Error('Invalid quad value.'); for (let i=r;i<r+n;i++) for (let j=c;j<c+n;j++) grid[i][j] = Number(node.val); } else { for (const [key,dr,dc] of [['topLeft',0,0],['topRight',0,n/2],['bottomLeft',n/2,0],['bottomRight',n/2,n/2]]) fill(node[key],r+dr,c+dc,n/2); } }

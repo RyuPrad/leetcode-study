@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { ROOT } from '../scripts/content.mjs';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 
 const verifyExisting = process.argv.includes('--verify-existing');
 const previous = process.env.STUDY_PREVIOUS_EXE;
@@ -168,8 +169,8 @@ for (const restart of [false, true]) {
   try {
     const state = await read(handle.page);
     assert.equal(state.version, next.version);
-    assert.equal(state.catalog.entries.filter(entry => entry.number).length, 252);
-    assert.equal(state.catalog.visualizers.length, 252);
+    assert.equal(state.catalog.entries.filter(entry => entry.number).length, PROBLEM_COUNT);
+    assert.equal(state.catalog.visualizers.length, PROBLEM_COUNT);
     for (const number of [700, 933]) assert.ok(state.catalog.entries.find(entry => entry.number === number)?.visualizerPath, `New ${number} visualizer is packaged.`);
     retained(state.data, expected, restart ? 'Current package restart' : 'Current package startup');
     assert.equal(fingerprint(state.preferences), fingerprint(baseline.preferences), 'Every study.* renderer preference is retained.');

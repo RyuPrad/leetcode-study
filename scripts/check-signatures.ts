@@ -49,7 +49,7 @@ for (const p of problems) {
         if (r.verdict !== 'Accepted') { errors.push(`${t.name}: reference ${r.error}`); continue; }
         const out = r.actual as Json;
         // In-place and adapter outputs have harness-defined shapes, not the return type.
-        if (c.method.returns === 'void' || [26, 27, 133, 138, 427].includes(p.number)) continue;
+        if (c.method.returns === 'void' || [26, 27, 80, 133, 138, 427].includes(p.number)) continue;
         const returns = p.number === 235 ? 'int' : c.method.returns;
         if (!fits(returns, out, p.number)) errors.push(`${t.name}: output is not ${returns}: ${JSON.stringify(out).slice(0, 80)}`);
       }

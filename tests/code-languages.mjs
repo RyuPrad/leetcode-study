@@ -6,11 +6,12 @@ import {chromium} from 'playwright';
 import {ROOT} from '../scripts/content.mjs';
 import{workers}from'../scripts/workers.mjs';
 import {buildCodeLanguages} from '../scripts/code-maps.mjs';
+import {guidedLessons} from '../scripts/check-guided.mjs';
 // Every visualizer, stepped to the end, in TypeScript, Java and C: each highlight on the
 // JavaScript reference must appear on exactly the mapped lines of the chosen language.
 if(process.env.STUDY_SKIP_GENERATE!=='1')buildCodeLanguages();
 const only=process.argv.slice(2).map(Number),lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).filter(l=>!only.length||only.includes(l.number));
-const guided=new Map([...JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/guided-content-a.json'),'utf8')),...JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/guided-content-b.json'),'utf8'))].map(l=>[l.id,l.checkpoints]));
+const guided=new Map(guidedLessons().map(l=>[l.id,l.checkpoints]));
 const browser=await chromium.launch({headless:true}),failures=[];let cursor=0,checked=0,steps=0;const unmapped={typescript:0,java:0,c:0};
 async function worker(){const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});while(cursor<lessons.length){const lesson=lessons[cursor++],errors=[];const onError=e=>errors.push(e.message);page.on('pageerror',onError);try{
  await page.goto(pathToFileURL(path.join(ROOT,lesson.path)).href+'?codeLanguage=java',{timeout:90000});await page.waitForFunction(()=>window.studyWalkthrough&&window.studyCodeLanguage);

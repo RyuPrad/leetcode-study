@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
 import { collectCatalog, ROOT } from '../scripts/content.mjs';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 import { assetPath } from '../desktop/protocol';
 import type { Catalog } from '../shared/types';
 const catalog = collectCatalog() as Catalog;
 test('every problem is catalogued with a stable ID and portable visualizer reference', () => {
-  assert.equal(catalog.entries.filter(e => e.number).length, 252); assert.equal(catalog.visualizers.length, 252); assert.equal(new Set(catalog.entries.map(e => e.id)).size, 254);
+  assert.equal(catalog.entries.filter(e => e.number).length, PROBLEM_COUNT); assert.equal(catalog.visualizers.length, PROBLEM_COUNT); assert.equal(new Set(catalog.entries.map(e => e.id)).size, PROBLEM_COUNT + 2);
   for (const entry of catalog.entries) { assert.ok(!entry.markdown.includes('<iframe')); if (entry.number) assert.equal(entry.id, `leetcode:${entry.number}`); if (entry.visualizerPath) { const source = fs.readFileSync(path.join(ROOT, entry.notePath), 'utf8'); assert.ok(!source.includes('file:///')); assert.ok(fs.readFileSync(path.join(ROOT, entry.visualizerPath), 'utf8').includes('../visualizer-ui/workspace.js')); } }
 });
 test('every problem carries its LeetCode difficulty and every listed difficulty names a problem', () => {

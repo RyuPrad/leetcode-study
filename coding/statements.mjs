@@ -58,6 +58,7 @@ export const statements = Object.fromEntries(`
 77|Return every combination of k distinct numbers chosen from 1 through n.
 78|Return every subset of nums, including the empty subset. Input values are distinct; result order does not matter.
 79|Return whether word can be formed by a path through horizontally or vertically adjacent board cells without reusing a cell.
+80|nums is sorted. Remove extra copies in place so each value appears at most twice, keeping sorted order. Return k, the kept count; the first k positions hold the result.
 81|Return whether target occurs in a rotated sorted array that may contain duplicates.
 84|Return the greatest rectangle area under adjacent histogram bars of width one.
 88|Merge the first m sorted values of nums1 and the n sorted values of nums2 into nums1 in place. nums1 has m+n slots.
@@ -135,6 +136,7 @@ export const statements = Object.fromEntries(`
 269|Infer any valid character order from words sorted in an unknown alphabet. Return each present character once; return an empty string if the words are inconsistent.
 271|Implement Codec.encode(strs) returning a string and Codec.decode(s) restoring the original string array exactly. Strings may be empty or contain separators. Encoding and decoding use separate Codec instances.
 279|Return the fewest positive perfect squares whose sum is n. A square may be used repeatedly.
+283|Move every 0 in nums to the end, in place, keeping the relative order of the nonzero values. Return nothing; the judge checks nums.
 286|Fill each empty room with its distance to the nearest gate in place. Gates are 0, walls are -1, and empty rooms are 2147483647. Move horizontally or vertically; unreachable rooms stay unchanged.
 287|The n+1 values are in [1,n] and exactly one value is repeated. Return that repeated value.
 295|Implement MedianFinder with addNum(num) and findMedian(). For an even number of values, return the mean of the middle two. At least one value precedes every median query.
@@ -159,6 +161,7 @@ export const statements = Object.fromEntries(`
 377|Count ordered sequences of positive nums whose sum is target. Values are distinct and may be reused.
 394|Decode nested repetition expressions such as 3[a2[c]]. Digits give a positive repeat count for the bracketed substring.
 399|Each equation [a,b] with value v means a/b=v. Return the ratio for each query, or -1 when unknown. Equations are mutually consistent.
+402|num is a nonnegative integer string without leading zeros. Remove exactly k digits to make the smallest possible number and return it without leading zeros ("0" if nothing remains).
 410|Split a nonnegative array into exactly k nonempty contiguous pieces, minimizing the largest piece sum. Return that minimum.
 416|Return whether the positive numbers can be partitioned into two subsets of equal sum.
 417|Return cells from which water can reach both the top/left border and the bottom/right border. Water moves to neighboring cells of no greater height.
@@ -166,6 +169,7 @@ export const statements = Object.fromEntries(`
 427|Build a quad tree for a square binary grid. A uniform region is a leaf; otherwise divide into topLeft, topRight, bottomLeft, bottomRight. Node(val,isLeaf,topLeft,topRight,bottomLeft,bottomRight) is provided.
 435|Return the fewest intervals to remove so the remaining half-open intervals do not overlap.
 450|Delete key from a BST and return the new root. If absent, keep all values. Any valid BST with exactly the remaining values is accepted.
+456|Return whether nums has indices i < j < k with nums[i] < nums[k] < nums[j].
 460|Implement LFUCache(capacity), get(key), and put(key,value). Missing keys return -1. Evict the least frequently used key; break ties by least recently used. Reads and updates increment frequency; new keys start at frequency 1.
 463|Return the perimeter of the single island in a binary grid. Land cells share sides horizontally or vertically, and the island has no lakes.
 473|Return whether every positive matchstick can be used exactly once to form four equal-length sides of a square.
@@ -212,9 +216,11 @@ export const statements = Object.fromEntries(`
 881|Each boat carries at most two people with combined weight at most limit. Every person fits alone. Return the fewest boats needed.
 895|Implement FreqStack.push(val) and pop(). pop removes and returns the most frequent value, breaking ties by the most recent occurrence.
 901|Implement StockSpanner.next(price). Return the number of consecutive days ending today with price no greater than today's price.
+904|Moving right from any starting tree, pick one fruit per tree into two baskets, each holding a single fruit type, and stop at the first tree that fits neither basket. Return the most fruit you can pick.
 912|Return nums sorted in ascending order.
 918|Return the greatest sum of a nonempty circular subarray, using each original position at most once.
 933|Implement RecentCounter.ping(t), returning the count of calls in the inclusive interval [t-3000,t]. Calls have strictly increasing positive timestamps.
+946|pushed and popped contain the same distinct values. Return whether this pop order can result from pushing values in the pushed order onto an initially empty stack.
 953|Return whether words are lexicographically sorted according to the supplied permutation of the 26 lowercase letters. A shorter prefix comes first.
 973|Return k input points nearest to the origin by Euclidean distance. Any tied selection and any result order are accepted; preserve multiplicity.
 978|Return the longest contiguous subarray whose adjacent comparisons strictly alternate greater-than and less-than. A single element is valid.
@@ -230,22 +236,32 @@ export const statements = Object.fromEntries(`
 1137|Return Tn where T0=0, T1=T2=1, and each later term is the sum of the preceding three terms.
 1140|Players alternately take the next 1 through 2*M piles, with M initially 1 and then max(M,taken). Both play optimally. Return the first player's maximum total stones.
 1143|Return the length of the longest subsequence shared by text1 and text2.
+1209|Repeatedly remove k adjacent equal letters from s until no such group remains. Return the final string; it is unique.
 1325|Delete every leaf with value target, repeating when deletion creates new target leaves. Return the remaining root or null.
+1343|Return how many contiguous subarrays of length k have an average of at least threshold.
 1405|Using at most a copies of a, b copies of b, and c copies of c, return any longest string with no three equal consecutive letters.
 1406|Players alternately take the next one, two, or three stones from the front. Both maximize their total value. Return Alice, Bob, or Tie according to the outcome.
 1448|Count nodes whose value is at least every value on their path from the root.
+1456|Return the largest number of vowels (a, e, i, o, u) in any substring of s with length k.
 1462|Prerequisite pairs [a,b] mean course a precedes b. For each query [u,v], return whether u is a direct or indirect prerequisite of v. The graph is acyclic.
 1489|For a connected weighted graph, return [critical,pseudoCritical] edge-index arrays. Critical edges appear in every minimum spanning tree; pseudo-critical edges appear in some but not every minimum spanning tree.
+1498|Count the nonempty subsequences of nums whose minimum plus maximum is at most target. Return the count modulo 1000000007.
 1584|Connect all points with minimum total Manhattan edge length. Return the weight of a minimum spanning tree.
 1631|A path's effort is the largest absolute height change between neighboring cells. Return the minimum effort to travel from top-left to bottom-right.
+1658|Each operation removes the leftmost or rightmost element of nums and subtracts it from x. Return the minimum number of operations to reduce x exactly to 0, or -1 if impossible.
 1768|Merge word1 and word2 by alternating characters starting with word1, appending any remainder at the end.
 1834|Tasks [enqueueTime,processingTime] run on one nonpreemptive CPU. When idle, choose an available task with shortest processing time, then smallest original index. Return execution indices.
+1838|One operation increments an element of nums by 1. Using at most k operations, return the largest possible frequency of any single value.
 1851|For each query, return the length of the shortest closed interval containing it, or -1. A closed interval [l,r] has length r-l+1.
 1863|For every subset, XOR its elements, with the empty subset contributing zero. Return the sum of all subset XOR values.
 1871|Starting at index 0 of a binary string, jump between minJump and maxJump positions rightward, landing only on 0. Return whether the final index is reachable.
+1888|You may move the first character of the binary string s to its end any number of times, and flip any character. Return the minimum number of flips needed to make s alternating.
 1899|You may combine two triplets by taking their coordinatewise maximum. Return whether some selection can produce target exactly.
 1929|Return the input array concatenated with itself.
+1968|nums holds distinct integers. Return any rearrangement in which no element (other than the first and last) equals the average of its two neighbors.
+1984|Choose k scores from nums. Return the minimum possible difference between the highest and lowest chosen score.
 2013|Implement DetectSquares.add(point) and count(point). Count axis-aligned positive-area squares having the query as one corner and three stored point occurrences as the others. Duplicate stored points multiply the count.
+2390|Each * in s removes itself and the closest remaining non-star character to its left. Return the string after all stars are processed.
 2392|Place 1 through k once each in a k by k zero-filled matrix. Each row condition [a,b] puts a above b; each column condition puts a left of b. Return any valid matrix, or [] if impossible.
 2402|Assign meetings in start-time order to the lowest available room index. If all rooms are busy, delay until the earliest room frees, keeping duration; break ties by room index. Return the most-used room, breaking ties by smallest index.
 2707|Split s into nonoverlapping dictionary words and leftover characters. Return the minimum number of leftover characters. Dictionary words may be reused.

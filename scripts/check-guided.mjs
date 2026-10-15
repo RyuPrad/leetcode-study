@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {collectCatalog,ROOT} from './content.mjs';
 import '../visualizer-ui/guided-core.js';
+import {SHARDS} from './guided-shards.mjs';
 
-export function guidedLessons(root=ROOT){return ['a','b'].flatMap(shard=>JSON.parse(fs.readFileSync(path.join(root,`visualizer-ui/guided-content-${shard}.json`),'utf8'))).sort((a,b)=>Number(a.id.split(':')[1])-Number(b.id.split(':')[1]));}
+export function guidedLessons(root=ROOT){return SHARDS.flatMap(shard=>JSON.parse(fs.readFileSync(path.join(root,`visualizer-ui/guided-content-${shard}.json`),'utf8'))).sort((a,b)=>Number(a.id.split(':')[1])-Number(b.id.split(':')[1]));}
 export function checkGuided(root=ROOT){
   const lessons=guidedLessons(root),catalog=collectCatalog(root),entries=catalog.entries.filter(e=>e.visualizerPath);
   if(entries.length!==lessons.length||new Set(lessons.map(l=>l.id)).size!==lessons.length)throw Error(`Guided lessons must cover all ${entries.length} visualizers exactly once.`);

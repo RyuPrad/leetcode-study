@@ -10,6 +10,7 @@ import { solutionPath } from '../coding/solutions';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CodingProblem } from '../shared/coding';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 
 const problems = definitions as CodingProblem[];
 const problem = (number: number) => problems.find(p => p.number === number)!;
@@ -118,7 +119,7 @@ test('every highlighted visualizer line maps to a reviewed line of each solution
   const { checkMaps, sources } = await import('../scripts/code-maps.mjs');
   const maps = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'visualizer-ui/code-maps.json'), 'utf8'));
   const list = sources();
-  assert.equal(list.length, 252);
+  assert.equal(list.length, PROBLEM_COUNT);
   assert.deepEqual(checkMaps(maps, list), []);
   // Two Sum: the map lookup and the store land on the hash table operations in C.
   const twoSum = list.find((s: { number: number }) => s.number === 1)!;

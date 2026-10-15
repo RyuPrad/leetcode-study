@@ -3,6 +3,10 @@
 // distractor~feedback, gentle hint, concrete hint. The compiler only binds
 // assertions/code references; it never invents a question or an answer.
 import fs from 'node:fs';
+import {shardOf} from './guided-shards.mjs';
+// --shard=c compiles the lessons for problems added after the original library.
+const shard=process.argv.find(arg=>arg.startsWith('--shard='))?.slice(8)||'b';
+if(!['b','c'].includes(shard))throw Error(`Unknown guided shard ${shard}`);
 const authored = new Map();
 function add(number, intro, commonMistake, rows) { authored.set(number, { intro, commonMistake, rows }); }
 
@@ -258,6 +262,7 @@ add(698,'Split all input numbers into four groups with the same sum, using each 
 
 const {authorLate}=await import('./author-guided-b-late.mjs');
 authorLate(add);
+if(shard==='c'){const {authorAdded}=await import('./author-guided-c.mjs');authorAdded(add);}
 add(700,'Find a target value by following one path through a binary search tree.','Returning a found subtree means returning the existing node object, not copying its value or rebuilding the tree.',[
 [4,'The current node is 4 and the target is 2. Which side should the search follow?','The left child','The right child~Values smaller than 4 belong on its left.','Both children~The BST ordering rules out one whole side.','Compare the target with the current node value.','2 is smaller than 4, so the left subtree is the only possible location.'],
 [5,'After curr = curr.left, which existing object does curr reference?','The node with value 2','The node with value 4~The assignment follows its left child reference.','A new node with value 2~Following a reference does not create a node.','Read the left property of the previous current node.','The root node with value 4 has the existing node with value 2 as its left child.'],
@@ -327,7 +332,7 @@ function assertions(step,other){
  for(const key of changed.filter(key=>Object.hasOwn(other.values,key)).slice(0,2))result.push({path:`values.${key}`,value:step.values[key]});
  return result;
 }
-const metadata=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8')).sort((a,b)=>a.number-b.number).slice(125);
+const metadata=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8')).sort((a,b)=>a.number-b.number).filter(spec=>shardOf(spec.number)===shard);
 const output=[];
 for(const spec of metadata){
  const content=authored.get(spec.number);if(!content){if(process.argv.includes('--validate-partial'))continue;throw Error(`Missing authored lesson ${spec.number}`);}
@@ -351,4 +356,4 @@ for(const spec of metadata){
  output.push({id:spec.id,version:1,caseId:'guided-default',title:spec.title,intro:content.intro,concepts:topicConcepts[spec.topic]||['variables','comparison','loops'],expectedInput:trace.steps[0].values,checkpoints,recap:spec.why,commonMistake:content.commonMistake});
 }
 if(process.argv.includes('--validate-partial'))console.log(`Reviewed ${output.length} authored lessons / ${output.length*3} bound checkpoints.`);
-else {fs.writeFileSync('visualizer-ui/guided-content-b.json',JSON.stringify(output,null,2)+'\n');console.log(`Wrote ${output.length} guided lessons / ${output.length*3} checkpoints.`);}
+else {fs.writeFileSync(`visualizer-ui/guided-content-${shard}.json`,JSON.stringify(output,null,2)+'\n');console.log(`Wrote ${output.length} guided lessons / ${output.length*3} checkpoints.`);}

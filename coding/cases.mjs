@@ -190,6 +190,22 @@ export function extraCase(n, seed) {
     case 2392:return [s+2,seq(s+1,1).map(i=>[i,i+1]),s%2?seq(s+1,1).map(i=>[i+1,i]):[[1,2],[2,1]]];
     case 2402:return [1+s%3,seq(len,0).map(i=>[s+i,s+i+(i%2?3:7)])];
     case 3133:return [s*3,s*7];
+    case 283:return [nums.map((x,i)=>(x+s+i)%3===0?0:x)];
+    case 1984:return [pos.concat(s*3),1+s%(len+1)];
+    case 80:return [v.flatMap(x=>Array(1+(x+s)%4).fill(x*2+s-6))];
+    case 1498:return [pos.map(x=>x+s%3).concat(s%2?Array(40+s).fill(1):[]),2*s+3];
+    case 1968:return [seq(len+1).map(x=>x*3+s).concat(s%2?[0]:[])];
+    case 1343:return [pos.map(x=>x+s),1+s%len,2+s%5];
+    case 1838:return [pos.map(x=>(x*s)%9+1),s*2];
+    case 1456:return [word+'abciiidef'.slice(0,3+s%6)+'ou'.repeat(s%3),1+s%3];
+    case 1888:return [(s*37+5).toString(2)+'1'.repeat(s%3)];
+    case 1658:return [pos,s%4===0?pos.reduce((a,b)=>a+b,0):s+3];
+    case 2390:return [word+'ab*c'+'*'.repeat(s%2)+'de'.repeat(s%3+1)+'*'];
+    case 946:{const p=seq(len,1).map(x=>x+s);return [p,s%3===0?p.slice().reverse():s%3===1?p.slice():[p[len-1],...p.slice(0,len-1)]];}
+    case 1209:return ['de'+'e'.repeat(s%3+1)+'dbbc'+'c'.repeat(s%2)+'cbbd'+'a'.repeat(s%4),2+s%2];
+    case 456:return [nums.concat(s%2?[s]:[])];
+    case 402:return [String(s*7919+10),1+s%3];
+    case 904:return [seq(len+3,0).map(i=>(i*(s%3+1)+(i>>2)+Math.floor(s/6))%4)];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

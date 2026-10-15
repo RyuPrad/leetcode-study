@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { ROOT } from '../scripts/content.mjs';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 import { testDesktopPlayback } from './desktop-playback.mjs';
 const seed = process.argv.includes('--seed');
 const expectedVersion = process.env.STUDY_EXPECT_VERSION || JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -18,7 +19,7 @@ try {
   assert.ok(await app.evaluate(({ app }) => app.isPackaged));
   assert.equal(await app.evaluate(({ app }) => app.getVersion()), expectedVersion);
   const { catalog, data } = await page.evaluate(() => window.study.bootstrap());
-  assert.equal(catalog.visualizers.length, 252);
+  assert.equal(catalog.visualizers.length, PROBLEM_COUNT);
   await app.evaluate(({ session }) => session.defaultSession.enableNetworkEmulation({ offline: true }));
   if (seed) {
     await page.getByRole('button', { name: 'Open Two Sum', exact: true }).click();
@@ -35,7 +36,7 @@ try {
       if (++count % 50 === 0) console.log(`Installed offline content: ${count}/${catalog.visualizers.length}`);
     }
     assert.deepEqual(errors, []);
-    console.log('PASS installed app launches with no Node/Git on PATH and all 252 packaged visualizers work offline');
+    console.log(`PASS installed app launches with no Node/Git on PATH and all ${PROBLEM_COUNT} packaged visualizers work offline`);
   } else {
     assert.equal(data.progress['leetcode:1'].status, 'completed');
     assert.ok(data.progress['leetcode:1'].bookmarked);

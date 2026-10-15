@@ -12,6 +12,11 @@ const baselineFile = path.join(ROOT, 'tests/fixtures/visualizer-baseline.json');
 const baseline = !capture && fs.existsSync(baselineFile) ? JSON.parse(fs.readFileSync(baselineFile, 'utf8')) : {};
 const correctionsFile = path.join(ROOT, 'tests/fixtures/visualizer-corrections.json');
 const corrections = fs.existsSync(correctionsFile) ? JSON.parse(fs.readFileSync(correctionsFile, 'utf8')) : {};
+// Problems added after the original library have no original to compare with. --accept-new records
+// the reviewed behavior of selected new pages (VISUALIZER_FILTER) after they were checked by hand.
+const addedFile = path.join(ROOT, 'tests/fixtures/visualizer-added.json');
+const added = fs.existsSync(addedFile) ? JSON.parse(fs.readFileSync(addedFile, 'utf8')) : {};
+const accept = process.argv.includes('--accept-new');
 const browser = await chromium.launch({ headless: true });
 const results = {}, failures = [];
 const pending = new Set();
@@ -60,8 +65,9 @@ async function inspect(page, file) {
     if (!capture) {
       if (!result.redesigned) failures.push(`${file}: shared layout not mounted`);
       if (!result.layout.controlsVisible) failures.push(`${file}: step controls hidden`);
-      const expected = corrections[file]?.expected || baseline[file];
-      if (!expected) failures.push(`${file}: missing baseline`);
+      const expected = corrections[file]?.expected || added[file]?.expected || baseline[file];
+      if (!expected && accept && !errors.length && !result.capped) added[file] = { reason: 'Reference visualizer added after the original library; expected behavior reviewed when it was added.', expected: hashes };
+      else if (!expected) failures.push(`${file}: missing baseline`);
       else for (const key of Object.keys(hashes)) if (entry[key] !== expected[key]) failures.push(`${file}: ${key} differs from expected behavior`);
       if (errors.length) failures.push(`${file}: ${errors.join('; ')}`);
       if (result.capped) failures.push(`${file}: did not finish within the explicit 50000-step verification limit`);
@@ -81,6 +87,7 @@ await Promise.all(Array.from({ length: workers() }, worker));
 clearInterval(heartbeat);
 await browser.close();
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
+if (accept && !failures.length) fs.writeFileSync(addedFile, JSON.stringify(Object.fromEntries(Object.entries(added).sort(([a], [b]) => a.localeCompare(b))), null, 2) + '\n');
 if (capture && !failures.length) { fs.mkdirSync(path.dirname(baselineFile), { recursive: true }); fs.writeFileSync(baselineFile, JSON.stringify(results, null, 2)); }
 fs.writeFileSync(path.join(ROOT, 'test-results/visualizers.json'), JSON.stringify({ count: selected.length, failures, results }, null, 2));
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }

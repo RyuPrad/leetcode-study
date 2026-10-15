@@ -194,7 +194,7 @@ public final class JudgeMain {
         Object result = method.invoke(solution, args);
         switch (number) {
             case 143: return fromList(args[0]);
-            case 26: case 27: {
+            case 26: case 27: case 80: {
                 int length = (Integer) result, total = ((int[]) args[0]).length;
                 if (length < 0 || length > total) throw new HarnessException("Return the number of retained elements.");
                 Map<String, Object> retained = new LinkedHashMap<>();
@@ -209,7 +209,8 @@ public final class JudgeMain {
             case 427: return quadGrid(result, asList(input.get(0)).size());
             default: break;
         }
-        if (method.getReturnType() == void.class) throw new HarnessException("The solution did not return a value.");
+        // A void method changes its first argument in place, as the C harness reports it.
+        if (method.getReturnType() == void.class) return encode(args[0], null);
         if (number == 190) return Integer.toUnsignedLong((Integer) result);
         return encode(result, method.getReturnType());
     }

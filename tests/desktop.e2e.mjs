@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from '../scripts/content.mjs';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 import { testDesktopPlayback } from './desktop-playback.mjs';
 fs.mkdirSync(path.join(ROOT, '.test-data'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
@@ -22,7 +23,7 @@ page.on('pageerror', error => errors.push(error.message));
 try {
   await page.waitForSelector('.problem-table');
   await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); });
-  assert.equal(await page.locator('.problem-table tbody tr').count(), 252);
+  assert.equal(await page.locator('.problem-table tbody tr').count(), PROBLEM_COUNT);
   console.log('PASS bundled library opens without external services');
   await app.evaluate(({ session }) => session.defaultSession.enableNetworkEmulation({ offline: true }));
   await page.getByRole('searchbox', { name: 'Search problems' }).fill('Two Sum');

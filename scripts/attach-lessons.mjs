@@ -3,10 +3,13 @@ import path from 'node:path';
 import { parse } from '@babel/parser';
 import { collectCatalog, ROOT } from './content.mjs';
 const catalog=collectCatalog();
+// With problem numbers, attach only those lessons and keep every other manifest entry as reviewed.
+const only=new Set(process.argv.slice(2).filter(arg=>/^\d+$/.test(arg)).map(Number));
+const kitClasses=fs.readFileSync(path.join(ROOT,'visualizer-ui/reference-kit.css'),'utf8');
 const notes=new Map(fs.readFileSync(path.join(ROOT,'visualizer-ui/lesson-notes.txt'),'utf8').trim().split(/\r?\n/).map(line=>{const split=line.indexOf('|');return [Number(line.slice(0,split)),line.slice(split+1)];}));
 const excluded=/^(?:drag|startX|startY|startLeft|startTop|offset|isDragging|dragging|fl$|dh$|ds$|pinned$|examples?$|EXAMPLES$|randomPools$|trace|history|hist$|steps$|snapshots$|autoTimer$|State$|memoryLabels$|cycleNesting$|objMode$|labelMode$|layoutMode$|activeExample$)/;
 const manifest=[];
-for(const entry of catalog.entries.filter(e=>e.visualizerPath)){
+for(const entry of catalog.entries.filter(e=>e.visualizerPath&&(!only.size||only.has(e.number)))){
   const file=path.join(ROOT,entry.visualizerPath);let source=fs.readFileSync(file,'utf8');
   const existingBridge=source.match(/\/\/ STUDY LESSON BRIDGE START[\s\S]*?\/\/ STUDY LESSON BRIDGE END/)?.[0];
   source=source.replace(/\s*\/\/ STUDY LESSON BRIDGE START[\s\S]*?\/\/ STUDY LESSON BRIDGE END\s*/,'\n');
@@ -18,7 +21,7 @@ for(const entry of catalog.entries.filter(e=>e.visualizerPath)){
   const history=['historyStack','history','hist'].find(name=>vars.includes(name));
   if(!notes.has(entry.number)||(!index||!collection)&&!history)throw new Error(`Missing lesson contract: ${entry.number}`);
   const meanings=Object.fromEntries([...entry.markdown.matchAll(/^\|\s*`?([^|`]+?)`?\s*\|\s*([^|]+)\s*\|/gm)].filter(m=>!/^Name$|^-+$/.test(m[1].trim())).map(m=>[m[1].trim(),m[2].trim()]));
-  const classes=[...new Set([...source.matchAll(/\.([a-zA-Z][\w-]*)/g)].map(m=>m[1]).filter(name=>/(?:cell|node|pill|bar|digit|char|tile|bucket|slot|balloon|interval|room|stick|coin|frame|stair|num-box|reg$|asteroid|^car$|item$|chip$|^bit$|sim-pkg|day-box|count-box)/i.test(name)&&!/(?:^|-)(?:wrap|wrapper|row|stage|label|caption|content|group|canvas|legend|summary|container|board|value|text|id|edge|line|arrow|panel|header|title|ptr|memory|empty|grid|list|heap|chart)$/.test(name)))];
+  const classes=[...new Set([...(source.includes('../visualizer-ui/reference-kit.js')?source+kitClasses:source).matchAll(/\.([a-zA-Z][\w-]*)/g)].map(m=>m[1]).filter(name=>/(?:cell|node|pill|bar|digit|char|tile|bucket|slot|balloon|interval|room|stick|coin|frame|stair|num-box|reg$|asteroid|^car$|item$|chip$|^bit$|sim-pkg|day-box|count-box)/i.test(name)&&!/(?:^|-)(?:wrap|wrapper|row|stage|label|caption|content|group|canvas|legend|summary|container|board|value|text|id|edge|line|arrow|panel|header|title|ptr|memory|empty|grid|list|heap|chart)$/.test(name)))];
   const spec={number:entry.number,title:entry.title,topic:entry.topic,why:notes.get(entry.number),meanings,entityClasses:classes,entitySelectors:entry.number===2013?['circle']:[],mode:collection?'precomputed':'history'};
   if([51,52].includes(entry.number)&&!spec.entityClasses.includes('sq'))spec.entityClasses.push('sq');
   const selected=vars.filter(name=>!excluded.test(name)&&!['stepIndex','idx','currentStep'].includes(name));
@@ -34,5 +37,9 @@ for(const entry of catalog.entries.filter(e=>e.visualizerPath)){
   fs.writeFileSync(file,source);
   manifest.push({id:entry.id,path:entry.visualizerPath,...spec});
 }
-fs.writeFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),JSON.stringify(manifest,null,2));
+if(only.size){
+  const previous=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8')).filter(lesson=>!only.has(lesson.number));
+  const order=new Map(catalog.entries.map((entry,index)=>[entry.id,index]));
+  fs.writeFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),JSON.stringify([...previous,...manifest].sort((a,b)=>order.get(a.id)-order.get(b.id)),null,2));
+}else fs.writeFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),JSON.stringify(manifest,null,2));
 console.log(`Attached explicit state adapters and teaching notes to ${manifest.length} lessons.`);

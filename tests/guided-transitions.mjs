@@ -5,9 +5,10 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {ROOT} from '../scripts/content.mjs';
+import {guidedLessons} from '../scripts/check-guided.mjs';
 
 const metadata=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json'),'utf8'));
-const lessons=['a','b'].flatMap(shard=>JSON.parse(fs.readFileSync(path.join(ROOT,`visualizer-ui/guided-content-${shard}.json`),'utf8')));
+const lessons=guidedLessons();
 const cases=lessons.flatMap(lesson=>lesson.checkpoints.filter(cp=>cp.afterIndex-cp.beforeIndex>1).map(cp=>({lesson,cp})));
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:960},reducedMotion:'reduce'});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(15000);

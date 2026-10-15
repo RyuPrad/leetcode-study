@@ -254,7 +254,7 @@ function functionCase(problem: CodingProblem, m: Method, input: Json[]): string[
     : m.params.map((p, i) => build(p, input[i], `p${i}`, n));
   lines.push(...built.flatMap(b => b.setup));
   lines.push('clock_t start = clock();', ...callReturning(m, `${m.name}(${args(built)})`, n), 'double ms = study_ms(start);');
-  if (n === 26 || n === 27) lines.push(`if (result < 0 || result > p0Size) study_fail("Return the number of retained elements.");`, 'study_text("{\\"length\\":"); study_int(result); study_text(",\\"values\\":"); study_ints(p0, result); study_text("}");');
+  if (n === 26 || n === 27 || n === 80) lines.push(`if (result < 0 || result > p0Size) study_fail("Return the number of retained elements.");`, 'study_text("{\\"length\\":"); study_int(result); study_text(",\\"values\\":"); study_ints(p0, result); study_text("}");');
   else if (n === 143) lines.push('study_out_list(p0);');
   else if (n === 235) lines.push('if (!result || result != study_find(p0, result->val)) study_fail("Return an ancestor node from the input tree.");', 'study_int(result->val);');
   else if (n === 427) lines.push(`study_quad(result, ${(input[0] as Json[]).length});`);

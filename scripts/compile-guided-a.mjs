@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { authored } from './author-guided-a.mjs';
-const catalogue=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8')).slice(0,125);
+import { shardA } from './guided-shards.mjs';
+const catalogue=JSON.parse(fs.readFileSync('visualizer-ui/lessons.json','utf8')).filter(lesson=>shardA.has(lesson.number));
 function syntax(code) {
   if(/\bheap\.pop\(/.test(code))return 'This min-heap pop removes the smallest value at the root, then restores the heap ordering. It is a custom heap operation.';
   if(/\bheap\.push\(/.test(code))return 'This min-heap push inserts a value and restores heap ordering so the smallest value stays at the root.';

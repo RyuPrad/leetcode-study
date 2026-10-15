@@ -4,13 +4,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 
 const source = fs.readFileSync(process.env.WINDOWS_OBJECT_NAVIGATION_SOURCE || new URL('./object-view.e2e.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('  for (const entry of entries) {');
 const end = source.indexOf("  await page.getByRole('button', { name: 'Back to library', exact: true }).click();", start);
 assert.ok(start >= 0 && end > start, 'Locate the production offline asset sweep.');
-const sweep = new Function('entries', 'assetFrame', 'assert', 'console', `return (async () => { const assets = []; ${source.slice(start, end)} return assets; })();`);
-const entries = Array.from({ length: 252 }, (_, index) => ({
+const sweep = new Function('entries', 'assetFrame', 'assert', 'console', 'PROBLEM_COUNT', `return (async () => { const assets = []; ${source.slice(start, end)} return assets; })();`);
+const entries = Array.from({ length: PROBLEM_COUNT }, (_, index) => ({
   number: index + 1,
   visualizerPath: `Two Pointers/lesson ${index + 1}_visualizer.html`,
 }));
@@ -61,13 +62,13 @@ function fixture(options = {}) {
       });
     },
   };
-  return { calls, events, run: (catalog = entries) => sweep(catalog, frame, assert, { log() {} }) };
+  return { calls, events, run: (catalog = entries) => sweep(catalog, frame, assert, { log() {} }, PROBLEM_COUNT) };
 }
 
-test('slow successful offline navigation still inspects all 252 exact lessons', async () => {
+test(`slow successful offline navigation still inspects all ${PROBLEM_COUNT} exact lessons`, async () => {
   const run = fixture({ loadMs: 60000 });
   const assets = await run.run();
-  assert.equal(assets.length, 252);
+  assert.equal(assets.length, PROBLEM_COUNT);
   for (const [index, call] of run.calls.entries()) {
     assert.deepEqual(call, { url: expectedUrl(entries[index]), config: { waitUntil: 'load', timeout: 90000 } });
     assert.equal(assets[index].number, entries[index].number);
@@ -122,8 +123,8 @@ for (const [name, options, expected] of [
   });
 }
 
-test('an incomplete catalog cannot satisfy the 252-lesson coverage assertion', async () => {
-  await assert.rejects(fixture().run(entries.slice(0, 251)), /251 !== 252/);
+test('an incomplete catalog cannot satisfy the lesson coverage assertion', async () => {
+  await assert.rejects(fixture().run(entries.slice(0, PROBLEM_COUNT - 1)), new RegExp(`${PROBLEM_COUNT - 1} !== ${PROBLEM_COUNT}`));
 });
 
 test('navigation headroom leaves operation timeouts and runtime errors strict', () => {

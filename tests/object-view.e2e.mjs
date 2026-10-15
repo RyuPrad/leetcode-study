@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import { ROOT } from '../scripts/content.mjs';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 
 const expectedVersion=process.env.STUDY_EXPECT_VERSION||JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8')).version;
 fs.mkdirSync(path.join(ROOT,'.test-data'),{recursive:true});fs.mkdirSync(path.join(ROOT,'test-results'),{recursive:true});
@@ -28,8 +29,8 @@ try {
   assert.equal(await app.evaluate(({app})=>app.getVersion()),expectedVersion);
   if(process.env.STUDY_TEST_EXE)assert.equal(await app.evaluate(({app})=>app.isPackaged),true);
   const entries = bootstrap.catalog.entries.filter(entry => entry.number);
-  assert.equal(entries.length, 252);
-  assert.equal(entries.filter(entry => entry.visualizerPath).length, 252);
+  assert.equal(entries.length, PROBLEM_COUNT);
+  assert.equal(entries.filter(entry => entry.visualizerPath).length, PROBLEM_COUNT);
   const first = entries.find(entry => entry.number === 1);
   await page.getByRole('searchbox', { name: 'Search problems' }).fill('1');
   await page.getByRole('button', { name: `Open ${first.title}`, exact: true }).click();
@@ -53,8 +54,8 @@ try {
     assert.equal(evidence.number, entry.number);assets.push(evidence);
     if(assets.length%50===0)console.log(`Offline Object View assets: ${assets.length}/${entries.length}`);
   }
-  assert.equal(assets.length, 252);
-  console.log('Checked offline Object View scripts and card stylesheet for all 252 packaged lessons.');
+  assert.equal(assets.length, PROBLEM_COUNT);
+  console.log(`Checked offline Object View scripts and card stylesheet for all ${PROBLEM_COUNT} packaged lessons.`);
   await page.getByRole('button', { name: 'Back to library', exact: true }).click();
   for (const number of [1, 21, 48, 98, 104, 141, 143, 206, 226, 133, 208, 230, 572, 146, 703, 700, 933]) {
     console.log(`Checking desktop Objects: ${number}`);

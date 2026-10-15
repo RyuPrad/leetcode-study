@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CodingProblem, Language } from '../shared/coding';
 import { solutionPath } from '../coding/solutions';
+import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 import { lex, normalize, toLines, units, wholeSolution } from '../src/typing/snippets';
 import { TypingRun } from '../src/typing/engine';
 import { personalBest, validResult, type TypingResult } from '../src/typing/typing-store';
@@ -27,7 +28,7 @@ function balanced(source: string, language: Language) {
 }
 
 test('every reference solution splits into balanced snippets that cover its code in order', () => {
-  assert.equal(solutions.length, 252 * 4);
+  assert.equal(solutions.length, PROBLEM_COUNT * 4);
   for (const { name, language, text } of solutions) {
     const whole = normalize(text), snippets = units(text, language);
     assert.ok(snippets.length > 0, name);
