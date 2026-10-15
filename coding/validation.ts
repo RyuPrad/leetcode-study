@@ -103,7 +103,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if ([46,47,78,90,1863].includes(n) && a[0].length>12 || [39,40,131,473,698].includes(n) && a[0].length>16 || n===140&&a[0].length>20) fail('This backtracking input is too large (12 elements, 16 for partition/combination problems, 20 for Word Break II).');
     if ([46,78].includes(n) && !unique(a[0])) fail('All values must be distinct.');
     if (n===77 && (a[0]<1||a[0]>16||a[1]<1||a[1]>a[0])) fail('Require 1 <= k <= n <= 16.');
-    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],9:[-2147483648,2147483647],12:[1,3999],59:[1,20],263:[-2147483648,2147483647],118:[1,30],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
+    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],1359:[1,500],9:[-2147483648,2147483647],12:[1,3999],59:[1,20],263:[-2147483648,2147483647],118:[1,30],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
     if (scalarBounds[n] && (a[0]<scalarBounds[n][0]||a[0]>scalarBounds[n][1])) fail(`Value must be in [${scalarBounds[n].join(', ')}].`);
     if (n===374 && (a[0]<1||a[0]>2147483647||a[1]<1||a[1]>a[0])) fail('Require 1 <= pick <= n <= 2^31 - 1.');
     if (n===1095) { const v=a[1],p=v.indexOf(Math.max(...v)); if(v.length<3||p===0||p===v.length-1||!sorted(v.slice(0,p+1),true)||!sorted(v.slice(p).reverse(),true)) fail('arr must strictly rise then strictly fall, with an interior peak.'); }
@@ -198,6 +198,21 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===2028 && (!a[0].length || a[0].some((x:any)=>x<1||x>6) || a[1]<1 || a[1]>6 || a[2]<1 || a[2]>1e5)) fail('rolls holds values 1 to 6; 1 <= mean <= 6; n >= 1.');
     if(n===1470 && (a[1]<1 || a[1]>500 || a[0].length!==2*a[1] || a[0].some((x:any)=>x<1||x>1000))) fail('nums has 2n values in [1, 1000]; 1 <= n <= 500.');
     if(n===989 && (!a[0].length || a[0].some((x:any)=>x<0||x>9) || a[0].length>1&&a[0][0]===0 || a[1]<1 || a[1]>10000)) fail('num is digits without leading zeros; 1 <= k <= 10^4.');
+    if(n===120 && (!a[0].length || a[0].length>200 || a[0].some((r:any,i:number)=>!Array.isArray(r)||r.length!==i+1||r.some((x:any)=>x<-1e4||x>1e4)))) fail('Row r of triangle has r + 1 values in [-10^4, 10^4]; 1 to 200 rows.');
+    if(n===740 && (!a[0].length || a[0].length>2e4 || a[0].some((x:any)=>x<1||x>1e4))) fail('nums has 1 to 2 × 10^4 values in [1, 10^4].');
+    if(n===256 && (!a[0].length || a[0].length>100 || a[0].some((r:any)=>!Array.isArray(r)||r.length!==3||r.some((x:any)=>x<1||x>20)))) fail('costs has 1 to 100 rows of three prices in [1, 20].');
+    if(n===2369 && (a[0].length<2 || a[0].some((x:any)=>x<1||x>1e6))) fail('nums has at least 2 values in [1, 10^6].');
+    if([1856,1964].includes(n) && (!a[0].length || a[0].some((x:any)=>x<1||x>1e7))) fail('Values are in [1, 10^7].');
+    if(n===983 && (!a[0].length || a[0].some((x:any,i:number)=>x<1||x>365||i&&x<=a[0][i-1]) || a[1].length!==3 || a[1].some((x:any)=>x<1||x>1000))) fail('days are strictly increasing in [1, 365]; costs has three prices in [1, 1000].');
+    if(n===673 && (!a[0].length || a[0].length>2000 || a[0].some((x:any)=>x<-1e6||x>1e6))) fail('nums has 1 to 2000 values in [-10^6, 10^6].');
+    if(n===691 && (!a[0].length || a[0].length>50 || a[0].some((w:any)=>!/^[a-z]{1,10}$/.test(w)) || !/^[a-z]{1,15}$/.test(a[1]))) fail('stickers are 1 to 50 words of 1 to 10 lowercase letters; target has 1 to 15 lowercase letters.');
+    if(n===1035 && (!a[0].length || !a[1].length || a[0].length>500 || a[1].length>500 || [...a[0],...a[1]].some((x:any)=>x<1||x>2000))) fail('Both arrays have 1 to 500 values in [1, 2000].');
+    if(n===2140 && (!a[0].length || a[0].some((q:any)=>!Array.isArray(q)||q.length!==2||q.some((x:any)=>x<1||x>1e5)))) fail('Each question is [points, brainpower] with values in [1, 10^5].');
+    if(n===2466 && (a[0]<1 || a[1]<a[0] || a[1]>1e5 || a[2]<1 || a[3]<1 || a[2]>a[0] || a[3]>a[0])) fail('Require 1 <= low <= high <= 10^5 and 1 <= zero, one <= low.');
+    if(n===837 && (a[1]<0 || a[0]<a[1] || a[0]>1e4 || a[2]<1 || a[2]>1e4)) fail('Require 0 <= k <= n <= 10^4 and 1 <= maxPts <= 10^4.');
+    if(n===1626 && (!a[0].length || a[0].length!==a[1].length || a[0].length>1000 || a[0].some((x:any)=>x<1||x>1e6) || a[1].some((x:any)=>x<1||x>1000))) fail('scores and ages have the same length; scores in [1, 10^6], ages in [1, 1000].');
+    if(n===472 && (!a[0].length || a[0].length>1e4 || a[0].some((w:any)=>!/^[a-z]{1,30}$/.test(w)) || !unique(a[0]))) fail('words are distinct, 1 to 30 lowercase letters each.');
+    if(n===1799 && (a[0].length<2 || a[0].length>14 || a[0].length%2 || a[0].some((x:any)=>x<1||x>1e6))) fail('nums has an even count of 2 to 14 values in [1, 10^6].');
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;

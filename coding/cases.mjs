@@ -276,6 +276,23 @@ export function extraCase(n, seed) {
     case 2028:return [pos.map(x=>1+(x*s)%6),1+s%6,1+s%5];
     case 1470:return [pos.concat(pos.map(x=>x*s%1000+1)),pos.length];
     case 989:return [pos.map(x=>x%10),s*97%10000+1];
+    case 120:return [Array.from({length:1+s%5},(_,r)=>Array.from({length:r+1},(_,c)=>(r*7+c*s+s)%21-10))];
+    case 740:return [pos.concat(pos.map(x=>x+s%3))];
+    case 256:return [pos.map((x,i)=>[(x*s+i)%20+1,(x+s*i)%20+1,(x*3+s)%20+1])];
+    case 2369:return [v.flatMap(x=>s%3===0?[x+s,x+s]:s%3===1?[x*3+s,x*3+s+1,x*3+s+2]:[x+s,x+s+s%2])];
+    case 1856:return [pos.map(x=>x*s%9+1)];
+    case 983:return [v.map(x=>x*(1+s%5)+s),[2+s%3,5+s%4,12+s%7]];
+    case 673:return [nums.concat(pos)];
+    case 691:return [[word+'ab','bc'+word,'ca'],'abc'+word.repeat(1+s%3)+(s%4===0?'z':'')];
+    case 1035:return [nums.map(x=>x+7),pos.map((x,i)=>1+(x*s+i)%7)];
+    case 2140:return [pos.map((x,i)=>[x*s%10+1,(x+i)%4+1])];
+    case 2466:{const low=1+s%4;return [low,low+s%6,1+s%low,1+(s*7)%low];}
+    case 837:return [s*3%25,s%8,1+s%10];
+    case 1626:return [pos.map(x=>x*s%10+1),pos.map((x,i)=>(x+i*s)%5+1)];
+    case 472:{const list=[word,'x',word+'x','x'+word+word,word+'yy'];if(s%2)list.push('yy');return [list];}
+    case 1799:return [v.concat(v).slice(0,2*(1+s%3)).map((x,i)=>x*(1+s%4)+i)];
+    case 1964:return [pos.concat(pos.map(x=>(x*s)%7+1))];
+    case 1359:return [s*41%500+1];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

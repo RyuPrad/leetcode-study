@@ -17,7 +17,8 @@ const esc = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>
 export function codeRows(code) {
   return code.replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n').map((line, index) => {
     let html = '';
-    const pattern = /(\/\/.*$)|('(?:\\.|[^'])*'|"(?:\\.|[^"])*"|`(?:\\.|[^`])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)(?=\s*\()|([A-Za-z_$][\w$]*)|([^A-Za-z_$\d'"`/]+|\/)/g;
+    // Numbers may carry a BigInt n suffix; the last alternative keeps any other character as text.
+    const pattern = /(\/\/.*$)|('(?:\\.|[^'])*'|"(?:\\.|[^"])*"|`(?:\\.|[^`])*`)|(\b\d+(?:\.\d+)?n?\b)|([A-Za-z_$][\w$]*)(?=\s*\()|([A-Za-z_$][\w$]*)|([^A-Za-z_$\d'"`/]+|\/)|([\s\S])/g;
     for (const match of line.matchAll(pattern)) {
       const [text, comment, string, number, call, word] = match;
       if (comment) html += `<span class="cm">${esc(comment)}</span>`;

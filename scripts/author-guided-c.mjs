@@ -347,4 +347,72 @@ add(989,'Add from the last digit, folding the carry into k, until both num and k
 [6,'k = 34 + num[3] = 34. What is pushed?','4','34~Only the last digit is pushed.','3~k % 10 = 4.','res.push(k % 10).','The ones digit is 4.'],
 [7,'What is k after the carry step?','3','4~The digit 4 was written; k keeps the rest.','0~34 / 10 rounds down to 3.','k = floor(k / 10).','floor(34 / 10) = 3.'],
 [28,'res = [4, 3, 2, 1]. What is returned?','[1, 2, 3, 4]','[4, 3, 2, 1]~res holds the least significant digit first.','1234~The answer is an array of digits.','Reverse res.','1200 + 34 = 1234.']]);
+add(120,'Start from the bottom row and fold each row into one array: a cell plus the cheaper of the two paths below it.','Going top-down and greedily taking the smaller child can miss a cheaper path further down.',[
+[6,'Row 2, column 0 holds 6; below it dp[0] = 4 and dp[1] = 1. What is dp[0]?','7','10~Take the cheaper of the two cells below.','5~The cell itself, 6, is added to the cheaper path.','dp[0] = 6 + min(4, 1).','6 + 1 = 7.'],
+[19,'Row 1, column 0 holds 3; below it dp[0] = 7 and dp[1] = 6. What is dp[0]?','9','10~min(7, 6) = 6.','6~Add the value 3.','3 + min(7, 6).','3 + 6 = 9.'],
+[34,'What is returned?','11','10~The top 2 is added: 2 + min(9, 10).','2~dp[0] holds the whole path cost.','dp[0] after folding row 0.','2 + 3 + 5 + 1 = 11.']]);
+add(740,'Group the points by value, then run House Robber over the values: taking v forbids taking v - 1.','Sorting and deleting greedily from the largest value can delete more points than it earns.',[
+[8,'num = 2. What is points[2]?','2','0~Each copy of 2 adds 2 points.','1~points stores value × count, not the count.','points[num] += num.','One 2 earns 2.'],
+[25,'v = 2: takeV = 0 + points[2] = 2. What is take after this step?','2','0~take becomes takeV.','3~takeV for v = 2 is 2.','take = takeV.','Taking 2 earns 2.'],
+[35,'v = 4: takeV = skip + points[4] = 2 + 4. What is take?','6','4~Taking 4 also keeps the best total that skipped 3.','7~skip before this step was 2, not 3.','take = takeV.','Take 2 and 4: 2 + 4 = 6.']]);
+add(256,'Keep the cheapest total ending with each color; a new house adds its price to the cheaper of the other two colors.','Choosing the cheapest color for each house in turn can force an expensive color on the next house.',[
+[4,'House 1 red: 16 + min(dp[1] = 2, dp[2] = 17). What is red?','18','33~Red follows blue or green, not red.','16~Add the cheaper previous ending.','16 + min(2, 17).','16 + 2 = 18.'],
+[7,'red = 18, blue = 33, green = 7. What is dp after this step?','[18, 33, 7]','[17, 2, 17]~dp is replaced by the new totals.','[7, 18, 33]~The order stays red, blue, green.','dp = [red, blue, green].','The cheapest totals ending with each color.'],
+[16,'What is returned?','10','21~Return the cheapest of the three endings.','37~That is the most expensive ending.','min(21, 10, 37).','Blue, green, blue: 2 + 5 + 3 = 10.']]);
+add(2369,'dp[i] is true when the first i values end with a good block of 2 or 3 after a valid shorter prefix.','Checking only blocks of 2 misses partitions that need three consecutive values.',[
+[8,'[4, 4] is an equal pair and dp[0] is true. What is dp[2]?','true','false~The first two values form a good block.','4~dp holds booleans.','dp[i] = true.','[4, 4] is valid.'],
+[17,'i = 3: [4, 4, 4] are three equal values and dp[0] is true. What is dp[3]?','true','false~Three equal values are a good block.','Only dp[2] changes~This step sets dp[3].','dp[3] = true.','[4, 4, 4] is valid.'],
+[30,'i = 5: [4, 5, 6] is consecutive and dp[2] is true. What is dp[5]?','true','false~[4, 4] then [4, 5, 6] is a valid partition.','It stays false because dp[4] is false~A block of 3 needs dp[i - 3] = dp[2].','dp[i - 3] = dp[2] is true.','[4, 4] + [4, 5, 6].']]);
+add(1856,'Use an increasing stack: when a value is popped, it is the minimum of the span from its start to just before the current index.','Checking every subarray and its minimum is quadratic; the stack finds each value\'s widest span once.',[
+[36,'At i = 3 (value 2), the top [2, 3] is popped. Over which span is 3 the minimum?','nums[2..2]','nums[0..3]~Smaller values bound it on both sides.','nums[2..3]~nums[3] = 2 is smaller and ends the span.','From its start, 2, up to i - 1.','Just the single 3.'],
+[37,'Its product is 3 × (prefix[3] - prefix[2]). What is product?','9','3~Multiply the minimum by the sum.','18~The span holds only the 3.','prefix[3] - prefix[2] = 6 - 3 = 3.','3 × 3 = 9.'],
+[55,'At the end, [1, 2] is popped: min 2 over nums[1..3]. What is product?','14','10~The span starts at index 1, not 2.','16~prefix[4] - prefix[1] = 8 - 1 = 7.','2 × (prefix[4] - prefix[1]).','2 × 7 = 14.']]);
+add(983,'dp[d] is the cheapest cost up to day d; on a travel day the last pass started 1, 7 or 30 days back.','Buying the pass that is cheapest per day ignores how many travel days it actually covers.',[
+[10,'Day 1: day = 2, week = 7, month = 15. What is dp[1]?','2','7~Take the cheapest of the three passes.','0~Day 1 is a travel day and must be covered.','min(2, 7, 15).','A 1-day pass.'],
+[14,'Day 2 has no travel. What is dp[2]?','2','4~No pass is needed on day 2.','0~The cost so far carries over.','dp[2] = dp[1].','Nothing new to pay.'],
+[46,'Day 7: day = 8, week = dp[0] + 7 = 7, month = 15. What is dp[7]?','7','8~The 7-day pass for days 1 to 7 is cheaper.','6~dp[6] + 2 = 8 for a 1-day pass.','min(8, 7, 15).','One 7-day pass covers days 1, 4, 6 and 7.']]);
+add(673,'For each end i, keep the longest length and how many subsequences reach it; equal-length extensions add their counts.','Counting only one subsequence per length misses ties that reach the same length in different ways.',[
+[14,'i = 1 (value 3) extends j = 0 (value 1). What is length[1]?','2','1~[1, 3] is longer than [3] alone.','3~length[0] + 1 = 2.','length[j] + 1.','The subsequence [1, 3].'],
+[79,'i = 4 (value 7): j = 3 (value 4) also reaches length 4. What is count[4]?','2','1~A second subsequence of the same length is found.','4~count[3] = 1 is added once.','count[4] += count[3].','[1, 3, 5, 7] and [1, 3, 4, 7].'],
+[104,'What is returned?','2','1~Both length-4 subsequences end at 7.','4~That is the longest length, not the count.','Sum count[i] where length[i] = 4.','count[4] = 2.']]);
+add(691,'Some sticker must cover the first missing letter; try only those, and remember the answer for each sorted remainder.','Trying every sticker at every step without memoization repeats the same remainders many times.',[
+[17,'Cutting "example" from "aehhtt": e and x are done, and ch = "a". What is next?','"hhtt"','"ahhtt"~The "a" is removed too.','"ehhtt"~The only "e" in rest was cut first.','next.replace("a", "").','"ahhtt" without its "a".'],
+[57,'solve("") returned 0 inside solve("ht"). What is best?','1','0~Using "with" counts as one sticker.','Infinity~1 + 0 = 1 is smaller.','best = min(best, 1 + solve(next)).','min(Infinity, 1 + 0) = 1.'],
+[82,'What is returned?','3','2~"hhtt" needs 2 stickers, plus "example".','-1~A solution was found.','res = solve("aehhtt") = 3.','"example" + "with" + "with".']]);
+add(1035,'Lines that do not cross match equal values in order, so the answer is the longest common subsequence.','Greedily connecting the first equal pair can block better connections later.',[
+[8,'nums1[0] = nums2[0] = 1. What is dp[1][1]?','1','0~Equal values can be connected.','2~Only one line so far.','dp[0][0] + 1.','Connect 1 with 1.'],
+[32,'nums1[1] = 4 equals nums2[2] = 4 and dp[1][2] = 1. What is dp[2][3]?','2','1~Both the 1-line and the 4-line fit.','3~Only nums1[0..1] and nums2[0..2] are used.','dp[i - 1][j - 1] + 1.','1 + 1 = 2.'],
+[53,'What is returned?','2','3~The 4 and 2 lines would cross.','1~Two lines fit without crossing.','dp[3][3].','1 with 1, plus either 4 with 4 or 2 with 2.']]);
+add(2140,'Go from the last question back: each one is either solved (its points plus the best after the skips) or skipped.','Going forward and always solving when possible ignores the questions the brainpower forces you to skip.',[
+[6,'Question 3 = [2, 5]: solving it jumps past the end (dp[4] = 0). What is solve?','2','0~Solving earns its points.','7~skip counts questions, not points.','points + dp[min(n, i + skip + 1)].','2 + 0 = 2.'],
+[17,'Question 1 = [4, 3]: solve = 4, and skipping gives dp[2] = 4. What is dp[1]?','4','8~Solving 1 skips questions 2 and 3.','0~Both choices earn 4.','max(solve, dp[i + 1]).','max(4, 4) = 4.'],
+[22,'Question 0 = [3, 2]: solving it jumps to question 3 (dp[3] = 2). What is dp[0]?','5','7~Solving 0 skips questions 1 and 2.','4~solve = 3 + 2 = 5 beats skipping, 4.','max(3 + dp[3], dp[1]).','Solve 0 and 3: 3 + 2 = 5.']]);
+add(2466,'Count strings by length: a string of length len ends with a 0-block or a 1-block, so add the counts for len - zero and len - one.','Building the strings themselves is exponential; only the counts per length are needed.',[
+[10,'len = 1: dp[1] got 1 from the 0-block, then adds dp[0] for the 1-block. What is dp[1]?','2','1~Both "0" and "1" have length 1.','0~Each block adds dp[0] = 1.','dp[1] += dp[1 - one].','"0" and "1".'],
+[24,'len = 3: dp[3] = 4 after the 0-block. What is it after the 1-block?','8','4~Strings ending in "1" are added too.','16~Add dp[2] = 4 once.','dp[3] += dp[3 - 1].','4 + 4 = 8.'],
+[26,'Length 3 is good. What is res?','8','0~Length 3 is in [3, 3].','4~All 8 strings of length 3 count.','res += dp[3].','Every binary string of length 3.']]);
+add(837,'dp[i] is the chance of ever reaching score i; it is window / maxPts, where window sums the scores that can still draw into i.','Summing the previous maxPts probabilities for every score separately makes the solution O(n × maxPts).',[
+[7,'dp[1] = window / maxPts with window = 1. What is dp[1]?','0.1','1~Each card value has probability 1 / 10.','0~Score 1 can be reached from 0.','1 / 10.','Drawing a 1 from score 0.'],
+[9,'Score 1 >= k = 1, so Alice stops there. What is res?','0.1','0~Stopping at 1 <= 6 counts.','1~Only the chance of reaching score 1 is added.','res += dp[1].','0 + 0.1.'],
+[43,'What is returned?','0.6','1~Scores 7 to 10 exceed n = 6.','0.1~Each of scores 1 to 6 adds 0.1.','Six final scores, each 0.1.','0.6.']]);
+add(1626,'Sort by age then score; a team is conflict-free when its scores never decrease along that order.','Sorting by score alone ignores that equal ages never conflict.',[
+[2,'After sorting by age then score, what is players?','[[1, 1], [2, 3], [3, 5], [4, 10], [5, 15]]','[[1, 1], [3, 2], [5, 3], [10, 4], [15, 5]]~Each pair is [age, score].','[[5, 15], [4, 10], [3, 5], [2, 3], [1, 1]]~Ages are sorted ascending.','players[k] = [age, score].','Ages 1 to 5.'],
+[41,'i = 3 (score 10) after j = 2 (dp = 9). What is dp[3]?','19','14~dp[2] = 9 beats dp[1] = 4.','10~Adding to a team of earlier players is allowed.','dp[3] = max(dp[3], dp[2] + 10).','9 + 10 = 19.'],
+[66,'What is returned?','34','15~The whole team has no conflict.','19~The oldest player joins too.','The largest dp value.','1 + 3 + 5 + 10 + 15 = 34.']]);
+add(472,'Run Word Break on every word, but never let the whole word count as its own single piece.','Checking only pairs of words misses words made of three or more pieces.',[
+[119,'"catdog": dp[0] is true and "cat" is a word. What is dp[3]?','true','false~"cat" is in the dictionary.','Only dp[6] matters~Every prefix is recorded.','dp[end] = true.','"cat" is one word.'],
+[183,'end = 6: dp[3] is true and "dog" is a word. What is dp[6]?','true','false~"cat" + "dog" splits the word.','It is skipped as the whole word~The last piece is "dog", not "catdog".','dp[6] = true.','Two pieces: "cat" and "dog".'],
+[190,'What is returned?','["catdog"]','[]~"catdog" is made of two words.','["cat", "dog", "catdog"]~"cat" and "dog" are single words.','Only words made of at least two others.','"cat" + "dog".']]);
+add(1799,'A bitmask of removed numbers is the state; the next operation number is half the removed count plus one.','Pairing greedily by largest gcd first ignores that later operations multiply by larger numbers.',[
+[16,'mask = 0000, op = 1, pair 3 and 4. What is dp[3] (mask 0011)?','1','0~gcd(3, 4) = 1 and op = 1.','7~The score is op × gcd, not the sum.','0 + 1 × gcd(3, 4).','gcd(3, 4) = 1.'],
+[21,'Pair 3 and 6 first. What is dp[5] (mask 0101)?','3','6~gcd(3, 6) = 3, times op = 1.','1~The pair is 3 and 6, not 3 and 4.','1 × gcd(3, 6).','gcd(3, 6) = 3.'],
+[126,'mask = 0101 (3 and 6 removed, dp = 3), op = 2, pair 4 and 8. What is dp[15]?','11','7~op = 2 doubles gcd(4, 8) = 4.','5~That came from pairing 3, 4 first, then 6, 8.','3 + 2 × gcd(4, 8).','3 + 8 = 11.']]);
+add(1964,'Keep the smallest tail height for each course length and binary search for where each obstacle fits.','Using a strict comparison (<) finds the longest strictly increasing course, but equal heights are allowed.',[
+[6,'tails is empty, so lo = 0. What is tails after placing height 1?','[1]','[]~The obstacle starts a course of length 1.','[0]~tails stores heights.','tails[0] = 1.','A course of length 1 ends with 1.'],
+[25,'Height 3: every tail is <= 3, so lo = 2. What is pushed to res?','3','2~lo + 1 = 3.','1~It extends the course [1, 2].','res.push(lo + 1).','[1, 2, 3].'],
+[37,'Height 2: tails = [1, 2, 3] and the first tail > 2 is at index 2. What is tails?','[1, 2, 2]','[1, 2, 3, 2]~It replaces the tail at index 2.','[1, 2, 3]~A smaller tail for length 3 is kept.','tails[2] = 2.','[1, 2, 2] ends a course of length 3 with 2.']]);
+add(1359,'Add orders one at a time: the new pickup has 2i - 1 places and its delivery must follow it.','Multiplying by (2i)! counts sequences where a delivery comes before its pickup.',[
+[5,'Order 2 joins sequences of 2 stops. How many places does its pickup have?','3','2~There are 2 + 1 gaps.','4~Only 2 stops exist so far.','slots = 2 × 2 - 1.','Before, between and after P1 D1.'],
+[6,'slots = 3. What is res?','6','3~The delivery must also be placed after the pickup.','9~Only placements with the delivery after the pickup count: 3 × 4 / 2.','res × slots × (slots + 1) / 2.','1 × 6 = 6.'],
+[9,'What is returned?','6','90~That is the answer for n = 3.','2~Count all valid sequences of 4 stops.','res = 6.','6 sequences for 2 orders.']]);
 }

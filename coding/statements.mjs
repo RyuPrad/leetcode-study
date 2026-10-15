@@ -83,6 +83,7 @@ export const statements = Object.fromEntries(`
 110|Return whether every node has left and right subtree heights differing by at most one.
 115|Count distinct subsequences of s equal to t. A subsequence preserves order but may skip characters.
 118|Return the first numRows rows of Pascal's triangle, where each number is the sum of the two numbers directly above it.
+120|Return the minimum path sum from the top of the triangle to the bottom, moving at each step to an adjacent number in the row below (index c or c + 1).
 121|Return the maximum profit from one buy followed by one sell on a later day. Return zero when no profit is possible.
 122|Return the maximum profit with any number of stock trades, holding at most one share at a time and selling before buying again.
 124|Return the largest sum along any nonempty simple path in the binary tree. The path may start and end at any nodes.
@@ -145,6 +146,7 @@ export const statements = Object.fromEntries(`
 242|Return whether t is an anagram of s, with exactly the same character counts.
 252|Return whether a person can attend all half-open meeting intervals without any overlaps. One meeting may start when another ends.
 253|Return the minimum number of rooms needed for all half-open meeting intervals.
+256|Paint n houses red, blue or green so that no two adjacent houses have the same color. costs[i][j] is the cost of painting house i with color j. Return the minimum total cost.
 261|Return whether the undirected graph with nodes 0 through n-1 and the supplied edges forms one tree.
 263|An ugly number is a positive integer whose prime factors are limited to 2, 3 and 5. Return true if n is an ugly number.
 268|nums contains n distinct values from 0 through n. Return the one missing value.
@@ -197,6 +199,7 @@ export const statements = Object.fromEntries(`
 456|Return whether nums has indices i < j < k with nums[i] < nums[k] < nums[j].
 460|Implement LFUCache(capacity), get(key), and put(key,value). Missing keys return -1. Evict the least frequently used key; break ties by least recently used. Reads and updates increment frequency; new keys start at frequency 1.
 463|Return the perimeter of the single island in a binary grid. Land cells share sides horizontally or vertically, and the island has no lakes.
+472|Return all words in the list that are made by concatenating at least two shorter words from the same list (words may repeat).
 473|Return whether every positive matchstick can be used exactly once to form four equal-length sides of a square.
 494|Assign plus or minus to every nums value. Count assignments whose resulting sum is target.
 496|nums1 is a subset of the distinct values in nums2. For each value in nums1, return the first greater value to its right in nums2, or -1 if none exists.
@@ -218,10 +221,12 @@ export const statements = Object.fromEntries(`
 649|Senators act cyclically in their given R/D order and optimally ban an opposing senator. Return Radiant or Dire, the winning party.
 658|Return the k closest values to x in a sorted array, in ascending order. For equal distance, prefer the smaller value.
 665|Return whether nums can become non-decreasing (nums[i] <= nums[i + 1] for every i) by changing at most one element.
+673|Return the number of longest strictly increasing subsequences in nums.
 678|Return whether the string can be balanced if each star may represent an opening parenthesis, a closing parenthesis, or an empty string.
 680|Return whether s can be made a palindrome by deleting at most one character.
 682|Maintain scores from operations: an integer adds a score, + adds the last two, D doubles the last, and C removes the last. All operations are valid. Return the final score sum.
 684|An undirected tree on nodes 1 through n has one extra edge. Return the edge to remove to restore a tree, choosing the last such edge in input order.
+691|Each sticker is a word whose letters you can cut out and rearrange; you have unlimited copies of every sticker. Return the minimum number of stickers needed to spell target, or -1 if it is impossible.
 695|Return the greatest size of a horizontally/vertically connected island of 1 cells, or zero if no land exists.
 698|Return whether all positive nums can be divided into k nonempty subsets of equal sum.
 700|Find val in a BST and return the root of its subtree, or null if absent.
@@ -234,6 +239,7 @@ export const statements = Object.fromEntries(`
 724|Return the leftmost index where the sum of the values strictly to its left equals the sum strictly to its right, or -1 if there is none.
 735|Asteroids move along a line: positive rightward, negative leftward, absolute value is size. Colliding smaller asteroids disappear; equal sizes both disappear. Return survivors in original order.
 739|For each day's temperature, return days until a strictly warmer temperature, or zero when none follows.
+740|Pick nums[i] to earn nums[i] points; every element equal to nums[i] - 1 or nums[i] + 1 is then deleted. Return the maximum number of points you can earn.
 743|Edges [u,v,w] give directed travel time. Return how long a signal from k takes to reach every node 1 through n, or -1 if any node is unreachable.
 746|Pay cost[i] to use stair i and then climb one or two stairs. Start at stair 0 or 1. Return the least cost to move beyond the last stair.
 752|Starting at 0000, rotate one digit up or down per move, wrapping between 0 and 9. Avoid deadends. Return minimum moves to target or -1.
@@ -241,6 +247,7 @@ export const statements = Object.fromEntries(`
 767|Rearrange every character of s so no adjacent characters are equal. Return any valid string or an empty string if impossible.
 778|Each square grid elevation is a distinct integer from 0 through n*n-1. At time t you may enter cells of elevation at most t. Return the earliest time a path connects top-left to bottom-right.
 787|Return the cheapest flight cost from src to dst using at most k intermediate stops, or -1 if impossible.
+837|Alice starts with 0 points and draws numbers while she has fewer than k points; each draw adds an integer from 1 to maxPts, uniformly at random. Return the probability that she ends with n or fewer points.
 838|Some dominoes are pushed left ("L") or right ("R"), the rest are upright ("."). A falling domino pushes its neighbor each second; a domino pushed from both sides stays upright. Return the final state.
 846|Return whether all cards can be partitioned into groups of groupSize consecutive integer values.
 853|Cars at distinct positions drive toward target at their given speeds. Cars cannot pass and merge into fleets when they catch up. Return how many fleets reach target.
@@ -262,11 +269,13 @@ export const statements = Object.fromEntries(`
 977|nums is sorted in nondecreasing order. Return the squares of its values, also sorted in nondecreasing order.
 978|Return the longest contiguous subarray whose adjacent comparisons strictly alternate greater-than and less-than. A single element is valid.
 981|Implement TimeMap.set(key,value,timestamp) and get(key,timestamp). get returns the value at the latest set time no greater than the query time, or an empty string. Set timestamps strictly increase.
+983|You travel on the given days of a year. A 1-day pass costs costs[0], a 7-day pass costs[1], and a 30-day pass costs[2]. Return the minimum cost to travel every day in days.
 989|The array-form of an integer lists its digits from left to right. Given the array-form num of an integer and an integer k, return the array-form of num + k.
 994|Each minute, rotten oranges (2) rot horizontally/vertically adjacent fresh oranges (1). Empty cells are 0. Return the time until no fresh oranges remain, or -1 if impossible.
 997|Among people 1 through n, the town judge trusts nobody and is trusted by everyone else. Return that person or -1.
 1011|Ship packages in their given order over at most days days. Return the smallest daily weight capacity needed.
 1029|costs[i] = [aCost, bCost] is the cost of flying person i to city a or city b. Send exactly half of the 2n people to each city and return the minimum total cost.
+1035|Draw lines connecting nums1[i] and nums2[j] when they are equal, so that no two lines cross or share an endpoint. Return the maximum number of lines.
 1041|A robot starts at (0, 0) facing north and repeats the instructions forever. Return true if it stays within some circle.
 1046|Repeatedly smash the two heaviest stones. Equal weights vanish; otherwise replace them by their difference. Return the last weight or zero.
 1049|Choose stone pairs to smash in any order. Equal weights vanish, otherwise their difference remains. Return the smallest possible final weight.
@@ -284,6 +293,7 @@ export const statements = Object.fromEntries(`
 1299|Replace every element of arr with the greatest element to its right, and the last element with -1. Return arr.
 1325|Delete every leaf with value target, repeating when deletion creates new target leaves. Return the remaining root or null.
 1343|Return how many contiguous subarrays of length k have an average of at least threshold.
+1359|Given n orders, each with a pickup and a delivery, count the sequences of all 2n stops in which every delivery comes after its own pickup. Return the count modulo 10^9 + 7.
 1396|Implement UndergroundSystem with checkIn(id, stationName, t), checkOut(id, stationName, t) and getAverageTime(startStation, endStation), the average time of all completed trips between those stations.
 1405|Using at most a copies of a, b copies of b, and c copies of c, return any longest string with no three equal consecutive letters.
 1406|Players alternately take the next one, two, or three stones from the front. Both maximize their total value. Return Alice, Bob, or Tie according to the outcome.
@@ -299,14 +309,17 @@ export const statements = Object.fromEntries(`
 1572|Return the sum of the primary and secondary diagonals of a square matrix, counting the center cell only once.
 1584|Connect all points with minimum total Manhattan edge length. Return the weight of a minimum spanning tree.
 1603|Implement ParkingSystem(big, medium, small) and addCar(carType), which parks a car in a free space of its type (1 big, 2 medium, 3 small) and returns whether it could.
+1626|A team conflicts if a younger player has a strictly higher score than an older player; players of the same age never conflict. Return the highest total score of a team without conflicts.
 1631|A path's effort is the largest absolute height change between neighboring cells. Return the minimum effort to travel from top-left to bottom-right.
 1647|A string is good when no two different letters have the same frequency. Return the minimum number of characters to delete from s to make it good.
 1658|Each operation removes the leftmost or rightmost element of nums and subtracts it from x. Return the minimum number of operations to reduce x exactly to 0, or -1 if impossible.
 1768|Merge word1 and word2 by alternating characters starting with word1, appending any remainder at the end.
+1799|nums has 2n positive integers. In the i-th operation (1-indexed) choose two remaining numbers x and y, earn i × gcd(x, y) and remove both. Return the maximum total score after n operations.
 1822|Return 1 if the product of nums is positive, -1 if it is negative, and 0 if it is zero.
 1834|Tasks [enqueueTime,processingTime] run on one nonpreemptive CPU. When idle, choose an available task with shortest processing time, then smallest original index. Return execution indices.
 1838|One operation increments an element of nums by 1. Using at most k operations, return the largest possible frequency of any single value.
 1851|For each query, return the length of the shortest closed interval containing it, or -1. A closed interval [l,r] has length r-l+1.
+1856|The min-product of an array is its minimum value times its sum. Return the maximum min-product of any nonempty subarray of nums, modulo 10^9 + 7 (maximize before taking the modulo).
 1863|For every subset, XOR its elements, with the empty subset contributing zero. Return the sum of all subset XOR values.
 1871|Starting at index 0 of a binary string, jump between minJump and maxJump positions rightward, landing only on 0. Return whether the final index is reachable.
 1888|You may move the first character of the binary string s to its end any number of times, and flip any character. Return the minimum number of flips needed to make s alternating.
@@ -316,6 +329,7 @@ export const statements = Object.fromEntries(`
 1929|Return the input array concatenated with itself.
 1930|Return the number of distinct palindromes of length 3 that are subsequences of s.
 1963|s has n / 2 "[" and n / 2 "]" characters. Return the minimum number of swaps (of any two positions) needed to make s balanced.
+1964|For each index i, return the length of the longest non-decreasing subsequence of obstacles[0..i] that includes obstacle i.
 1968|nums holds distinct integers. Return any rearrangement in which no element (other than the first and last) equals the average of its two neighbors.
 1984|Choose k scores from nums. Return the minimum possible difference between the highest and lowest chosen score.
 2001|Rectangles i < j are interchangeable when width / height is equal for both. Return the number of interchangeable pairs.
@@ -323,15 +337,18 @@ export const statements = Object.fromEntries(`
 2013|Implement DetectSquares.add(point) and count(point). Count axis-aligned positive-area squares having the query as one corner and three stored point occurrences as the others. Duplicate stored points multiply the count.
 2017|Two robots cross a 2 × n grid from top-left to bottom-right, moving only right or down. The first collects and zeroes its path; then the second collects what remains. The first robot minimizes the second robot's total, the second maximizes it. Return the second robot's total.
 2028|You observed m dice rolls; n more are missing. The mean of all n + m rolls is mean. Return any n values from 1 to 6 for the missing rolls, or an empty array if none exist.
+2140|Questions are processed in order. Solving question i earns points[i] but you must skip the next brainpower[i] questions; you may also skip any question. Return the maximum points you can earn.
 2215|Return [answer1, answer2]: the distinct values of nums1 not in nums2, and the distinct values of nums2 not in nums1. Values within each list may be in any order.
 2300|A spell and a potion succeed when the product of their strengths is at least success. For each spell, return how many potions it succeeds with.
 2306|Choose two distinct ideas, swap their first letters, and keep the pair if neither new name is in ideas. The concatenation "newA newB" is then a valid company name. Return the number of distinct valid names.
 2348|Return the number of contiguous subarrays of nums that contain only 0.
+2369|Partition nums into contiguous blocks. Each block must be two equal values, three equal values, or three consecutive increasing values. Return true if at least one valid partition exists.
 2390|Each * in s removes itself and the closest remaining non-star character to its left. Return the string after all stars are processed.
 2392|Place 1 through k once each in a k by k zero-filled matrix. Each row condition [a,b] puts a above b; each column condition puts a left of b. Return any valid matrix, or [] if impossible.
 2402|Assign meetings in start-time order to the lowest available room index. If all rooms are busy, delay until the earliest room frees, keeping duration; break ties by room index. Return the most-used room, breaking ties by smallest index.
 2405|Split s into the fewest substrings in which no letter appears more than once. Return that number.
 2439|In one operation choose i > 0 with nums[i] > 0, decrease nums[i] by 1 and increase nums[i - 1] by 1. Return the minimum possible value of the maximum of nums.
+2466|Build strings by repeatedly appending either zero copies of "0" or one copies of "1". A good string has length between low and high inclusive. Return the number of different good strings modulo 10^9 + 7.
 2483|Closing at hour j costs 1 for every open hour before j with no customers ("N") and 1 for every closed hour from j on with customers ("Y"). Return the earliest closing hour with the minimum penalty.
 2616|Choose p pairs of distinct indices from nums (each index used at most once) to minimize the largest absolute difference within a pair. Return that minimum; it is 0 when p = 0.
 2707|Split s into nonoverlapping dictionary words and leftover characters. Return the minimum number of leftover characters. Dictionary words may be reused.
