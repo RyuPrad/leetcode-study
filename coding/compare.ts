@@ -15,7 +15,7 @@ export function accepts(problem: CodingProblem, input: Json[], actual: any, expe
   if (n === 27) return actual && actual.length === expected.length && Array.isArray(actual.values) && bag(actual.values, expected.values);
   if ([15,18,39,40,77,78,90].includes(n)) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
   if (n === 49) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
-  if ([17,22,46,47,51,93,131,140,187,212,229,310,347,417,472].includes(n)) return Array.isArray(actual) && bag(actual, expected);
+  if ([17,22,46,47,51,93,131,140,187,212,229,310,347,417,472,1557].includes(n)) return Array.isArray(actual) && bag(actual, expected);
   if (n === 1489) return Array.isArray(actual) && actual.length === 2 && actual.every(Array.isArray) && bag(actual[0],expected[0]) && bag(actual[1],expected[1]);
   if (n === 721) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(row => [row[0], ...row.slice(1).sort()]), expected.map((row: any[]) => [row[0], ...row.slice(1).sort()]));
   if (n === 133) return Array.isArray(actual) && actual.every(Array.isArray) && actual.length === expected.length && actual.every((row,i) => bag(row, expected[i]));

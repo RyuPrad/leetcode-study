@@ -250,7 +250,9 @@ export const statements = Object.fromEntries(`
 763|Partition s into as many consecutive parts as possible so that no character appears in multiple parts. Return their lengths.
 767|Rearrange every character of s so no adjacent characters are equal. Return any valid string or an empty string if impossible.
 778|Each square grid elevation is a distinct integer from 0 through n*n-1. At time t you may enter cells of elevation at most t. Return the earliest time a path connects top-left to bottom-right.
+785|Return true if the nodes of the undirected graph can be split into two sets so that every edge connects a node in one set to a node in the other.
 787|Return the cheapest flight cost from src to dst using at most k intermediate stops, or -1 if impossible.
+802|A node is terminal if it has no outgoing edges, and safe if every path from it leads to a terminal node. Return all safe nodes in ascending order.
 837|Alice starts with 0 points and draws numbers while she has fewer than k points; each draw adds an integer from 1 to maxPts, uniformly at random. Return the probability that she ends with n or fewer points.
 838|Some dominoes are pushed left ("L") or right ("R"), the rest are upright ("."). A falling domino pushes its neighbor each second; a domino pushed from both sides stays upright. Return the final state.
 846|Return whether all cards can be partitioned into groups of groupSize consecutive integer values.
@@ -264,12 +266,14 @@ export const statements = Object.fromEntries(`
 895|Implement FreqStack.push(val) and pop(). pop removes and returns the most frequent value, breaking ties by the most recent occurrence.
 901|Implement StockSpanner.next(price). Return the number of consecutive days ending today with price no greater than today's price.
 904|Moving right from any starting tree, pick one fruit per tree into two baskets, each holding a single fruit type, and stop at the first tree that fits neither basket. Return the most fruit you can pick.
+909|Squares are numbered 1 to n² in a zigzag from the bottom-left. Each move rolls a die (1 to 6) and, if the square has a snake or ladder, follows it. Return the fewest moves to reach square n², or -1.
 912|Return nums sorted in ascending order.
 918|Return the greatest sum of a nonempty circular subarray, using each original position at most once.
 920|Your music player has n different songs. Count the playlists of goal songs in which every song is played at least once and a song is replayed only after k other songs. Return the count modulo 10^9 + 7.
 926|A binary string is monotone increasing if it is some 0s followed by some 1s. Return the minimum number of flips to make s monotone increasing.
 929|In the local name (before @), dots are ignored and everything after the first + is ignored; the domain is unchanged. Return how many different addresses actually receive mail.
 933|Implement RecentCounter.ping(t), returning the count of calls in the inclusive interval [t-3000,t]. Calls have strictly increasing positive timestamps.
+934|An n × n grid contains exactly two islands of 1s. Return the smallest number of 0s that must be flipped to 1 to connect them.
 946|pushed and popped contain the same distinct values. Return whether this pop order can result from pushing values in the pushed order onto an initially empty stack.
 953|Return whether words are lexicographically sorted according to the supplied permutation of the 26 lowercase letters. A shorter prefix comes first.
 973|Return k input points nearest to the origin by Euclidean distance. Any tied selection and any result order are accepted; preserve multiplicity.
@@ -281,21 +285,26 @@ export const statements = Object.fromEntries(`
 994|Each minute, rotten oranges (2) rot horizontally/vertically adjacent fresh oranges (1). Empty cells are 0. Return the time until no fresh oranges remain, or -1 if impossible.
 997|Among people 1 through n, the town judge trusts nobody and is trusted by everyone else. Return that person or -1.
 1011|Ship packages in their given order over at most days days. Return the smallest daily weight capacity needed.
+1020|In a grid of 0 (sea) and 1 (land), return the number of land cells from which you cannot walk off the edge of the grid moving 4-directionally on land.
 1029|costs[i] = [aCost, bCost] is the cost of flying person i to city a or city b. Send exactly half of the 2n people to each city and return the minimum total cost.
 1035|Draw lines connecting nums1[i] and nums2[j] when they are equal, so that no two lines cross or share an endpoint. Return the maximum number of lines.
 1041|A robot starts at (0, 0) facing north and repeats the instructions forever. Return true if it stays within some circle.
 1046|Repeatedly smash the two heaviest stones. Equal weights vanish; otherwise replace them by their difference. Return the last weight or zero.
 1049|Choose stone pairs to smash in any order. Equal weights vanish, otherwise their difference remains. Return the smallest possible final weight.
 1071|Return the longest string that repeats a whole number of times to form both str1 and str2, or an empty string.
+1091|Return the length (number of cells) of the shortest path from the top-left to the bottom-right cell of an n × n binary matrix, moving in 8 directions through 0s only, or -1 if none exists.
 1094|Trips [passengers,start,end] occupy seats from start up to but excluding end. Return whether all trips fit within capacity along the route.
 1095|Return the smallest index of target in a strictly rising then strictly falling MountainArray, or -1. Use arr.length() and arr.get(index); at most 100 get calls are allowed.
+1129|Edges are red or blue. Return answer where answer[x] is the length of the shortest path from node 0 to x whose edge colors alternate, or -1 if no such path exists.
 1137|Return Tn where T0=0, T1=T2=1, and each later term is the sum of the preceding three terms.
 1140|Players alternately take the next 1 through 2*M piles, with M initially 1 and then max(M,taken). Both play optimally. Return the first player's maximum total stones.
 1143|Return the length of the longest subsequence shared by text1 and text2.
+1162|In an n × n grid of 0 (water) and 1 (land), find a water cell whose Manhattan distance to the nearest land is as large as possible and return that distance, or -1 if the grid has no land or no water.
 1189|Using each letter of text at most once, return how many times the word "balloon" can be formed.
 1209|Repeatedly remove k adjacent equal letters from s until no such group remains. Return the final string; it is unique.
 1220|Count the strings of length n made of lowercase vowels where each "a" is followed only by "e", "e" only by "a" or "i", "i" by anything but "i", "o" only by "i" or "u", and "u" only by "a". Return the count modulo 10^9 + 7.
 1239|Concatenate a subsequence of arr so that every character is unique. Return the maximum possible length.
+1254|In a grid of 0 (land) and 1 (water), a closed island is a group of 4-directionally connected land cells completely surrounded by water. Return the number of closed islands.
 1260|One shift moves every element one place to the right; the last element of each row moves to the start of the next row, and the last element of the grid moves to grid[0][0]. Return the grid after k shifts.
 1268|After each character of searchWord is typed, suggest up to three products that start with the typed prefix, in lexicographic order. Return the list of suggestion lists.
 1288|Remove every interval [a, b) that is covered by another interval [c, d), meaning c <= a and b <= d. Return the number of intervals that remain.
@@ -312,12 +321,15 @@ export const statements = Object.fromEntries(`
 1456|Return the largest number of vowels (a, e, i, o, u) in any substring of s with length k.
 1461|Return whether every binary code of length k is a substring of the binary string s.
 1462|Prerequisite pairs [a,b] mean course a precedes b. For each query [u,v], return whether u is a direct or indirect prerequisite of v. The graph is acyclic.
+1466|n cities are joined by n - 1 one-way roads that form a tree when directions are ignored. Return the minimum number of roads to reverse so that every city can reach city 0.
 1470|Given nums = [x1, x2, ..., xn, y1, y2, ..., yn], return [x1, y1, x2, y2, ..., xn, yn].
 1489|For a connected weighted graph, return [critical,pseudoCritical] edge-index arrays. Critical edges appear in every minimum spanning tree; pseudo-critical edges appear in some but not every minimum spanning tree.
 1498|Count the nonempty subsequences of nums whose minimum plus maximum is at most target. Return the count modulo 1000000007.
 1514|Given an undirected graph where edge i succeeds with probability succProb[i], return the maximum probability of a path from start_node to end_node, or 0 if there is none.
 1523|Given two nonnegative integers low and high, return the count of odd numbers between low and high, inclusive.
 1547|A stick of length n is to be cut at every position in cuts, in any order. Each cut costs the length of the piece being cut. Return the minimum total cost.
+1553|Each day you may eat one orange, or n/2 oranges if n is divisible by 2, or 2n/3 oranges if n is divisible by 3. Return the minimum number of days to eat all n oranges.
+1557|Given a directed acyclic graph, return the smallest set of vertices from which all nodes are reachable (any order).
 1572|Return the sum of the primary and secondary diagonals of a square matrix, counting the center cell only once.
 1579|Edges have type 1 (only Alice can use), 2 (only Bob) or 3 (both). Return the maximum number of edges you can remove so that both Alice and Bob can still reach every node, or -1 if that is impossible.
 1584|Connect all points with minimum total Manhattan edge length. Return the weight of a minimum spanning tree.
@@ -337,6 +349,7 @@ export const statements = Object.fromEntries(`
 1849|Return true if s can be split into two or more pieces whose numeric values are in descending order and each adjacent pair differs by exactly 1.
 1851|For each query, return the length of the shortest closed interval containing it, or -1. A closed interval [l,r] has length r-l+1.
 1856|The min-product of an array is its minimum value times its sum. Return the maximum min-product of any nonempty subarray of nums, modulo 10^9 + 7 (maximize before taking the modulo).
+1857|The color value of a path is the count of its most frequent color. Return the largest color value of any path in the directed graph, or -1 if the graph has a cycle.
 1863|For every subset, XOR its elements, with the empty subset contributing zero. Return the sum of all subset XOR values.
 1866|There are n sticks with lengths 1 to n. A stick is visible from the left if no longer stick is to its left. Return the number of arrangements with exactly k visible sticks, modulo 10^9 + 7.
 1871|Starting at index 0 of a binary string, jump between minJump and maxJump positions rightward, landing only on 0. Return whether the final index is reachable.
@@ -344,10 +357,12 @@ export const statements = Object.fromEntries(`
 1888|You may move the first character of the binary string s to its end any number of times, and flip any character. Return the minimum number of flips needed to make s alternating.
 1898|Remove the characters of s at removable[0..k-1]. Return the largest k such that p is still a subsequence of s.
 1899|You may combine two triplets by taking their coordinatewise maximum. Return whether some selection can produce target exactly.
+1905|An island in grid2 is a sub-island if every cell of it is also land in grid1. Return the number of sub-islands in grid2.
 1911|The alternating sum of a sequence is the sum of the elements at even indices minus the sum at odd indices. Return the maximum alternating sum of any subsequence of nums.
 1921|Monster i starts dist[i] away from the city and moves speed[i] per minute. A weapon shoots one monster at minute 0, 1, 2, and so on. You lose when a monster reaches the city, including at the same moment the weapon is ready. Return the number of monsters eliminated before losing, or n if all are eliminated.
 1929|Return the input array concatenated with itself.
 1930|Return the number of distinct palindromes of length 3 that are subsequences of s.
+1958|Playing color at the empty cell (rMove, cMove) is legal if it becomes an endpoint of a good line: three or more cells in a row where both endpoints are color and every middle cell is the other color. Return true if the move is legal.
 1963|s has n / 2 "[" and n / 2 "]" characters. Return the minimum number of swaps (of any two positions) needed to make s balanced.
 1964|For each index i, return the length of the longest non-decreasing subsequence of obstacles[0..i] that includes obstacle i.
 1968|nums holds distinct integers. Return any rearrangement in which no element (other than the first and last) equals the average of its two neighbors.
@@ -359,12 +374,14 @@ export const statements = Object.fromEntries(`
 2013|Implement DetectSquares.add(point) and count(point). Count axis-aligned positive-area squares having the query as one corner and three stored point occurrences as the others. Duplicate stored points multiply the count.
 2017|Two robots cross a 2 × n grid from top-left to bottom-right, moving only right or down. The first collects and zeroes its path; then the second collects what remains. The first robot minimizes the second robot's total, the second maximizes it. Return the second robot's total.
 2028|You observed m dice rolls; n more are missing. The mean of all n + m rolls is mean. Return any n values from 1 to 6 for the missing rolls, or an empty array if none exist.
+2101|Detonating a bomb detonates every bomb within its circular range, which may continue the chain. You may detonate one bomb. Return the maximum number of bombs that can be detonated.
 2140|Questions are processed in order. Solving question i earns points[i] but you must skip the next brainpower[i] questions; you may also skip any question. Return the maximum points you can earn.
 2215|Return [answer1, answer2]: the distinct values of nums1 not in nums2, and the distinct values of nums2 not in nums1. Values within each list may be in any order.
 2218|Each move takes the top coin of any pile. Return the maximum total value of exactly k coins.
 2300|A spell and a potion succeed when the product of their strengths is at least success. For each spell, return how many potions it succeeds with.
 2306|Choose two distinct ideas, swap their first letters, and keep the pair if neither new name is in ideas. The concatenation "newA newB" is then a valid company name. Return the number of distinct valid names.
 2348|Return the number of contiguous subarrays of nums that contain only 0.
+2359|In a directed graph where each node has at most one outgoing edge, return the node reachable from both node1 and node2 that minimizes the maximum of the two distances (smallest index on ties), or -1.
 2369|Partition nums into contiguous blocks. Each block must be two equal values, three equal values, or three consecutive increasing values. Return true if at least one valid partition exists.
 2390|Each * in s removes itself and the closest remaining non-star character to its left. Return the string after all stars are processed.
 2392|Place 1 through k once each in a k by k zero-filled matrix. Each row condition [a,b] puts a above b; each column condition puts a left of b. Return any valid matrix, or [] if impossible.
@@ -373,7 +390,9 @@ export const statements = Object.fromEntries(`
 2421|A tree has n nodes with values vals. A good path starts and ends at nodes with the same value, and every node on it has a value no larger than that. Count the good paths, including single nodes, where a path and its reverse count once.
 2439|In one operation choose i > 0 with nums[i] > 0, decrease nums[i] by 1 and increase nums[i - 1] by 1. Return the minimum possible value of the maximum of nums.
 2466|Build strings by repeatedly appending either zero copies of "0" or one copies of "1". A good string has length between low and high inclusive. Return the number of different good strings modulo 10^9 + 7.
+2477|A tree of n cities has one representative per city who must reach city 0. Each city has a car with seats seats; driving one road costs 1 liter. Return the minimum total fuel.
 2483|Closing at hour j costs 1 for every open hour before j with no customers ("N") and 1 for every closed hour from j on with customers ("Y"). Return the earliest closing hour with the minimum penalty.
+2492|The score of a path is the smallest road distance on it; paths may repeat cities and roads. Cities 1 and n are connected. Return the minimum possible score of a path between them.
 2542|Choose k indices. The score is the sum of nums1 at those indices times the minimum of nums2 at those indices. Return the maximum possible score.
 2616|Choose p pairs of distinct indices from nums (each index used at most once) to minimize the largest absolute difference within a pair. Return that minimum; it is 0 when p = 0.
 2707|Split s into nonoverlapping dictionary words and leftover characters. Return the minimum number of leftover characters. Dictionary words may be reused.

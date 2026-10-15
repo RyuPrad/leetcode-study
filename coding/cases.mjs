@@ -318,6 +318,25 @@ export function extraCase(n, seed) {
     case 1985:return [v.map(x=>String(x*s*37%1000)),1+s%len];
     case 1383:return [pos.length,pos.map(x=>x*s%10+1),pos.map((x,i)=>(x+i*s)%8+1),1+s%pos.length];
     case 2421:{const n=2+s%6;const vals=Array.from({length:n},(_,i)=>1+(i*s+s)%4);const edges=[];for(let i=1;i<n;i++)edges.push([s%i,i]);return [vals,edges];}
+    case 1905:return [grid(2+s%3,2+s%4,(r,c)=>(r*c+s+c)%3?1:0),grid(2+s%3,2+s%4,(r,c)=>(r+c*s)%3===0?0:1)];
+    case 1254:return [grid(3+s%3,3+s%4,(r,c)=>(r*c+s*r+c)%3?1:0)];
+    case 1020:return [grid(2+s%4,2+s%5,(r,c)=>(r*c+s+r)%3?1:0)];
+    case 934:{const n=3+s%4;const g=grid(n,n,()=>0);g[0][0]=1;if(s%2)g[1][0]=1;const c=1+s%(n-1);g[n-1][c]=1;if(n>=4&&s%3===0)g[n-2][c]=1;if(s%5===0)g[0][1]=1;return [g];}
+    case 1091:{const n=2+s%4;const g=grid(n,n,(r,c)=>(r*7+c*s+s*s)%5===0?1:0);g[0][0]=0;if(s%6)g[n-1][n-1]=0;return [g];}
+    case 1162:return [grid(2+s%5,2+s%5,(r,c)=>(r*7+c*s+s)%6===0?1:0)];
+    case 909:{const n=2+s%4;const b=grid(n,n,()=>-1);if(n>2){b[n-2][(s*3)%n]=1+(s*5)%(n*n);b[0][(s+1)%n]=2+s%(n*n-2);}b[n-1][0]=-1;b[0][n%2?n-1:0]=-1;return [b];}
+    case 802:{const n=3+s%5;const g=Array.from({length:n},(_,i)=>[...new Set([(i*s+1)%n,(i+s)%n].filter(j=>j!==i&&(i+j+s)%3!==0))].sort((a,b)=>a-b));return [g];}
+    case 1466:{const n=2+s%7;const c=[];for(let i=1;i<n;i++){const p=s%i;c.push((i+s)%3?[p,i]:[i,p]);}return [n,c];}
+    case 2359:{const n=3+s%5;const e=Array.from({length:n},(_,i)=>(i*s+1)%n===i?-1:(i*s+1)%n);if(s%3===0)e[n-1]=-1;return [e,s%n,(s*2+1)%n];}
+    case 1129:return [2+s%5,[[0,1],[1,(1+s)%(2+s%5)]],[[0,(s*3)%(2+s%5)],[1,s%(2+s%5)]]];
+    case 2477:{const n=2+s%7;const r=[];for(let i=1;i<n;i++)r.push([s%i,i]);return [r,1+s%4];}
+    case 2492:{const n=2+s%5;const r=[];for(let i=1;i<n;i++)r.push([i,i+1,1+(i*s)%9]);if(n>3)r.push([2,n,1+s%4]);return [n,r];}
+    case 1557:{const n=2+s%7;const e=[];for(let i=1;i<n;i++)if((i*s)%3)e.push([s%i,i]);return [n,e];}
+    case 785:{const n=2+s%6;const sets=Array.from({length:n},()=>new Set());for(let i=0;i<n;i++){const j=(i*s+1)%n;if(j!==i&&(i+j+s)%4){sets[i].add(j);sets[j].add(i);}}return [sets.map(x=>[...x].sort((a,b)=>a-b))];}
+    case 2101:return [v.map((x,i)=>[1+(x*s)%10,1+(x*3+i)%7,1+(x+s)%4])];
+    case 1857:{const n=2+s%5;const colors=Array.from({length:n},(_,i)=>String.fromCharCode(97+(i*s)%3)).join('');const e=[];for(let i=1;i<n;i++)e.push([s%i,i]);if(s%4===0)e.push([n-1,0]);return [colors,e];}
+    case 1553:return [s*s*s*97+s];
+    case 1958:{const b=grid(8,8,(r,c)=>(r*s+c*3+s)%5===0?'B':(r+c*s)%7===0?'W':'.');const r=s%8,c=(s*3)%8;b[r][c]='.';return [b,r,c,s%2?'B':'W'];}
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }
