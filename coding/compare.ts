@@ -5,7 +5,7 @@ const eq = (a: unknown, b: unknown) => key(a) === key(b);
 const bag = (a: unknown[], b: unknown[]) => eq(sorted(a), sorted(b));
 export function accepts(problem: CodingProblem, input: Json[], actual: any, expected: any): boolean {
   const n = problem.number, a = input as any[];
-  if ([4,50,399,295].includes(n)) {
+  if ([4,50,399,295,1396].includes(n)) {
     const near = (x: any, y: any): boolean => typeof y === 'number' ? typeof x === 'number' && Number.isFinite(x) && Math.abs(x-y) <= 1e-5 * Math.max(1, Math.abs(y)) : Array.isArray(y) ? Array.isArray(x) && x.length === y.length && y.every((v,i) => near(x[i],v)) : x === y;
     return near(actual, expected);
   }
@@ -15,7 +15,7 @@ export function accepts(problem: CodingProblem, input: Json[], actual: any, expe
   if (n === 27) return actual && actual.length === expected.length && Array.isArray(actual.values) && bag(actual.values, expected.values);
   if ([15,18,39,40,77,78,90].includes(n)) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
   if (n === 49) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
-  if ([17,22,46,47,51,131,140,212,229,310,347,417].includes(n)) return Array.isArray(actual) && bag(actual, expected);
+  if ([17,22,46,47,51,131,140,187,212,229,310,347,417].includes(n)) return Array.isArray(actual) && bag(actual, expected);
   if (n === 1489) return Array.isArray(actual) && actual.length === 2 && actual.every(Array.isArray) && bag(actual[0],expected[0]) && bag(actual[1],expected[1]);
   if (n === 721) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(row => [row[0], ...row.slice(1).sort()]), expected.map((row: any[]) => [row[0], ...row.slice(1).sort()]));
   if (n === 133) return Array.isArray(actual) && actual.every(Array.isArray) && actual.length === expected.length && actual.every((row,i) => bag(row, expected[i]));
@@ -26,6 +26,9 @@ export function accepts(problem: CodingProblem, input: Json[], actual: any, expe
   if (n === 269) { if (typeof actual !== 'string') return false; if (!expected) return actual === ''; const chars = [...new Set<string>(a[0].join(''))]; if (!bag([...actual], chars)) return false; return a[0].slice(1).every((word: string,i: number) => { const prev = a[0][i]; let j = 0; while (j < Math.min(prev.length,word.length) && prev[j] === word[j]) j++; return j === Math.min(prev.length,word.length) ? prev.length <= word.length : actual.indexOf(prev[j]) < actual.indexOf(word[j]); }); }
   if (n === 2392) { if (!Array.isArray(actual)) return false; if (!expected.length) return actual.length === 0; const k = a[0], positions = new Map<number,number[]>(); if (actual.length !== k || actual.some(row => !Array.isArray(row) || row.length !== k)) return false; for (let r=0;r<k;r++) for (let c=0;c<k;c++) { const v = actual[r][c]; if (!Number.isInteger(v) || v < 0 || v > k || v && positions.has(v)) return false; if (v) positions.set(v,[r,c]); } return positions.size === k && [a[1],a[2]].every((edges,axis) => edges.every(([x,y]: number[]) => positions.get(x)![axis] < positions.get(y)![axis])); }
   if (n === 162) return Number.isInteger(actual) && actual >= 0 && actual < a[0].length && (actual === 0 || a[0][actual] > a[0][actual - 1]) && (actual === a[0].length - 1 || a[0][actual] > a[0][actual + 1]);
+  if (n === 2215) return Array.isArray(actual) && actual.length === 2 && actual.every(Array.isArray) && bag(actual[0], expected[0]) && bag(actual[1], expected[1]);
+  if (n === 280) return Array.isArray(actual) && bag(actual, a[0]) && actual.every((v: any, i: number) => i === 0 || (i % 2 ? v >= actual[i - 1] : v <= actual[i - 1]));
+  if (n === 380) { if (!Array.isArray(actual) || actual.length !== expected.length || actual[0] !== null) return false; const [ops, args] = a, set = new Set(); return ops.every((op: string, i: number) => { if (!i) return true; const v = args[i][0]; if (op === 'insert') { const ok = actual[i] === !set.has(v); set.add(v); return ok; } if (op === 'remove') { const ok = actual[i] === set.has(v); set.delete(v); return ok; } return set.has(actual[i]); }); }
   if (n === 1968) return Array.isArray(actual) && bag(actual, a[0]) && actual.every((v: any, i: number) => i === 0 || i === actual.length - 1 || 2 * v !== actual[i - 1] + actual[i + 1]);
   // A BST deletion/insertion may use any valid shape with the required values.
   if ([450,701].includes(n)) { if (!Array.isArray(actual) || !bag(actual.filter(v => v !== null), expected.filter((v: any) => v !== null))) return false; const queue: [number,number][] = [[-Infinity,Infinity]]; let i=0; for (let q=0;q<queue.length && i<actual.length;q++) { const [lo,hi]=queue[q], v=actual[i++]; if (v === null) continue; if (typeof v !== 'number' || v <= lo || v >= hi) return false; queue.push([lo,v],[v,hi]); } return i===actual.length; }

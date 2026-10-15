@@ -21,7 +21,7 @@ for (const p of problems) {
   if(p.parameters.some(v=>['head','list1','list2','l1','l2','lists'].includes(v)))p.constraints.push('Lists use value arrays in cases; your code receives nodes. ListNode(val = 0, next = null) is available.');
   if(p.number===138)p.constraints.push('Random lists use [value, randomIndexOrNull] pairs. Node(val) provides val, next and random.');
   if(p.number===133)p.constraints.push('Graphs use adjacency lists indexed by node value minus one. Node(val, neighbors = []) is available.');
-  if([26,27,48,73,75,88,130,143,189,283,286,344].includes(p.number))p.constraints.push('The judge checks the mutated argument. For problems 26/27, also return the retained length.');
+  if([26,27,48,73,75,88,130,143,189,280,283,286,344].includes(p.number))p.constraints.push('The judge checks the mutated argument. For problems 26/27, also return the retained length.');
   if(p.number===80)p.constraints.push('Return k; the judge checks k and the first k positions of nums.');
   if([46,47,78,90,1863].includes(p.number))p.constraints.push('Local backtracking limit: 12 values.');
   if([39,40,131,473,698].includes(p.number))p.constraints.push('Local backtracking limit: 16 input elements/characters.');

@@ -157,6 +157,12 @@ public final class JudgeMain {
     private static Object execute(String kind, String className, String entry, List<Object> input) throws Throwable {
         Class<?> type = loader.loadClass(className);
         if (kind.equals("design")) return design(type, input);
+        if (number == 535) {
+            Object codec = construct(type);
+            Object encoded = call(codec, "encode", List.of(input.get(0)));
+            if (!(encoded instanceof String)) throw new HarnessException("encode must return a string.");
+            return encode(call(codec, "decode", List.of(encoded)), null);
+        }
         if (number == 271) {
             Object encoded = call(construct(type), "encode", List.of(input.get(0)));
             if (!(encoded instanceof String)) throw new HarnessException("encode must return a string.");

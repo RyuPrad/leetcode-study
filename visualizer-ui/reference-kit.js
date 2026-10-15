@@ -46,12 +46,17 @@
       snap(line, phase, narration, extra = {}) {
         const { returned, ...fields } = extra, scope = read(), state = { ...clone(scope), ...fields, trace: trace.map(row => ({ ...row })), executedLine: line, lines: line ? [line] : [], phase, narration, finished: false };
         Object.defineProperty(state, '_names', { value: Object.keys(scope) });
-        // The return value is kept apart from the locals; the walkthrough's return caption reads result.
-        if (Object.hasOwn(extra, 'returned')) { Object.defineProperty(state, 'returned', { value: clone(returned) }); if (!Object.hasOwn(scope, 'result')) state.result = state.returned; }
+        // The return value is kept apart from the locals.
+        if (Object.hasOwn(extra, 'returned')) Object.defineProperty(state, 'returned', { value: clone(returned) });
         steps.push(state);
         return state;
       },
-      finish() { if (steps.length) steps[steps.length - 1].finished = true; }
+      finish() {
+        const last = steps[steps.length - 1]; if (!last) return;
+        last.finished = true;
+        // The walkthrough's final return caption reads result.
+        if (Object.hasOwn(last, 'returned') && !last._names.includes('result')) last.result = last.returned;
+      }
     };
   }
 

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 1603. Design Parking System Visualizer</title>
+  <style>
+    :root { color-scheme:dark; font-family:system-ui,sans-serif; background:#1e1e1e; color:#d4d4d4; }
+    body { margin:0; padding:24px; } button,input { font:inherit; } button { cursor:pointer; }
+    .panel { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:16px; } h2 { font-size:16px; }
+    .layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .code-line { white-space:pre; font:14px/1.7 Consolas,monospace; padding:0 8px; }
+    .code-line.active { background:#34312a; border-left:3px solid #d7ba7d; } .kw { color:#c586c0; } .fn { color:#dcdcaa; } .num { color:#b5cea8; } .str { color:#ce9178; } .cm { color:#6a9955; }
+    .console { white-space:pre-wrap; font:13px/1.7 Consolas,monospace; } .result-value { color:#b5cea8; }
+    #drag-container > div { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; } #custom-input { min-width:310px; }
+  </style>
+  <link rel="stylesheet" href="../visualizer-ui/reference-kit.css" />
+  <script src="../visualizer-ui/reference-kit.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
+  <script defer src="../visualizer-ui/workspace.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/learning.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <script defer src="../visualizer-ui/operation-rules.js"></script>
+  <script defer src="../visualizer-ui/operations.js"></script>
+  <script defer src="../visualizer-ui/learning.js"></script>
+  <script defer src="../visualizer-ui/guided-core.js"></script>
+  <script defer src="../visualizer-ui/guided.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/code-language.css" />
+  <script defer src="../visualizer-ui/code-languages.js"></script>
+  <script defer src="../visualizer-ui/code-language.js"></script>
+</head>
+<body>
+  <h1 class="page-title">1603. Design Parking System</h1>
+  <div id="drag-container">
+    <div><button id="btn-prev" onclick="prevStep()">Back</button><button id="btn-next" onclick="nextStep()">Step Over</button><button id="btn-reset" onclick="init()">Reset</button><button id="btn-fullscreen" onclick="document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()">Fullscreen</button></div>
+    <div><button id="btn-ex-1" onclick="loadExample(1)">LeetCode example</button><button id="btn-ex-2" onclick="loadExample(2)">Plenty of space</button><button id="btn-ex-3" onclick="loadExample(3)">No big spaces</button></div>
+    <div><label for="custom-input">Operations</label><input id="custom-input" value="new 1 1 0; addCar 1; addCar 2; addCar 3; addCar 1" /><button onclick="loadCustom()">Load</button></div>
+  </div>
+  <div class="layout">
+    <div class="panel"><h2>Free spaces counted by car type</h2><div id="narration-ui"></div><div id="visual-ui"></div><div id="final-ui" class="result-value"></div></div>
+    <div class="panel code-panel"><h2>Live Debugger</h2><div id="reference-code">
+<div id="line-1" class="code-line"><span class="kw">class</span> ParkingSystem {</div>
+<div id="line-2" class="code-line">  <span class="kw">constructor</span>(big, medium, small) {</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.spaces = [<span class="num">0</span>, big, medium, small];</div>
+<div id="line-4" class="code-line">  }</div>
+<div id="line-5" class="code-line">  <span class="fn">addCar</span>(carType) {</div>
+<div id="line-6" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.spaces[carType] === <span class="num">0</span>) {</div>
+<div id="line-7" class="code-line">      <span class="kw">return</span> <span class="kw">false</span>;</div>
+<div id="line-8" class="code-line">    }</div>
+<div id="line-9" class="code-line">    <span class="kw">this</span>.spaces[carType]--;</div>
+<div id="line-10" class="code-line">    <span class="kw">return</span> <span class="kw">true</span>;</div>
+<div id="line-11" class="code-line">  }</div>
+<div id="line-12" class="code-line">}</div>
+    </div></div>
+    <div class="panel"><h2>Object View — nested JS object format (debugger-style)</h2><div id="object-view"></div></div>
+    <div class="panel"><h2>Variables & Outputs</h2><div id="console-ui" class="console"></div></div>
+    <div class="panel"><h2>Operation Trace</h2><div id="trace-ui"></div></div>
+  </div>
+  <script>
+    const examples={1:'new 1 1 0; addCar 1; addCar 2; addCar 3; addCar 1',2:'new 2 2 2; addCar 3; addCar 3; addCar 3',3:'new 0 1 1; addCar 1; addCar 2'};
+    let ops=parse(examples[1]),steps=[],stepIndex=0;
+    function parse(text){
+      const pieces=text.split(';').map(x=>x.trim()).filter(Boolean);if(!pieces.length||pieces.length>15)throw Error('Use 1 to 15 operations, starting with new big medium small.');
+      const first=pieces[0].match(/^new\s+(\d+)\s+(\d+)\s+(\d+)$/i);if(!first)throw Error('Start with new big medium small, e.g. new 1 1 0.');
+      const list=[{method:'new',args:first.slice(1,4).map(Number)}];if(list[0].args.some(x=>x>20))throw Error('Use at most 20 spaces of each type.');
+      for(const piece of pieces.slice(1)){const m=piece.match(/^addCar\s+([123])$/i);if(!m)throw Error('Use addCar 1, addCar 2 or addCar 3.');list.push({method:'addCar',carType:Number(m[1])});}
+      return list;
+    }
+    function buildSteps(){
+      steps=[];const self={},v={this:self},rec=StudyKit.recorder(steps,()=>v),outputs=[];
+      rec.snap(null,'ready','Track the free spaces for each car type.');
+      for(const op of ops){
+        if(op.method==='new'){
+          [v.big,v.medium,v.small]=op.args;rec.snap(2,'constructor','new ParkingSystem('+op.args.join(', ')+').');
+          self.spaces=[0,...op.args];rec.snap(3,'init','this.spaces = '+JSON.stringify(self.spaces)+'. Index 0 is unused so carType can index directly.');
+          delete v.big;delete v.medium;delete v.small;outputs.push(null);rec.log({call:'new ParkingSystem('+op.args.join(', ')+')',result:'null'});continue;
+        }
+        v.carType=op.carType;rec.snap(5,'call','addCar('+op.carType+').');
+        const full=self.spaces[op.carType]===0;
+        rec.snap(6,'check',full?'this.spaces['+op.carType+'] is 0: no free space of that type.':'this.spaces['+op.carType+'] = '+self.spaces[op.carType]+': a space is free.');
+        if(full){outputs.push(false);rec.log({call:'addCar('+op.carType+')',result:'false'});rec.snap(7,'return-false','Return false.',{returned:false});delete v.carType;continue;}
+        self.spaces[op.carType]--;rec.snap(9,'park','this.spaces['+op.carType+']-- → '+self.spaces[op.carType]+'.');
+        outputs.push(true);rec.log({call:'addCar('+op.carType+')',result:'true'});rec.snap(10,'return-true','Return true.',{returned:true});delete v.carType;
+      }
+      steps[steps.length-1].outputs=outputs.slice();
+      rec.finish();
+    }
+    function render(){
+      const state=steps[stepIndex],spaces=state.this.spaces||[];
+      const cls=x=>state.carType===x&&state.phase==='park'?'changed':state.carType===x&&state.phase==='check'?'read':x===0?'discarded':'';
+      const visual=spaces.length?StudyKit.array(spaces,{scope:'spaces',label:'this.spaces (0 unused, 1 big, 2 medium, 3 small)',cls,pointers:state.carType===undefined?{}:{carType:state.carType}}):'<p>Not constructed yet.</p>';
+      StudyKit.render(state,stepIndex,steps.length,{visual,result:state.finished?'outputs = '+JSON.stringify(state.outputs):Object.hasOwn(state,'returned')?'return '+state.returned:''});
+    }
+    function init(){buildSteps();stepIndex=0;render();}
+    function nextStep(){if(stepIndex<steps.length-1){stepIndex++;render();}}
+    function prevStep(){if(stepIndex>0){stepIndex--;render();}}
+    function loadExample(number){ops=parse(examples[number]);document.getElementById('custom-input').value=examples[number];init();}
+    function loadCustom(){try{ops=parse(document.getElementById('custom-input').value);init();}catch(error){alert(error.message);}}
+    init();
+
+    // STUDY LESSON BRIDGE START
+    window.studyLessonSource = {
+      spec: {"number":1603,"title":"Design Parking System","topic":"Array & Hashing","why":"Storing the free counts in an array indexed by car type turns each addCar into one lookup and, if a space is free, one decrement.","meanings":{"this.spaces":"free spaces by car type: index 1 big, 2 medium, 3 small","big":"big spaces at the start","medium":"medium spaces at the start","small":"small spaces at the start","carType":"1, 2 or 3"},"entityClasses":["kit-slot","kit-cell","tree-node","list-node","map-item","stack-item","grid-cell","tree-slot","stack-slot"],"entitySelectors":[],"mode":"precomputed"},
+      index:()=>stepIndex,count:()=>steps.length,read:()=>steps[stepIndex],readAt:index=>steps[index],
+      phases:()=>steps.map((state,index)=>({index,phase:state.phase})),
+      jump:index=>{stepIndex=Math.max(0,Math.min(steps.length-1,index));render();},
+      objectFrame(index=stepIndex){const state=steps[index],method=state.carType!==undefined?'ParkingSystem.addCar':'ParkingSystem.constructor';return StudyKit.objectFrame(state,method,{scope:name=>name==='this'?method:'Local'});}
+    };
+    // STUDY LESSON BRIDGE END
+</script>
+</body>
+</html>

@@ -24,15 +24,22 @@ export function executeCase(number, input, entry, deserializeFn) {
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
   const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448];
   const lists = [19,25,92,143,206,2807];
-  const design = [146,155,208,211,225,232,295,304,355,460,622,703,705,706,895,901,933,981,2013];
+  const design = [146,155,208,211,225,232,295,303,304,355,380,460,622,703,705,706,895,901,933,981,1396,1603,2013];
   if (design.includes(number)) {
+    // RandomizedSet draws from a fixed sequence so the reference result is reproducible.
+    if (number === 380) { let seed = 42; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
     const [ops, args] = input, obj = new entry(...args[0]), result = [null];
     for (let i = 1; i < ops.length; i++) {
       const method=ops[i], value=obj[method](...args[i]);
-      const isVoid=['push','insert','addWord','addNum','postTweet','follow','unfollow','put','set','remove'].includes(method) || method==='add'&&[705,2013].includes(number) || method==='pop'&&number===155;
+      const isVoid=number!==380&&['push','insert','addWord','addNum','postTweet','follow','unfollow','put','set','remove'].includes(method) || method==='add'&&[705,2013].includes(number) || method==='pop'&&number===155;
       result.push(isVoid || value===undefined ? null : clone(value));
     }
     return result;
+  }
+  if (number === 535) {
+    const codec = new entry(), shortUrl = codec.encode(input[0]);
+    if (typeof shortUrl !== 'string') throw new Error('encode must return a string.');
+    return codec.decode(shortUrl);
   }
   if (number === 271) {
     const encoded = new entry().encode(clone(input[0]));
@@ -73,7 +80,7 @@ export function executeCase(number, input, entry, deserializeFn) {
   if ([105,226,450,700,701,1325].includes(number)) return fromTree(result);
   if (number === 235) { if (!result || result !== findNode(args[0], result.val)) throw new Error('Return an ancestor node from the input tree.'); return result.val; }
   if ([26,27,80].includes(number)) { if (!Number.isInteger(result) || result < 0 || result > input[0].length) throw new Error('Return the number of retained elements.'); return { length: result, values: args[0].slice(0,result) }; }
-  if ([48,73,75,88,130,189,283,286,344].includes(number)) return args[0];
+  if ([48,73,75,88,130,189,280,283,286,344].includes(number)) return args[0];
   if (number === 427) {
     const size = input[0].length, grid = Array.from({length:size}, () => Array(size).fill(0)), seen = new Set();
     function fill(node, r, c, n) { if (!node || seen.has(node) || n < 1) throw new Error('Invalid quad tree.'); seen.add(node); if (node.isLeaf) { if (![true,false,0,1].includes(node.val)) throw new Error('Invalid quad value.'); for (let i=r;i<r+n;i++) for (let j=c;j<c+n;j++) grid[i][j] = Number(node.val); } else { for (const [key,dr,dc] of [['topLeft',0,0],['topRight',0,n/2],['bottomLeft',n/2,0],['bottomRight',n/2,n/2]]) fill(node[key],r+dr,c+dc,n/2); } }

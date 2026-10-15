@@ -26,7 +26,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
         if(i && (method==='constructor' || !Object.hasOwn(problem.methods || {},method))) fail('Use a documented public operation.');
         if (!parameters || !array(args[i]) || args[i].length !== parameters.length) fail(`Invalid arguments for ${String(ops[i])}.`);
         if (!parameters) throw new Error('Unknown operation.');
-        for (let j=0;j<parameters.length;j++) { const p=parameters[j],v=args[i][j]; if (['word','prefix','str','key','value'].includes(p) && [208,211,981].includes(n)) { if (typeof v !== 'string' || !v.length || (n !== 981 && !/^[a-z.]+$/.test(v))) fail(`${p} must be a nonempty string (lowercase letters for tries; . is allowed only in WordDictionary.search).`); if (n===208 && v.includes('.') || n===211 && method==='addWord' && v.includes('.')) fail('Inserted words use lowercase letters.'); } else if (!['matrix','nums','point'].includes(p) && !integer(v)) fail(`${p} must be an integer.`); }
+        for (let j=0;j<parameters.length;j++) { const p=parameters[j],v=args[i][j]; if (['word','prefix','str','key','value'].includes(p) && [208,211,981].includes(n)) { if (typeof v !== 'string' || !v.length || (n !== 981 && !/^[a-z.]+$/.test(v))) fail(`${p} must be a nonempty string (lowercase letters for tries; . is allowed only in WordDictionary.search).`); if (n===208 && v.includes('.') || n===211 && method==='addWord' && v.includes('.')) fail('Inserted words use lowercase letters.'); } else if (n===1396 && ['stationName','startStation','endStation'].includes(p)) { if (typeof v !== 'string' || !/^[A-Za-z]{1,10}$/.test(v)) fail(`${p} must be 1 to 10 letters.`); } else if (!['matrix','nums','point'].includes(p) && !integer(v)) fail(`${p} must be an integer.`); }
         if (!i && [146,622,703].includes(n) && args[0][0] < 1) fail('Capacity/k must be positive.');
         if (!i && n===460 && args[0][0]<0) fail('Capacity cannot be negative.');
         if (!i && n===304 && !matrix(args[0][0])) fail('matrix must be nonempty and rectangular.');
@@ -37,8 +37,14 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
         if (n===933 && i) { if (args[i][0] <= lastTime || args[i][0] < 1) fail('ping times must be positive and strictly increasing.'); lastTime = args[i][0]; }
         if (n===981 && method==='set') { if (args[i][2] <= lastTime) fail('set timestamps must be strictly increasing.'); lastTime=args[i][2]; }
         if (n===304 && i) { const [r,c,R,C]=args[i], mat=args[0][0]; if (r<0||c<0||R<r||C<c||R>=mat.length||C>=mat[0].length) fail('sumRegion coordinates are outside the matrix.'); }
+        if (n===303 && !i && (!array(args[0][0]) || !args[0][0].length || args[0][0].some((x:any)=>!integer(x)))) fail('nums must be a nonempty integer array.');
+        if (n===303 && i && (args[i][0]<0 || args[i][1]<args[i][0] || args[i][1]>=args[0][0].length)) fail('Require 0 <= left <= right < nums.length.');
+        if (n===1603 && !i && args[0].some((x:any)=>x<0||x>1000)) fail('Space counts are in [0, 1000].');
+        if (n===1603 && i && ![1,2,3].includes(args[i][0])) fail('carType is 1, 2 or 3.');
         if (n===2013 && i && (!array(args[i][0]) || args[i][0].length!==2 || args[i][0].some((v:any)=>!integer(v)||v<0||v>1000))) fail('Points must have two integer coordinates in [0,1000].');
       }
+      if (n===380) { const set=new Set<number>(); for (let i=1;i<ops.length;i++) { const v=args[i][0]; if (ops[i]==='insert') set.add(v); else if (ops[i]==='remove') set.delete(v); else if (!set.size) fail('getRandom requires a nonempty set.'); } }
+      if (n===1396) { const open=new Map<number,string>(), routes=new Set<string>(); let last=-Infinity; for (let i=1;i<ops.length;i++) { const v=args[i]; if (ops[i]==='getAverageTime') { if (!routes.has(v[0]+','+v[1])) fail('getAverageTime needs a completed trip on that route.'); continue; } if (v[2]<last) fail('Event times must not decrease.'); last=v[2]; if (ops[i]==='checkIn') { if (open.has(v[0])) fail('That customer is already checked in.'); open.set(v[0],v[1]); } else { if (!open.has(v[0])) fail('checkOut needs a matching checkIn.'); routes.add(open.get(v[0])+','+v[1]); open.delete(v[0]); } } }
       return null;
     }
     // Infer primitive container types from the maintained example contract, allowing empty arrays.
@@ -96,7 +102,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if ([46,47,78,90,1863].includes(n) && a[0].length>12 || [39,40,131,473,698].includes(n) && a[0].length>16 || n===140&&a[0].length>20) fail('This backtracking input is too large (12 elements, 16 for partition/combination problems, 20 for Word Break II).');
     if ([46,78].includes(n) && !unique(a[0])) fail('All values must be distinct.');
     if (n===77 && (a[0]<1||a[0]>16||a[1]<1||a[1]>a[0])) fail('Require 1 <= k <= n <= 16.');
-    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
+    const scalarBounds: Record<number,[number,number]> = {7:[-2147483648,2147483647],118:[1,30],367:[1,2147483647],441:[1,2147483647],22:[1,8],69:[0,2147483647],70:[1,45],168:[1,2147483647],190:[0,4294967295],191:[1,2147483647],202:[1,2147483647],279:[1,10000],338:[0,1000],343:[2,58],1137:[0,37]};
     if (scalarBounds[n] && (a[0]<scalarBounds[n][0]||a[0]>scalarBounds[n][1])) fail(`Value must be in [${scalarBounds[n].join(', ')}].`);
     if (n===374 && (a[0]<1||a[0]>2147483647||a[1]<1||a[1]>a[0])) fail('Require 1 <= pick <= n <= 2^31 - 1.');
     if (n===1095) { const v=a[1],p=v.indexOf(Math.max(...v)); if(v.length<3||p===0||p===v.length-1||!sorted(v.slice(0,p+1),true)||!sorted(v.slice(p).reverse(),true)) fail('arr must strictly rise then strictly fall, with an interior peak.'); }
@@ -152,6 +158,29 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===34 && !sorted(a[0])) fail('nums must be sorted.');
     if(n===1898){const [t,q,r]=a;if(!/^[a-z]+$/.test(t)||!/^[a-z]+$/.test(q)||!unique(r)||r.some((x:number)=>x<0||x>=t.length))fail('s and p use lowercase letters; removable holds distinct indices of s.');let j=0;for(const ch of t)if(ch===q[j])j++;if(j<q.length)fail('p must be a subsequence of s.');}
     if(n===1268 && (!a[0].length || a[0].some((x:any)=>!/^[a-z]+$/.test(x)) || !unique(a[0]) || !/^[a-z]+$/.test(a[1]))) fail('products are distinct lowercase words; searchWord is lowercase.');
+    if([1299,724,1822,280,665,2348,2215].includes(n) && (!a[0].length || n===2215 && !a[1].length)) fail('The input arrays must be nonempty.');
+    if([392,28,438].includes(n) && (!/^[a-z]*$/.test(a[0]) || !/^[a-z]*$/.test(a[1]) || n!==392 && (!a[0].length || !a[1].length))) fail('Use lowercase letters (nonempty for this problem).');
+    if(n===58 && (!/^[A-Za-z ]+$/.test(a[0]) || !/[A-Za-z]/.test(a[0]))) fail('s uses letters and spaces and has at least one word.');
+    if(n===929 && (!a[0].length || a[0].some((e:any)=>!/^[a-z][a-z.+]*@[a-z.]+\.com$/.test(e)))) fail('Each email is local@domain.com with a lowercase local name not starting with + or a dot.');
+    if(n===205 && (a[0].length!==a[1].length || !a[0].length)) fail('s and t are nonempty and the same length.');
+    if(n===605 && (!a[0].length || a[0].some((x:any,i:number)=>x!==0&&x!==1||x===1&&a[0][i+1]===1) || a[1]<0)) fail('flowerbed holds 0s and 1s with no adjacent 1s; n >= 0.');
+    if(n===496 && (!unique(a[1]) || !unique(a[0]) || a[0].some((x:any)=>!a[1].includes(x)) || a[1].some((x:any)=>x<0||x>10000))) fail('Values are distinct, in [0, 10000], and nums1 is a subset of nums2.');
+    if(n===448 && (!a[0].length || a[0].some((x:any)=>x<1||x>a[0].length))) fail('Values must be in [1, n].');
+    if([1189,2405,1930].includes(n) && (!/^[a-z]+$/.test(a[0]) || n===1930 && a[0].length<3)) fail('Use lowercase letters (at least 3 for problem 1930).');
+    if(n===290 && (!/^[a-z]+$/.test(a[0]) || !/^[a-z]+( [a-z]+)*$/.test(a[1]))) fail('pattern is lowercase; s is lowercase words separated by single spaces.');
+    if(n===554 && (!a[0].length || a[0].some((r:any)=>!r.length||r.some((w:any)=>w<1)) || new Set(a[0].map((r:any)=>r.reduce((x:number,y:number)=>x+y,0))).size!==1)) fail('Every row is nonempty, widths are positive, and all rows have the same total.');
+    if(n===1963 && (a[0].length%2 || !/^[\[\]]+$/.test(a[0]) || [...a[0]].filter((c:string)=>c==='[').length*2!==a[0].length)) fail('s has equal numbers of [ and ].');
+    if(n===2001 && (!a[0].length || a[0].some((r:any)=>r.length!==2||r.some((x:any)=>x<1)))) fail('Each rectangle is [width, height] with positive sides.');
+    if(n===2002 && !/^[a-z]{2,12}$/.test(a[0])) fail('s has 2 to 12 lowercase letters.');
+    if(n===2017 && (a[0].length!==2 || !a[0][0].length || a[0][0].length!==a[0][1].length || a[0].flat().some((x:any)=>x<1))) fail('grid has two rows of the same nonzero length with positive values.');
+    if(n===179 && (!a[0].length || a[0].some((x:any)=>x<0))) fail('nums is nonempty and nonnegative.');
+    if(n===523 && (!a[0].length || a[0].some((x:any)=>x<0) || a[1]<1)) fail('nums is nonempty and nonnegative; k >= 1.');
+    if(n===838 && !/^[LR.]+$/.test(a[0])) fail('dominoes uses L, R and . only.');
+    if(n===187 && !/^[ACGT]+$/.test(a[0])) fail('s uses A, C, G and T only.');
+    if(n===1461 && (!/^[01]+$/.test(a[0]) || a[1]<1 || a[1]>20)) fail('s is binary; 1 <= k <= 20.');
+    if(n===2483 && !/^[YN]+$/.test(a[0])) fail('customers uses Y and N only.');
+    if(n===68 && (!a[0].length || a[1]<1 || a[0].some((w:any)=>!w.length||w.length>a[1]||/\s/.test(w)))) fail('Words are nonempty, contain no spaces, and fit in maxWidth.');
+    if(n===2306 && (a[0].length<2 || !unique(a[0]) || a[0].some((w:any)=>!/^[a-z]+$/.test(w)))) fail('ideas holds at least two distinct lowercase words.');
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;

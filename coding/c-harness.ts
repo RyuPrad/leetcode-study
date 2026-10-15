@@ -312,6 +312,11 @@ function codecCase(problem: CodingProblem, input: Json[]): string[] {
       'struct TreeNode* copy = deserialize(text);', 'double ms = study_ms(start);', 'study_out_tree(copy);', 'study_finish("actual", ms);'
     ];
   }
+  if (problem.number === 535) return [
+    `char* url = study_dup(${cString(input[0] as string)});`,
+    'clock_t start = clock();', 'char* shortUrl = encode(url);', 'if (!shortUrl) study_fail("encode must return a string.");',
+    'char* decoded = decode(shortUrl);', 'double ms = study_ms(start);', 'study_str(decoded);', 'study_finish("actual", ms);'
+  ];
   const strs = input[0] as string[];
   return [
     `int count = ${strs.length}; char** strs = ${flat('String', strs, 271)};`,

@@ -216,6 +216,45 @@ export function extraCase(n, seed) {
     case 1898:{const t=word+'abcacb'.repeat(1+s%2);return [t,'ab',seq(t.length,0).map(i=>(i*(s%5+1)+s)%t.length).filter((x,i,a)=>a.indexOf(x)===i).slice(0,3+s%3)];}
     case 1268:return [['mobile','mouse','moneypot','monitor','mousepad',word+'mouse','mop'].slice(0,3+s%5),['mouse','mon','mob','zzz','mo'][s%5]+'abc'.slice(0,s%3)];
     case 977:return [v.map(x=>x*(1+s%4)-len-Math.floor(s/2))];
+    case 1299:return [pos.map(x=>x*s%17+1)];
+    case 392:return ['ace'.slice(0,s%4)+word,'abcde'+word.repeat(s%2)+'xyz'+'q'.repeat(s)];
+    case 58:return ['hello'+' world'.repeat(s%3)+' '.repeat(s%4)+(s%2?' '+word.repeat(s):'')+' '.repeat(Math.floor(s/4))];
+    case 118:return [1+s%30];
+    case 929:return [['test.email+alex@leetcode.com','test.e.mail+bob.cathy@leetcode.com','testemail+david@lee.tcode.com',word+'.x@a.com',word+'x+y@a.com'].slice(0,2+s%4).concat(s%2?['a'+word.repeat(s)+'@b.com']:[])];
+    case 205:return ['egg'+word.repeat(s%3+1),s%2?'add'+String.fromCharCode(98+s%20).repeat(s%3+1):'adb'+'q'.repeat(s%3+1)];
+    case 605:return [seq(len+3,0).map(i=>i%(2+s%3)===0?1:0),s%3+Math.floor(s/6)];
+    case 496:{const m=len+3,b=seq(m,1+s),c=b.slice(s%m).concat(b.slice(0,s%m)),d=s%2?c.reverse():c;return [d.filter((_,i)=>i%2===0),d];}
+    case 724:return [nums.concat(s%2?[s]:[])];
+    case 303:return ops('NumArray',[nums],[['sumRange',0,len-1],['sumRange',1%len,len-1],['sumRange',0,0],['sumRange',len-1,len-1],['sumRange',s%len,s%len]]);
+    case 448:return [seq(len+2,1).map(x=>((x*s)%(len+2))+1)];
+    case 1189:return ['balloon'.repeat(s%3)+'lo'.repeat(s%4)+'ban'+word+'o'.repeat(Math.floor(s/4))];
+    case 290:return ['abba'.slice(0,2+s%3),['dog','cat','cat','dog','fish'].slice(0,2+(s+1)%4).join(' ')];
+    case 1822:return [nums.map(x=>x===0&&s%3?1:x).concat(s%2?[-s]:[s])];
+    case 2215:return [nums,nums.map(x=>x+s%3).concat([s*10])];
+    case 1603:return ops('ParkingSystem',[s%3,1+s%2,s%4],[['addCar',1],['addCar',2],['addCar',3],['addCar',1],['addCar',2],['addCar',3],['addCar',s%3+1]]);
+    case 28:return [word+'sadbutsad'.slice(0,3+s%7)+'ab'.repeat(s%3),['sad','but','ab','zz','d'][s%5]+(s>9?'b':'')];
+    case 535:return ['https://leetcode.com/problems/'+word.repeat(s)+'/design-tinyurl'];
+    case 554:{const base=[1,1+s%4,2,1+Math.floor(s/4)];return [seq(3+s%3,0).map(r=>base.slice(r%4).concat(base.slice(0,r%4)))];}
+    case 1930:return ['aabca'+word.repeat(s%3)+'bbcbaba'.slice(0,s%7)+'a'.repeat(Math.floor(s/6))];
+    case 1963:{const k=1+s%4;return [']'.repeat(k)+'['.repeat(k)+'[]'.repeat(Math.floor(s/4))];}
+    case 2001:return [seq(len+2,1).map(i=>[i*(1+s%3),i*(2+s%2)]).concat([[s+1,s+2]])];
+    case 2002:return ['leetcodecom'.slice(0,2+s%9)+word];
+    case 2017:return [[pos.map(x=>x*s%7+1),pos.map(x=>(x+s)%5+1)]];
+    case 438:return ['cbaebabacd'.slice(0,4+s%7)+word.repeat(s%3),'abc'.slice(0,1+s%3)];
+    case 280:return [nums.concat(s%2?[s]:[])];
+    case 179:return [s%5===0?[0,0]:pos.map(x=>x*s%30)];
+    case 523:return [pos.map(x=>x*s%9),2+s%5];
+    case 838:return ['.L.R...LR..L..'.slice(0,5+s%10)+'R.'.repeat(s%3)+'.'.repeat(Math.floor(s/10))];
+    case 187:return ['AAAAACCCCC'.repeat(1+s%2)+'AAAAAGGGTT'.slice(0,s%10)+'ACGT'[s%4].repeat(s)];
+    case 380:return ops('RandomizedSet',[],[['insert',s],['insert',s+1],['insert',s],['getRandom'],['remove',s+2],['remove',s],['insert',s+3],['getRandom'],['remove',s+1],['getRandom']]);
+    case 1461:return ['00110110'.slice(0,3+s%6)+(s*5).toString(2),1+s%3];
+    case 665:return [nums.concat(s%2?[s]:[])];
+    case 2348:return [nums.map((x,i)=>(i+s)%3?0:x).concat(s%2?[0,0]:[1])];
+    case 2405:return ['abacaba'.slice(0,3+s%5)+word.repeat(s%3)+'z'.repeat(Math.floor(s/5))];
+    case 1396:return ops('UndergroundSystem',[],[['checkIn',1,'A',s],['checkIn',2,'A',s+1],['checkOut',1,'B',s+5+s%3],['checkOut',2,'B',s+9],['getAverageTime','A','B'],['checkIn',1,'B',s+20],['checkOut',1,'C',s+21+s%4],['getAverageTime','B','C'],['getAverageTime','A','B']]);
+    case 2483:return ['YYNY'.repeat(1+s%3)+'N'.repeat(s%4)+'Y'.repeat(Math.floor(s/4))];
+    case 68:return [['This','is','an','example','of','text','justification.'].slice(0,3+s%5).concat(s%2?['ok']:[]),14+s%6];
+    case 2306:return [['coffee','donuts','time','toffee','tea','cash','dime'].slice(0,3+s%5).concat([word+'x'+'y'.repeat(s)])];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

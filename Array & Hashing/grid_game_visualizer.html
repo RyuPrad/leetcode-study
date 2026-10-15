@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 2017. Grid Game Visualizer</title>
+  <style>
+    :root { color-scheme:dark; font-family:system-ui,sans-serif; background:#1e1e1e; color:#d4d4d4; }
+    body { margin:0; padding:24px; } button,input { font:inherit; } button { cursor:pointer; }
+    .panel { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:16px; } h2 { font-size:16px; }
+    .layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .code-line { white-space:pre; font:14px/1.7 Consolas,monospace; padding:0 8px; }
+    .code-line.active { background:#34312a; border-left:3px solid #d7ba7d; } .kw { color:#c586c0; } .fn { color:#dcdcaa; } .num { color:#b5cea8; } .str { color:#ce9178; } .cm { color:#6a9955; }
+    .console { white-space:pre-wrap; font:13px/1.7 Consolas,monospace; } .result-value { color:#b5cea8; }
+    #drag-container > div { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; } #custom-input { min-width:310px; }
+  </style>
+  <link rel="stylesheet" href="../visualizer-ui/reference-kit.css" />
+  <script src="../visualizer-ui/reference-kit.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
+  <script defer src="../visualizer-ui/workspace.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/learning.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <script defer src="../visualizer-ui/operation-rules.js"></script>
+  <script defer src="../visualizer-ui/operations.js"></script>
+  <script defer src="../visualizer-ui/learning.js"></script>
+  <script defer src="../visualizer-ui/guided-core.js"></script>
+  <script defer src="../visualizer-ui/guided.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/code-language.css" />
+  <script defer src="../visualizer-ui/code-languages.js"></script>
+  <script defer src="../visualizer-ui/code-language.js"></script>
+</head>
+<body>
+  <h1 class="page-title">2017. Grid Game</h1>
+  <div id="drag-container">
+    <div><button id="btn-prev" onclick="prevStep()">Back</button><button id="btn-next" onclick="nextStep()">Step Over</button><button id="btn-reset" onclick="init()">Reset</button><button id="btn-fullscreen" onclick="document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()">Fullscreen</button></div>
+    <div><button id="btn-ex-1" onclick="loadExample(1)">3 columns</button><button id="btn-ex-2" onclick="loadExample(2)">Bottom heavy</button><button id="btn-ex-3" onclick="loadExample(3)">4 columns</button></div>
+    <div><label for="custom-input">grid</label><input id="custom-input" value="[[2,5,4],[1,5,1]]" /><button onclick="loadCustom()">Load</button></div>
+  </div>
+  <div class="layout">
+    <div class="panel"><h2>Where the first robot turns down</h2><div id="narration-ui"></div><div id="visual-ui"></div><div id="final-ui" class="result-value"></div></div>
+    <div class="panel code-panel"><h2>Live Debugger</h2><div id="reference-code">
+<div id="line-1" class="code-line"><span class="kw">var</span> gridGame = <span class="kw">function</span>(grid) {</div>
+<div id="line-2" class="code-line">  <span class="kw">const</span> n = grid[<span class="num">0</span>].length;</div>
+<div id="line-3" class="code-line">  <span class="kw">let</span> top = grid[<span class="num">0</span>].<span class="fn">reduce</span>((a, b) =&gt; a + b, <span class="num">0</span>), bottom = <span class="num">0</span>, res = <span class="kw">Infinity</span>;</div>
+<div id="line-4" class="code-line">  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; n; i++) {</div>
+<div id="line-5" class="code-line">    top -= grid[<span class="num">0</span>][i];</div>
+<div id="line-6" class="code-line">    res = Math.<span class="fn">min</span>(res, Math.<span class="fn">max</span>(top, bottom));</div>
+<div id="line-7" class="code-line">    bottom += grid[<span class="num">1</span>][i];</div>
+<div id="line-8" class="code-line">  }</div>
+<div id="line-9" class="code-line">  <span class="kw">return</span> res;</div>
+<div id="line-10" class="code-line">};</div>
+    </div></div>
+    <div class="panel"><h2>Object View — nested JS object format (debugger-style)</h2><div id="object-view"></div></div>
+    <div class="panel"><h2>Variables & Outputs</h2><div id="console-ui" class="console"></div></div>
+    <div class="panel"><h2>Operation Trace</h2><div id="trace-ui"></div></div>
+  </div>
+  <script>
+    const examples={1:[[2,5,4],[1,5,1]],2:[[3,3,1],[8,5,2]],3:[[1,3,1,15],[1,3,3,1]]};
+    let grid=examples[1].map(r=>r.slice()),steps=[],stepIndex=0;
+    function buildSteps(){
+      steps=[];const v={grid:grid.map(r=>r.slice())},rec=StudyKit.recorder(steps,()=>v);
+      rec.snap(null,'ready','The first robot turns down at one column; the second robot then takes the better leftover.');
+      v.n=grid[0].length;rec.snap(2,'init-n','n = '+v.n+'.');
+      v.top=grid[0].reduce((a,b)=>a+b,0);v.bottom=0;v.res=Infinity;rec.snap(3,'init','top = sum of the top row = '+v.top+', bottom = 0, res = Infinity.');
+      v.i=0;rec.snap(4,'init-i','i = 0.');
+      while(true){
+        const more=v.i<v.n;
+        rec.snap(4,'loop-check',more?'Try turning down at column '+v.i+'.':'Every turning column was tried.');
+        if(!more)break;
+        v.top-=grid[0][v.i];rec.snap(5,'take-top','The first robot takes top cell '+v.i+': top = '+v.top+' remains to its right.');
+        const second=Math.max(v.top,v.bottom),before=v.res;v.res=Math.min(v.res,second);rec.log({turn:'column '+v.i,top:String(v.top),bottom:String(v.bottom),second:String(second)});
+        rec.snap(6,'update','The second robot takes max('+v.top+', '+v.bottom+') = '+second+'. '+(v.res<before?'res = '+v.res+'.':'res stays '+v.res+'.'));
+        v.bottom+=grid[1][v.i];rec.snap(7,'add-bottom','bottom += '+grid[1][v.i]+' → '+v.bottom+' for later turns.');
+        v.i++;rec.snap(4,'advance','i++ → '+v.i+'.');
+      }
+      rec.snap(9,'return','Return res = '+v.res+'.',{returned:v.res});
+      rec.finish();
+    }
+    function render(){
+      const state=steps[stepIndex],i=state.i;
+      const cls=(r,c)=>i===undefined||i>=state.n?'':r===0&&c===i&&state.phase==='take-top'||r===1&&c===i&&state.phase==='add-bottom'?'changed':r===0&&c>i||r===1&&c<i?'path':r===0&&c<=i?'discarded':'';
+      const visual=StudyKit.grid(state.grid,{scope:'grid',label:'grid (purple = left for the second robot)',cls,pointers:i!==undefined&&i<state.grid[0].length?{i:[0,i]}:{}})+(state.top===undefined?'':'<p>top = '+state.top+' · bottom = '+state.bottom+' · res = '+StudyKit.show(state.res)+'</p>');
+      StudyKit.render(state,stepIndex,steps.length,{visual,result:state.finished?'return '+state.returned:''});
+    }
+    function loadExample(number){grid=examples[number].map(r=>r.slice());document.getElementById('custom-input').value=JSON.stringify(grid);init();}
+    function loadCustom(){try{const value=JSON.parse(document.getElementById('custom-input').value);if(!Array.isArray(value)||value.length!==2||!Array.isArray(value[0])||!Array.isArray(value[1])||!value[0].length||value[0].length>12||value[0].length!==value[1].length||value.flat().some(x=>!Number.isSafeInteger(x)||x<1||x>100000))throw Error('Use two rows of equal length (1 to 12) with positive values.');grid=value;init();}catch(error){alert(error.message);}}
+
+    function init(){buildSteps();stepIndex=0;render();}
+    function nextStep(){if(stepIndex<steps.length-1){stepIndex++;render();}}
+    function prevStep(){if(stepIndex>0){stepIndex--;render();}}
+    init();
+
+    // STUDY LESSON BRIDGE START
+    window.studyLessonSource = {
+      spec: {"number":2017,"title":"Grid Game","topic":"Array & Hashing","why":"The first robot turns down at one column i, leaving only the top suffix after i and the bottom prefix before i; the second robot takes the larger of the two, so the first robot picks the i that minimizes that maximum.","meanings":{"grid":"2 × n points","n":"number of columns","top":"points left on the top row after the first robot turns down","bottom":"points left on the bottom row before the turn","res":"smallest score the second robot can be held to","i":"column where the first robot moves down"},"entityClasses":["kit-slot","kit-cell","tree-node","list-node","map-item","stack-item","grid-cell","tree-slot","stack-slot"],"entitySelectors":[],"mode":"precomputed"},
+      index:()=>stepIndex,count:()=>steps.length,read:()=>steps[stepIndex],readAt:index=>steps[index],
+      phases:()=>steps.map((state,index)=>({index,phase:state.phase})),
+      jump:index=>{stepIndex=Math.max(0,Math.min(steps.length-1,index));render();},
+      objectFrame(index=stepIndex){return StudyKit.objectFrame(steps[index],"gridGame");}
+    };
+    // STUDY LESSON BRIDGE END
+</script>
+</body>
+</html>
