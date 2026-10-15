@@ -415,4 +415,52 @@ add(1359,'Add orders one at a time: the new pickup has 2i - 1 places and its del
 [5,'Order 2 joins sequences of 2 stops. How many places does its pickup have?','3','2~There are 2 + 1 gaps.','4~Only 2 stops exist so far.','slots = 2 × 2 - 1.','Before, between and after P1 D1.'],
 [6,'slots = 3. What is res?','6','3~The delivery must also be placed after the pickup.','9~Only placements with the delivery after the pickup count: 3 × 4 / 2.','res × slots × (slots + 1) / 2.','1 × 6 = 6.'],
 [9,'What is returned?','6','90~That is the answer for n = 3.','2~Count all valid sequences of 4 stops.','res = 6.','6 sequences for 2 orders.']]);
+add(516,'dp[i][j] is the longest palindrome inside s[i..j]: matching ends wrap the inside, otherwise drop one end.','Reversing s and taking the longest common substring finds a contiguous palindrome, not a subsequence.',[
+[14,'s[3..4] = "ab": the ends differ. What is dp[3][4]?','1','2~"a" and "b" cannot both be used.','0~One letter alone is a palindrome.','max(dp[4][4], dp[3][3]).','max(1, 1) = 1.'],
+[27,'s[2..4] = "bab": both ends are "b" and dp[3][3] = 1. What is dp[2][4]?','3','2~The ends wrap the inside.','1~Matching ends add 2.','dp[3][3] + 2.','"bab" itself.'],
+[70,'What is returned?','4','5~"bbbab" is not a palindrome.','3~"bbbb" has length 4.','dp[0][4].','"bbbb".']]);
+add(221,'The largest square ending at a 1 is one more than the smallest square ending above, left and diagonally up-left.','Checking every possible square from every cell repeats the same work many times.',[
+[9,'Cell (0, 0) is "1" and its three neighbors in dp are 0. What is dp[1][1]?','1','0~A single "1" is a square of side 1.','2~The neighbors are all 0.','1 + min(0, 0, 0).','A 1 × 1 square.'],
+[74,'Cell (2, 3): up = 1, left = 1, diagonal = 1. What is dp[3][4]?','2','1~All three neighbors hold squares of side 1.','3~Add 1 to the smallest neighbor, not to their sum.','1 + min(1, 1, 1).','A 2 × 2 square ends at (2, 3).'],
+[108,'side = 2. What is returned?','4','2~Return the area, side × side.','9~No 3 × 3 square exists.','side × side.','2 × 2 = 4.']]);
+add(474,'A knapsack with a zero budget and a one budget; update budgets from high to low so each string is used once.','Updating budgets from low to high lets the same string be counted several times.',[
+[9,'"10" fits budget (1, 1): skip gives 0, take gives dp[0][0] + 1. What is dp[1][1]?','1','0~Taking "10" gives one string.','2~Only one string so far.','max(0, dp[0][0] + 1).','{"10"}.'],
+[24,'"0" at budget (1, 0): take gives dp[0][0] + 1. What is dp[1][0]?','1','0~"0" uses one zero and no ones.','2~Only "0" fits in (1, 0).','max(0, dp[0][0] + 1).','{"0"}.'],
+[36,'"1" at budget (1, 1): take gives dp[1][0] + 1. What is dp[1][1]?','2','1~"0" and "1" together fit in (1, 1).','3~"10" would need another zero and one.','max(1, dp[1][0] + 1).','{"0", "1"}.']]);
+add(1911,'Track the best sum ending on an added term and the best ending on a subtracted term.','Adding every larger value and subtracting every smaller one ignores that terms must alternate.',[
+[3,'num = 4 with plus = 0 and minus = 0. What is nextPlus?','4','0~Adding 4 after the empty subsequence helps.','-4~The first term is added, not subtracted.','max(plus, minus + 4).','max(0, 0 + 4) = 4.'],
+[9,'num = 2 with plus = 4. What is nextMinus?','2','0~Subtracting 2 after [4] gives 2.','-2~plus is 4, so 4 - 2 = 2.','max(minus, plus - 2).','max(0, 4 - 2) = 2.'],
+[13,'num = 5 with minus = 2. What is nextPlus?','7','5~Adding after [4, 2] gives 2 + 5.','9~minus already includes subtracting 2.','max(plus, minus + 5).','max(4, 2 + 5) = 7.']]);
+add(1220,'Count the strings of each length by their last vowel; each vowel extends the vowels allowed before it.','Listing the strings themselves grows exponentially; only five counts per length are needed.',[
+[5,'Length 2: "a" may follow e, i or u (each count 1). What is na?','3','1~Three different vowels can come before "a".','5~"a" and "o" cannot be followed by "a".','e + i + u.','1 + 1 + 1 = 3.'],
+[8,'"o" may follow only "i", and i = 1. What is no?','1','2~Only "i" can be followed by "o".','0~"io" is allowed.','no = i.','Just "io".'],
+[21,'Length 3 counts: a 6, e 5, i 3, o 2, u 3. What is returned?','19','6~Sum the counts for every last vowel.','10~That is the answer for n = 2.','a + e + i + o + u.','6 + 5 + 3 + 2 + 3 = 19.']]);
+add(1866,'Insert the shortest stick: in front it is visible, behind any of the other i - 1 sticks it is hidden.','Inserting the tallest stick instead changes which sticks are visible behind it, which is much harder to count.',[
+[15,'dp[2][1] = dp[1][0] + 1 × dp[1][1], with dp[1][0] = 0. What is it?','1','2~dp[1][0] is 0.','0~Stick 1 can hide behind stick 2.','0 + 1 × 1.','Only [2, 1].'],
+[25,'dp[3][1] = dp[2][0] + 2 × dp[2][1]. What is it?','2','1~The shortest stick has 2 hiding places.','3~dp[2][0] is 0.','0 + 2 × 1.','[3, 1, 2] and [3, 2, 1].'],
+[28,'dp[3][2] = dp[2][1] + 2 × dp[2][2]. What is it?','3','2~dp[2][1] = 1 adds the arrangement with stick 1 in front.','4~dp[2][2] = 1, so hiding gives 2 more.','1 + 2 × 1.','[1, 3, 2], [2, 3, 1] and [2, 1, 3].']]);
+add(926,'A 0 after some 1s costs either one flip of itself or flipping all earlier 1s; keep the cheaper.','Trying every split point and counting flips on both sides from scratch is quadratic.',[
+[4,'The first character is "0" with no 1s before it. What is res?','0','1~A 0 before any 1 needs no flip.','-1~res cannot be negative.','min(res + 1, ones) = min(1, 0).','Nothing to flip.'],
+[13,'The second "1" is read. What is ones?','2','1~Two 1s have been read.','0~ones counts 1s, not flips.','ones++.','"0011" so far.'],
+[16,'A "0" after two 1s. What is res?','1','2~Flipping this single 0 costs 1.','0~The prefix "00110" is not monotone.','min(res + 1, ones) = min(1, 2).','Flip the last 0 to 1.']]);
+add(2218,'For each pile, try every top prefix and combine it with the best use of the remaining coins on earlier piles.','Taking the most valuable available top coin each time misses large coins hidden under small ones.',[
+[21,'Pile 0, t = 2: taken = 1 + 100 = 101. What is next[2]?','101','1~Taking the top 2 coins of pile 0 gives 101.','100~Both top coins, 1 and 100, are taken.','max(next[2], dp[0] + 101).','max(1, 101) = 101.'],
+[35,'Pile 1, t = 1 (taken = 7), used = 1. What is next[1]?','7','1~The single coin 7 beats the coin 1 from pile 0.','8~Only the top coin, 7, is taken.','max(next[1], dp[0] + 7).','max(1, 7) = 7.'],
+[53,'What is returned?','101','15~7 + 8 is less than 1 + 100.','108~Exactly k = 2 coins are taken.','dp[2].','1 + 100 from pile 0.']]);
+add(920,'The last song is either new (n - j + 1 choices) or a repeat of one of the j - k songs not played in the last k.','Counting arrangements first and dividing by repeats fails because the gap rule depends on order.',[
+[8,'Length 1, one song: dp[0][0] × 3 unused songs. What is fresh?','3','1~Any of the 3 songs can start the playlist.','0~dp[0][0] = 1.','dp[0][0] × (3 - 1 + 1).','1 × 3 = 3.'],
+[22,'Length 2, two songs: fresh = dp[1][1] × 2 unused songs. What is fresh?','6','3~Two songs are still unused.','9~Only n - j + 1 = 2 songs are new.','dp[1][1] × (3 - 2 + 1).','3 × 2 = 6.'],
+[48,'What is returned?','6','18~Every song must be played, and repeats need a gap.','3~dp[3][3] counts all orders of the 3 songs.','dp[3][3].','3! = 6 orders.']]);
+add(1639,'Count letters per column, then use columns left to right: each column may supply the next target letter or be skipped.','Tracking which word supplied each letter is unnecessary and multiplies the states.',[
+[57,'Column 0 has one "a" (in "acca"). What is dp[1]?','1','0~Column 0 can supply the first "a".','3~Only one word has "a" in column 0.','dp[1] += dp[0] × 1.','0 + 1 × 1 = 1.'],
+[69,'Column 1 also has one "a". What is dp[1]?','2','1~The first "a" can come from column 0 or column 1.','3~Column 1 has only one "a".','dp[1] += dp[0] × 1.','1 + 1 = 2.'],
+[93,'Column 3 has two "a"s and dp[2] = 3. What is dp[3]?','6','3~Each of the 2 words with "a" there gives a way.','2~Multiply by the 3 ways to form "ab" first.','dp[3] += dp[2] × 2.','0 + 3 × 2 = 6.']]);
+add(879,'A knapsack over members where profit is capped at minProfit, so every profitable scheme lands in one column.','Keeping exact profits makes the table as wide as the total profit, though everything above minProfit counts the same.',[
+[84,'Crime 0 (2 members, profit 2) from the empty scheme: capped = 2. What is dp[2][2]?','1','0~dp[0][0] = 1 is added.','2~Only one scheme so far.','dp[2][2] += dp[0][0].','The scheme {crime 0}.'],
+[121,'Crime 1 (2 members, profit 3) after dp[2][2] = 1: capped = min(3, 5) = 3. What is dp[4][3]?','1','0~dp[2][2] = 1 is added.','5~Profit is capped at minProfit = 3.','dp[4][3] += dp[2][2].','The scheme {crime 0, crime 1}.'],
+[197,'What is returned?','2','1~{crime 1} alone also reaches profit 3.','3~{crime 0} alone earns only 2.','Sum dp[members][3] over all member counts.','{crime 1} and {crime 0, crime 1}.']]);
+add(1547,'dp[left][right] is the cheapest way to cut a piece; its first cut costs the piece length and splits it in two.','Always cutting at the middle cut first is not always cheapest.',[
+[15,'The piece from point 0 to point 3 has one cut, at 1. What is dp[0][2]?','3','1~Cutting a piece of length 3 costs 3.','0~The cut at 1 is inside this piece.','best 0 + (3 - 0).','One cut on a piece of length 3.'],
+[62,'The piece from 0 to 4 has cuts at 1 and 3; either first cut leaves halves costing 3. What is dp[0][3]?','7','3~The first cut also costs the piece length, 4.','4~The second cut costs 3 more.','best 3 + (4 - 0).','3 + 4 = 7.'],
+[147,'Whole stick: cutting first at 3 leaves halves costing 3 + 6 = 9, the best. What is dp[0][5]?','16','9~Add the length 7 for the first cut.','12~Cutting first at 1 leaves halves costing 12.','best 9 + (7 - 0).','9 + 7 = 16.']]);
 }

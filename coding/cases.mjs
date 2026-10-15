@@ -293,6 +293,18 @@ export function extraCase(n, seed) {
     case 1799:return [v.concat(v).slice(0,2*(1+s%3)).map((x,i)=>x*(1+s%4)+i)];
     case 1964:return [pos.concat(pos.map(x=>(x*s)%7+1))];
     case 1359:return [s*41%500+1];
+    case 516:return [word+'ab'+word.repeat(s%3)+'ba'+(s%2?'c':'')+String.fromCharCode(98+s%5)];
+    case 221:return [grid(1+s%4,1+s%5,(r,c)=>(r*c+s+r+c)%3?'1':'0')];
+    case 474:return [v.map(x=>'0'.repeat(x%3)+'1'.repeat((x+s)%3)||'0'),1+s%5,1+s%4];
+    case 1911:return [pos.concat(pos.map(x=>x*s%9+1))];
+    case 1220:return [s*s*7%200+1];
+    case 1866:{const n=2+s*3%17;return [n,1+(s*5)%n];}
+    case 926:return ['0'.repeat(s%4)+'1'.repeat(1+s%3)+'0'.repeat(s%5)+'1'+(s%2?'0':'')];
+    case 2218:{const piles=v.slice(0,1+s%3).map((x,i)=>pos.slice(0,1+(x+i)%4).map(y=>y*s%20+1));const total=piles.reduce((t,p)=>t+p.length,0);return [piles,1+s%total];}
+    case 920:{const n=2+s%4;return [n,n+s%5,s%n];}
+    case 1639:return [[word+'ab'+word,'ba'+word+word,word+word+'ab'].map(w=>w.slice(0,4)),(word+'ab').slice(0,1+s%3)];
+    case 879:return [3+s%5,s%4,pos.map(x=>1+x%3),pos.map((x,i)=>(x*s+i)%5)];
+    case 1547:{const n=10+s;const cuts=[...new Set(v.map(x=>1+(x*s)%(n-1)))];return [n,cuts];}
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

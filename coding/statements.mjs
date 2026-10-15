@@ -135,6 +135,7 @@ export const statements = Object.fromEntries(`
 215|Return the kth largest array value, counting duplicate occurrences separately.
 217|Return whether any value occurs at least twice in nums.
 219|Return whether equal values occur at two distinct indices whose distance is at most k.
+221|Given a matrix of "0" and "1", return the area of the largest square containing only "1".
 225|Implement a last-in-first-out stack using queue operations. push(x) adds; pop returns and removes the top; top reads it; empty returns a boolean.
 226|Swap every node's left and right children and return the root of the inverted binary tree.
 229|Return every value occurring more than floor(n/3) times, without duplicates.
@@ -201,9 +202,11 @@ export const statements = Object.fromEntries(`
 463|Return the perimeter of the single island in a binary grid. Land cells share sides horizontally or vertically, and the island has no lakes.
 472|Return all words in the list that are made by concatenating at least two shorter words from the same list (words may repeat).
 473|Return whether every positive matchstick can be used exactly once to form four equal-length sides of a square.
+474|Return the size of the largest subset of strs that has at most m 0s and n 1s in total.
 494|Assign plus or minus to every nums value. Count assignments whose resulting sum is target.
 496|nums1 is a subset of the distinct values in nums2. For each value in nums1, return the first greater value to its right in nums2, or -1 if none exists.
 502|Starting with capital w, perform at most k projects. A project requires its capital threshold and adds its profit once. Return the maximum final capital.
+516|Return the length of the longest palindromic subsequence of s.
 518|Count unordered combinations of coin denominations totaling amount. Denominations are distinct positive integers and may be reused.
 523|Return whether nums has a contiguous subarray of length at least 2 whose sum is a multiple of k (0 counts as a multiple).
 535|Design a Codec with encode(longUrl), returning a short URL, and decode(shortUrl), returning the original. The judge checks decode(encode(longUrl)) on the same Codec instance.
@@ -255,12 +258,15 @@ export const statements = Object.fromEntries(`
 867|Return the transpose of matrix, exchanging rows and columns.
 875|Koko eats from one pile each hour at a fixed positive integer speed. Return the smallest speed that finishes all piles within h hours.
 877|Two optimal players take a whole pile from either end of an even-length row. The positive pile total is odd. Return whether the first player wins.
+879|n members can commit crimes; crime i needs group[i] members and earns profit[i], and a member can join only one crime. Count the subsets of crimes with total profit at least minProfit using at most n members, modulo 10^9 + 7.
 881|Each boat carries at most two people with combined weight at most limit. Every person fits alone. Return the fewest boats needed.
 895|Implement FreqStack.push(val) and pop(). pop removes and returns the most frequent value, breaking ties by the most recent occurrence.
 901|Implement StockSpanner.next(price). Return the number of consecutive days ending today with price no greater than today's price.
 904|Moving right from any starting tree, pick one fruit per tree into two baskets, each holding a single fruit type, and stop at the first tree that fits neither basket. Return the most fruit you can pick.
 912|Return nums sorted in ascending order.
 918|Return the greatest sum of a nonempty circular subarray, using each original position at most once.
+920|Your music player has n different songs. Count the playlists of goal songs in which every song is played at least once and a song is replayed only after k other songs. Return the count modulo 10^9 + 7.
+926|A binary string is monotone increasing if it is some 0s followed by some 1s. Return the minimum number of flips to make s monotone increasing.
 929|In the local name (before @), dots are ignored and everything after the first + is ignored; the domain is unchanged. Return how many different addresses actually receive mail.
 933|Implement RecentCounter.ping(t), returning the count of calls in the inclusive interval [t-3000,t]. Calls have strictly increasing positive timestamps.
 946|pushed and popped contain the same distinct values. Return whether this pop order can result from pushing values in the pushed order onto an initially empty stack.
@@ -287,6 +293,7 @@ export const statements = Object.fromEntries(`
 1143|Return the length of the longest subsequence shared by text1 and text2.
 1189|Using each letter of text at most once, return how many times the word "balloon" can be formed.
 1209|Repeatedly remove k adjacent equal letters from s until no such group remains. Return the final string; it is unique.
+1220|Count the strings of length n made of lowercase vowels where each "a" is followed only by "e", "e" only by "a" or "i", "i" by anything but "i", "o" only by "i" or "u", and "u" only by "a". Return the count modulo 10^9 + 7.
 1260|One shift moves every element one place to the right; the last element of each row moves to the start of the next row, and the last element of the grid moves to grid[0][0]. Return the grid after k shifts.
 1268|After each character of searchWord is typed, suggest up to three products that start with the typed prefix, in lexicographic order. Return the list of suggestion lists.
 1288|Remove every interval [a, b) that is covered by another interval [c, d), meaning c <= a and b <= d. Return the number of intervals that remain.
@@ -306,11 +313,13 @@ export const statements = Object.fromEntries(`
 1489|For a connected weighted graph, return [critical,pseudoCritical] edge-index arrays. Critical edges appear in every minimum spanning tree; pseudo-critical edges appear in some but not every minimum spanning tree.
 1498|Count the nonempty subsequences of nums whose minimum plus maximum is at most target. Return the count modulo 1000000007.
 1523|Given two nonnegative integers low and high, return the count of odd numbers between low and high, inclusive.
+1547|A stick of length n is to be cut at every position in cuts, in any order. Each cut costs the length of the piece being cut. Return the minimum total cost.
 1572|Return the sum of the primary and secondary diagonals of a square matrix, counting the center cell only once.
 1584|Connect all points with minimum total Manhattan edge length. Return the weight of a minimum spanning tree.
 1603|Implement ParkingSystem(big, medium, small) and addCar(carType), which parks a car in a free space of its type (1 big, 2 medium, 3 small) and returns whether it could.
 1626|A team conflicts if a younger player has a strictly higher score than an older player; players of the same age never conflict. Return the highest total score of a team without conflicts.
 1631|A path's effort is the largest absolute height change between neighboring cells. Return the minimum effort to travel from top-left to bottom-right.
+1639|Form target left to right by taking target[i] from column c of any word; after using column c, only columns to its right may be used for later letters. Return the number of ways modulo 10^9 + 7.
 1647|A string is good when no two different letters have the same frequency. Return the minimum number of characters to delete from s to make it good.
 1658|Each operation removes the leftmost or rightmost element of nums and subtracts it from x. Return the minimum number of operations to reduce x exactly to 0, or -1 if impossible.
 1768|Merge word1 and word2 by alternating characters starting with word1, appending any remainder at the end.
@@ -321,10 +330,12 @@ export const statements = Object.fromEntries(`
 1851|For each query, return the length of the shortest closed interval containing it, or -1. A closed interval [l,r] has length r-l+1.
 1856|The min-product of an array is its minimum value times its sum. Return the maximum min-product of any nonempty subarray of nums, modulo 10^9 + 7 (maximize before taking the modulo).
 1863|For every subset, XOR its elements, with the empty subset contributing zero. Return the sum of all subset XOR values.
+1866|There are n sticks with lengths 1 to n. A stick is visible from the left if no longer stick is to its left. Return the number of arrangements with exactly k visible sticks, modulo 10^9 + 7.
 1871|Starting at index 0 of a binary string, jump between minJump and maxJump positions rightward, landing only on 0. Return whether the final index is reachable.
 1888|You may move the first character of the binary string s to its end any number of times, and flip any character. Return the minimum number of flips needed to make s alternating.
 1898|Remove the characters of s at removable[0..k-1]. Return the largest k such that p is still a subsequence of s.
 1899|You may combine two triplets by taking their coordinatewise maximum. Return whether some selection can produce target exactly.
+1911|The alternating sum of a sequence is the sum of the elements at even indices minus the sum at odd indices. Return the maximum alternating sum of any subsequence of nums.
 1921|Monster i starts dist[i] away from the city and moves speed[i] per minute. A weapon shoots one monster at minute 0, 1, 2, and so on. You lose when a monster reaches the city, including at the same moment the weapon is ready. Return the number of monsters eliminated before losing, or n if all are eliminated.
 1929|Return the input array concatenated with itself.
 1930|Return the number of distinct palindromes of length 3 that are subsequences of s.
@@ -339,6 +350,7 @@ export const statements = Object.fromEntries(`
 2028|You observed m dice rolls; n more are missing. The mean of all n + m rolls is mean. Return any n values from 1 to 6 for the missing rolls, or an empty array if none exist.
 2140|Questions are processed in order. Solving question i earns points[i] but you must skip the next brainpower[i] questions; you may also skip any question. Return the maximum points you can earn.
 2215|Return [answer1, answer2]: the distinct values of nums1 not in nums2, and the distinct values of nums2 not in nums1. Values within each list may be in any order.
+2218|Each move takes the top coin of any pile. Return the maximum total value of exactly k coins.
 2300|A spell and a potion succeed when the product of their strengths is at least success. For each spell, return how many potions it succeeds with.
 2306|Choose two distinct ideas, swap their first letters, and keep the pair if neither new name is in ideas. The concatenation "newA newB" is then a valid company name. Return the number of distinct valid names.
 2348|Return the number of contiguous subarrays of nums that contain only 0.
