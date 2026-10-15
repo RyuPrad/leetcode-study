@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leetcode 1845. Seat Reservation Manager Visualizer</title>
+  <style>
+    :root { color-scheme:dark; font-family:system-ui,sans-serif; background:#1e1e1e; color:#d4d4d4; }
+    body { margin:0; padding:24px; } button,input { font:inherit; } button { cursor:pointer; }
+    .panel { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:16px; } h2 { font-size:16px; }
+    .layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .code-line { white-space:pre; font:14px/1.7 Consolas,monospace; padding:0 8px; }
+    .code-line.active { background:#34312a; border-left:3px solid #d7ba7d; } .kw { color:#c586c0; } .fn { color:#dcdcaa; } .num { color:#b5cea8; } .str { color:#ce9178; } .cm { color:#6a9955; }
+    .console { white-space:pre-wrap; font:13px/1.7 Consolas,monospace; } .result-value { color:#b5cea8; }
+    #drag-container > div { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; } #custom-input { min-width:310px; }
+  </style>
+  <link rel="stylesheet" href="../visualizer-ui/reference-kit.css" />
+  <script src="../visualizer-ui/reference-kit.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/workspace.css" />
+  <link rel="stylesheet" href="../visualizer-ui/panel-layout.css" />
+  <script defer src="../visualizer-ui/panel-layout.js"></script>
+  <script defer src="../visualizer-ui/workspace.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/learning.css" />
+  <link rel="stylesheet" href="../visualizer-ui/object-view.css" />
+  <script defer src="../visualizer-ui/object-view.js"></script>
+  <script defer src="../visualizer-ui/object-state.js"></script>
+  <script defer src="../visualizer-ui/operation-rules.js"></script>
+  <script defer src="../visualizer-ui/operations.js"></script>
+  <script defer src="../visualizer-ui/learning.js"></script>
+  <script defer src="../visualizer-ui/guided-core.js"></script>
+  <script defer src="../visualizer-ui/guided.js"></script>
+  <link rel="stylesheet" href="../visualizer-ui/code-language.css" />
+  <script defer src="../visualizer-ui/code-languages.js"></script>
+  <script defer src="../visualizer-ui/code-language.js"></script>
+</head>
+<body>
+  <h1 class="page-title">1845. Seat Reservation Manager</h1>
+  <div id="drag-container">
+    <div><button id="btn-prev" onclick="prevStep()">Back</button><button id="btn-next" onclick="nextStep()">Step Over</button><button id="btn-reset" onclick="init()">Reset</button><button id="btn-fullscreen" onclick="document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()">Fullscreen</button></div>
+    <div><button id="btn-ex-1" onclick="loadExample(1)">LeetCode example</button><button id="btn-ex-2" onclick="loadExample(2)">Several returns</button><button id="btn-ex-3" onclick="loadExample(3)">Reuse one seat</button></div>
+    <div><label for="custom-input">Operations</label><input id="custom-input" value="new 5; reserve; reserve; unreserve 2; reserve; reserve; reserve; reserve; unreserve 5" /><button onclick="loadCustom()">Load</button></div>
+  </div>
+  <div class="layout">
+    <div class="panel"><h2>A counter for new seats, a heap for returned ones</h2><div id="narration-ui"></div><div id="visual-ui"></div><div id="final-ui" class="result-value"></div></div>
+    <div class="panel code-panel"><h2>Live Debugger</h2><div id="reference-code">
+<div id="line-1" class="code-line"><span class="kw">class</span> SeatManager {</div>
+<div id="line-2" class="code-line">  <span class="kw">constructor</span>(n) {</div>
+<div id="line-3" class="code-line">    <span class="kw">this</span>.next = <span class="num">1</span>;</div>
+<div id="line-4" class="code-line">    <span class="kw">this</span>.freed = <span class="kw">new</span> <span class="fn">Heap</span>((a, b) =&gt; a &lt; b);</div>
+<div id="line-5" class="code-line">  }</div>
+<div id="line-6" class="code-line">  <span class="fn">reserve</span>() {</div>
+<div id="line-7" class="code-line">    <span class="kw">if</span> (<span class="kw">this</span>.freed.<span class="fn">size</span>()) {</div>
+<div id="line-8" class="code-line">      <span class="kw">return</span> <span class="kw">this</span>.freed.<span class="fn">pop</span>();</div>
+<div id="line-9" class="code-line">    }</div>
+<div id="line-10" class="code-line">    <span class="kw">return</span> <span class="kw">this</span>.next++;</div>
+<div id="line-11" class="code-line">  }</div>
+<div id="line-12" class="code-line">  <span class="fn">unreserve</span>(seatNumber) {</div>
+<div id="line-13" class="code-line">    <span class="kw">this</span>.freed.<span class="fn">push</span>(seatNumber);</div>
+<div id="line-14" class="code-line">  }</div>
+<div id="line-15" class="code-line">}</div>
+    </div></div>
+    <div class="panel"><h2>Object View — nested JS object format (debugger-style)</h2><div id="object-view"></div></div>
+    <div class="panel"><h2>Variables & Outputs</h2><div id="console-ui" class="console"></div></div>
+    <div class="panel"><h2>Operation Trace</h2><div id="trace-ui"></div></div>
+  </div>
+  <script>
+    const examples={1:'new 5; reserve; reserve; unreserve 2; reserve; reserve; reserve; reserve; unreserve 5',2:'new 4; reserve; reserve; reserve; unreserve 3; unreserve 1; reserve; reserve',3:'new 2; reserve; unreserve 1; reserve; reserve'};
+    let ops=parse(examples[1]),steps=[],stepIndex=0;
+    const lower=(a,b)=>a<b;
+    function parse(text){
+      const pieces=text.split(';').map(x=>x.trim()).filter(Boolean);if(!pieces.length||pieces.length>14)throw Error('Use 1 to 14 operations, starting with new n.');
+      const first=pieces[0].match(/^new\s+(\d+)$/i);if(!first)throw Error('Start with new n, e.g. new 5.');
+      const n=Number(first[1]);if(n<1||n>9)throw Error('Use 1 to 9 seats.');
+      const list=[{method:'new',n}],taken=new Set();let next=1;const freed=[];
+      for(const piece of pieces.slice(1)){
+        if(/^reserve$/i.test(piece)){if(next>n&&!freed.length)throw Error('reserve needs a free seat.');let seat;if(freed.length){freed.sort((a,b)=>a-b);seat=freed.shift();}else seat=next++;taken.add(seat);list.push({method:'reserve'});continue;}
+        const m=piece.match(/^unreserve\s+(\d+)$/i);if(!m)throw Error('Use reserve or unreserve seatNumber.');
+        const seat=Number(m[1]);if(!taken.has(seat))throw Error('unreserve '+seat+' needs a reserved seat.');taken.delete(seat);freed.push(seat);list.push({method:'unreserve',seat});
+      }
+      return list;
+    }
+    function buildSteps(){
+      steps=[];const self={},v={this:self},rec=StudyKit.recorder(steps,()=>v),outputs=[];let method='constructor',reserved=new Set();
+      const snap=(line,phase,text,extra={})=>rec.snap(line,phase,text,{view:{method,reserved:[...reserved]},...extra});
+      snap(null,'ready','Hand out the smallest free seat each time.');
+      for(const op of ops){
+        if(op.method==='new'){
+          method='constructor';v.n=op.n;snap(2,'constructor','new SeatManager('+op.n+').');
+          self.next=1;snap(3,'init-next','this.next = 1: no seat was reserved yet.');
+          self.freed=[];snap(4,'init-freed','this.freed = empty min-heap.');
+          delete v.n;outputs.push(null);rec.log({call:'new SeatManager('+op.n+')',result:'null'});continue;
+        }
+        if(op.method==='reserve'){
+          method='reserve';snap(6,'call','reserve().');
+          const has=self.freed.length>0;snap(7,'freed-check',has?'A returned seat is waiting.':'No returned seats.');
+          let seat;
+          if(has){seat=StudyKit.heapPop(self.freed,lower);reserved.add(seat);outputs.push(seat);rec.log({call:'reserve()',result:String(seat)});snap(8,'return-freed','Return the smallest returned seat, '+seat+'.',{returned:seat});}
+          else{seat=self.next;self.next++;reserved.add(seat);outputs.push(seat);rec.log({call:'reserve()',result:String(seat)});snap(10,'return-next','Return '+seat+'; this.next becomes '+self.next+'.',{returned:seat});}
+          continue;
+        }
+        method='unreserve';v.seatNumber=op.seat;snap(12,'call','unreserve('+op.seat+').');
+        StudyKit.heapPush(self.freed,op.seat,lower);reserved.delete(op.seat);snap(13,'push','this.freed.push('+op.seat+').');
+        delete v.seatNumber;outputs.push(null);rec.log({call:'unreserve('+op.seat+')',result:'null'});
+      }
+      steps[steps.length-1].outputs=outputs.slice();
+      rec.finish();
+    }
+    function render(){
+      const state=steps[stepIndex],self=state.this,reserved=state.view.reserved,n=ops[0].n;
+      let visual='';
+      if(self.next!==undefined){
+        const seats=Array.from({length:n},(_,k)=>k+1);
+        visual+=StudyKit.array(seats,{scope:'seats',label:'seats (green = reserved)',indices:false,cls:k=>reserved.includes(k+1)?'complete':k+1===self.next?'active':'',pointers:self.next<=n?{next:self.next-1}:{}});
+      }
+      if(self.freed)visual+=StudyKit.array(self.freed,{scope:'freed',label:'this.freed (array form, smallest first)',cls:k=>state.phase==='push'&&self.freed[k]===state.seatNumber?'changed':state.phase==='freed-check'&&k===0?'read':''});
+      const result=state.finished?'outputs = '+JSON.stringify(state.outputs):Object.hasOwn(state,'returned')?'return '+state.returned:'';
+      StudyKit.render(state,stepIndex,steps.length,{visual,result});
+    }
+    function init(){buildSteps();stepIndex=0;render();}
+    function nextStep(){if(stepIndex<steps.length-1){stepIndex++;render();}}
+    function prevStep(){if(stepIndex>0){stepIndex--;render();}}
+    function loadExample(number){ops=parse(examples[number]);document.getElementById('custom-input').value=examples[number];init();}
+    function loadCustom(){try{ops=parse(document.getElementById('custom-input').value);init();}catch(error){alert(error.message);}}
+    init();
+
+    // STUDY LESSON BRIDGE START
+    window.studyLessonSource = {
+      spec: {"number":1845,"title":"Seat Reservation Manager","topic":"Heap","why":"Every seat at or after next has never been taken, and every freed seat is smaller than next. So the smallest free seat is the top of the freed heap when it has one, and next otherwise; the n untouched seats never need to be stored.","meanings":{"this.next":"smallest seat that was never reserved","this.freed":"min-heap of seats that were reserved and given back","n":"number of seats","seatNumber":"seat being given back"},"entityClasses":["kit-slot","kit-cell","tree-node","list-node","map-item","stack-item","grid-cell","tree-slot","stack-slot"],"entitySelectors":[],"mode":"precomputed"},
+      index:()=>stepIndex,count:()=>steps.length,read:()=>steps[stepIndex],readAt:index=>steps[index],
+      phases:()=>steps.map((state,index)=>({index,phase:state.phase})),
+      jump:index=>{stepIndex=Math.max(0,Math.min(steps.length-1,index));render();},
+      objectFrame(index=stepIndex){const state=steps[index],method='SeatManager.'+state.view.method;return StudyKit.objectFrame(state,method,{scope:name=>name==='this'?method:'Local'});}
+    };
+    // STUDY LESSON BRIDGE END
+</script>
+</body>
+</html>

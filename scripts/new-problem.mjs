@@ -6,8 +6,8 @@
 //   node scripts/new-problem.mjs <problem-module.mjs> [...more]
 // A module default-exports { number, title, topic, difficulty, visualizer, variables: [[name, meaning]],
 // why, statement, signature (Java notation, or signatureCode for design/codec), entry, kind,
-// parameters, methods?, reference, examples: [input], cases (body of `case n:` in extraCase),
-// solutions: { typescript, java, c } }.
+// parameters, methods?, reference, helpers? (judge-only code appended to the reference),
+// examples: [input], cases (body of `case n:` in extraCase), solutions: { typescript, java, c } }.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -43,7 +43,9 @@ export function apply(p) {
 
   // coding/problems.json
   const problems = JSON.parse(read('coding/problems.json')).filter(q => q.number !== n);
-  problems.push({ id: `leetcode:${n}`, number: n, title: p.title, description: p.statement, constraints: [], entry: p.entry, kind: p.kind, parameters: p.parameters, ...(p.methods ? { methods: p.methods } : {}), reference: p.reference.trim(), starter: starter(p), examples: p.examples.map((input, i) => ({ name: `Example ${i + 1}`, input })), tests: [] });
+  // helpers (such as a heap class) run with the reference but are not shown on the visualizer page.
+  const reference = p.reference.trim() + (p.helpers ? '\n\n' + p.helpers.trim() : '');
+  problems.push({ id: `leetcode:${n}`, number: n, title: p.title, description: p.statement, constraints: [], entry: p.entry, kind: p.kind, parameters: p.parameters, ...(p.methods ? { methods: p.methods } : {}), reference, starter: starter(p), examples: p.examples.map((input, i) => ({ name: `Example ${i + 1}`, input })), tests: [] });
   problems.sort((a, b) => a.number - b.number);
   write('coding/problems.json', JSON.stringify(problems, null, 2) + '\n');
 

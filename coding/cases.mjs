@@ -305,6 +305,19 @@ export function extraCase(n, seed) {
     case 1639:return [[word+'ab'+word,'ba'+word+word,word+word+'ab'].map(w=>w.slice(0,4)),(word+'ab').slice(0,1+s%3)];
     case 879:return [3+s%5,s%4,pos.map(x=>1+x%3),pos.map((x,i)=>(x*s+i)%5)];
     case 1547:{const n=10+s;const cuts=[...new Set(v.map(x=>1+(x*s)%(n-1)))];return [n,cuts];}
+    case 93:return [String(s*7919+s).slice(0,4+s%6)+String(s%10).repeat(s%3)];
+    case 1849:{const x=5+s*7;const t=String(x)+String(x-1).padStart(s%2?3:0,'0')+(s%4===0?String(x-2):'');return [s%5===0?t+'7':t];}
+    case 1980:{const n=1+s%5;const set=new Set();for(let k=0;set.size<n;k++)set.add(((k*7+s*3)%(1<<n)).toString(2).padStart(n,'0'));return [[...set]];}
+    case 1239:return [[word+'b','c'+word,'de','f'+word+'f','gh'].slice(0,2+s%4)];
+    case 1514:{const n=3+s%4;const edges=[],prob=[];for(let i=1;i<n;i++){edges.push([i-1,i]);prob.push(((i*s)%9+1)/10);}edges.push([0,n-1]);prob.push((s%5)/10);return [n,edges,prob,0,n-1];}
+    case 1579:{const n=2+s%4;const edges=[];for(let i=2;i<=n;i++)edges.push([1+(i+s)%3,i-1,i]);edges.push([3,1,n]);if(s%2)edges.push([1+s%2,1,2]);const seen=new Set();return [n,edges.filter(e=>{const k=e.join();if(seen.has(k))return false;seen.add(k);return true;})];}
+    case 1675:return [pos.map(x=>x*s%17+1)];
+    case 2542:return [pos.map(x=>x*s%11),pos.map((x,i)=>(x+i*s)%9+1),1+s%pos.length];
+    case 1845:{const n=5+s%5;const list=[];for(let k=0;k<1+s%4;k++)list.push(['reserve']);list.push(['unreserve',1]);list.push(['reserve']);if(s%2){list.push(['unreserve',1]);list.push(['reserve']);}list.push(['reserve']);return ops('SeatManager',[n],list);}
+    case 1882:return [v.slice(0,1+s%3).map(x=>(x*s)%5+1),pos.map(x=>x*s%4+1)];
+    case 1985:return [v.map(x=>String(x*s*37%1000)),1+s%len];
+    case 1383:return [pos.length,pos.map(x=>x*s%10+1),pos.map((x,i)=>(x+i*s)%8+1),1+s%pos.length];
+    case 2421:{const n=2+s%6;const vals=Array.from({length:n},(_,i)=>1+(i*s+s)%4);const edges=[];for(let i=1;i<n;i++)edges.push([s%i,i]);return [vals,edges];}
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

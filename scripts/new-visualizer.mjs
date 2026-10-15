@@ -121,7 +121,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     const problem = problems.find(p => p.number === spec.number);
     if (!problem) throw Error(`Add problem ${spec.number} to coding/problems.json first.`);
     const out = path.join(ROOT, spec.topic, spec.file);
-    fs.writeFileSync(out, page({ ...spec, title: spec.title || problem.title }, problem.reference));
+    // The page shows the module's own reference; judge-only helpers stay out of the code panel.
+    fs.writeFileSync(out, page({ ...spec, title: spec.title || problem.title }, module.page && module.reference ? module.reference.trim() : problem.reference));
     console.log(`Wrote ${path.relative(ROOT, out)}`);
   }
 }

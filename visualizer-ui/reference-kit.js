@@ -189,5 +189,32 @@
   }
   const parts = (text, count, example) => { const pieces = text.split('|').map(piece => piece.trim()); if (pieces.length !== count) throw Error(`Use ${count} parts separated by |, e.g. ${example}`); return pieces; };
 
-  globalThis.StudyKit = { esc, tag, idOf, clone, show, recorder, objectFrame, array, grid, treeFromLevel, levelOrder, tree, listFromValues, listValues, list, map, stack, variables, table, render, parseArray, parseInteger, parseString, parts };
+  // Binary heap steps matching the judge's Heap helper; before(a, b) is true when a belongs above b.
+  function heapPush(items, value, before) {
+    items.push(value);
+    for (let i = items.length - 1; i > 0;) {
+      const parent = (i - 1) >> 1;
+      if (!before(items[i], items[parent])) break;
+      [items[parent], items[i]] = [items[i], items[parent]];
+      i = parent;
+    }
+  }
+  function heapPop(items, before) {
+    const top = items[0], last = items.pop();
+    if (items.length) {
+      items[0] = last;
+      for (let i = 0; ;) {
+        const left = 2 * i + 1, right = left + 1;
+        let best = i;
+        if (left < items.length && before(items[left], items[best])) best = left;
+        if (right < items.length && before(items[right], items[best])) best = right;
+        if (best === i) break;
+        [items[best], items[i]] = [items[i], items[best]];
+        i = best;
+      }
+    }
+    return top;
+  }
+
+  globalThis.StudyKit = { esc, tag, idOf, clone, show, recorder, objectFrame, array, grid, treeFromLevel, levelOrder, tree, listFromValues, listValues, list, map, stack, variables, table, render, parseArray, parseInteger, parseString, parts, heapPush, heapPop };
 })();
