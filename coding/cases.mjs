@@ -337,6 +337,21 @@ export function extraCase(n, seed) {
     case 1857:{const n=2+s%5;const colors=Array.from({length:n},(_,i)=>String.fromCharCode(97+(i*s)%3)).join('');const e=[];for(let i=1;i<n;i++)e.push([s%i,i]);if(s%4===0)e.push([n-1,0]);return [colors,e];}
     case 1553:return [s*s*s*97+s];
     case 1958:{const b=grid(8,8,(r,c)=>(r*s+c*3+s)%5===0?'B':(r+c*s)%7===0?'W':'.');const r=s%8,c=(s*3)%8;b[r][c]='.';return [b,r,c,s%2?'B':'W'];}
+    case 234:return [s%3===0?[...v,...v.slice().reverse()].map(x=>(x*s)%10):s%3===1?[...v,s%10,...v.slice().reverse()].map(x=>(x+s)%10):v.map(x=>(x*s+1)%10)];
+    case 203:return [s%7===0?[]:v.map(x=>1+(x*s)%4),1+s%4];
+    case 83:return [s%6===0?[]:v.flatMap(x=>Array(1+(x*s)%3).fill(x*3-s))];
+    case 876:return [v.map(x=>1+(x*s*7)%100)];
+    case 160:{const pa=seq(1+s%3,s+10),pb=seq((s*2)%4,s+20),t=s%4===0?[]:v.map(x=>x+s);const a=[...pa,...t],b=[...pb,...t];if(!b.length)b.push(99);return [a,b,t.length?pa.length:a.length,t.length?pb.length:b.length];}
+    case 2130:return [[...v,...v.map(x=>x+s)].map(x=>1+(x*s*37)%1000)];
+    case 1721:return [v.map(x=>(x*s*7)%50),1+s%len];
+    case 707:{const list=[["addAtHead",s%10],["addAtTail",s+1],["addAtIndex",1,s+2],["get",s%3],["addAtTail",7],["deleteAtIndex",s%4],["get",1],["addAtIndex",s%5,9],["get",s%4],["deleteAtIndex",0],["get",0],["addAtIndex",9,4]];return ops("MyLinkedList",[],list.slice(0,6+s%7));}
+    case 1472:{const u=k=>String.fromCharCode(97+(s+k)%26)+".com";const list=[["visit",u(1)],["visit",u(2)],["back",1+s%3],["visit",u(3)],["forward",1+s%2],["back",s%4+1],["forward",2],["visit",u(4)],["back",1],["forward",3]];return ops("BrowserHistory",[u(0)],list.slice(0,4+s%7));}
+    case 24:return [s%8===0?[]:v.map(x=>(x*s*7)%101)];
+    case 148:return [s%9===0?[]:v.concat(v).map(x=>(x*s*17)%61-30)];
+    case 86:return [s%9===0?[]:v.map(x=>(x*s*7)%21-10),s%7-3];
+    case 61:return [s%9===0?[]:v.map(x=>x*s%201-100),s%4===0?2e9-s:(s*3)%11];
+    case 147:return [v.map(x=>(x*s*13)%41-20)];
+    case 725:return [s%8===0?[]:v.concat(v.map(x=>x+len)).map(x=>(x*s)%1001),1+(s*3)%7];
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

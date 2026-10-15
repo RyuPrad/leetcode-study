@@ -6,7 +6,7 @@
 //   node scripts/new-problem.mjs <problem-module.mjs> [...more]
 // A module default-exports { number, title, topic, difficulty, visualizer, variables: [[name, meaning]],
 // why, statement, signature (Java notation, or signatureCode for design/codec), entry, kind,
-// parameters, methods?, reference, helpers? (judge-only code appended to the reference),
+// parameters, harnessOnly? (parameters left out of the starter), methods?, reference, helpers? (judge-only code appended to the reference),
 // examples: [input], cases (body of `case n:` in extraCase), solutions: { typescript, java, c } }.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,9 @@ const write = (name, text) => fs.writeFileSync(file(name), text);
 const todo = '    // Write your code here.\n    throw new Error("Not implemented");';
 
 export function starter(p) {
-  if (p.kind === 'function') return `function ${p.entry}(${p.parameters.join(', ')}) {\n  // Write your code here.\n  throw new Error("Not implemented");\n}\n`;
+  // harnessOnly parameters (such as 160's skipA and skipB) build the input but are not passed to the solution.
+  const parameters = p.parameters.filter(name => !(p.harnessOnly || []).includes(name));
+  if (p.kind === 'function') return `function ${p.entry}(${parameters.join(', ')}) {\n  // Write your code here.\n  throw new Error("Not implemented");\n}\n`;
   const members = Object.entries(p.methods).map(([name, params]) => name === 'constructor'
     ? `  constructor(${params.join(', ')}) {\n    // Write your code here.\n    \n  }`
     : `  ${name}(${params.join(', ')}) {\n${todo}\n  }`);

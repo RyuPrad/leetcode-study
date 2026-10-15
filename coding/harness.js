@@ -23,15 +23,15 @@ export function executeCase(number, input, entry, deserializeFn) {
   const fromTree = root => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
   const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448];
-  const lists = [19,25,92,143,206,2807];
-  const design = [146,155,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,895,901,933,981,1396,1603,1845,2013];
+  const lists = [19,24,25,61,83,86,92,143,147,148,203,206,234,725,876,1721,2130,2807];
+  const design = [146,155,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,707,895,901,933,981,1396,1472,1603,1845,2013];
   if (design.includes(number)) {
     // RandomizedSet draws from a fixed sequence so the reference result is reproducible.
     if (number === 380) { let seed = 42; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
     const [ops, args] = input, obj = new entry(...args[0]), result = [null];
     for (let i = 1; i < ops.length; i++) {
       const method=ops[i], value=obj[method](...args[i]);
-      const isVoid=number!==380&&['push','insert','addWord','addNum','postTweet','follow','unfollow','put','set','remove','unreserve'].includes(method) || method==='add'&&[705,2013].includes(number) || method==='pop'&&number===155;
+      const isVoid=number!==380&&['push','insert','addWord','addNum','postTweet','follow','unfollow','put','set','remove','unreserve','addAtHead','addAtTail','addAtIndex','deleteAtIndex','visit'].includes(method) || method==='add'&&[705,2013].includes(number) || method==='pop'&&number===155;
       result.push(isVoid || value===undefined ? null : clone(value));
     }
     return result;
@@ -63,6 +63,16 @@ export function executeCase(number, input, entry, deserializeFn) {
     return out.map(node => { if (node.random && !seen.has(node.random)) throw new Error('random must point into the copied list.'); return [node.val, node.random ? out.indexOf(node.random) : null]; });
   }
   if (number === 141) { const nodes = listNodes(input[0]); if (nodes.length && input[1] >= 0) nodes.at(-1).next = nodes[input[1]]; return entry(nodes[0] || null); }
+  // 160 joins list B's first skipB nodes to list A's node at skipA; the answer is that node itself.
+  if (number === 160) {
+    const [a, b, skipA, skipB] = input, nodesA = listNodes(a), nodesB = listNodes(b.slice(0, skipB)), shared = nodesA[skipA] || null;
+    if (nodesB.length) nodesB.at(-1).next = shared;
+    const chainB = [...nodesB, ...nodesA.slice(skipA)], result = entry(nodesA[0] || null, nodesB[0] || shared);
+    const intact = (chain, values) => chain.every((node, i) => node.val === values[i] && node.next === (chain[i + 1] || null));
+    if (!intact(nodesA, a) || !intact(chainB, b)) throw new Error('The lists must keep their original structure.');
+    if (result !== null && result !== shared) throw new Error('Return the first node shared by both lists.');
+    return result === null ? null : result.val;
+  }
   if (number === 374) { globalThis.guess = value => value === input[1] ? 0 : value < input[1] ? 1 : -1; return entry(input[0]); }
   if (number === 1095) { let calls = 0; const values = input[1]; return entry(input[0], Object.freeze({ length: () => values.length, get: i => { if (++calls > 100) throw new Error('MountainArray.get exceeded 100 calls.'); if (!Number.isInteger(i) || i < 0 || i >= values.length) throw new Error('MountainArray index out of range.'); return values[i]; } })); }
   const args = clone(input);
@@ -75,7 +85,8 @@ export function executeCase(number, input, entry, deserializeFn) {
   if (number === 23) args[0] = args[0].map(toList);
   if (number === 297) { const text = entry(args[0]); if (typeof text !== 'string') throw new Error('serialize must return a string.'); return fromTree(deserializeFn(text)); }
   const result = entry(...args);
-  if ([2,19,21,23,25,92,206,2807].includes(number)) return fromList(result);
+  if ([2,19,21,23,24,25,61,83,86,92,147,148,203,206,876,1721,2807].includes(number)) return fromList(result);
+  if (number === 725) { if (!Array.isArray(result)) throw new Error('Return an array of list heads.'); return result.map(fromList); }
   if (number === 143) return fromList(args[0]);
   if ([105,226,450,700,701,1325].includes(number)) return fromTree(result);
   if (number === 235) { if (!result || result !== findNode(args[0], result.val)) throw new Error('Return an ancestor node from the input tree.'); return result.val; }

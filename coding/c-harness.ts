@@ -107,6 +107,7 @@ static void study_out_list(struct ListNode* head) {
   for (; head; head = head->next) { if (!study_add(&seen, head) || count > 10000) study_fail("Output list contains a cycle or is too large."); STUDY_SEP(count); study_int(head->val); count++; }
   study_text("]");
 }
+static void study_lists(struct ListNode** p, int n) { study_check_array(p, n, "returnSize"); study_text("["); for (int i = 0; i < n; i++) { STUDY_SEP(i); study_out_list(p[i]); } study_text("]"); }
 static struct TreeNode* study_tree_node(int v) { struct TreeNode* n = (struct TreeNode*)malloc(sizeof *n); n->val = v; n->left = n->right = NULL; return n; }
 /* Level order with nulls, as in LeetCode: present[i] is false for null. */
 static struct TreeNode* study_tree(int n, const int* v, const bool* present) {
@@ -216,7 +217,7 @@ function write(type: string, expr: string, size = `${expr}Size`, cols = `${expr}
     if (base === 'String') return `study_str(${expr});`;
     return number === 190 ? `study_uint(${expr});` : `study_int(${expr});`;
   }
-  if (depth === 1) return { int: 'study_ints', long: 'study_longs', double: 'study_doubles', boolean: 'study_bools', char: 'study_chars', String: 'study_strs' }[base] + `(${expr}, ${size});`;
+  if (depth === 1) return { int: 'study_ints', long: 'study_longs', double: 'study_doubles', boolean: 'study_bools', char: 'study_chars', String: 'study_strs', ListNode: 'study_lists' }[base] + `(${expr}, ${size});`;
   return { int: 'study_ints2', char: 'study_chars2', String: 'study_strs2' }[base] + `(${expr}, ${size}, ${cols});`;
 }
 
@@ -240,6 +241,22 @@ function functionCase(problem: CodingProblem, m: Method, input: Json[]): string[
     lines.push(`struct ListNode* head = study_list(${values.length}, (const int[]){${values.join(',') || '0'}});`);
     if (values.length && pos >= 0) lines.push(`{ struct ListNode* target = head; for (int i = 0; i < ${pos}; i++) target = target->next; struct ListNode* tail = head; while (tail->next) tail = tail->next; tail->next = target; }`);
     return [...lines, 'clock_t start = clock();', `bool result = ${m.name}(head);`, 'double ms = study_ms(start);', 'study_bool(result);', 'study_finish("actual", ms);'];
+  }
+  if (n === 160) {
+    const [a, b, skipA, skipB] = input as [number[], number[], number, number];
+    return [
+      `int m = ${a.length}, skipA = ${skipA}, skipB = ${skipB}; const int a[] = {${a.join(',') || '0'}}; const int b[] = {${b.join(',') || '0'}};`,
+      'struct ListNode** nodes = (struct ListNode**)malloc(sizeof(void*) * (m + skipB + 1));',
+      'struct ListNode* headA = study_list(m, a); struct ListNode* p = headA; for (int i = 0; i < m; i++, p = p->next) nodes[i] = p;',
+      'struct ListNode* shared = skipA < m ? nodes[skipA] : NULL; struct ListNode* headB = study_list(skipB, b); p = headB;',
+      'for (int i = 0; i < skipB; i++, p = p->next) nodes[m + i] = p;',
+      'if (skipB) nodes[m + skipB - 1]->next = shared; else headB = shared;',
+      'clock_t start = clock();', 'struct ListNode* result = getIntersectionNode(headA, headB);', 'double ms = study_ms(start);',
+      'for (int i = 0; i < m; i++) if (nodes[i]->val != a[i] || nodes[i]->next != (i + 1 < m ? nodes[i + 1] : NULL)) study_fail("The lists must keep their original structure.");',
+      'for (int i = 0; i < skipB; i++) if (nodes[m + i]->val != b[i] || nodes[m + i]->next != (i + 1 < skipB ? nodes[m + i + 1] : shared)) study_fail("The lists must keep their original structure.");',
+      'if (result && result != shared) study_fail("Return the first node shared by both lists.");',
+      'if (result) study_int(result->val); else study_text("null");', 'study_finish("actual", ms);'
+    ];
   }
   if (n === 374) return [`study_pick = ${input[1]};`, 'clock_t start = clock();', `int result = guessNumber(${input[0]});`, 'double ms = study_ms(start);', 'study_int(result);', 'study_finish("actual", ms);'];
   if (n === 1095) {

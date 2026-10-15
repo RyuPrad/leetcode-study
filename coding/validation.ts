@@ -26,7 +26,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
         if(i && (method==='constructor' || !Object.hasOwn(problem.methods || {},method))) fail('Use a documented public operation.');
         if (!parameters || !array(args[i]) || args[i].length !== parameters.length) fail(`Invalid arguments for ${String(ops[i])}.`);
         if (!parameters) throw new Error('Unknown operation.');
-        for (let j=0;j<parameters.length;j++) { const p=parameters[j],v=args[i][j]; if (['word','prefix','str','key','value'].includes(p) && [208,211,981].includes(n)) { if (typeof v !== 'string' || !v.length || (n !== 981 && !/^[a-z.]+$/.test(v))) fail(`${p} must be a nonempty string (lowercase letters for tries; . is allowed only in WordDictionary.search).`); if (n===208 && v.includes('.') || n===211 && method==='addWord' && v.includes('.')) fail('Inserted words use lowercase letters.'); } else if (n===1396 && ['stationName','startStation','endStation'].includes(p)) { if (typeof v !== 'string' || !/^[A-Za-z]{1,10}$/.test(v)) fail(`${p} must be 1 to 10 letters.`); } else if (!['matrix','nums','point'].includes(p) && !integer(v)) fail(`${p} must be an integer.`); }
+        for (let j=0;j<parameters.length;j++) { const p=parameters[j],v=args[i][j]; if (['word','prefix','str','key','value'].includes(p) && [208,211,981].includes(n)) { if (typeof v !== 'string' || !v.length || (n !== 981 && !/^[a-z.]+$/.test(v))) fail(`${p} must be a nonempty string (lowercase letters for tries; . is allowed only in WordDictionary.search).`); if (n===208 && v.includes('.') || n===211 && method==='addWord' && v.includes('.')) fail('Inserted words use lowercase letters.'); } else if (n===1472 && ['homepage','url'].includes(p)) { if (typeof v !== 'string' || !/^[a-z.]{1,20}$/.test(v)) fail(`${p} must be 1 to 20 lowercase letters or dots.`); } else if (n===1396 && ['stationName','startStation','endStation'].includes(p)) { if (typeof v !== 'string' || !/^[A-Za-z]{1,10}$/.test(v)) fail(`${p} must be 1 to 10 letters.`); } else if (!['matrix','nums','point'].includes(p) && !integer(v)) fail(`${p} must be an integer.`); }
         if (!i && [146,622,703].includes(n) && args[0][0] < 1) fail('Capacity/k must be positive.');
         if (!i && n===460 && args[0][0]<0) fail('Capacity cannot be negative.');
         if (!i && n===304 && !matrix(args[0][0])) fail('matrix must be nonempty and rectangular.');
@@ -41,6 +41,8 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
         if (n===303 && i && (args[i][0]<0 || args[i][1]<args[i][0] || args[i][1]>=args[0][0].length)) fail('Require 0 <= left <= right < nums.length.');
         if (n===1603 && !i && args[0].some((x:any)=>x<0||x>1000)) fail('Space counts are in [0, 1000].');
         if (n===1603 && i && ![1,2,3].includes(args[i][0])) fail('carType is 1, 2 or 3.');
+        if (n===707 && i && args[i].some((x:any)=>!integer(x)||x<0||x>1000)) fail('Indexes and values are in [0, 1000].');
+        if (n===1472 && args[i].some((x:any)=>typeof x==='string' ? !/^[a-z.]{1,20}$/.test(x) : !integer(x)||x<1||x>100)) fail('URLs have 1 to 20 lowercase letters or dots; steps are in [1, 100].');
         if (n===352 && method==='addNum' && (args[i][0]<0 || args[i][0]>10000)) fail('value is in [0, 10000].');
         if (n===2013 && i && (!array(args[i][0]) || args[i][0].length!==2 || args[i][0].some((v:any)=>!integer(v)||v<0||v>1000))) fail('Points must have two integer coordinates in [0,1000].');
       }
@@ -254,6 +256,17 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===785 && (!a[0].length || a[0].length>100 || a[0].some((e:any,i:number)=>!Array.isArray(e)||e.some((x:any)=>x<0||x>=a[0].length||x===i)||new Set(e).size!==e.length||e.some((x:any)=>!a[0][x].includes(i))))) fail('graph is undirected: no self-loops or repeated neighbors, and j in graph[i] means i in graph[j].');
     if(n===2101 && (!a[0].length || a[0].length>100 || a[0].some((b:any)=>!Array.isArray(b)||b.length!==3||b.some((x:any)=>x<1||x>1e5)))) fail('bombs are 1 to 100 triples [x, y, r] with values in [1, 10^5].');
     if(n===1857 && (!/^[a-z]{1,100000}$/.test(a[0]) || a[1].some((e:any)=>!Array.isArray(e)||e.length!==2||e.some((x:any)=>x<0||x>=a[0].length)))) fail('colors is lowercase; edges are pairs of nodes in [0, n - 1].');
+    if([234,876,1721,2130,147].includes(n) && !a[0].length) fail('The list must be nonempty.');
+    if([234,203,83,876,2130,1721,24,148,86,61,147,725].includes(n) && a[0].length>5e4) fail('Lists have at most 5 × 10^4 nodes.');
+    if(n===234 && a[0].some((x:any)=>x<0||x>9)) fail('Node values are in [0, 9].');
+    if(n===203 && (a[0].some((x:any)=>x<1||x>50) || a[1]<0 || a[1]>50)) fail('Node values are in [1, 50] and val is in [0, 50].');
+    if(n===83 && (a[0].some((x:any)=>x<-100||x>100) || !sorted(a[0]))) fail('The list is sorted with values in [-100, 100].');
+    if(n===2130 && (a[0].length%2 || a[0].some((x:any)=>x<1||x>1e5))) fail('The list has an even number of nodes with values in [1, 10^5].');
+    if(n===1721 && (a[1]<1 || a[1]>a[0].length)) fail('k is between 1 and the list length.');
+    if(n===86 && (a[0].some((x:any)=>x<-100||x>100) || a[1]<-200 || a[1]>200)) fail('Node values are in [-100, 100] and x is in [-200, 200].');
+    if(n===61 && (a[1]<0 || a[1]>2e9)) fail('k is in [0, 2 × 10^9].');
+    if(n===725 && (a[1]<1 || a[1]>50)) fail('k is in [1, 50].');
+    if(n===160) { const [la, lb, sa, sb]=a; if (!la.length || !lb.length || !integer(sa) || !integer(sb) || sa<0 || sa>la.length || sb<0 || sb>lb.length || (sa===la.length)!==(sb===lb.length) || JSON.stringify(la.slice(sa))!==JSON.stringify(lb.slice(sb))) fail('listA and listB are nonempty; skipA and skipB mark where their shared tail starts (the tails must hold the same values), or both equal the list lengths for no intersection.'); }
     if(n===150){const stack:number[]=[];for(const token of a[0]){if(['+','-','*','/'].includes(token)){if(stack.length<2)fail('RPN needs two operands before each operator.');const y=stack.pop()!,x=stack.pop()!;if(token==='/'&&y===0)fail('Cannot divide by zero.');stack.push(token==='+'?x+y:token==='-'?x-y:token==='*'?x*y:Math.trunc(x/y));}else {if(!/^-?\d+$/.test(token))fail('RPN operands must be integers.');stack.push(Number(token));}}if(stack.length!==1)fail('RPN must leave exactly one result.');}
     if(n===394){let depth=0;for(let i=0;i<a[0].length;i++){const c=a[0][i];if(c==='['){if(!/\d/.test(a[0][i-1]||''))fail('A repeat count must precede [.');depth++;}else if(c===']'){if(--depth<0)fail('Unbalanced brackets.');}else if(!/[a-z0-9]/.test(c))fail('Use lowercase letters, digits, and brackets.');}if(depth)fail('Unbalanced brackets.');}
     return null;

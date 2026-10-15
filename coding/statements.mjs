@@ -21,6 +21,7 @@ export const statements = Object.fromEntries(`
 21|Merge two sorted linked lists into one sorted linked list and return its head.
 22|Return every balanced string containing n pairs of parentheses, without duplicates.
 23|Merge all sorted linked lists in lists into one sorted linked list.
+24|Swap every two adjacent nodes of the linked list by relinking nodes (not by changing values), and return the head.
 25|Reverse the nodes of a linked list in consecutive groups of k. Leave the final group unchanged if it has fewer than k nodes.
 26|Remove duplicates from sorted nums in place. Return k, the number of distinct values, and put those values in the first k positions in sorted order.
 27|Remove every occurrence of val from nums in place. Return the number k of retained values and put them in the first k positions. Their order may vary.
@@ -49,6 +50,7 @@ export const statements = Object.fromEntries(`
 57|Insert newInterval into sorted, disjoint closed intervals, merging any overlaps. Return the result sorted by start.
 58|s contains English letters and spaces and has at least one word. Return the length of its last word.
 59|Return an n × n matrix filled with the numbers 1 to n² in clockwise spiral order, starting at the top-left corner.
+61|Rotate the linked list to the right by k places and return the new head.
 62|Count paths from the top-left to the bottom-right of an m by n grid, moving only right or down.
 63|Count right/down paths through a grid where 1 is blocked and 0 is open, from top-left to bottom-right.
 64|Return the minimum sum along a top-left to bottom-right path through a nonnegative grid, moving only right or down.
@@ -68,7 +70,9 @@ export const statements = Object.fromEntries(`
 79|Return whether word can be formed by a path through horizontally or vertically adjacent board cells without reusing a cell.
 80|nums is sorted. Remove extra copies in place so each value appears at most twice, keeping sorted order. Return k, the kept count; the first k positions hold the result.
 81|Return whether target occurs in a rotated sorted array that may contain duplicates.
+83|Delete all duplicates from a sorted linked list so that each value appears once, and return the sorted list.
 84|Return the greatest rectangle area under adjacent histogram bars of width one.
+86|Rearrange the linked list so that all nodes less than x come before nodes greater than or equal to x, preserving the original relative order within each part. Return the head.
 88|Merge the first m sorted values of nums1 and the n sorted values of nums2 into nums1 in place. nums1 has m+n slots.
 90|Return every distinct subset of nums, including the empty subset. Input values may repeat.
 91|Count decodings of a digit string under 1=A through 26=Z. Codes cannot start with zero.
@@ -105,11 +109,14 @@ export const statements = Object.fromEntries(`
 144|Return binary tree values in preorder: node, left subtree, right subtree.
 145|Return binary tree values in postorder: left subtree, right subtree, node.
 146|Implement LRUCache(capacity), get(key), and put(key,value). get returns -1 for a missing key. Both reads and writes make a key most recently used. When full, evict the least recently used key.
+147|Sort a singly linked list with insertion sort and return the sorted head.
+148|Sort the linked list in ascending order and return its head, in O(n log n) time.
 149|Given distinct points on a plane, return the maximum number of points that lie on the same straight line.
 150|Evaluate valid reverse Polish notation using integer operands and +, -, *, /. Division truncates toward zero.
 152|Return the largest product of a nonempty contiguous subarray.
 153|Return the minimum value in a rotated sorted array of distinct integers.
 155|Implement a stack with push(val), pop(), top(), and getMin(). pop removes without returning a value; getMin returns the current minimum. Read/pop operations are called only on a nonempty stack.
+160|Return the node at which two singly linked lists intersect, or null if they do not. Cases give listA, listB, and skipA and skipB: list B joins list A at node skipA after its first skipB nodes (equal to the list lengths when there is no intersection). The lists must keep their structure.
 162|Return the index of any peak element: a value strictly greater than its neighbors, where positions outside the array count as negative infinity.
 167|In a sorted array, find the unique two values summing to target. Return their increasing one-based indices.
 168|Convert a positive integer into its Excel column name, where 1=A, 26=Z, and 27=AA.
@@ -124,6 +131,7 @@ export const statements = Object.fromEntries(`
 200|Count islands of 1 cells in a rectangular character grid. Land connects horizontally or vertically; 0 is water.
 201|Return the bitwise AND of every integer in the inclusive range [left,right].
 202|Repeatedly replace n with the sum of the squares of its decimal digits. Return whether this eventually reaches 1.
+203|Remove every node of the linked list whose value equals val, and return the new head.
 205|s and t have the same length. Return whether the characters of s can be replaced to get t, mapping each character to exactly one character and no two characters to the same one.
 206|Reverse a singly linked list and return its new head.
 207|For each [course,prerequisite] pair, the prerequisite must come first. Return whether all numCourses courses can be finished.
@@ -142,6 +150,7 @@ export const statements = Object.fromEntries(`
 229|Return every value occurring more than floor(n/3) times, without duplicates.
 230|Return the kth smallest value, counting from one, in a binary search tree with distinct values.
 232|Implement a first-in-first-out queue using stacks. push(x) adds; pop removes and returns the front; peek reads it; empty returns a boolean.
+234|Return true if the values of the singly linked list read the same forwards and backwards.
 235|Return the lowest node in the BST whose subtree contains both p and q, allowing either node to be its own ancestor. The case uses node values; your function receives node objects.
 238|Return an array where each position is the product of every input value except the value at that position.
 239|Return the maximum value of every consecutive window of length k, from left to right.
@@ -239,8 +248,10 @@ export const statements = Object.fromEntries(`
 704|Find target in a strictly increasing integer array. Return its index or -1.
 705|Implement MyHashSet with add(key), remove(key), and contains(key). Adding a present key or removing an absent key has no extra effect.
 706|Implement MyHashMap with put(key,value), get(key), and remove(key). Missing keys return -1; putting an existing key replaces its value.
+707|Implement MyLinkedList with get(index) (the value at index, or -1 if invalid), addAtHead(val), addAtTail(val), addAtIndex(index, val) (ignored if index > length) and deleteAtIndex(index) (ignored if invalid).
 721|Merge accounts sharing email addresses, including transitive matches. Matching accounts have the same name. Return each name followed by its unique sorted emails; account order may vary.
 724|Return the leftmost index where the sum of the values strictly to its left equals the sum strictly to its right, or -1 if there is none.
+725|Split the linked list into k consecutive parts whose sizes differ by at most one, with earlier parts never smaller than later ones. Return the k part heads (null for empty parts).
 735|Asteroids move along a line: positive rightward, negative leftward, absolute value is size. Colliding smaller asteroids disappear; equal sizes both disappear. Return survivors in original order.
 739|For each day's temperature, return days until a strictly warmer temperature, or zero when none follows.
 740|Pick nums[i] to earn nums[i] points; every element equal to nums[i] - 1 or nums[i] + 1 is then deleted. Return the maximum number of points you can earn.
@@ -260,6 +271,7 @@ export const statements = Object.fromEntries(`
 860|Lemonade costs 5. Process bills of 5, 10, or 20 in order starting with no cash. Return whether exact change can be given to everyone.
 867|Return the transpose of matrix, exchanging rows and columns.
 875|Koko eats from one pile each hour at a fixed positive integer speed. Return the smallest speed that finishes all piles within h hours.
+876|Return the middle node of a singly linked list; if there are two middle nodes, return the second one.
 877|Two optimal players take a whole pile from either end of an even-length row. The positive pile total is odd. Return whether the first player wins.
 879|n members can commit crimes; crime i needs group[i] members and earns profit[i], and a member can join only one crime. Count the subsets of crimes with total profit at least minProfit using at most n members, modulo 10^9 + 7.
 881|Each boat carries at most two people with combined weight at most limit. Every person fits alone. Return the fewest boats needed.
@@ -323,6 +335,7 @@ export const statements = Object.fromEntries(`
 1462|Prerequisite pairs [a,b] mean course a precedes b. For each query [u,v], return whether u is a direct or indirect prerequisite of v. The graph is acyclic.
 1466|n cities are joined by n - 1 one-way roads that form a tree when directions are ignored. Return the minimum number of roads to reverse so that every city can reach city 0.
 1470|Given nums = [x1, x2, ..., xn, y1, y2, ..., yn], return [x1, y1, x2, y2, ..., xn, yn].
+1472|Implement BrowserHistory(homepage) with visit(url), which clears forward history, back(steps) and forward(steps), which move at most steps pages and return the current URL.
 1489|For a connected weighted graph, return [critical,pseudoCritical] edge-index arrays. Critical edges appear in every minimum spanning tree; pseudo-critical edges appear in some but not every minimum spanning tree.
 1498|Count the nonempty subsequences of nums whose minimum plus maximum is at most target. Return the count modulo 1000000007.
 1514|Given an undirected graph where edge i succeeds with probability succProb[i], return the maximum probability of a path from start_node to end_node, or 0 if there is none.
@@ -340,6 +353,7 @@ export const statements = Object.fromEntries(`
 1647|A string is good when no two different letters have the same frequency. Return the minimum number of characters to delete from s to make it good.
 1658|Each operation removes the leftmost or rightmost element of nums and subtracts it from x. Return the minimum number of operations to reduce x exactly to 0, or -1 if impossible.
 1675|You may double any odd element (once it becomes even it can only be halved) and halve any even element, any number of times. Return the minimum possible difference between the maximum and minimum element.
+1721|Swap the values of the kth node from the beginning and the kth node from the end (1-indexed), and return the head.
 1768|Merge word1 and word2 by alternating characters starting with word1, appending any remainder at the end.
 1799|nums has 2n positive integers. In the i-th operation (1-indexed) choose two remaining numbers x and y, earn i × gcd(x, y) and remove both. Return the maximum total score after n operations.
 1822|Return 1 if the product of nums is positive, -1 if it is negative, and 0 if it is zero.
@@ -375,6 +389,7 @@ export const statements = Object.fromEntries(`
 2017|Two robots cross a 2 × n grid from top-left to bottom-right, moving only right or down. The first collects and zeroes its path; then the second collects what remains. The first robot minimizes the second robot's total, the second maximizes it. Return the second robot's total.
 2028|You observed m dice rolls; n more are missing. The mean of all n + m rolls is mean. Return any n values from 1 to 6 for the missing rolls, or an empty array if none exist.
 2101|Detonating a bomb detonates every bomb within its circular range, which may continue the chain. You may detonate one bomb. Return the maximum number of bombs that can be detonated.
+2130|In a linked list of even length n, node i and node n - 1 - i are twins. Return the maximum sum of a node and its twin.
 2140|Questions are processed in order. Solving question i earns points[i] but you must skip the next brainpower[i] questions; you may also skip any question. Return the maximum points you can earn.
 2215|Return [answer1, answer2]: the distinct values of nums1 not in nums2, and the distinct values of nums2 not in nums1. Values within each list may be in any order.
 2218|Each move takes the top coin of any pile. Return the maximum total value of exactly k coins.

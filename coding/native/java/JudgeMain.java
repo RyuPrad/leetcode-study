@@ -185,6 +185,20 @@ public final class JudgeMain {
                 if (!nodes.isEmpty() && pos >= 0) field(nodes.get(nodes.size() - 1), "next", nodes.get(pos));
                 return method.invoke(solution, nodes.isEmpty() ? null : nodes.get(0));
             }
+            case 160: {
+                List<Object> a = asList(input.get(0)), b = asList(input.get(1));
+                int skipA = toInt(input.get(2)), skipB = toInt(input.get(3));
+                List<Object> nodesA = listNodes(a), nodesB = listNodes(b.subList(0, skipB));
+                Object shared = skipA < nodesA.size() ? nodesA.get(skipA) : null;
+                if (!nodesB.isEmpty()) field(nodesB.get(nodesB.size() - 1), "next", shared);
+                Object result = method.invoke(solution, nodesA.isEmpty() ? null : nodesA.get(0), nodesB.isEmpty() ? shared : nodesB.get(0));
+                for (int i = 0; i < nodesA.size(); i++)
+                    if (toInt(field(nodesA.get(i), "val")) != toInt(a.get(i)) || field(nodesA.get(i), "next") != (i + 1 < nodesA.size() ? nodesA.get(i + 1) : null)) throw new HarnessException("The lists must keep their original structure.");
+                for (int i = 0; i < nodesB.size(); i++)
+                    if (toInt(field(nodesB.get(i), "val")) != toInt(b.get(i)) || field(nodesB.get(i), "next") != (i + 1 < nodesB.size() ? nodesB.get(i + 1) : shared)) throw new HarnessException("The lists must keep their original structure.");
+                if (result != null && result != shared) throw new HarnessException("Return the first node shared by both lists.");
+                return result == null ? null : field(result, "val");
+            }
             case 374: {
                 Class<?> game = loader.loadClass("GuessGame");
                 Field pick = game.getDeclaredField("pick"); pick.setAccessible(true); pick.setInt(null, ((Number) input.get(1)).intValue());
@@ -297,8 +311,11 @@ public final class JudgeMain {
         if (value == null || value instanceof String || value instanceof Boolean || value instanceof Number) return value;
         if (value instanceof Character ch) return String.valueOf(ch);
         if (value.getClass().isArray()) {
+            // Elements of a ListNode[] or TreeNode[] are written as lists even when null, as in the other judges.
+            Class<?> component = value.getClass().getComponentType();
+            Class<?> nodes = component.getSimpleName().equals("ListNode") || component.getSimpleName().equals("TreeNode") ? component : null;
             List<Object> out = new ArrayList<>();
-            for (int i = 0; i < Array.getLength(value); i++) out.add(encode(Array.get(value, i), null));
+            for (int i = 0; i < Array.getLength(value); i++) out.add(encode(Array.get(value, i), nodes));
             return out;
         }
         if (value instanceof Collection<?> items) { List<Object> out = new ArrayList<>(); for (Object item : items) out.add(encode(item, null)); return out; }
