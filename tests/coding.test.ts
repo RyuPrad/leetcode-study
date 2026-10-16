@@ -17,7 +17,8 @@ test('every catalog problem has a complete coding definition, working reference,
   for(const p of problems){
     assert.ok(p.description.length>30&&p.constraints.length>=3&&p.starter.length>30,p.id);
     assert.ok(p.examples.length>0&&p.tests.length>=10,p.id);
-    if(![22,51,52].includes(p.number))assert.ok(new Set(p.tests.map(t=>JSON.stringify(t.input))).size>=10,`${p.id}: at least 10 distinct additional cases`);
+    // These take one small n, so fewer than ten distinct inputs exist (95 allows only n = 1 to 8).
+    if(![22,51,52,95].includes(p.number))assert.ok(new Set(p.tests.map(t=>JSON.stringify(t.input))).size>=10,`${p.id}: at least 10 distinct additional cases`);
     for(const t of [...p.examples,...p.tests]){
       assert.equal(validateInput(p,t.input),null,`${p.id} ${t.name}`);
       const result=evaluate(vm,p,p.reference,t.input);

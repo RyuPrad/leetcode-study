@@ -3,6 +3,13 @@ const key = (v: unknown) => JSON.stringify(v);
 const sorted = (v: unknown[]) => v.map(key).sort();
 const eq = (a: unknown, b: unknown) => key(a) === key(b);
 const bag = (a: unknown[], b: unknown[]) => eq(sorted(a), sorted(b));
+/** A level-order array as linked nodes, or undefined when values have no parent. */
+function levelTree(values: any[]): any {
+  if (!values.length || values[0] === null) return null;
+  const root: any = { val: values[0], left: null, right: null }, queue = [root]; let i = 1;
+  for (let q = 0; q < queue.length && i < values.length; q++) for (const side of ['left', 'right']) { if (i < values.length && values[i] !== null) { queue[q][side] = { val: values[i], left: null, right: null }; queue.push(queue[q][side]); } i++; }
+  return i >= values.length ? root : undefined;
+}
 export function accepts(problem: CodingProblem, input: Json[], actual: any, expected: any): boolean {
   const n = problem.number, a = input as any[];
   if ([4,50,399,295,837,1396,1514].includes(n)) {
@@ -15,7 +22,14 @@ export function accepts(problem: CodingProblem, input: Json[], actual: any, expe
   if (n === 27) return actual && actual.length === expected.length && Array.isArray(actual.values) && bag(actual.values, expected.values);
   if ([15,18,39,40,77,78,90].includes(n)) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
   if (n === 49) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(sorted), expected.map(sorted));
-  if ([17,22,46,47,51,93,131,140,187,212,229,310,347,417,472,1557].includes(n)) return Array.isArray(actual) && bag(actual, expected);
+  // Any height-balanced BST whose in-order values are nums is accepted.
+  if (n === 108) {
+    if (!Array.isArray(actual) || actual.some((v: any) => v !== null && !Number.isInteger(v))) return false;
+    const root = levelTree(actual), order: number[] = [];
+    const height = (t: any): number => { if (!t) return 0; const l = height(t.left); order.push(t.val); const r = height(t.right); return l < 0 || r < 0 || Math.abs(l - r) > 1 ? -1 : 1 + Math.max(l, r); };
+    return root !== undefined && height(root) >= 0 && eq(order, a[0]);
+  }
+  if ([17,22,46,47,51,93,95,131,140,187,212,229,310,347,417,472,652,894,1557].includes(n)) return Array.isArray(actual) && bag(actual, expected);
   if (n === 1489) return Array.isArray(actual) && actual.length === 2 && actual.every(Array.isArray) && bag(actual[0],expected[0]) && bag(actual[1],expected[1]);
   if (n === 721) return Array.isArray(actual) && actual.every(Array.isArray) && bag(actual.map(row => [row[0], ...row.slice(1).sort()]), expected.map((row: any[]) => [row[0], ...row.slice(1).sort()]));
   if (n === 133) return Array.isArray(actual) && actual.every(Array.isArray) && actual.length === expected.length && actual.every((row,i) => bag(row, expected[i]));

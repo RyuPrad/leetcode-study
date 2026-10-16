@@ -18,7 +18,7 @@ const numbers = new Set(args.filter(a => /^\d+$/.test(a)).map(Number));
 const options = { toolchains: path.join(ROOT, 'toolchains'), native: path.join(ROOT, 'dist/native'), tempRoot: os.tmpdir() };
 const expected = [
   /^Error: The solution did not return a value\.$/, /must return a string/, /Return an ancestor node/, /Invalid quad tree/,
-  /Set \*returnSize/, /Set \*returnColumnSizes/, /^java\.lang\.NullPointerException/, /random must point|Invalid output list/
+  /Set \*returnSize/, /Set \*returnColumnSizes/, /^java\.lang\.NullPointerException/, /random must point|Invalid output list/, /Return the root of the input tree/
 ];
 
 const outcomes = new Map<string, number[]>();

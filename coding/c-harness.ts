@@ -21,6 +21,7 @@ struct TreeNode { int val; struct TreeNode *left; struct TreeNode *right; };
 const NODES: Record<number, string> = {
   133: 'struct Node { int val; int numNeighbors; struct Node** neighbors; };\n',
   138: 'struct Node { int val; struct Node *next; struct Node *random; };\n',
+  116: 'struct Node { int val; struct Node *left; struct Node *right; struct Node *next; };\n',
   427: 'struct Node { bool val; bool isLeaf; struct Node *topLeft; struct Node *topRight; struct Node *bottomLeft; struct Node *bottomRight; };\n'
 };
 const API: Record<number, string> = {
@@ -121,14 +122,15 @@ static struct TreeNode* study_tree(int n, const int* v, const bool* present) {
   }
   free(queue); return root;
 }
-static void study_out_tree(struct TreeNode* root) {
+/* shared allows one subtree to appear more than once (894 builds trees from shared subtrees). */
+static void study_out_tree_from(struct TreeNode* root, bool shared) {
   int cap = 64, size = 0, head = 0, emitted = 0, pending = 0; struct TreeNode** queue = (struct TreeNode**)malloc(sizeof(void*) * cap); StudySet seen = { 0 };
   queue[size++] = root; study_text("[");
   for (; head < size; head++) {
     struct TreeNode* node = queue[head];
     /* Trailing nulls are trimmed, so nulls are only written once a value follows them. */
     if (!node) { pending++; continue; }
-    if (!study_add(&seen, node) || size > 20000) study_fail("Output tree contains a cycle, shared node, or is too large.");
+    if ((!shared && !study_add(&seen, node)) || size > 20000) study_fail("Output tree contains a cycle, shared node, or is too large.");
     for (; pending; pending--) { STUDY_SEP(emitted); study_text("null"); emitted++; }
     STUDY_SEP(emitted); study_int(node->val); emitted++;
     if (size + 2 > cap) { cap *= 2; queue = (struct TreeNode**)realloc(queue, sizeof(void*) * cap); }
@@ -136,6 +138,8 @@ static void study_out_tree(struct TreeNode* root) {
   }
   study_text("]"); free(queue);
 }
+static void study_out_tree(struct TreeNode* root) { study_out_tree_from(root, false); }
+static void study_trees(struct TreeNode** p, int n, bool shared) { study_check_array(p, n, "returnSize"); study_text("["); for (int i = 0; i < n; i++) { STUDY_SEP(i); study_out_tree_from(p[i], shared); } study_text("]"); }
 static struct TreeNode* study_find(struct TreeNode* node, int val) {
   if (!node) return NULL; if (node->val == val) return node;
   struct TreeNode* left = study_find(node->left, val); return left ? left : study_find(node->right, val);
@@ -217,6 +221,7 @@ function write(type: string, expr: string, size = `${expr}Size`, cols = `${expr}
     if (base === 'String') return `study_str(${expr});`;
     return number === 190 ? `study_uint(${expr});` : `study_int(${expr});`;
   }
+  if (depth === 1 && base === 'TreeNode') return `study_trees(${expr}, ${size}, ${number === 894 ? 'true' : 'false'});`;
   if (depth === 1) return { int: 'study_ints', long: 'study_longs', double: 'study_doubles', boolean: 'study_bools', char: 'study_chars', String: 'study_strs', ListNode: 'study_lists' }[base] + `(${expr}, ${size});`;
   return { int: 'study_ints2', char: 'study_chars2', String: 'study_strs2' }[base] + `(${expr}, ${size}, ${cols});`;
 }
@@ -241,6 +246,21 @@ function functionCase(problem: CodingProblem, m: Method, input: Json[]): string[
     lines.push(`struct ListNode* head = study_list(${values.length}, (const int[]){${values.join(',') || '0'}});`);
     if (values.length && pos >= 0) lines.push(`{ struct ListNode* target = head; for (int i = 0; i < ${pos}; i++) target = target->next; struct ListNode* tail = head; while (tail->next) tail = tail->next; tail->next = target; }`);
     return [...lines, 'clock_t start = clock();', `bool result = ${m.name}(head);`, 'double ms = study_ms(start);', 'study_bool(result);', 'study_finish("actual", ms);'];
+  }
+  if (n === 116) {
+    const values = input[0] as number[];
+    return [
+      `int count = ${values.length}; const int values[] = {${values.join(',') || '0'}};`,
+      'struct Node** nodes = (struct Node**)malloc(sizeof(void*) * (count ? count : 1));',
+      'for (int i = 0; i < count; i++) { nodes[i] = (struct Node*)malloc(sizeof(struct Node)); nodes[i]->val = values[i]; nodes[i]->next = NULL; }',
+      'for (int i = 0; i < count; i++) { nodes[i]->left = 2 * i + 1 < count ? nodes[2 * i + 1] : NULL; nodes[i]->right = 2 * i + 2 < count ? nodes[2 * i + 2] : NULL; }',
+      'clock_t start = clock();', 'struct Node* root = connect(count ? nodes[0] : NULL);', 'double ms = study_ms(start);',
+      'if (root != (count ? nodes[0] : NULL)) study_fail("Return the root of the input tree.");',
+      'for (int i = 0; i < count; i++) if (nodes[i]->val != values[i] || nodes[i]->left != (2 * i + 1 < count ? nodes[2 * i + 1] : NULL) || nodes[i]->right != (2 * i + 2 < count ? nodes[2 * i + 2] : NULL)) study_fail("The tree must keep its structure.");',
+      'int emitted = 0; study_text("[");',
+      'for (int first = 0; first < count; first = 2 * first + 1) { int seen = 0; for (struct Node* node = nodes[first]; node; node = node->next) { if (++seen > count) study_fail("next pointers form a cycle."); STUDY_SEP(emitted); study_int(node->val); emitted++; } STUDY_SEP(emitted); study_text("\\"#\\""); emitted++; }',
+      'study_text("]");', 'study_finish("actual", ms);'
+    ];
   }
   if (n === 160) {
     const [a, b, skipA, skipB] = input as [number[], number[], number, number];

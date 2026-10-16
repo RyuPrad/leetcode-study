@@ -352,6 +352,30 @@ export function extraCase(n, seed) {
     case 61:return [s%9===0?[]:v.map(x=>x*s%201-100),s%4===0?2e9-s:(s*3)%11];
     case 147:return [v.map(x=>(x*s*13)%41-20)];
     case 725:return [s%8===0?[]:v.concat(v.map(x=>x+len)).map(x=>(x*s)%1001),1+(s*3)%7];
+    case 116:return [seq([0,1,3,7,15][s%5]).map(x=>(x*s)%50-25)];
+    case 108:return [seq(len+s%5).map(x=>x*3-s)];
+    case 617:{const a=tree.map(x=>(x*s)%13),b=tree.map(x=>(x+s)%11);if(s%2)a[4]=null,a[5]=null;if(s%3===0)b[3]=null;if(s%3===1)b.length=3;return [s%7===0?[]:a,b];}
+    case 112:{const t=tree.map(x=>x-s+((x*s)%7)-3);if(s%2)t[4]=null;if(s%3===0)t[6]=null;return [s%5===0?[]:t,s%4===0?999:t[0]+t[2]+t[5]];}
+    case 606:{const t=tree.map(x=>(x*s)%21-10);if(s%2)t[3]=null;if(s%3===0)t[5]=null;if(s%4===1)t[2]=null,t.length=5;return [t];}
+    case 783:{const t=tree.map(x=>x*(1+s%5)+s);if(s%2)t[3]=null;if(s%3===0)t[6]=null;return [t];}
+    case 101:{const x=s%5,y=s%7;return [s%3===0?[1,2,2,x,y,y,x]:s%3===1?[s,1+s%4,1+s%4,null,x,x]:[s,x,x+(s%2),y,null,null,y]];}
+    case 103:{const t=tree.map(x=>(x*s)%31);if(s%2)t[3]=null;if(s%3===0)t.push(s,null,s+1);return [s%8===0?[]:t];}
+    case 958:{const t=seq(2+(s*5)%9);if(s%3===1)t[Math.min(t.length-2,1+s%4)]=null;return [t];}
+    case 662:{const t=tree.map(x=>(x*s)%17);if(s%2)t[3]=null;if(s%3!==1)t[6]=null;if(s%4===0)t.push(null,s,s+1,null,null,null,s+2);return [t];}
+    case 1376:{const n=len+2;const m=Array.from({length:n},(_,i)=>i?(i*s+3)%i:-1);const boss=new Set(m);return [n,0,m,m.map((_,i)=>boss.has(i)?1+(i*s)%7:0)];}
+    case 96:return [1+(s*7)%19];
+    case 95:return [1+(s*3)%8];
+    case 129:{const t=tree.map(x=>(x*s)%10);if(s%2)t[4]=null;if(s%3===0)t.push(s%10,null,(s+3)%10);return [t];}
+    case 951:{const a=tree.slice();const b=s%3===2?[a[0],a[1],a[2],a[3],a[4],a[5],a[6]]:[a[0],a[2],a[1],a[6],a[5],a[4],a[3]];if(s%4===0)b[3]=a[0]+100;if(s%5===0)a.length=3,b.length=3;return [a,b];}
+    case 1993:{const n=len+3;const parent=Array.from({length:n},(_,i)=>i?(i*s+1)%i:-1);const list=[["lock",n-1,1+s%3],["unlock",n-1,2],["lock",(s+1)%n,4],["upgrade",0,5],["lock",n-2,7],["upgrade",(n-1)%2,3],["unlock",(s+1)%n,4],["upgrade",0,9],["lock",0,1]];return ops("LockingTree",[parent],list.slice(0,4+s%6));}
+    case 513:{const t=tree.map(x=>(x*s)%23);if(s%2)t[3]=null;if(s%3===0)t.push(null,null,s+1);return [t];}
+    case 669:{const t=tree.map(x=>x*2);if(s%2)t[3]=null;return [t,2*s+1+(s%3),2*s+11-(s%4)];}
+    case 173:{const t=tree.map(x=>x*(1+s%4));if(s%2)t[3]=null;const count=t.filter(x=>x!==null).length;const list=[];for(let k=0;k<count;k++){if((k+s)%2)list.push(["hasNext"]);list.push(["next"]);}list.push(["hasNext"]);return ops("BSTIterator",[t],list.slice(0,5+s%9));}
+    case 538:{const t=tree.map(x=>x*(1+s%3)-s);if(s%2)t[3]=null;if(s%3===0)t[6]=null;return [s%7===0?[]:t];}
+    case 894:return [[1,3,5,7,9,11,2,4,6,8,10,13][s%12]];
+    case 106:{const t=tree.map(x=>x*(2+s%3)-s);if(s%2)t[4]=null;if(s%3===0)t.length=4;const nodes=[];let root=null;{const q=[];let i=0;const mk=x=>x===null?null:{v:x,l:null,r:null};root=mk(t[i++]);q.push(root);while(q.length&&i<t.length){const p=q.shift();for(const k of ["l","r"]){if(i<t.length){const c=mk(t[i++]);if(c){p[k]=c;q.push(c);}}}}}const ino=[],post=[];const go=n=>{if(!n)return;go(n.l);ino.push(n.v);go(n.r);};const gp=n=>{if(!n)return;gp(n.l);gp(n.r);post.push(n.v);};go(root);gp(root);return [ino,post];}
+    case 652:{const t=tree.map(x=>((x+s)*(s%4+1))%(2+s%3));if(s%2)t[3]=null;if(s%3===0)t.push(t[1],t[2]);if(s%4===1)t.push(null,s%3);return [t];}
+    case 1443:{const n=len+2+s%3;return [n,seq(n-1).map(i=>s%2?[(i*s*7+s+3)%i,i]:[i,(i*s*7+s+3)%i]),Array.from({length:n},(_,i)=>((i+1)*(s*3+1))%5<2)];}
     default:throw new Error(`Missing authored cases for ${n}`);
   }
 }

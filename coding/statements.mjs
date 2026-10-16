@@ -79,14 +79,22 @@ export const statements = Object.fromEntries(`
 92|Reverse the nodes between the one-based positions left and right, inclusive, and return the list head.
 93|Return every valid IP address that can be formed by inserting three dots into the digit string s, in any order. Each of the four parts is 0 to 255 with no leading zeros.
 94|Return the binary tree values in inorder: left subtree, node, right subtree.
+95|Return all structurally unique binary search trees that store exactly the values 1 to n, in any order.
+96|Return the number of structurally unique binary search trees that store exactly the values 1 to n.
 97|Return whether s3 can be formed by interleaving s1 and s2 while preserving the order within each input string.
 98|Return whether a binary tree is a strict binary search tree: every left descendant is smaller, and every right descendant is larger.
 100|Return whether two binary trees have identical structure and values.
+101|Return true if the binary tree is a mirror of itself (symmetric around its center).
 102|Return the binary tree values grouped by depth, from root level downward and left to right within each level.
+103|Return the zigzag level order traversal of the tree: left to right on the first level, right to left on the next, alternating.
 104|Return the number of nodes on the longest path from the root to a leaf. An empty tree has depth zero.
 105|Reconstruct a binary tree from its preorder and inorder traversals, which contain the same distinct values. Return its root.
+106|Given the inorder and postorder traversals of a binary tree with distinct values, build and return the tree.
+108|Convert a strictly increasing array into a height-balanced binary search tree (any valid answer is accepted).
 110|Return whether every node has left and right subtree heights differing by at most one.
+112|Return true if the tree has a root-to-leaf path whose node values add up to targetSum.
 115|Count distinct subsequences of s equal to t. A subsequence preserves order but may skip characters.
+116|In a perfect binary tree, set each node's next pointer to the node on its right in the same level (null at the end of a level). Cases give the tree in level order; the output lists each level by following next, ending each level with "#".
 118|Return the first numRows rows of Pascal's triangle, where each number is the sum of the two numbers directly above it.
 120|Return the minimum path sum from the top of the triangle to the bottom, moving at each step to an adjacent number in the row below (index c or c + 1).
 121|Return the maximum profit from one buy followed by one sell on a later day. Return zero when no profit is possible.
@@ -95,6 +103,7 @@ export const statements = Object.fromEntries(`
 125|Return whether s is a palindrome after ignoring nonalphanumeric characters and letter case.
 127|Return the number of words in a shortest transformation from beginWord to endWord, changing one letter at a time. Every word after beginWord must be in wordList. Return zero if impossible.
 128|Return the length of the longest consecutive integer sequence present in nums, regardless of input order.
+129|Each root-to-leaf path of digits forms a number. Return the sum of all these numbers.
 130|Change every region of O cells completely enclosed by X cells into X in place. Horizontal or vertical connection to a border keeps a region open.
 131|Return every partition of s into substrings that are all palindromes. Preserve substring order within a partition.
 133|Return a deep copy of an undirected connected graph. Node values are 1 through n; each node has val and neighbors. No returned node may be an original node.
@@ -121,6 +130,7 @@ export const statements = Object.fromEntries(`
 167|In a sorted array, find the unique two values summing to target. Return their increasing one-based indices.
 168|Convert a positive integer into its Excel column name, where 1=A, 26=Z, and 27=AA.
 169|Return the value occurring more than floor(n/2) times. Such a value is guaranteed to exist.
+173|Implement BSTIterator(root) over the in-order traversal of a binary search tree, with next() returning the next smallest value and hasNext() telling whether one remains.
 179|Arrange the nonnegative integers in nums to form the largest number and return it as a string (without leading zeros).
 187|Return every 10-letter sequence that occurs more than once in the DNA string s, in any order.
 189|Rotate nums to the right by k positions in place.
@@ -216,10 +226,12 @@ export const statements = Object.fromEntries(`
 494|Assign plus or minus to every nums value. Count assignments whose resulting sum is target.
 496|nums1 is a subset of the distinct values in nums2. For each value in nums1, return the first greater value to its right in nums2, or -1 if none exists.
 502|Starting with capital w, perform at most k projects. A project requires its capital threshold and adds its profit once. Return the maximum final capital.
+513|Return the leftmost value in the last row of the binary tree.
 516|Return the length of the longest palindromic subsequence of s.
 518|Count unordered combinations of coin denominations totaling amount. Denominations are distinct positive integers and may be reused.
 523|Return whether nums has a contiguous subarray of length at least 2 whose sum is a multiple of k (0 counts as a multiple).
 535|Design a Codec with encode(longUrl), returning a short URL, and decode(shortUrl), returning the original. The judge checks decode(encode(longUrl)) on the same Codec instance.
+538|Change every value in the binary search tree to the original value plus the sum of all values greater than it, and return the root.
 540|nums is sorted; every value appears exactly twice except one value that appears once. Return that value in O(log n) time.
 543|Return the greatest number of edges on any path between two nodes in the binary tree.
 554|Each row of wall lists brick widths with the same total. Draw a vertical line from top to bottom, not along either outer edge, crossing as few bricks as possible. Return that count.
@@ -227,13 +239,18 @@ export const statements = Object.fromEntries(`
 567|Return whether s2 contains any contiguous permutation of s1.
 572|Return whether a node in root starts a subtree identical in structure and values to subRoot.
 605|flowerbed has 0 for empty and 1 for planted, with no two adjacent flowers. Return whether n new flowers can be planted without any two flowers being adjacent.
+606|Return the preorder string of the tree where each child subtree is wrapped in parentheses, omitting empty parentheses that do not affect the one-to-one mapping (keep "()" for a missing left child when a right child exists).
+617|Merge two binary trees by overlaying them: overlapping nodes sum their values, otherwise the non-null node is used. Return the merged tree.
 621|Schedule unit-time tasks in any order with at least n idle or other-task intervals between equal task types. Return the shortest total time including idle intervals.
 622|Implement a fixed-capacity circular queue: enQueue(value) and deQueue() return success booleans; Front() and Rear() return -1 when empty; isEmpty() and isFull() return booleans.
 646|A pair [c, d] can follow [a, b] when b < c. Return the length of the longest chain that can be formed from pairs, using the pairs in any order.
 647|Count all palindromic substring occurrences. Equal strings at different positions count separately.
 649|Senators act cyclically in their given R/D order and optimally ban an opposing senator. Return Radiant or Dire, the winning party.
+652|Return one root node for every kind of duplicate subtree (same structure and values) in the tree, in any order.
 658|Return the k closest values to x in a sorted array, in ascending order. For equal distance, prefer the smaller value.
+662|Return the maximum width of the binary tree: for each level, the length between its leftmost and rightmost non-null nodes, counting the null positions between them.
 665|Return whether nums can become non-decreasing (nums[i] <= nums[i + 1] for every i) by changing at most one element.
+669|Remove every node of the binary search tree whose value is outside [low, high], keeping the relative structure of the remaining nodes. Return the new root.
 673|Return the number of longest strictly increasing subsequences in nums.
 678|Return whether the string can be balanced if each star may represent an opening parenthesis, a closing parenthesis, or an empty string.
 680|Return whether s can be made a palindrome by deleting at most one character.
@@ -261,6 +278,7 @@ export const statements = Object.fromEntries(`
 763|Partition s into as many consecutive parts as possible so that no character appears in multiple parts. Return their lengths.
 767|Rearrange every character of s so no adjacent characters are equal. Return any valid string or an empty string if impossible.
 778|Each square grid elevation is a distinct integer from 0 through n*n-1. At time t you may enter cells of elevation at most t. Return the earliest time a path connects top-left to bottom-right.
+783|Return the minimum difference between the values of any two different nodes in a binary search tree.
 785|Return true if the nodes of the undirected graph can be split into two sets so that every edge connects a node in one set to a node in the other.
 787|Return the cheapest flight cost from src to dst using at most k intermediate stops, or -1 if impossible.
 802|A node is terminal if it has no outgoing edges, and safe if every path from it leads to a terminal node. Return all safe nodes in ascending order.
@@ -275,6 +293,7 @@ export const statements = Object.fromEntries(`
 877|Two optimal players take a whole pile from either end of an even-length row. The positive pile total is odd. Return whether the first player wins.
 879|n members can commit crimes; crime i needs group[i] members and earns profit[i], and a member can join only one crime. Count the subsets of crimes with total profit at least minProfit using at most n members, modulo 10^9 + 7.
 881|Each boat carries at most two people with combined weight at most limit. Every person fits alone. Return the fewest boats needed.
+894|Return all full binary trees (every node has 0 or 2 children) with n nodes, all values 0, in any order.
 895|Implement FreqStack.push(val) and pop(). pop removes and returns the most frequent value, breaking ties by the most recent occurrence.
 901|Implement StockSpanner.next(price). Return the number of consecutive days ending today with price no greater than today's price.
 904|Moving right from any starting tree, pick one fruit per tree into two baskets, each holding a single fruit type, and stop at the first tree that fits neither basket. Return the most fruit you can pick.
@@ -287,7 +306,9 @@ export const statements = Object.fromEntries(`
 933|Implement RecentCounter.ping(t), returning the count of calls in the inclusive interval [t-3000,t]. Calls have strictly increasing positive timestamps.
 934|An n × n grid contains exactly two islands of 1s. Return the smallest number of 0s that must be flipped to 1 to connect them.
 946|pushed and popped contain the same distinct values. Return whether this pop order can result from pushing values in the pushed order onto an initially empty stack.
+951|A flip swaps the left and right children of a node. Return true if root1 can be turned into root2 by some number of flips.
 953|Return whether words are lexicographically sorted according to the supplied permutation of the 26 lowercase letters. A shorter prefix comes first.
+958|Return true if the binary tree is complete: every level except possibly the last is full, and the last level has all its nodes as far left as possible.
 973|Return k input points nearest to the origin by Euclidean distance. Any tied selection and any result order are accepted; preserve multiplicity.
 977|nums is sorted in nondecreasing order. Return the squares of its values, also sorted in nondecreasing order.
 978|Return the longest contiguous subarray whose adjacent comparisons strictly alternate greater-than and less-than. A single element is valid.
@@ -324,11 +345,13 @@ export const statements = Object.fromEntries(`
 1325|Delete every leaf with value target, repeating when deletion creates new target leaves. Return the remaining root or null.
 1343|Return how many contiguous subarrays of length k have an average of at least threshold.
 1359|Given n orders, each with a pickup and a delivery, count the sequences of all 2n stops in which every delivery comes after its own pickup. Return the count modulo 10^9 + 7.
+1376|The head of a company tree informs direct reports, each of whom informs theirs; employee i needs informTime[i] minutes. Return the minutes needed to inform all employees.
 1383|Choose at most k engineers. Performance is the sum of their speeds times the minimum efficiency among them. Return the maximum performance modulo 10^9 + 7.
 1396|Implement UndergroundSystem with checkIn(id, stationName, t), checkOut(id, stationName, t) and getAverageTime(startStation, endStation), the average time of all completed trips between those stations.
 1405|Using at most a copies of a, b copies of b, and c copies of c, return any longest string with no three equal consecutive letters.
 1406|Players alternately take the next one, two, or three stones from the front. Both maximize their total value. Return Alice, Bob, or Tie according to the outcome.
 1423|Take exactly k cards, each from the beginning or the end of the row. Return the maximum total points.
+1443|Starting and ending at vertex 0 of an undirected tree, return the minimum seconds needed to collect all apples, where walking an edge takes 1 second.
 1448|Count nodes whose value is at least every value on their path from the root.
 1456|Return the largest number of vowels (a, e, i, o, u) in any substring of s with length k.
 1461|Return whether every binary code of length k is a substring of the binary string s.
@@ -383,6 +406,7 @@ export const statements = Object.fromEntries(`
 1980|Given n distinct binary strings, each of length n, return any binary string of length n that does not appear in nums.
 1984|Choose k scores from nums. Return the minimum possible difference between the highest and lowest chosen score.
 1985|Each string in nums is an integer without leading zeros. Return the string of the k-th largest integer (duplicates count separately).
+1993|Implement LockingTree(parent) with lock(num, user), unlock(num, user) and upgrade(num, user): upgrade locks num for user and unlocks all its descendants, but only if num is unlocked, it has at least one locked descendant, and no ancestor is locked.
 2001|Rectangles i < j are interchangeable when width / height is equal for both. Return the number of interchangeable pairs.
 2002|Choose two disjoint palindromic subsequences of s (no index used by both). Return the maximum possible product of their lengths.
 2013|Implement DetectSquares.add(point) and count(point). Count axis-aligned positive-area squares having the query as one corner and three stored point occurrences as the others. Duplicate stored points multiply the count.

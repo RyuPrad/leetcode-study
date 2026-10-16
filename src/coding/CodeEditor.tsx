@@ -33,7 +33,7 @@ import TypeScriptWorker from 'monaco-editor/language/typescript/ts.worker.js?wor
 typescript.typescriptDefaults.setCompilerOptions({target:typescript.ScriptTarget.ESNext,lib:['esnext'],strict:true,noImplicitAny:false,allowNonTsExtensions:true});
 typescript.typescriptDefaults.addExtraLib(`declare class ListNode { val: number; next: ListNode | null; constructor(val?: number, next?: ListNode | null); }
 declare class TreeNode { val: number; left: TreeNode | null; right: TreeNode | null; constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null); }
-declare class _Node { val: any; next: _Node | null; random: _Node | null; neighbors: _Node[]; isLeaf: boolean; topLeft: _Node | null; topRight: _Node | null; bottomLeft: _Node | null; bottomRight: _Node | null; constructor(val?: any, second?: any, topLeft?: _Node | null, topRight?: _Node | null, bottomLeft?: _Node | null, bottomRight?: _Node | null); }
+declare class _Node { val: any; next: _Node | null; random: _Node | null; left: _Node | null; right: _Node | null; neighbors: _Node[]; isLeaf: boolean; topLeft: _Node | null; topRight: _Node | null; bottomLeft: _Node | null; bottomRight: _Node | null; constructor(val?: any, second?: any, topLeft?: _Node | null, topRight?: _Node | null, bottomLeft?: _Node | null, bottomRight?: _Node | null); }
 interface MountainArray { get(index: number): number; length(): number; }
 declare function guess(num: number): number;
 declare var console: { log(...data: any[]): void; info(...data: any[]): void; warn(...data: any[]): void; error(...data: any[]): void; debug(...data: any[]): void; };`,'study://types/leetcode.d.ts');

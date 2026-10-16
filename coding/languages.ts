@@ -15,7 +15,7 @@ export function isType(type: string): boolean {
   if (scalar.has(type)) return true;
   if (type.endsWith('[]')) return isType(type.slice(0, -2)) && type !== 'void[]';
   const list = /^List<(.+)>$/.exec(type);
-  return !!list && ['Integer', 'String', 'Boolean'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
+  return !!list && ['Integer', 'String', 'Boolean', 'TreeNode'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
 }
 /** Element type of an array or list, with boxed names unboxed. */
 export function element(type: string): string | undefined {
@@ -84,6 +84,7 @@ const javaParams = (params: Param[]) => params.map(p => `${p.type} ${p.name}`).j
 const javaBody = (m: Method, indent: string) => `${indent}// Write your code here.\n${m.returns === 'void' ? '' : `${indent}return ${javaDefault(m.returns)};\n`}`;
 const javaNodeDocs: Record<number, string> = {
   133: '/*\n// Definition for a Node.\nclass Node {\n    public int val;\n    public List<Node> neighbors;\n}\n*/\n\n',
+  116: '/*\n// Definition for a Node.\nclass Node {\n    public int val;\n    public Node left;\n    public Node right;\n    public Node next;\n}\n*/\n\n',
   138: '/*\n// Definition for a Node.\nclass Node {\n    int val;\n    Node next;\n    Node random;\n}\n*/\n\n',
   427: '/*\n// Definition for a QuadTree node.\nclass Node {\n    public boolean val;\n    public boolean isLeaf;\n    public Node topLeft, topRight, bottomLeft, bottomRight;\n    public Node(boolean val, boolean isLeaf) {}\n    public Node(boolean val, boolean isLeaf, Node topLeft, Node topRight, Node bottomLeft, Node bottomRight) {}\n}\n*/\n\n'
 };
@@ -111,6 +112,7 @@ function javaStarter(problem: CodingProblem, c: Contract): string {
 // and array returns report their size through returnSize / returnColumnSizes.
 const cNodes: Record<number, string> = {
   133: '/**\n * Definition for a Node.\n * struct Node {\n *     int val;\n *     int numNeighbors;\n *     struct Node** neighbors;\n * };\n */\n\n',
+  116: '/**\n * Definition for a Node.\n * struct Node {\n *     int val;\n *     struct Node *left;\n *     struct Node *right;\n *     struct Node *next;\n * };\n */\n\n',
   138: '/**\n * Definition for a Node.\n * struct Node {\n *     int val;\n *     struct Node *next;\n *     struct Node *random;\n * };\n */\n\n',
   427: '/**\n * Definition for a Node.\n * struct Node {\n *     bool val;\n *     bool isLeaf;\n *     struct Node *topLeft;\n *     struct Node *topRight;\n *     struct Node *bottomLeft;\n *     struct Node *bottomRight;\n * };\n */\n\n'
 };

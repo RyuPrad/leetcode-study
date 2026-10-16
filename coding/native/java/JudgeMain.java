@@ -17,6 +17,7 @@ public final class JudgeMain {
     private static final String LIST_NODE = "class ListNode { int val; ListNode next; ListNode() {} ListNode(int val) { this.val = val; } ListNode(int val, ListNode next) { this.val = val; this.next = next; } }";
     private static final String TREE_NODE = "class TreeNode { int val; TreeNode left; TreeNode right; TreeNode() {} TreeNode(int val) { this.val = val; } TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; } }";
     private static final Map<Integer, String> NODES = Map.of(
+        116, "class Node { public int val; public Node left; public Node right; public Node next; public Node() {} public Node(int _val) { val = _val; } public Node(int _val, Node _left, Node _right, Node _next) { val = _val; left = _left; right = _right; next = _next; } }",
         133, "import java.util.*; class Node { public int val; public List<Node> neighbors; public Node() { val = 0; neighbors = new ArrayList<Node>(); } public Node(int _val) { val = _val; neighbors = new ArrayList<Node>(); } public Node(int _val, ArrayList<Node> _neighbors) { val = _val; neighbors = _neighbors; } }",
         138, "class Node { int val; Node next; Node random; public Node(int val) { this.val = val; this.next = null; this.random = null; } }",
         427, "class Node { public boolean val; public boolean isLeaf; public Node topLeft; public Node topRight; public Node bottomLeft; public Node bottomRight; public Node() { this.val = false; this.isLeaf = false; } public Node(boolean val, boolean isLeaf) { this.val = val; this.isLeaf = isLeaf; } public Node(boolean val, boolean isLeaf, Node topLeft, Node topRight, Node bottomLeft, Node bottomRight) { this.val = val; this.isLeaf = isLeaf; this.topLeft = topLeft; this.topRight = topRight; this.bottomLeft = bottomLeft; this.bottomRight = bottomRight; } }");
@@ -184,6 +185,23 @@ public final class JudgeMain {
                 int pos = ((Number) input.get(1)).intValue();
                 if (!nodes.isEmpty() && pos >= 0) field(nodes.get(nodes.size() - 1), "next", nodes.get(pos));
                 return method.invoke(solution, nodes.isEmpty() ? null : nodes.get(0));
+            }
+            case 116: {
+                List<Object> values = asList(input.get(0)), nodes = new ArrayList<>();
+                for (Object v : values) nodes.add(newNode("Node", toInt(v)));
+                int count = nodes.size();
+                for (int i = 0; i < count; i++) { field(nodes.get(i), "left", 2 * i + 1 < count ? nodes.get(2 * i + 1) : null); field(nodes.get(i), "right", 2 * i + 2 < count ? nodes.get(2 * i + 2) : null); }
+                Object root = method.invoke(solution, count == 0 ? null : nodes.get(0));
+                if (root != (count == 0 ? null : nodes.get(0))) throw new HarnessException("Return the root of the input tree.");
+                for (int i = 0; i < count; i++)
+                    if (toInt(field(nodes.get(i), "val")) != toInt(values.get(i)) || field(nodes.get(i), "left") != (2 * i + 1 < count ? nodes.get(2 * i + 1) : null) || field(nodes.get(i), "right") != (2 * i + 2 < count ? nodes.get(2 * i + 2) : null)) throw new HarnessException("The tree must keep its structure.");
+                List<Object> out = new ArrayList<>();
+                for (int first = 0; first < count; first = 2 * first + 1) {
+                    int seen = 0;
+                    for (Object node = nodes.get(first); node != null; node = field(node, "next")) { if (++seen > count) throw new HarnessException("next pointers form a cycle."); out.add(field(node, "val")); }
+                    out.add("#");
+                }
+                return out;
             }
             case 160: {
                 List<Object> a = asList(input.get(0)), b = asList(input.get(1));
@@ -375,7 +393,8 @@ public final class JudgeMain {
         for (int q = 0; q < queue.size(); q++) {
             Object node = queue.get(q);
             if (node == null) { out.add(null); continue; }
-            if (!seen.add(node) || queue.size() > 20000) throw new HarnessException("Output tree contains a cycle, shared node, or is too large.");
+            // 894 may reuse one subtree object several times.
+            if ((number != 894 && !seen.add(node)) || queue.size() > 20000) throw new HarnessException("Output tree contains a cycle, shared node, or is too large.");
             out.add(field(node, "val")); queue.add(field(node, "left")); queue.add(field(node, "right"));
         }
         while (!out.isEmpty() && out.get(out.size() - 1) == null) out.remove(out.size() - 1);

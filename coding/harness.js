@@ -4,7 +4,7 @@ export function installEnvironment() {
   globalThis.TreeNode = class TreeNode { constructor(val = 0, left = null, right = null) { this.val = val; this.left = left; this.right = right; } };
   globalThis.Node = class Node {
     constructor(val = 0, second = null, topLeft = null, topRight = null, bottomLeft = null, bottomRight = null) {
-      this.val = val; this.next = null; this.random = null;
+      this.val = val; this.next = null; this.random = null; this.left = null; this.right = null;
       this.neighbors = Array.isArray(second) ? second : [];
       this.isLeaf = second; this.topLeft = topLeft; this.topRight = topRight; this.bottomLeft = bottomLeft; this.bottomRight = bottomRight;
     }
@@ -20,15 +20,17 @@ export function executeCase(number, input, entry, deserializeFn) {
   const toList = values => listNodes(values)[0] || null;
   const fromList = head => { const values = [], seen = new Set(); while (head) { if (seen.has(head) || values.length > 10000) throw new Error('Output list contains a cycle or is too large.'); seen.add(head); values.push(head.val); head = head.next; } return values; };
   const toTree = values => { if (!values.length || values[0] === null) return null; const root = new TreeNode(values[0]), queue = [root]; let i = 1; for (let q = 0; q < queue.length && i < values.length; q++) for (const key of ['left','right']) { if (i < values.length && values[i] !== null) { queue[q][key] = new TreeNode(values[i]); queue.push(queue[q][key]); } i++; } return root; };
-  const fromTree = root => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
+  // shared allows one subtree object to appear more than once (894 builds trees from shared subtrees).
+  const fromTree = (root, shared = false) => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (!shared && seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
-  const trees = [94,98,102,104,110,124,144,145,199,226,230,235,297,337,450,543,572,700,701,1325,1448];
+  const trees = [94,98,101,102,103,104,110,112,124,129,144,145,199,226,230,235,297,337,450,513,538,543,572,606,652,662,669,700,701,783,958,1325,1448];
   const lists = [19,24,25,61,83,86,92,143,147,148,203,206,234,725,876,1721,2130,2807];
-  const design = [146,155,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,707,895,901,933,981,1396,1472,1603,1845,2013];
+  const design = [146,155,173,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,707,895,901,933,981,1396,1472,1603,1845,1993,2013];
   if (design.includes(number)) {
     // RandomizedSet draws from a fixed sequence so the reference result is reproducible.
     if (number === 380) { let seed = 42; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
-    const [ops, args] = input, obj = new entry(...args[0]), result = [null];
+    // BSTIterator receives the tree built from its level-order argument.
+    const [ops, args] = input, obj = new entry(...(number === 173 ? [toTree(args[0][0])] : args[0])), result = [null];
     for (let i = 1; i < ops.length; i++) {
       const method=ops[i], value=obj[method](...args[i]);
       const isVoid=number!==380&&['push','insert','addWord','addNum','postTweet','follow','unfollow','put','set','remove','unreserve','addAtHead','addAtTail','addAtIndex','deleteAtIndex','visit'].includes(method) || method==='add'&&[705,2013].includes(number) || method==='pop'&&number===155;
@@ -73,11 +75,25 @@ export function executeCase(number, input, entry, deserializeFn) {
     if (result !== null && result !== shared) throw new Error('Return the first node shared by both lists.');
     return result === null ? null : result.val;
   }
+  // 116 builds a perfect tree of Node objects; each level's next chain is written out and ended with #, as LeetCode prints it.
+  if (number === 116) {
+    const values = input[0], nodes = values.map(v => new Node(v));
+    nodes.forEach((node, i) => { node.left = nodes[2 * i + 1] || null; node.right = nodes[2 * i + 2] || null; });
+    const root = entry(nodes[0] || null), out = [];
+    if (root !== (nodes[0] || null)) throw new Error('Return the root of the input tree.');
+    if (nodes.some((node, i) => node.val !== values[i] || node.left !== (nodes[2 * i + 1] || null) || node.right !== (nodes[2 * i + 2] || null))) throw new Error('The tree must keep its structure.');
+    for (let first = 0; first < nodes.length; first = 2 * first + 1) {
+      let count = 0;
+      for (let node = nodes[first]; node; node = node.next) { if (++count > nodes.length) throw new Error('next pointers form a cycle.'); out.push(node.val); }
+      out.push('#');
+    }
+    return out;
+  }
   if (number === 374) { globalThis.guess = value => value === input[1] ? 0 : value < input[1] ? 1 : -1; return entry(input[0]); }
   if (number === 1095) { let calls = 0; const values = input[1]; return entry(input[0], Object.freeze({ length: () => values.length, get: i => { if (++calls > 100) throw new Error('MountainArray.get exceeded 100 calls.'); if (!Number.isInteger(i) || i < 0 || i >= values.length) throw new Error('MountainArray index out of range.'); return values[i]; } })); }
   const args = clone(input);
   if (trees.includes(number)) args[0] = toTree(args[0]);
-  if (number === 100) { args[0] = toTree(args[0]); args[1] = toTree(args[1]); }
+  if ([100,617,951].includes(number)) { args[0] = toTree(args[0]); args[1] = toTree(args[1]); }
   if (number === 572) args[1] = toTree(args[1]);
   if (number === 235) { args[1] = findNode(args[0], args[1]); args[2] = findNode(args[0], args[2]); }
   if (lists.includes(number)) args[0] = toList(args[0]);
@@ -88,7 +104,8 @@ export function executeCase(number, input, entry, deserializeFn) {
   if ([2,19,21,23,24,25,61,83,86,92,147,148,203,206,876,1721,2807].includes(number)) return fromList(result);
   if (number === 725) { if (!Array.isArray(result)) throw new Error('Return an array of list heads.'); return result.map(fromList); }
   if (number === 143) return fromList(args[0]);
-  if ([105,226,450,700,701,1325].includes(number)) return fromTree(result);
+  if ([105,106,108,226,450,538,617,669,700,701,1325].includes(number)) return fromTree(result);
+  if ([95,652,894].includes(number)) { if (!Array.isArray(result)) throw new Error('Return an array of tree roots.'); return result.map(root => fromTree(root, number === 894)); }
   if (number === 235) { if (!result || result !== findNode(args[0], result.val)) throw new Error('Return an ancestor node from the input tree.'); return result.val; }
   if ([26,27,80].includes(number)) { if (!Number.isInteger(result) || result < 0 || result > input[0].length) throw new Error('Return the number of retained elements.'); return { length: result, values: args[0].slice(0,result) }; }
   if ([48,73,75,88,130,189,280,283,286,344].includes(number)) return args[0];
