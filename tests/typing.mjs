@@ -32,7 +32,8 @@ function Harness(){
 }
 createRoot(document.getElementById('root')).render(<Harness/>);
 `);
-const server=await createServer({configFile:false,root:ROOT,plugins:[react()],server:{host:'127.0.0.1',port:0},logLevel:'error'});
+// No file watcher: crawling the repository's generated test data made the first request take over 30 seconds.
+const server=await createServer({configFile:false,root:ROOT,plugins:[react()],server:{host:'127.0.0.1',port:0,watch:null},logLevel:'error'});
 await server.listen();
 const base=`${server.resolvedUrls.local[0]}.test-data/${path.basename(fixture)}/index.html`;
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];

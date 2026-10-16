@@ -35,7 +35,8 @@ function Harness(){
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);
 `);
-const server=await createServer({configFile:false,root:ROOT,plugins:[react()],server:{host:'127.0.0.1',port:0},logLevel:'error'});await server.listen();
+// No file watcher: crawling the repository's generated test data made the first request take over 30 seconds.
+const server=await createServer({configFile:false,root:ROOT,plugins:[react()],server:{host:'127.0.0.1',port:0,watch:null},logLevel:'error'});await server.listen();
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1500,height:1100},reducedMotion:'reduce'}),errors=[];page.on('pageerror',error=>errors.push(error.message));
 const container=()=>page.locator('#debug-objects-panel .study-object-view'),reference=()=>page.locator('#reference'),card=name=>cardFor(container(),name,1),body=name=>card(name).locator('.study-object-body');
 const scroll=[],geometry=[];

@@ -19,7 +19,8 @@ async function worker(){
    await page.waitForFunction(()=>window.studyLessonAdapter&&window.studyWalkthrough);
    const cases=await page.evaluate(async()=>{
     const source=studyLessonSource,adapter=studyLessonAdapter;
-    const serialize=value=>JSON.stringify(value,(_,item)=>typeof item==='bigint'?String(item)+'n':item);
+    // States may hold cycles (a doubly linked list's prev and next); a repeated object is written once.
+    const serialize=value=>{const seen=new WeakSet();return JSON.stringify(value,(_,item)=>{if(typeof item==='bigint')return String(item)+'n';if(item&&typeof item==='object'){if(seen.has(item))return '[seen]';seen.add(item);}return item;});};
     const buttons=[...document.querySelectorAll('.study-input-popover button')].filter(button=>/^load(?:Example|Ex)\(/.test(button.getAttribute('onclick')||''));
     const cases=[];
     for(let preset=0;preset<buttons.length;preset++){
