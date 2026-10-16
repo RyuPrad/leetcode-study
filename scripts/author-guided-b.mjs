@@ -1,3 +1,4 @@
+import './legacy-guided-write-disabled.mjs';
 // Reviewed, algorithm-specific predictions against the fixed reference examples.
 // Each row is: revealed trace index, question, answer, distractor~feedback,
 // distractor~feedback, gentle hint, concrete hint. The compiler only binds

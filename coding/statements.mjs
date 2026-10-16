@@ -27,7 +27,7 @@ export const statements = Object.fromEntries(`
 27|Remove every occurrence of val from nums in place. Return the number k of retained values and put them in the first k positions. Their order may vary.
 28|Return the index of the first occurrence of needle in haystack, or -1 if needle does not occur.
 33|Find target in a sorted array of distinct integers that has been rotated. Return its index, or -1 if absent.
-34|nums is sorted in nondecreasing order. Return [first, last], the first and last indices of target, or [-1, -1] if target is absent, in O(log n) time.
+34|Return the first and last indices of target in nondecreasing nums, or [-1, -1] if it is absent. Duplicates and an empty array are allowed. Use O(log n) time.
 35|Return the index of target in sorted nums, or the index where it should be inserted to keep the array sorted.
 36|Return whether a partially filled 9 by 9 Sudoku board has no repeated digit in any row, column, or 3 by 3 box. Dots are empty cells; solving the board is unnecessary.
 39|Return unique combinations of positive candidates summing to target. A candidate may be reused any number of times.
@@ -213,6 +213,7 @@ export const statements = Object.fromEntries(`
 424|Return the longest substring that can be made of one repeated uppercase letter by changing at most k characters.
 427|Build a quad tree for a square binary grid. A uniform region is a leaf; otherwise divide into topLeft, topRight, bottomLeft, bottomRight. Node(val,isLeaf,topLeft,topRight,bottomLeft,bottomRight) is provided.
 435|Return the fewest intervals to remove so the remaining half-open intervals do not overlap.
+437|Given a binary tree and an integer targetSum, return the number of nonempty paths whose node values add to targetSum. Each path follows parent-to-child edges downward; it may start or end at any node. Count different paths separately, even when they overlap or contain the same values.
 438|Return the start indices of every substring of s that is an anagram of p, in increasing order.
 441|Build a staircase with n coins where row i holds exactly i coins. Return the number of complete rows.
 448|nums has n values, each in [1, n]. Return every value in [1, n] that does not appear in nums.
@@ -279,7 +280,7 @@ export const statements = Object.fromEntries(`
 767|Rearrange every character of s so no adjacent characters are equal. Return any valid string or an empty string if impossible.
 778|Each square grid elevation is a distinct integer from 0 through n*n-1. At time t you may enter cells of elevation at most t. Return the earliest time a path connects top-left to bottom-right.
 783|Return the minimum difference between the values of any two different nodes in a binary search tree.
-785|Return true if the nodes of the undirected graph can be split into two sets so that every edge connects a node in one set to a node in the other.
+785|Given an undirected graph as a zero-based adjacency list, return whether its vertices can be assigned to two groups so every edge joins vertices in different groups. The graph may be disconnected and may contain isolated vertices. Each edge appears in both endpoint rows; there are no self edges or duplicate neighbors.
 787|Return the cheapest flight cost from src to dst using at most k intermediate stops, or -1 if impossible.
 802|A node is terminal if it has no outgoing edges, and safe if every path from it leads to a terminal node. Return all safe nodes in ascending order.
 837|Alice starts with 0 points and draws numbers while she has fewer than k points; each draw adds an integer from 1 to maxPts, uniformly at random. Return the probability that she ends with n or fewer points.

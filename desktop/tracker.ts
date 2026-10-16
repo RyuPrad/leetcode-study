@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { StudySession, TimerState } from '../shared/types';
+import type { StudySession, TimerState, UserData } from '../shared/types';
 import { StudyStore } from './store';
 export const IDLE_MS = 5 * 60 * 1000;
 export const CHECKPOINT_MS = 15000;
@@ -45,6 +45,14 @@ export class StudyTracker {
     this.tick();
     this.active.endedAt = this.wall();
     this.checkpoint();
+    this.active = null;
+  }
+  restore(data: UserData) {
+    // Preserve the latest time in the pre-import archive. Detach only after the
+    // replacement reaches disk, so a failed restore can keep the same session.
+    this.tick();
+    this.checkpoint();
+    this.store.restore(data);
     this.active = null;
   }
   edit(id: string, patch: Pick<StudySession, 'durationMs' | 'outcome' | 'reflection'>) {

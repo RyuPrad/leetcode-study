@@ -1,6 +1,8 @@
 import assert from'node:assert/strict';import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';import{chromium}from'playwright';import{ROOT}from'../scripts/content.mjs';
 const lessons=JSON.parse(fs.readFileSync(path.join(ROOT,'visualizer-ui/lessons.json')));
 const cases=[
+ [322,['1,2,5 | 11','1 | 0',Array.from({length:12},(_,i)=>i+1).join(',')+' | 60'],['1,2',' | 1','1,,2 | 4','0,2 | 4','-1 | 4','1.5 | 4','Infinity | 4','9007199254740992 | 4','1 | ','1 | 1.5','1 | -1','1 | 61','1 | Infinity','1 | 9007199254740992',Array(13).fill(1).join(',')+' | 60',Array(10000).fill(1).join(',')+' | 60']],
+ [46,['-1,0,2','-0,1','9007199254740991,-9007199254740991','','   '],['1,,2',',1','1,',',','1,1','0,-0','1,Infinity','1,-Infinity','1,NaN','1,1e309','1,9007199254740992','1,-9007199254740992','1,2.5','1,2.0','1,0x2','1,2,3,4,5,6']],
  [1095,['[1,3,5,4,2] | 4','1,3,5,4,2 | 1'],['1,bad,5,4,2 | 4','[1,null,5,4,2] | 4','[1,true,5,4,2] | 4','[1,3,5 | 4','1,3,3,2 | 3','1,2 | 2','1,3,2 | 1.5','1,3,2 |','1,3,2 | 1 | 2']],
  [4,['[1,3] | [2]','| 1,2'],['1,bad,3 | 2','[1,null,3] | 2','[1,"2",3] | 2','1,,3 | 2','3,1 | 2','|','1,2 | 2.5','1,2 | 3 | 4']],
  [42,['0,1,0,2','[0,1,0,2]','[]'],['0,bad,2','0,,2','[0,null,2]','[0,true,2]','[0,"1",2]','[0,1','-1,2','1.5,2','1,Infinity']],
@@ -23,6 +25,7 @@ const cases=[
 ];
 const browser=await chromium.launch(),page=await browser.newPage();let accepted=0,rejected=0;
 try{for(const[number,valid,invalid]of cases){await page.goto(pathToFileURL(path.join(ROOT,lessons.find(l=>l.number===number).path)).href);await page.waitForFunction(()=>window.studyLessonAdapter);
+ if(number===322||number===46){await page.locator('.study-custom-menu').evaluate(menu=>{menu.open=true;});const help=page.locator('.study-custom-menu #custom-input-help');assert.equal(await help.isVisible(),true,`${number}: bounds/help remain visible after workspace mounts`);assert.match(await help.textContent(),number===322?/1–12.*0 to 60/:/5 distinct safe integers.*Blank input/);assert.equal(await page.locator('#custom-input').getAttribute('aria-describedby'),'custom-input-help');}
  for(const input of valid){const result=await page.evaluate(input=>{window.alert=()=>{};document.getElementById('custom-input').value=input;if(document.getElementById('target-input'))document.getElementById('target-input').value=studyLessonSource.spec.number===875?'8':studyLessonSource.spec.number===1011?'2':'3';return loadCustom();},input);assert.equal(result,true,`${number}: accepted format ${input}`);accepted++;}
  const outcomes=await page.evaluate(inputs=>{window.alert=()=>{};for(let i=0;i<5&&!document.getElementById('btn-next').disabled;i++){const instruction=studyLessonSource.pendingInstruction?.();if(!instruction&&!Number.isInteger(studyLessonSource.readAt?.(studyLessonSource.index()+1).executedLine))break;studyLessonAdapter.next();}studyWalkthrough.setMode('detailed');
  const observe=()=>JSON.stringify({raw:studyLessonSource.read(),index:studyLessonSource.index(),transition:studyLessonAdapter.currentTransition(),operation:studyWalkthrough.operation,mode:studyWalkthrough.mode,timeline:document.querySelector('.study-timeline').outerHTML,range:document.querySelector('.study-timeline input')?.value,card:document.querySelector('.operation-card')?.outerHTML});

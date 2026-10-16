@@ -7,9 +7,17 @@ import type { CodingProblem, Json } from '../shared/coding';
 import { evaluate, judge } from '../coding/engine';
 import { accepts } from '../coding/compare';
 import { parseCases, validateInput } from '../coding/validation';
+import { extraCase } from '../coding/cases.mjs';
+import { statements } from '../coding/statements.mjs';
 const problems = definitions as CodingProblem[];
 const get = (n:number)=>problems.find(p=>p.number===n)!;
 const vm=await getQuickJS();
+// Independent oracle: deliberately scan rather than repeating the reference's binary searches.
+const linearRange = (nums:number[],target:number):[number,number] => {
+  let first=-1,last=-1;
+  for(let i=0;i<nums.length;i++) if(nums[i]===target){if(first===-1)first=i;last=i;}
+  return [first,last];
+};
 test('every catalog problem has a complete coding definition, working reference, and rejected incorrect implementation',async()=>{
   const catalog=JSON.parse(fs.readFileSync('dist/content/catalog.json','utf8'));
   assert.deepEqual(problems.map(p=>p.id).sort(),catalog.entries.filter((p:any)=>p.number).map((p:any)=>p.id).sort());
@@ -81,4 +89,138 @@ test('custom cases validate before reference execution and match documented argu
   assert.throws(()=>parseCases(get(1),'['),/JSON/);
   assert.throws(()=>parseCases(get(230),'[[[2,1,3],4]]'),/existing node/);
   assert.throws(()=>parseCases(get(933),'[[["RecentCounter","ping","ping"],[[],[10],[2]]]]'),/increasing/);
+});
+test('Search Range includes the standard examples and twelve independently checked boundary cases',()=>{
+  const p=get(34);
+  assert.equal(p.id,'leetcode:34');
+  assert.equal(p.entry,'searchRange');
+  assert.equal(p.kind,'function');
+  assert.deepEqual(p.parameters,['nums','target']);
+  assert.equal(p.description,statements[34]);
+  assert.match(p.starter,/function searchRange\(nums, target\)/);
+  assert.deepEqual(p.examples.map(t=>[t.input,t.expected]),[
+    [[[5,7,7,8,8,10],8],[3,4]],
+    [[[5,7,7,8,8,10],6],[-1,-1]],
+    [[[],0],[-1,-1]]
+  ]);
+  assert.equal(p.tests.length,12);
+  assert.equal(new Set(p.tests.map(t=>JSON.stringify(t.input))).size,12);
+  p.tests.forEach((t,i)=>assert.deepEqual(t.input,extraCase(34,i+1)));
+  for(const t of [...p.examples,...p.tests]){
+    const [nums,target]=t.input as [number[],number];
+    assert.equal(validateInput(p,t.input),null,t.name);
+    const result=evaluate(vm,p,p.reference,t.input);
+    assert.equal(result.verdict,'Accepted',`${t.name}: ${result.error}`);
+    assert.deepEqual(result.actual,linearRange(nums,target),t.name);
+    if(t.expected!==undefined)assert.deepEqual(t.expected,linearRange(nums,target),t.name);
+  }
+});
+test('Search Range matches a linear oracle across exhaustive small sorted arrays',()=>{
+  const p=get(34), alphabet=[-2,0,3], targets=[-3,-2,-1,0,1,3,4];
+  function check(nums:number[],start:number){
+    for(const target of targets){
+      const result=evaluate(vm,p,p.reference,[nums,target]);
+      assert.equal(result.verdict,'Accepted',result.error);
+      assert.deepEqual(result.actual,linearRange(nums,target),JSON.stringify([nums,target]));
+    }
+    if(nums.length===6)return;
+    for(let i=start;i<alphabet.length;i++)check([...nums,alphabet[i]],i);
+  }
+  check([],0);
+});
+test('Search Range validates sorted safe-integer input while allowing duplicates and empty arrays',()=>{
+  const p=get(34);
+  for(const input of [[[],0],[[2,2],2],[[Number.MIN_SAFE_INTEGER,0,Number.MAX_SAFE_INTEGER],Number.MAX_SAFE_INTEGER],[Array(2000).fill(7),7]]){
+    assert.equal(validateInput(p,input),null,JSON.stringify(input));
+  }
+  for(const input of [null,[],[[1]],[[1],1,2],['1',1],[[1],'1'],[[2,1],1],[[1,2,1],1],[[1.5],1],[[1],1.5],[[null],0],[[true],0],[[Number.MAX_SAFE_INTEGER+1],0],[[Number.MIN_SAFE_INTEGER-1],0],[[1],Number.MAX_SAFE_INTEGER+1],[[Infinity],0],[[1],NaN],[Array(2001).fill(0),0]]){
+    assert.notEqual(validateInput(p,input),null,JSON.stringify(input));
+  }
+  assert.equal(parseCases(p,'[[[],0],[[2,2],2]]').length,2);
+  assert.throws(()=>parseCases(p,'[[[2,1],1]]'),/nondecreasing/);
+});
+test('Search Range uses logarithmic element reads without mutating its input',()=>{
+  const p=get(34);
+  const measuredReference=p.reference+`
+const unmeasuredSearchRange = searchRange;
+searchRange = function(nums, target) {
+  let reads = 0;
+  const measured = new Proxy(nums, {
+    get(array, key) {
+      if (/^(0|[1-9][0-9]*)$/.test(String(key))) reads++;
+      return array[key];
+    },
+    set() { throw new Error('searchRange must not mutate nums'); }
+  });
+  const result = unmeasuredSearchRange(measured, target);
+  if (reads > 2 * Math.ceil(Math.log2(nums.length + 1)) + 1) {
+    throw new Error('Expected logarithmic element reads');
+  }
+  return result;
+};`;
+  const arrays=[Array(2000).fill(7),Array.from({length:2000},(_,i)=>Math.floor(i/4)-250)];
+  for(const nums of arrays)for(const target of [-251,-250,0,7,249,250]){
+    const result=evaluate(vm,p,measuredReference,[nums,target]);
+    assert.equal(result.verdict,'Accepted',result.error);
+    assert.deepEqual(result.actual,linearRange(nums,target));
+  }
+});
+test('Search Range rejects single-match, exclusive-end, absent-target, and malformed answers',async()=>{
+  const p=get(34);
+  for(const source of [
+    'function searchRange(){return [-1,-1];}',
+    'function searchRange(nums,target){const i=nums.indexOf(target);return [i,i];}',
+    'function searchRange(nums,target){return [nums.indexOf(target),nums.lastIndexOf(target)+1];}',
+    'function searchRange(nums,target){let i=0;while(i<nums.length&&nums[i]<target)i++;let j=i;while(j<nums.length&&nums[j]===target)j++;return [i,j-1];}'
+  ]){
+    const result=await judge(vm,p,source,[...p.examples,...p.tests]);
+    assert.equal(result.verdict,'Wrong answer');
+  }
+  for(const actual of [[4,3],[3,5],[3],[3,4,4],3,null])assert.ok(!accepts(p,p.examples[0].input,actual,[3,4]));
+});
+
+test('Path Sum III preserves multiplicity, branch isolation and exact large prefixes in QuickJS',()=>{
+  const p=get(437);
+  assert.equal(p.entry,'pathSum');assert.deepEqual(p.parameters,['root','targetSum']);
+  const cases:[Json[],number][]=[[[[],0],0],[[[0],0],1],[[[0,0,0],0],5],[[[0,null,0,null,0],0],6],[[[1,1,1],0],0],[[[1,-1,-1],0],2],[[[1,null,1,null,1],2],2],[[[1000000000,1000000000,null,294967296,null,1000000000,null,1000000000],0],0]];
+  for(const [input,expected]of cases){assert.equal(validateInput(p,input),null);const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',result.error);assert.equal(result.actual,expected);}
+  const mutants=[
+    p.reference.replace('freq.set(0, 1);',''),
+    p.reference.replace('const matches = freq.get(need) || 0;','const matches = freq.has(need) ? 1 : 0;'),
+    p.reference.replace('freq.set(sum, freq.get(sum) - 1);',''),
+    p.reference.replace('freq.set(sum, freq.get(sum) - 1);','freq.delete(sum);'),
+    p.reference.replace('sum += node.val;','sum = (sum + node.val) | 0;'),
+  ];
+  for(const mutant of mutants)assert.ok(cases.some(([input,expected])=>{const result=evaluate(vm,p,mutant,input);return result.verdict!=='Accepted'||result.actual!==expected;}),'independent expected results reject the plausible defect');
+});
+
+test('Path Sum III official maximum-depth trees execute in the real QuickJS stack budget',()=>{
+  const p=get(437);
+  for(const side of ['left','right'])for(const value of [0,1000000000]){
+    const values:(number|null)[]=[value];for(let i=1;i<1000;i++)values.push(...(side==='left'?[value,null]:[null,value]));
+    while(values.at(-1)===null)values.pop();
+    const input:Json[]=[values,0];assert.equal(validateInput(p,input),null);
+    const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',`${side}/${value}: ${result.error}`);assert.equal(result.actual,value===0?500500:0);
+  }
+  for(const input of [[Array(1001).fill(0),0],[[1000000001],0],[[0],1001],[[9007199254740991,1,null,1],0]])assert.notEqual(validateInput(p,input),null);
+});
+
+test('Is Graph Bipartite executes all official 100-vertex boundaries in the real QuickJS budget',()=>{
+  const p=get(785),empty=()=>Array.from({length:100},()=>[] as number[]);
+  const fromEdges=(edges:number[][])=>{const graph=empty();for(const [u,v]of edges){graph[u].push(v);graph[v].push(u);}return graph;};
+  const chainEdges=Array.from({length:99},(_,i)=>[i,i+1]);
+  const cases:[string,number[][],boolean][]=[
+    ['100 isolates',empty(),true],
+    ['100-vertex path',fromEdges(chainEdges),true],
+    ['100-vertex even cycle',fromEdges([...chainEdges,[99,0]]),true],
+    ['99-vertex odd cycle plus isolate',fromEdges([...chainEdges.slice(0,98),[98,0]]),false],
+    ['complete bipartite K50,50',fromEdges(Array.from({length:50},(_,u)=>Array.from({length:50},(_,v)=>[u,v+50])).flat()),true],
+    ['complete K100',fromEdges(Array.from({length:100},(_,u)=>Array.from({length:99-u},(_,v)=>[u,u+v+1])).flat()),false],
+    ['97-vertex path followed by a triangle',fromEdges([...chainEdges.slice(0,96),[97,98],[98,99],[99,97]]),false],
+  ];
+  for(const [name,graph,expected]of cases){
+    const input:Json[]=[graph],original=JSON.stringify(graph);assert.equal(graph.length,100);assert.equal(validateInput(p,input),null,name);
+    const result=evaluate(vm,p,p.reference,input);assert.equal(result.verdict,'Accepted',name+': '+result.error);assert.equal(result.actual,expected,name);assert.equal(JSON.stringify(graph),original,name+': input preserved');
+  }
+  assert.notEqual(validateInput(p,[[]]),null);assert.notEqual(validateInput(p,[Array.from({length:101},()=>[])]),null);
 });

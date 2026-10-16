@@ -26,6 +26,20 @@ export function extraCase(n, seed) {
     case 26:return [v.flatMap(x=>[x+s,x+s])];
     case 27:return [[s,0,s,2,3,s,4],s];
     case 33:case 153:case 81:{ const x=v.map(x=>x+s); const r=s%len; const rot=x.slice(r).concat(x.slice(0,r));return n===153?[rot]:[n===81?rot.flatMap(x=>[x,x]):rot,s%2?s+1:100]; }
+    case 34:return [
+      [[1],1],
+      [[1],2],
+      [[2,2,2,2],1],
+      [[2,2,2,2],2],
+      [[1,1,2,3],1],
+      [[1,2,3,3],3],
+      [[-8,-4,-4,-4,0,7],-4],
+      [[-3,-1,0,0,0,2,9],0],
+      [[1,1,3,3,5],2],
+      [[-9,...Array(64).fill(7),12],7],
+      [[Number.MIN_SAFE_INTEGER,Number.MIN_SAFE_INTEGER,-1,0,Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER],Number.MIN_SAFE_INTEGER],
+      [[Number.MIN_SAFE_INTEGER,Number.MIN_SAFE_INTEGER,-1,0,Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER],Number.MAX_SAFE_INTEGER]
+    ][s-1];
     case 35:case 704:return [v.map(x=>x*2+s),s*2];
     case 36:{const b=grid(9,9,()=>'.');b[s%9][(s*2)%9]=String(1+s%9);b[(s+3)%9][(s*2)%9]=s%2?String(1+s%9):String(1+(s+1)%9);return [b];}
     case 39:return [[2,3,5+s],s+5];
@@ -124,6 +138,7 @@ export function extraCase(n, seed) {
     case 410:return [pos,1+s%len];
     case 424:return [('AB'.repeat(s)+'CCCC'),s%5];
     case 427:return [grid(4,4,(r,c)=>s&(1<<((r*4+c)%8))?1:0)];
+    case 437:return [[[],0],[[0],0],[[7],7],[[7],0],[[-3],-3],[[0,0,0],0],[[0,null,0,null,0],0],[[1,1,1],0],[[1,-1,-1],0],[[1,null,1,null,1],2],[[2,null,-2,2,-2],0],[[1000000000,1000000000,null,294967296,null,1000000000,null,1000000000],0]][s-1];
     case 450:return [tree,s%2?s+4:s+100];
     case 463:return [grid(2+s%4,2+s%3,(r,c)=>r===0||c===0?1:0)];
     case 494:return [pos,s%2?s:0];
@@ -154,6 +169,7 @@ export function extraCase(n, seed) {
     case 763:return [word+'ab'+word+'cd'.repeat(s)];
     case 767:return [word.repeat(s)+'a'.repeat(1+s%5)+'b'];
     case 778:{const k=2+s%3;return [grid(k,k,(r,c)=>(r*k+c+s)%(k*k))];}
+    case 785:return [[[[]]],[[[],[],[]]],[[[1],[0]]],[[[1],[0,2],[1,3],[2]]],[[[1,4],[0,2],[1,3],[2,4],[0,3]]],[[[1,5],[0,2],[1,3],[2,4],[3,5],[0,4]]],[[[1,2,3,4],[0],[0],[0],[0]]],[[[2,3],[2,3],[0,1],[0,1]]],[[[1,2,3],[0,2,3],[0,1,3],[0,1,2]]],[[[],[2],[1],[],[5,6],[4,6],[4,5]]],[[[],[2],[1],[],[5],[4]]],[[[3,1],[2,0],[3,1],[2,0]]]][s-1];
     case 787:return [3,[[0,1,s*10],[1,2,s*10],[0,2,s*30]],0,2,s%2];
     case 846:return [[s,s+1,s+2,s,s+1,s+2],s%2?3:2];
     case 853:return [s+20,[0,s,s+5],[1,3,2]];
@@ -212,7 +228,6 @@ export function extraCase(n, seed) {
     case 162:return [s%3===0?seq(len+1,0).map(i=>i*s):seq(len+1,0).map(i=>i%2?s+10+i:i)];
     case 2300:return [pos.map(x=>x+s),seq(len+2,1).map(x=>x*3%11+1),s*7];
     case 2616:return [nums.map(x=>Math.abs(x)*s%17),s%(Math.floor(len/2)+1)];
-    case 34:return [v.flatMap(x=>Array(1+(x+s)%3).fill(x+s)),s%3===0?100:s+2];
     case 1898:{const t=word+'abcacb'.repeat(1+s%2);return [t,'ab',seq(t.length,0).map(i=>(i*(s%5+1)+s)%t.length).filter((x,i,a)=>a.indexOf(x)===i).slice(0,3+s%3)];}
     case 1268:return [['mobile','mouse','moneypot','monitor','mousepad',word+'mouse','mop'].slice(0,3+s%5),['mouse','mon','mob','zzz','mo'][s%5]+'abc'.slice(0,s%3)];
     case 977:return [v.map(x=>x*(1+s%4)-len-Math.floor(s/2))];
@@ -332,7 +347,6 @@ export function extraCase(n, seed) {
     case 2477:{const n=2+s%7;const r=[];for(let i=1;i<n;i++)r.push([s%i,i]);return [r,1+s%4];}
     case 2492:{const n=2+s%5;const r=[];for(let i=1;i<n;i++)r.push([i,i+1,1+(i*s)%9]);if(n>3)r.push([2,n,1+s%4]);return [n,r];}
     case 1557:{const n=2+s%7;const e=[];for(let i=1;i<n;i++)if((i*s)%3)e.push([s%i,i]);return [n,e];}
-    case 785:{const n=2+s%6;const sets=Array.from({length:n},()=>new Set());for(let i=0;i<n;i++){const j=(i*s+1)%n;if(j!==i&&(i+j+s)%4){sets[i].add(j);sets[j].add(i);}}return [sets.map(x=>[...x].sort((a,b)=>a-b))];}
     case 2101:return [v.map((x,i)=>[1+(x*s)%10,1+(x*3+i)%7,1+(x+s)%4])];
     case 1857:{const n=2+s%5;const colors=Array.from({length:n},(_,i)=>String.fromCharCode(97+(i*s)%3)).join('');const e=[];for(let i=1;i<n;i++)e.push([s%i,i]);if(s%4===0)e.push([n-1,0]);return [colors,e];}
     case 1553:return [s*s*s*97+s];

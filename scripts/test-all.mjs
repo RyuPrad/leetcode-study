@@ -44,13 +44,14 @@ add('test:code-languages', node('tests/code-languages.mjs'), 'browser', 6, true)
 for (const f of ['reference-transitions', 'state-instructions', 'precomputed-instructions', 'numeric-inputs', 'precomputed-statements', 'additional-statements', 'setup-statements', 'dp-setup', 'tree-projections', 'cache-projections'])
   add(`instructions/${f}`, node(`tests/${f}.mjs`), 'browser', f === 'precomputed-instructions' ? 6 : 1, f === 'precomputed-instructions');
 add('test:presets', node('tests/preset-instructions.mjs'), 'browser', 6, true);
+add('permutation-history', node('tests/permutation-history.mjs'));
 add('test:oracles', node('tests/state-oracles.mjs'), 'browser', 6, true);
 add('test:inputs', node('tests/visualizer-inputs.mjs'));
 add('test:playback', node('tests/playback.mjs'));
 add('editor/tabout', node('tests/tabout.mjs'));
 add('editor/focus', node('tests/editor-focus.mjs'));
 add('test:typing', node('tests/typing.mjs'));
-for (const [name, f] of [['test:e2e', 'desktop'], ['test:motion:desktop', 'pointer-motion'], ['test:objects:desktop', 'object-view'], ['test:objects:readability:desktop', 'object-view-readability'], ['test:layout:desktop', 'ui-layout'], ['test:panels:desktop', 'panel-layout'], ['test:coding', 'coding'], ['test:debugger', 'debugger'], ['test:guided:desktop', 'guided']])
+for (const [name, f] of [['test:e2e', 'desktop'], ['restore-isolation', 'restore-isolation'], ['test:motion:desktop', 'pointer-motion'], ['test:objects:desktop', 'object-view'], ['test:objects:readability:desktop', 'object-view-readability'], ['test:layout:desktop', 'ui-layout'], ['test:panels:desktop', 'panel-layout'], ['test:coding', 'coding'], ['test:debugger', 'debugger'], ['test:guided:desktop', 'guided']])
   add(name, node(`tests/${f}.e2e.mjs`), 'desktop');
 
 const logs = path.join(ROOT, 'test-results/logs'), timingsFile = path.join(ROOT, 'test-results/timings.json');

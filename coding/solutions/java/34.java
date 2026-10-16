@@ -1,27 +1,32 @@
 class Solution {
-    public int[] searchRange(int[] nums, int target) {
-        int first = bound(nums, target, true);
-        int last = bound(nums, target, false);
-        return new int[] { first, last };
-    }
-
-    private int bound(int[] nums, int target, boolean leftBias) {
-        int left = 0, right = nums.length - 1, res = -1;
-        while (left <= right) {
-            int mid = (left + right) / 2;
+    public int[] searchRange(long[] nums, long target) {
+        int left = 0;
+        int right = nums.length;
+        // Lower bound: first index whose value is at least target.
+        while (left < right) {
+            int mid = left + (right - left) / 2;
             if (nums[mid] < target) {
                 left = mid + 1;
-            } else if (nums[mid] > target) {
-                right = mid - 1;
             } else {
-                res = mid;
-                if (leftBias) {
-                    right = mid - 1;
-                } else {
-                    left = mid + 1;
-                }
+                right = mid;
             }
         }
-        return res;
+        int first = left;
+        left = 0;
+        right = nums.length;
+        // Upper bound: first index whose value is greater than target.
+        while (left < right) {
+            int mid = left + (right - left) / 2;
+            if (nums[mid] <= target) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        int afterLast = left;
+        if (first == nums.length || nums[first] != target) {
+            return new int[] { -1, -1 };
+        }
+        return new int[] { first, afterLast - 1 };
     }
 }

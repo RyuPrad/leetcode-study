@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { _electron as electron } from 'playwright';
 import { ROOT } from '../scripts/content.mjs';
+import { auditSolutionTechniques } from './solution-techniques-layout.mjs';
 
 fs.mkdirSync(path.join(ROOT, '.test-data'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
@@ -107,6 +108,10 @@ try {
       await click(button('Bookmarks'), 'Bookmarks'); await reachable(page.locator('.problem-link').first(), 'Bookmarked problem');
       await click(button('Review queue'), 'Review queue'); await reachable(page.locator('.problem-link').first(), 'Review problem');
       await capture(`ui-layout-${label}-library.png`);
+    });
+    await audit('Algorithms and techniques', async () => {
+      await auditSolutionTechniques({ page, library, open, tab, reachable, shellFits, settle });
+      await capture(`ui-layout-${label}-algorithms.png`);
     });
     await audit('Notes and history', async () => {
       await open(206); await tab('Notes'); await page.locator('.markdown').waitFor();

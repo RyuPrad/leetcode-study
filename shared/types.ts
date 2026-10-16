@@ -3,9 +3,15 @@ import type { GuidedProgress } from './guided';
 export type ProblemStatus = 'not-started' | 'in-progress' | 'completed';
 export type Outcome = 'studied' | 'solved' | 'needs-review';
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+export interface SolutionTechnique {
+  name: string;
+  kind: 'algorithm' | 'technique' | 'data-structure';
+  role: string;
+}
 export interface Entry {
   id: string; number?: number; title: string; topic: string; difficulty?: Difficulty;
   notePath: string; markdown: string; searchText: string; visualizerPath?: string;
+  solutionTechniques?: SolutionTechnique[];
 }
 export interface Catalog { version: 1; entries: Entry[]; topics: string[]; visualizers: string[]; }
 export interface Progress { status: ProblemStatus; bookmarked: boolean; needsReview: boolean; updatedAt: string; }

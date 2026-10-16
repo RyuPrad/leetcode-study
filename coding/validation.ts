@@ -5,7 +5,7 @@ const integer = (x: any) => Number.isSafeInteger(x);
 const sorted = (a: number[], strict = false) => a.every((v,i) => !i || (strict ? v > a[i-1] : v >= a[i-1]));
 const unique = (a: unknown[]) => new Set(a).size === a.length;
 const matrix = (a: any) => array(a) && a.length > 0 && a.length <= 100 && a.every((r: any) => array(r) && r.length > 0 && r.length <= 100 && r.length === a[0].length);
-const treeIds = new Set([94,98,100,101,102,103,104,105,110,112,116,124,129,144,145,199,226,230,235,297,337,450,513,538,543,572,606,617,652,662,669,700,701,783,951,958,1325,1448]);
+const treeIds = new Set([94,98,100,101,102,103,104,105,110,112,116,124,129,144,145,199,226,230,235,297,337,437,450,513,538,543,572,606,617,652,662,669,700,701,783,951,958,1325,1448]);
 function tree(values: any[]): boolean { let slots = 1; for (const value of values) { if (slots-- <= 0) return false; if (value !== null) { if (!integer(value)) return false; slots += 2; } } return true; }
 function bst(values: any[]): boolean { const queue: [number,number][] = [[-Infinity,Infinity]]; let i = 0; for (let q = 0; q < queue.length && i < values.length; q++) { const [lo,hi] = queue[q],v = values[i++]; if (v === null) continue; if (!integer(v) || v <= lo || v >= hi) return false; queue.push([lo,v],[v,hi]); } return i === values.length; }
 export function validateInput(problem: CodingProblem, input: unknown): string | null {
@@ -73,6 +73,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
       if (n===235 && (a[1]===a[2] || !a[0].includes(a[1]) || !a[0].includes(a[2]))) fail('p and q must be distinct values present in the tree.');
       if (n===701 && a[0].includes(a[1])) fail('val must not already be in the tree.');
     }
+    if (n===437 && (a[0].filter((v:any)=>v!==null).length>1000 || a[0].some((v:any)=>v!==null&&Math.abs(v)>1000000000) || Math.abs(a[1])>1000)) fail('Path Sum III allows at most 1,000 non-null nodes, node values in [-1,000,000,000, 1,000,000,000], and targetSum in [-1,000, 1,000].');
     if (n===105 && (a[0].length!==a[1].length || !unique(a[0]) || a[0].some((v:any)=>!a[1].includes(v)))) fail('Traversals must contain the same distinct values.');
     if ([19,25,92,143,2807].includes(n) && !a[0].length) fail('The list must be nonempty.');
     if ([19,25].includes(n) && (a[1]<1 || a[1]>a[0].length)) fail('n/k must be between 1 and the list length.');
@@ -81,6 +82,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if (n===2 && a.some(v=>!v.length || v.some((d:any)=>d<0||d>9) || v.length>1&&v.at(-1)===0)) fail('Digit lists are nonempty, reversed, and have no leading zero.');
     if (n===21 && a.some(v=>!sorted(v)) || n===23 && a[0].some((v:any)=>!array(v)||!sorted(v))) fail('Input lists must be sorted.');
     if ([26,35,167,658,704].includes(n) && !sorted(a[0],[35,704].includes(n))) fail('The input array must be sorted (distinct values for binary search).');
+    if (n===34 && !sorted(a[0])) fail('nums must be sorted in nondecreasing order; duplicates are allowed.');
     if (n===4 && (a[0].length+a[1].length===0 || a.some(v=>!sorted(v)))) fail('Provide sorted arrays with at least one value in total.');
     if ([1,167].includes(n)) { let count=0; for(let i=0;i<a[0].length;i++) for(let j=i+1;j<a[0].length;j++) if(a[0][i]+a[0][j]===a[1]) count++; if(count!==1) fail('Exactly one pair must sum to target.'); }
     if ([11,15,18,45,53,55,84,121,122,134,135,136,152,153,169,198,213,215,238,239,287,300,309,312,416,473,494,698,735,739,746,763,767,846,860,875,877,881,912,918,973,978,1011,1046,1049,1140,1406,1834,1863,1929,2709,283].includes(n) && !a[0].length) fail('This input must be nonempty.');
@@ -131,6 +133,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if([56,252,253,435].includes(n) && a[0].some((r:any)=>r.length!==2||(n===56?r[0]>r[1]:r[0]>=r[1])))fail('Intervals need ordered endpoints; meetings and problem 435 require start < end.');
     if(n===57 && (a[1].length!==2||a[1][0]>a[1][1]||a[0].some((r:any,i:number)=>r.length!==2||r[0]>r[1]||i>0&&r[0]<=a[0][i-1][1])))fail('Existing intervals must be sorted and disjoint; newInterval has start <= end.');
     if(n===133){const g=a[0];if(g.some((row:any,i:number)=>!unique(row)||row.some((v:any)=>v<1||v>g.length||v===i+1||!g[v-1].includes(i+1))))fail('Use a simple undirected adjacency list with nodes 1 through n.');const seen=new Set<number>();const visit=(i:number)=>{if(seen.has(i))return;seen.add(i);g[i].forEach((v:number)=>visit(v-1));};if(g.length)visit(0);if(seen.size!==g.length)fail('The graph must be connected.');}
+    if(n===785){const g=a[0];if(!array(g)||g.length<1||g.length>100||g.some((row:any,u:number)=>!array(row)||!unique(row)||row.some((v:any)=>!integer(v)||v<0||v>=g.length||v===u))||g.some((row:number[],u:number)=>row.some(v=>!g[v].includes(u))))fail('Use 1–100 vertices with distinct integer neighbors in [0,n-1], no self edges, and symmetric undirected adjacency. Disconnected graphs are allowed.');}
     const edgeSpecs:Record<number,[number,number,number]>={207:[0,1,0],210:[0,1,0],261:[0,1,0],310:[0,1,0],323:[0,1,0],997:[0,1,1],1462:[0,1,0],1489:[0,1,0],743:[1,0,1],787:[0,1,0],2392:[0,1,1]};
     if(edgeSpecs[n]){const [ni,ei,base]=edgeSpecs[n],size=a[ni],edges=a[ei];if(!integer(size)||size<1||size>2000||!array(edges)||edges.some((e:any)=>!array(e)||e.length!==([1489,743,787].includes(n)?3:2)||e.some((v:any)=>!integer(v))||e[0]===e[1]||e[0]<base||e[1]<base||e[0]>=size+base||e[1]>=size+base))fail('Graph edges must have valid distinct endpoints within the node range.');}
     if(n===310 && a[1].length!==a[0]-1)fail('The graph must be a tree.');
@@ -163,7 +166,6 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===162 && (!a[0].length || a[0].some((x:number,i:number)=>i>0&&x===a[0][i-1]))) fail('nums is nonempty and neighbors differ.');
     if(n===2300 && (!a[0].length || !a[1].length || a[0].concat(a[1]).some((x:number)=>x<1) || a[2]<1)) fail('spells and potions are nonempty and positive; success >= 1.');
     if(n===2616 && (!a[0].length || a[0].some((x:number)=>x<0) || a[1]<0 || a[1]>Math.floor(a[0].length/2))) fail('nums is nonempty and nonnegative; 0 <= p <= nums.length / 2.');
-    if(n===34 && !sorted(a[0])) fail('nums must be sorted.');
     if(n===1898){const [t,q,r]=a;if(!/^[a-z]+$/.test(t)||!/^[a-z]+$/.test(q)||!unique(r)||r.some((x:number)=>x<0||x>=t.length))fail('s and p use lowercase letters; removable holds distinct indices of s.');let j=0;for(const ch of t)if(ch===q[j])j++;if(j<q.length)fail('p must be a subsequence of s.');}
     if(n===1268 && (!a[0].length || a[0].some((x:any)=>!/^[a-z]+$/.test(x)) || !unique(a[0]) || !/^[a-z]+$/.test(a[1]))) fail('products are distinct lowercase words; searchWord is lowercase.');
     if([1299,724,1822,280,665,2348,2215].includes(n) && (!a[0].length || n===2215 && !a[1].length)) fail('The input arrays must be nonempty.');
@@ -257,7 +259,6 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     if(n===2477 && (a[0].length>1e5 || !isTree(a[0].length+1,a[0]) || a[1]<1 || a[1]>1e5)) fail('roads form a tree over cities 0 to n - 1; 1 <= seats <= 10^5.');
     if(n===2492) { const size=a[0]; if (size<2 || size>1e5 || !a[1].length || a[1].some((e:any)=>!Array.isArray(e)||e.length!==3||e[0]<1||e[1]<1||e[0]>size||e[1]>size||e[0]===e[1]||e[2]<1||e[2]>1e4) || new Set(a[1].map((e:any)=>Math.min(e[0],e[1])+','+Math.max(e[0],e[1]))).size!==a[1].length) fail('roads are distinct [a, b, distance] with a != b in [1, n] and distance in [1, 10^4].'); const root=Array.from({length:size+1},(_,k)=>k), find=(x:number):number=>root[x]===x?x:(root[x]=find(root[x])); for (const e of a[1]) root[find(e[0])]=find(e[1]); if (find(1)!==find(size)) fail('Cities 1 and n must be connected.'); }
     if(n===1557) { const size=a[0]; if (size<2 || size>1e5 || a[1].some((e:any)=>!Array.isArray(e)||e.length!==2||e.some((x:any)=>x<0||x>=size)||e[0]===e[1]) || new Set(a[1].map((e:any)=>e.join())).size!==a[1].length) fail('edges are distinct pairs of different nodes in [0, n - 1].'); const indeg=new Array(size).fill(0), out:number[][]=Array.from({length:size},()=>[]); for (const [x,y] of a[1]) { out[x].push(y); indeg[y]++; } const queue=[...Array(size).keys()].filter(k=>!indeg[k]); for (let h=0;h<queue.length;h++) for (const y of out[queue[h]]) if (!--indeg[y]) queue.push(y); if (queue.length!==size) fail('The graph must be acyclic.'); }
-    if(n===785 && (!a[0].length || a[0].length>100 || a[0].some((e:any,i:number)=>!Array.isArray(e)||e.some((x:any)=>x<0||x>=a[0].length||x===i)||new Set(e).size!==e.length||e.some((x:any)=>!a[0][x].includes(i))))) fail('graph is undirected: no self-loops or repeated neighbors, and j in graph[i] means i in graph[j].');
     if(n===2101 && (!a[0].length || a[0].length>100 || a[0].some((b:any)=>!Array.isArray(b)||b.length!==3||b.some((x:any)=>x<1||x>1e5)))) fail('bombs are 1 to 100 triples [x, y, r] with values in [1, 10^5].');
     if(n===1857 && (!/^[a-z]{1,100000}$/.test(a[0]) || a[1].some((e:any)=>!Array.isArray(e)||e.length!==2||e.some((x:any)=>x<0||x>=a[0].length)))) fail('colors is lowercase; edges are pairs of nodes in [0, n - 1].');
     if([234,876,1721,2130,147].includes(n) && !a[0].length) fail('The list must be nonempty.');

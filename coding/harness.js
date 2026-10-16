@@ -23,7 +23,7 @@ export function executeCase(number, input, entry, deserializeFn) {
   // shared allows one subtree object to appear more than once (894 builds trees from shared subtrees).
   const fromTree = (root, shared = false) => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (!shared && seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
-  const trees = [94,98,101,102,103,104,110,112,124,129,144,145,199,226,230,235,297,337,450,513,538,543,572,606,652,662,669,700,701,783,958,1325,1448];
+  const trees = [94,98,101,102,103,104,110,112,124,129,144,145,199,226,230,235,297,337,437,450,513,538,543,572,606,652,662,669,700,701,783,958,1325,1448];
   const lists = [19,24,25,61,83,86,92,143,147,148,203,206,234,725,876,1721,2130,2807];
   const design = [146,155,173,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,707,895,901,933,981,1396,1472,1603,1845,1993,2013];
   if (design.includes(number)) {

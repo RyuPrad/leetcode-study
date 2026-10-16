@@ -1,7 +1,9 @@
 // Guided predictions for problems added after the original library (shard C).
 // Same row format as shard B: revealed trace index, question, answer,
 // distractor~feedback, distractor~feedback, gentle hint, concrete hint.
-// Compile with: node scripts/author-guided-b.mjs --shard=c
+// Historical record: visualizer-ui/guided-content-c.json is the reviewed source. The legacy
+// writer (node scripts/author-guided-b.mjs --shard=c) is disabled; see README.md,
+// "Maintaining Guided content".
 export function authorAdded(add) {
 add(283,'Move nonzero values forward with a write index so the zeros collect at the end.','Advancing left on every iteration would leave zeros in the front; left moves only after a nonzero value is placed.',[
 [4,'nums[0] is 0. What happens to left?','left stays at 0','left moves to 1~Only a nonzero value fills the slot at left.','The 0 is moved to the end~Zeros are never moved directly; later swaps displace them.','Compare nums[right] with 0.','nums[0] !== 0 is false, so the swap and left++ are skipped.'],
@@ -95,10 +97,6 @@ add(2616,'Binary search the answer and check each guess by greedily pairing sort
 [1,'What is nums after sorting [10, 1, 2, 7, 1, 3]?','[1, 1, 2, 3, 7, 10]','[10, 7, 3, 2, 1, 1]~The comparator a - b sorts in ascending order.','[1, 2, 3, 7, 10]~Sorting keeps both 1s.','Sort in ascending order.','Neighbors are now the closest values.'],
 [24,'With mid = 4, three pairs were formed and p = 2. What changes?','right becomes 4','left becomes 5~Enough pairs means mid is achievable, so look for a smaller answer.','p becomes 3~p is the required number of pairs and never changes.','pairs >= p keeps mid as a candidate.','right = mid = 4.'],
 [87,'What is returned?','1','2~With a limit of 1, the pairs [1, 1] and [2, 3] already fit.','0~Only one pair has difference 0.','left = right = 1.','The smallest feasible maximum difference is 1.']]);
-add(34,'Run binary search twice, continuing left after a match for the first index and right for the last.','Stopping at the first match found returns some occurrence, not necessarily the first or the last.',[
-[12,'nums[4] = 8 equals the target while looking for the first match. What is res?','4','-1~A match updates res.','3~res records mid, which is 4 here.','res = mid on a match.','res becomes 4, but an earlier 8 may still exist.'],
-[14,'leftBias is true after the match at 4. What changes?','right becomes 3','left becomes 5~Looking for the first match means searching left.','The search stops~A first-match search keeps narrowing after a match.','The first occurrence can only be to the left.','right = mid - 1 = 3.'],
-[46,'What is returned?','[3, 4]','[4, 4]~The first 8 is at index 3.','[3, 3]~The last 8 is at index 4.','first and last come from the two calls.','bound(true) found 3 and bound(false) found 4.']]);
 add(1898,'Binary search the number of removals, testing each guess with a two-pointer subsequence check.','Testing every k in order works but repeats the subsequence check many times; removals only make things worse, so k can be binary searched.',[
 [5,'mid = 2. Which indices does isSubsequence(2) remove?','3 and 1','3, 1 and 0~Only the first k = 2 removals apply.','0 and 1~removable lists indices in removal order.','Take removable.slice(0, 2).','removed = {3, 1}.'],
 [31,'isSubsequence(2) returned true. What changes?','left becomes 2','right becomes 1~p survives, so at least 2 removals work.','The search returns 2~One larger count is still untested.','A success raises the lower bound.','left = mid = 2.'],
@@ -571,10 +569,6 @@ add(1557,'A node with no incoming edge cannot be reached from anywhere else, and
 [17,'Node 0 has no incoming edge. What is res?','[0]','[]~A node nobody points to must be in the answer.','[1]~Node 1 has an incoming edge from 0.','Push nodes where hasIncoming is false.','hasIncoming[0] is false.'],
 [23,'Node 2 is checked. Is it added to res?','No, it has an incoming edge','Yes, every node is checked~Only nodes with no incoming edge are added.','Yes, because it leads to node 5~Outgoing edges do not matter; incoming ones do.','Look at hasIncoming[2].','Edges 0 → 2 and 4 → 2 point into node 2.'],
 [36,'Every node was checked. What is returned?','[0, 3]','[0, 3, 5]~Node 5 is reached by 2 → 5.','[0, 1, 2, 3, 4, 5]~Only nodes with no incoming edge are needed.','Collect nodes nobody points to.','Only 0 and 3 have no incoming edges.']]);
-add(785,'Color each component with breadth-first search, giving every neighbor the opposite color; an edge between two equal colors means the graph is not bipartite.','Starting only from node 0 misses other components; every uncolored node must start a new search.',[
-[13,'Node 0 has color 0; its neighbor 1 is uncolored. What is color?','[0, 1, -1, -1]','[0, 0, -1, -1]~Neighbors get the opposite color.','[0, 1, 0, 1]~Only node 1 is colored in this step.','color[next] = 1 - color[node].','1 - 0 = 1.'],
-[28,'From node 1 (color 1), neighbor 2 is uncolored. What is color[2]?','0','1~Neighbors get the opposite color: 1 - 1 = 0.','-1~Node 2 is uncolored, so it receives a color.','color[next] = 1 - color[node].','1 - 1 = 0.'],
-[39,'Node 3 (color 1) sees neighbor 2 (color 0). What happens?','Nothing; the colors differ','return false~Only equal colors on an edge break the two-coloring.','Node 2 is recolored to 0~A colored node is never recolored.','Compare color[next] with color[node].','0 !== 1, so the edge is fine.']]);
 add(2101,'Bomb i triggers bomb j when j is within i\x27s radius, which is one-directional, so search the directed graph from every starting bomb.','Treating the range as symmetric is wrong: a big bomb can reach a small one that cannot reach it back.',[
 [21,'Bomb 1 at (6, 1) has radius 4, and bomb 0 is 4 away. What is adj?','[[], [0]]','[[1], [0]]~Bomb 0 has radius 3, and bomb 1 is 4 away.','[[], []]~16 <= 16, so bomb 0 is in range of bomb 1.','Compare dx² + dy² with radius².','16 <= 4² = 16, so adj[1].push(0).'],
 [39,'Starting at bomb 0, no other bomb is in range. What is res?','1','0~The starting bomb itself always explodes.','2~Bomb 1 is out of range of bomb 0.','res = Math.max(res, visited.size).','visited = {0}, size 1.'],

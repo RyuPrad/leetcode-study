@@ -1,3 +1,4 @@
+import './legacy-guided-write-disabled.mjs';
 import fs from 'node:fs';
 import { authored } from './author-guided-a.mjs';
 import { shardA } from './guided-shards.mjs';
