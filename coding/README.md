@@ -1,6 +1,6 @@
 # Offline coding contracts
 
-`problems.json` contains the 252 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
+`problems.json` contains the 438 runtime definitions: original concise statements, JavaScript entry points, class methods, starters, visible examples with expected results, reference programs, and submission cases. The app loads these as bundled assets; no LeetCode account, remote judge, or installed language runtime is used.
 
 `statements.mjs` and `cases.mjs` maintain statements and deterministic additional cases. Run `npx tsx scripts/author-coding.ts` after editing them. This refreshes definitions, checks input contracts, runs each reference, and updates displayed example results. References and starter signatures are maintained directly in `problems.json`. The optional `scripts/import-coding.mjs` is a one-time import aid for extracted visualizer code, not part of a build or regeneration workflow.
 
@@ -28,6 +28,6 @@ Java and C run in the desktop main process (`desktop/native-runner.ts`) with the
 
 ## Reference solutions
 
-`solutions/{typescript,java,c}/<number>.{ts,java,c}` translate each problem's JavaScript `reference`, keeping its algorithm and variable names so they match the Visualizer. `npm run check:solutions` judges all 756 on their full submission suites, and must stay Accepted. The Code tab loads them lazily (`src/coding/solutions.ts`); `scripts/content.mjs` appends them, with the JavaScript reference, to each bundled note.
+`solutions/{typescript,java,c}/<number>.{ts,java,c}` translate each problem's JavaScript `reference`, keeping its algorithm and variable names so they match the Visualizer. `npm run check:solutions` judges all 1,314 on their full submission suites, and must stay Accepted. The Code tab loads them lazily (`src/coding/solutions.ts`); `scripts/content.mjs` appends them, with the JavaScript reference, to each bundled note.
 
 The Visualizer and Learn tabs can show these solutions instead of the JavaScript reference, highlighting the line that matches each step. `visualizer-ui/code-maps.json` maps every highlighted JavaScript line to a line of each solution; `0` marks a line with no counterpart, and `reviewed` lists the mappings a person checked. After changing a solution, run `node scripts/code-maps.mjs --author --refresh=<number>:<language>` to derive its new map, review it, and list the checked lines in `reviewed`. `npm run check:code-maps` fails until every line is mapped and every dissimilar or contested mapping is reviewed; the build writes the maps and solutions to `visualizer-ui/code-languages.js`.
