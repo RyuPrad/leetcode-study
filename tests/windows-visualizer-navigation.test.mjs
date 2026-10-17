@@ -19,13 +19,16 @@ const hash = value => createHash('sha256').update(JSON.stringify(value)).digest(
 const snapshots = Object.fromEntries(keys.map(key => [key, { state: key }]));
 const expected = Object.fromEntries(keys.map(key => [key, hash(snapshots[key])]));
 const plain = value => JSON.parse(JSON.stringify(value));
+// The validator sizes its page pool with scripts/workers.mjs.
+const pagePool = 3;
 
 async function validate({ loadMs = 0, resultPatch = {}, pageError, navigationError, baseline = true } = {}) {
   const output = new Map(), calls = [], events = [];
-  let evaluations = 0, closedPages = 0, browserClosed = false, cleared = false;
+  let evaluations = 0, openedPages = 0, closedPages = 0, browserClosed = false, cleared = false;
   const processStub = { argv: [], env: {}, exitCode: undefined };
   const browser = {
     async newPage() {
+      openedPages++;
       const handlers = new Map();
       return {
         on: (name, handler) => handlers.set(name, handler),
@@ -65,6 +68,7 @@ async function validate({ loadMs = 0, resultPatch = {}, pageError, navigationErr
     },
     path, pathToFileURL, createHash, ROOT: root,
     collectCatalog: () => ({ visualizers: [file] }),
+    workers: () => pagePool,
     chromium: { launch: async () => browser },
     process: processStub,
     console: { log() {}, error() {} },
@@ -74,7 +78,8 @@ async function validate({ loadMs = 0, resultPatch = {}, pageError, navigationErr
   await new vm.Script(`(async () => {\n${executable}\n})()`, { filename: sourcePath }).runInContext(context);
   assert.equal(browserClosed, true);
   assert.equal(cleared, true);
-  assert.equal(closedPages, 4);
+  assert.equal(openedPages, pagePool, 'One page per worker');
+  assert.equal(closedPages, pagePool, 'Every worker page is closed');
   assert.equal(calls.length, 1, 'Navigation failures must not be retried');
   assert.equal(calls[0].url, pathToFileURL(path.join(root, file)).href);
   assert.equal(calls[0].waitUntil, 'load', 'Retain the full page-load readiness gate');

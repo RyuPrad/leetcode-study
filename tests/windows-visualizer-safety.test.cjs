@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const crypto = require('node:crypto');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const baseline = require('./fixtures/windows-safety-controls-baselines.json').files;
+const { codeLanguageHrefs } = require('./helpers/code-language-assets.cjs');
 const originalArg = process.argv.indexOf('--originals');
 if (originalArg >= 0 && !process.argv[originalArg + 1]) throw new Error('--originals requires a source directory');
 const originals = originalArg >= 0 ? path.resolve(process.argv[originalArg + 1]) : null;
@@ -90,7 +91,7 @@ for (const key of Object.keys(paths)) {
   const html = fs.readFileSync(path.join(root, paths[key]), 'utf8');
   test(`${key}: shared assets and lesson bridge remain unchanged`, () => {
     assert.equal(hash(html.match(/    \/\/ STUDY LESSON BRIDGE START[\s\S]*?    \/\/ STUDY LESSON BRIDGE END/)[0]), baseline[paths[key]].bridgeSha256);
-    assert.deepEqual([...html.matchAll(/(?:src|href)="(\.\.\/visualizer-ui\/[^"]+)"/g)].map(m=>m[1]), baseline[paths[key]].sharedAssets);
+    assert.deepEqual([...html.matchAll(/(?:src|href)="(\.\.\/visualizer-ui\/[^"]+)"/g)].map(m=>m[1]), [...baseline[paths[key]].sharedAssets, ...codeLanguageHrefs]);
   });
   const count = h.exec('Object.keys(examples).length');
   for (let i = 1; i <= count; i++) test(`${key} preset ${i}: unchanged snapshots, render every step, back/forward, reset`, () => {

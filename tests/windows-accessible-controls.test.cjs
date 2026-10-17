@@ -8,6 +8,7 @@ const base = path.resolve(__dirname, '..');
 const crypto = require('node:crypto');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const baseline = require('./fixtures/windows-safety-controls-baselines.json').files;
+const { codeLanguageHrefs } = require('./helpers/code-language-assets.cjs');
 const originalArg = process.argv.indexOf('--originals');
 if (originalArg >= 0 && !process.argv[originalArg + 1]) throw new Error('--originals requires a source directory');
 const originals = originalArg >= 0 ? path.resolve(process.argv[originalArg + 1]) : null;
@@ -140,7 +141,7 @@ for (const file of files) {
   equal(narration.getAttribute('aria-live'), 'polite', 'polite step narration'); equal(narration.getAttribute('aria-atomic'), 'true', 'atomic step narration');
   check(/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(html) && /animation: none !important/.test(html), 'reduced-motion CSS');
   equal(hash(html.match(/    \/\/ STUDY LESSON BRIDGE START[\s\S]*?    \/\/ STUDY LESSON BRIDGE END/)[0]), baseline[file].bridgeSha256, 'lesson bridge preserved');
-  equal(JSON.stringify([...html.matchAll(/(?:src|href)="(\.\.\/visualizer-ui\/[^"]+)"/g)].map(m=>m[1])), JSON.stringify(baseline[file].sharedAssets), 'shared assets preserved');
+  equal(JSON.stringify([...html.matchAll(/(?:src|href)="(\.\.\/visualizer-ui\/[^"]+)"/g)].map(m=>m[1])), JSON.stringify([...baseline[file].sharedAssets, ...codeLanguageHrefs]), 'shared assets preserved');
   check(/<div class="custom-input-group">\s*<label[^>]*for="custom-input"[\s\S]*?<div class="custom-row">[\s\S]*?<input[^>]*id="custom-input"[\s\S]*?<\/div>\s*<p[^>]*id="custom-input-help"[\s\S]*?<\/p>\s*<\/div>/.test(html), 'input label, input, and help move as one shared workspace row');
   check(!/clampControlsToViewport|controlsDock/.test(html), 'legacy docking controller does not compete with shared panels');
   app.document.fullscreenElement = {}; app.document.dispatch('fullscreenchange');
