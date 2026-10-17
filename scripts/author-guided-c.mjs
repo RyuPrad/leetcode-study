@@ -1,9 +1,12 @@
 // Guided predictions for problems added after the original library (shard C).
 // Same row format as shard B: revealed trace index, question, answer,
 // distractor~feedback, distractor~feedback, gentle hint, concrete hint.
-// Historical record: visualizer-ui/guided-content-c.json is the reviewed source. The legacy
-// writer (node scripts/author-guided-b.mjs --shard=c) is disabled; see README.md,
-// "Maintaining Guided content".
+// visualizer-ui/guided-content-c.json is the reviewed source: rows for problems that already have
+// a lesson there are a historical record and are never recompiled. For a newly added problem,
+// append its rows here, capture its trace, and run `node scripts/add-guided-c.mjs <number>`,
+// which appends only that lesson at version 1 and refuses any problem that already has one or
+// belongs to shard A or B. The legacy writer (node scripts/author-guided-b.mjs --shard=c) stays
+// disabled; see README.md, "Maintaining Guided content".
 export function authorAdded(add) {
 add(283,'Move nonzero values forward with a write index so the zeros collect at the end.','Advancing left on every iteration would leave zeros in the front; left moves only after a nonzero value is placed.',[
 [4,'nums[0] is 0. What happens to left?','left stays at 0','left moves to 1~Only a nonzero value fills the slot at left.','The 0 is moved to the end~Zeros are never moved directly; later swaps displace them.','Compare nums[right] with 0.','nums[0] !== 0 is false, so the swap and left++ are skipped.'],
