@@ -1,0 +1,68 @@
+{
+  "number": 640,
+  "title": "Solve the Equation",
+  "spec": "leetcode",
+  "statement": "`equation` is a linear equation in one unknown `x`: two sides joined by a single `=`, each side a chain of terms combined with `+` and `-` (a side's first term may also carry a sign). A term is either a whole number or an `x` term, written as `x` alone or with a whole-number coefficient right before it, such as `3x` or `0x`. Solve it and return:\n\n- `\"x=#value\"` (for example `\"x=-4\"`) when exactly one value of `x` works; that value is guaranteed to be an integer.\n- `\"No solution\"` when no value works.\n- `\"Infinite solutions\"` when every value works.",
+  "constraints": [
+    "3 <= equation.length <= 1000",
+    "equation contains exactly one '='",
+    "Every number in equation is between 0 and 100 and has no leading zeros",
+    "equation contains only digits, 'x', '+', '-' and '='",
+    "If there is exactly one solution, it is an integer"
+  ],
+  "signature": "String solveEquation(String equation)",
+  "entry": "solveEquation",
+  "kind": "function",
+  "parameters": [
+    "equation"
+  ],
+  "validator": "function validate([equation]) {\n  if (typeof equation !== 'string' || equation.length < 3 || equation.length > 1000) return 'equation must have 3 to 1000 characters.';\n  const parts = equation.split('=');\n  if (parts.length !== 2) return 'equation needs exactly one \"=\".';\n  const term = '(?:(?:0|[1-9]\\\\d*)?x|0|[1-9]\\\\d*)';\n  const shape = new RegExp('^[+-]?' + term + '(?:[+-]' + term + ')*$');\n  if (!shape.test(parts[0]) || !shape.test(parts[1])) return 'Each side must be terms like 3x, x or 7 joined by + and -.';\n  if ((equation.match(/\\d+/g) || []).some(d => Number(d) > 100)) return 'Every number is at most 100.';\n  let coefficient = 0;\n  let constant = 0;\n  parts.forEach((part, index) => {\n    const side = index === 0 ? 1 : -1;\n    for (const token of part.match(/[+-]?(\\d*x|\\d+)/g)) {\n      const sign = token[0] === '-' ? -side : side;\n      const body = token.replace(/^[+-]/, '');\n      if (body.endsWith('x')) coefficient += sign * (body === 'x' ? 1 : Number(body.slice(0, -1)));\n      else constant -= sign * Number(body);\n    }\n  });\n  if (coefficient !== 0 && constant % coefficient !== 0) return 'A single solution must be an integer.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function solveEquation(equation) {\n  let coefficient = 0;\n  let constant = 0;\n  let side = 1;\n  let i = 0;\n\n  while (i < equation.length) {\n    if (equation[i] === '=') {\n      side = -1;\n      i++;\n      continue;\n    }\n    let sign = side;\n    if (equation[i] === '+' || equation[i] === '-') {\n      if (equation[i] === '-') sign = -sign;\n      i++;\n    }\n    let digits = '';\n    while (i < equation.length && equation[i] >= '0' && equation[i] <= '9') {\n      digits += equation[i];\n      i++;\n    }\n    if (equation[i] === 'x') {\n      coefficient += sign * (digits === '' ? 1 : Number(digits));\n      i++;\n    } else {\n      constant -= sign * Number(digits);\n    }\n  }\n\n  if (coefficient === 0) {\n    return constant === 0 ? 'Infinite solutions' : 'No solution';\n  }\n  return 'x=' + constant / coefficient;\n}",
+  "brute": "function solveEquation(equation) {\n  // Evaluate left - right at every integer that could be the answer and count the roots.\n  const sides = equation.split('=').map(part => part.match(/[+-]?(\\d*x|\\d+)/g));\n  const evaluate = (tokens, t) => {\n    let total = 0;\n    for (const token of tokens) {\n      if (token.endsWith('x')) {\n        const head = token.slice(0, -1);\n        const factor = head === '' || head === '+' ? 1 : head === '-' ? -1 : Number(head);\n        total += factor * t;\n      } else {\n        total += Number(token);\n      }\n    }\n    return total;\n  };\n  const numbers = equation.match(/\\d+/g) || [];\n  const bound = numbers.reduce((sum, d) => sum + Number(d), 0) + 1;\n  const roots = [];\n  for (let t = -bound; t <= bound && roots.length < 2; t++) {\n    if (evaluate(sides[0], t) === evaluate(sides[1], t)) roots.push(t);\n  }\n  if (roots.length === 2) return 'Infinite solutions';\n  if (roots.length === 1) return 'x=' + roots[0];\n  return 'No solution';\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const maxValue = large ? 100 : (rand() < 0.5 ? 5 : 12);\n  const randInt = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  for (;;) {\n    // Each term: { left, sign, isX, value }. C·x = K collects everything on the left.\n    const terms = [];\n    const perSide = large ? randInt(60, 110) : randInt(1, 3);\n    for (const left of [true, false]) {\n      const count = large ? perSide + randInt(-20, 20) : randInt(1, 3);\n      for (let k = 0; k < count; k++) terms.push({ left, sign: rand() < 0.5 ? 1 : -1, isX: rand() < 0.45, value: randInt(0, maxValue) });\n    }\n    const totals = () => {\n      let C = 0, K = 0;\n      for (const t of terms) {\n        const s = (t.left ? 1 : -1) * t.sign;\n        if (t.isX) C += s * t.value; else K -= s * t.value;\n      }\n      return [C, K];\n    };\n    const insert = (term) => {\n      const position = randInt(0, terms.length);\n      terms.splice(position, 0, term);\n    };\n    const mode = rand();\n    let [C, K] = totals();\n    if (mode < 0.4) {\n      // No unique answer: cancel the x coefficient.\n      while (C !== 0) {\n        const v = Math.min(Math.abs(C), maxValue);\n        insert({ left: true, sign: C > 0 ? -1 : 1, isX: true, value: v });\n        [C, K] = totals();\n      }\n      if (mode < 0.2) {\n        while (K !== 0) {\n          const v = Math.min(Math.abs(K), maxValue);\n          insert({ left: true, sign: K > 0 ? 1 : -1, isX: false, value: v });\n          [C, K] = totals();\n        }\n      } else if (K === 0) {\n        insert({ left: false, sign: 1, isX: false, value: randInt(1, maxValue) });\n      }\n    } else {\n      if (C === 0) insert({ left: rand() < 0.5, sign: rand() < 0.5 ? 1 : -1, isX: true, value: randInt(1, maxValue) });\n      [C, K] = totals();\n      if (C === 0) continue;\n      const target = Math.round(K / C) + randInt(-2, 2);\n      let diff = C * target - K;\n      while (diff !== 0) {\n        const v = Math.min(Math.abs(diff), maxValue);\n        insert({ left: true, sign: diff > 0 ? -1 : 1, isX: false, value: v });\n        [C, K] = totals();\n        diff = C * target - K;\n      }\n    }\n    const render = (list) => list.map((t, k) => {\n      const body = t.isX ? (t.value === 1 && rand() < 0.9 ? 'x' : t.value + 'x') : String(t.value);\n      if (t.sign < 0) return '-' + body;\n      return k === 0 ? body : '+' + body;\n    }).join('');\n    const leftTerms = terms.filter(t => t.left);\n    const rightTerms = terms.filter(t => !t.left);\n    if (leftTerms.length === 0 || rightTerms.length === 0) continue;\n    const equation = render(leftTerms) + '=' + render(rightTerms);\n    if (equation.length >= 3 && equation.length <= 1000) return [equation];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["x+5-3+x=6+x-2"],"expected":"x=2"},
+    {"name":"Example 2","input":["x=x"],"expected":"Infinite solutions"},
+    {"name":"Example 3","input":["2x=x"],"expected":"x=0"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["x=1"]},
+    {"name":"Test 2","input":["-x=-1"]},
+    {"name":"Test 3","input":["0x=0"]},
+    {"name":"Test 4","input":["0x=5"]},
+    {"name":"Test 5","input":["x+5=x+6"]},
+    {"name":"Test 6","input":["2x+3=x-7"]},
+    {"name":"Test 7","input":["-100x=100"]},
+    {"name":"Test 8","input":["x-x+x-x=0"]},
+    {"name":"Test 9","input":["3x=33+3"]},
+    {"name":"Test 10","input":["5=x"]},
+    {"name":"Test 11","input":["-2x-3=-x+4-x-x"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAny such equation can be rearranged into `coefficient · x = constant` by moving every `x` term to the left and every number to the right. A single left-to-right scan can do this directly: a term on the right side simply counts with the opposite sign. Then there are three cases: a nonzero coefficient gives one answer, while a zero coefficient gives either every `x` (when `constant` is also zero) or none. A brute force could instead plug in every integer in a safe range and count which ones balance.\n\n## Approach\n\n1. Start with `coefficient = 0`, `constant = 0`, and `side = 1` for the left side.\n2. On `=`, set `side = -1`: everything after it is moved across.\n3. For each term, start `sign` at `side` and flip it if the term begins with `-`.\n4. Collect the term's digits. If an `x` follows, add `sign` times the coefficient (1 when there are no digits) to `coefficient`.\n5. Otherwise the term is a number; moving it to the right flips it, so subtract `sign` times it from `constant`.\n6. If `coefficient` is 0, return `\"Infinite solutions\"` or `\"No solution\"` depending on `constant`; otherwise return `x=` and `constant / coefficient`.\n\n## Example 1, step by step\n\n`\"x+5-3+x=6+x-2\"`. Left side: `x` makes `coefficient = 1`, `+5` makes `constant = -5`, `-3` makes `constant = -2`, `+x` makes `coefficient = 2`. After `=`, `side = -1`: `6` makes `constant = 4`, `+x` makes `coefficient = 1`, `-2` makes `constant = 2`. So `1 · x = 2` and the answer is `\"x=2\"`.\n\n## Complexity\n\n- Time: O(n): each character is read once.\n- Space: O(1) apart from the short `digits` buffer.\n\n## Pitfalls\n\n- A bare `x` has coefficient 1 and `-x` has `-1`, but `0x` really is 0: test for empty digits, not for a falsy number.\n- Terms after `=` must be negated; forgetting this solves `left + right = 0` instead.\n- Check `coefficient === 0` before dividing, and only then look at `constant`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `coefficient` | total coefficient of `x` after moving everything left |\n| `constant` | total of the numbers after moving them right |\n| `side` | `1` before `=`, `-1` after it |\n| `i` | cursor into `equation` |\n| `sign` | effective sign of the current term |\n| `digits` | the current term's digits as text |",
+  "narration": {
+    "2": "Total coefficient of x once every x term is moved to the left side.",
+    "3": "Total of the plain numbers once they are all moved to the right side.",
+    "4": "side is 1 while reading the left side; terms there keep their sign.",
+    "7": "Scan the equation one term at a time.",
+    "8": "Reaching the equals sign switches to the right side.",
+    "9": "From now on every term is moved across the equals sign, so its sign flips.",
+    "13": "A term starts with the sign of the side it is on.",
+    "15": "A minus in front of the term flips that sign.",
+    "19": "Collect the term's digits, if it has any.",
+    "23": "An x after the digits means this is an x term.",
+    "24": "Add its coefficient; a bare x with no digits counts as 1.",
+    "27": "A plain number moves to the other side, so it is subtracted from constant.",
+    "31": "With no x left, the equation does not depend on x at all.",
+    "32": "0 = 0 holds for every x; 0 = anything else holds for none.",
+    "34": "Otherwise divide to get the single (guaranteed integer) solution."
+  }
+}

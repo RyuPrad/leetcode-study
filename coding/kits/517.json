@@ -1,0 +1,61 @@
+{
+  "number": 517,
+  "title": "Super Washing Machines",
+  "spec": "leetcode",
+  "statement": "A row of `n` washing machines is described by `machines`, where `machines[i]` is the number of dresses inside machine `i` (counting from the left). In a single move you pick any number of machines, at least one, and each picked machine at the same moment hands one of its own dresses to the machine directly to its left or directly to its right (each picked machine chooses its own direction, and it must hold a dress to hand over). Return the smallest number of moves after which all machines hold equally many dresses, or `-1` if no sequence of moves can achieve that.",
+  "constraints": [
+    "n == machines.length",
+    "1 <= n <= 10^4",
+    "0 <= machines[i] <= 10^5"
+  ],
+  "signature": "int findMinMoves(int[] machines)",
+  "entry": "findMinMoves",
+  "kind": "function",
+  "parameters": [
+    "machines"
+  ],
+  "validator": "function validate([machines]) {\n  if (machines.length < 1 || machines.length > 10000) return 'machines needs 1 to 10^4 machines.';\n  if (machines.some(v => !Number.isInteger(v) || v < 0 || v > 100000)) return 'Each machine holds 0 to 10^5 dresses.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMinMoves(machines) {\n  const n = machines.length;\n  let total = 0;\n  for (const dresses of machines) {\n    total += dresses;\n  }\n  if (total % n !== 0) {\n    return -1;\n  }\n  const target = total / n;\n  let flow = 0;\n  let moves = 0;\n  for (const dresses of machines) {\n    const extra = dresses - target;\n    flow += extra;\n    moves = Math.max(moves, Math.abs(flow), extra);\n  }\n  return moves;\n}",
+  "brute": "function findMinMoves(machines) {\n  const n = machines.length;\n  const total = machines.reduce((a, b) => a + b, 0);\n  if (total % n !== 0) return -1;\n  const target = total / n;\n  if (n <= 5 && total <= 12) {\n    // Breadth-first search over states: each move lets every machine stay, pass left or pass right.\n    const goal = machines.map(() => target).join(',');\n    const seen = new Set([machines.join(',')]);\n    let frontier = [machines.slice()];\n    for (let moves = 0; ; moves++) {\n      if (frontier.some(state => state.join(',') === goal)) return moves;\n      const next = [];\n      for (const state of frontier) {\n        for (let code = 1; code < 3 ** n; code++) {\n          const after = state.slice();\n          let ok = true;\n          for (let i = 0, c = code; i < n && ok; i++, c = Math.floor(c / 3)) {\n            if (c % 3 === 0) continue;\n            const to = c % 3 === 1 ? i - 1 : i + 1;\n            if (state[i] === 0 || to < 0 || to >= n) ok = false;\n            else { after[i]--; after[to]++; }\n          }\n          const key = after.join(',');\n          if (ok && !seen.has(key)) { seen.add(key); next.push(after); }\n        }\n      }\n      frontier = next;\n    }\n  }\n  // Bigger cases: recompute each boundary's net crossing and each machine's surplus from scratch.\n  let best = 0;\n  for (let i = 0; i < n; i++) {\n    let crossing = 0;\n    for (let j = 0; j <= i; j++) crossing += machines[j] - target;\n    best = Math.max(best, Math.abs(crossing), machines[i] - target);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    const n = int(1, 5);\n    if (rand() < 0.25) return [Array.from({ length: n }, () => int(0, 3))];\n    // Usually a balanced total: scatter target * n dresses over the machines.\n    const target = int(0, Math.floor(10 / n));\n    const machines = new Array(n).fill(0);\n    for (let k = 0; k < target * n; k++) machines[rand() < 0.4 ? 0 : int(0, n - 1)]++;\n    if (rand() < 0.5) machines.reverse();\n    return [machines];\n  }\n  const n = 2000;\n  const mode = int(0, 2);\n  let machines;\n  if (mode === 0) machines = Array.from({ length: n }, () => int(0, 100000));\n  else if (mode === 1) machines = Array.from({ length: n }, (_, i) => (i < n / 2 ? int(60000, 100000) : int(0, 40000)));\n  else { machines = new Array(n).fill(0); machines[int(0, n - 1)] = n * int(1, 50); }\n  // Make the total divisible by n so the answer is not -1.\n  let remainder = machines.reduce((a, b) => a + b, 0) % n;\n  for (let i = 0; remainder > 0; i++) {\n    const take = Math.min(remainder, machines[i]);\n    machines[i] -= take;\n    remainder -= take;\n  }\n  return [machines];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,0,5]],"expected":3},
+    {"name":"Example 2","input":[[0,3,0]],"expected":2},
+    {"name":"Example 3","input":[[0,2,0]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0]]},
+    {"name":"Test 2","input":[[7]]},
+    {"name":"Test 3","input":[[4,0]]},
+    {"name":"Test 4","input":[[1,2]]},
+    {"name":"Test 5","input":[[3,3,3]]},
+    {"name":"Test 6","input":[[0,9,0]]},
+    {"name":"Test 7","input":[[0,0,0,0,10]]},
+    {"name":"Test 8","input":[[4,0,0,4]]},
+    {"name":"Test 9","input":[[0,0,11,5]]},
+    {"name":"Test 10","input":[[100000,0,0,0,0,0,0,0,0,0]]},
+    {"name":"Test 11","input":[[0,4,0,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSearching over every combination of moves explodes quickly. Instead, find lower bounds that every schedule must respect, and use the fact that the largest of them can always be met.\n\nIf the dresses cannot be split evenly (`total % n !== 0`) the answer is `-1`. Otherwise every machine must end with `target = total / n`. Look at the boundary to the right of machine `i`: the machines to its left hold `flow` more dresses than they should, so `|flow|` dresses must cross that boundary, and a single move carries at most one dress across it in net. Also, a machine with `extra` surplus dresses can hand over only one per move, so it needs at least `extra` moves. A machine short of dresses gives no such bound, because it can receive from both sides at once.\n\n## Approach\n\n1. Add up `total`; if it is not a multiple of `n`, return `-1`.\n2. Set `target = total / n`, and start `flow` and `moves` at 0.\n3. For each machine, compute `extra = dresses - target` and add it to the running `flow`.\n4. Raise `moves` to `|flow|` (the boundary bound) and to `extra` (the giver bound).\n5. Return `moves`.\n\n## Example 1, step by step\n\n`machines = [1, 0, 5]`, `total = 6`, `target = 2`.\n\n- Machine 0: `extra = -1`, `flow = -1`, `moves = 1`.\n- Machine 1: `extra = -2`, `flow = -3`: three dresses must cross into the left pair, so `moves = 3`.\n- Machine 2: `extra = 3`, `flow = 0`; the giver bound is also 3, so `moves` stays 3.\n\nThe answer is 3.\n\n## Complexity\n\n- Time: O(n): two passes over the machines.\n- Space: O(1): a few counters.\n\n## Pitfalls\n\n- Do not use `Math.abs(extra)`: `[3, 0, 3]` takes one move, because the empty middle machine receives from both sides at once, while a deficit of 2 would claim two.\n- Check divisibility before dividing; otherwise `target` is a fraction and the bounds are meaningless.\n- Taking only the boundary bound fails on `[0, 9, 0]`: `|flow|` never exceeds 3, yet the middle machine needs 6 moves to give away its surplus.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | number of dresses overall |\n| `target` | dresses each machine must end with |\n| `extra` | how many dresses the current machine has above `target` (negative when short) |\n| `flow` | net dresses that must cross the boundary right of the current machine |\n| `moves` | largest lower bound seen so far, which is the answer |",
+  "narration": {
+    "3": "Count all dresses first.",
+    "7": "An uneven total can never be split equally.",
+    "8": "So no sequence of moves works.",
+    "10": "Every machine must end with this many dresses.",
+    "11": "flow will be the net number of dresses that must cross the current boundary.",
+    "12": "moves keeps the largest lower bound found.",
+    "13": "Visit the machines from left to right.",
+    "14": "How many dresses this machine must lose (negative if it must gain).",
+    "15": "Running prefix sum: the surplus of everything up to here must cross the next boundary.",
+    "16": "One move carries one dress across a boundary and lets a machine give only one, so both bounds must hold.",
+    "18": "The largest bound can always be achieved, so it is the answer."
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "number": 431,
+  "title": "Encode N-ary Tree to Binary Tree",
+  "spec": "recalled",
+  "statement": "An N-ary tree node has an integer `val` and an ordered array `children` holding any number of child nodes (empty for a leaf). A binary tree node is a `TreeNode` with `val`, `left` and `right`. Design a class `Codec` that converts between the two kinds of tree:\n\n- `encode(root)` receives the root of an N-ary tree (`null` when the tree is empty) and returns the root of a binary tree made of `TreeNode` objects that represents it (`null` is allowed).\n- `decode(data)` receives a binary tree that `encode` produced and returns the root of a newly built N-ary tree identical to the original: the same values, the same shape, and every node's children in the same order (`null` for an empty tree).\n\nHow the binary tree represents the N-ary tree is up to you. Both methods must be stateless: `decode` may rely only on the binary tree it is given, never on anything kept in fields, statics or globals.\n\nN-ary nodes are `Node` objects (also available as `_Node`): `new Node(val, children)` creates one, and `children` defaults to a new empty array.\n\nEach case is `[[\"Codec\", \"encode\"], [[], [root]]]`, where `root` is the N-ary tree in LeetCode's level order: the root's value, then for every node in breadth-first order a `null` followed by that node's children from first to last, with trailing `null`s dropped (`[1,null,3,2,4,null,5,6]` is a root `1` with children `3, 2, 4`, and `3` has children `5, 6`). The judge builds the tree and calls `encode` on one `Codec`. It copies the returned binary tree into fresh `TreeNode` objects, keeping only `val`, `left` and `right` (every `val` must be an integer), and passes the copy to `decode` on a second `Codec`. The rebuilt tree, written in the same level order, must equal `root`.",
+  "constraints": [
+    "The tree has between 0 and 10^4 nodes (in this app, root is at most 2,000 items long)",
+    "0 <= Node.val <= 10^4",
+    "The height of the N-ary tree is at most 1000",
+    "encode and decode must not share state through fields, statics or globals"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "Codec",
+    "constructor": "Codec()",
+    "methods": [
+      "TreeNode encode(Node root)",
+      "Node decode(TreeNode data)"
+    ]
+  },
+  "entry": "Codec",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [],
+    "encode": [
+      "root"
+    ],
+    "decode": [
+      "data"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  if (!Array.isArray(operations) || operations.length !== 2 || operations[0] !== 'Codec' || operations[1] !== 'encode') return 'Each case is [[\"Codec\", \"encode\"], [[], [root]]]; the judge calls decode itself.';\n  if (!Array.isArray(args) || args.length !== 2 || !Array.isArray(args[0]) || args[0].length !== 0 || !Array.isArray(args[1]) || args[1].length !== 1 || !Array.isArray(args[1][0])) return 'Pass the tree as the only argument of encode.';\n  const root = args[1][0];\n  if (root.length === 0) return null;\n  if (root.some(v => v !== null && (!Number.isInteger(v) || v < 0 || v > 10000))) return 'Node values are whole numbers from 0 to 10^4.';\n  if (root[0] === null) return 'A non-empty tree starts with the root value.';\n  if (root.length > 1 && root[1] !== null) return 'The root value is followed by null, then its children.';\n  if (root[root.length - 1] === null) return 'Drop the trailing nulls from the level order.';\n  const depths = [1];\n  let index = 2;\n  for (let head = 0; index < root.length; head++) {\n    if (head >= depths.length) return 'Every null starts the children of the next node; there are more groups than nodes.';\n    while (index < root.length && root[index] !== null) {\n      depths.push(depths[head] + 1);\n      index++;\n    }\n    index++;\n  }\n  if (depths.length > 10000) return 'The tree has at most 10^4 nodes.';\n  if (Math.max(...depths) > 1000) return 'The tree is at most 1000 levels tall.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  // LeetCode's N-ary node: a value and an ordered array of children.\n  class Node {\n    constructor(val = 0, children = []) {\n      this.val = val;\n      this.children = children;\n    }\n  }\n  globalThis.Node = Node;\n  globalThis._Node = Node;\n  const values = input[1][1][0];\n  const original = [];\n  let root = null;\n  if (values.length) {\n    root = new Node(values[0], []);\n    original.push(root);\n    let index = 2;\n    for (let head = 0; head < original.length && index < values.length; head++) {\n      while (index < values.length && values[index] !== null) {\n        const child = new Node(values[index], []);\n        original[head].children.push(child);\n        original.push(child);\n        index++;\n      }\n      index++;\n    }\n  }\n  const encoded = new solve().encode(root);\n  if (encoded === undefined) throw new Error('encode did not return a value.');\n  // Copy the binary tree into fresh TreeNodes so that only val, left and right reach decode.\n  const isNode = value => value !== null && typeof value === 'object';\n  if (encoded !== null && !isNode(encoded)) throw new Error('encode must return a TreeNode or null.');\n  let copy = null;\n  if (encoded !== null) {\n    const seen = new Set();\n    const limit = 4 * values.length + 2000;\n    copy = new kit.TreeNode();\n    const stack = [[encoded, copy]];\n    while (stack.length) {\n      const [from, to] = stack.pop();\n      if (seen.has(from) || seen.size > limit) throw new Error('The binary tree from encode contains a cycle, a shared node, or too many nodes.');\n      seen.add(from);\n      if (!Number.isInteger(from.val)) throw new Error('Every binary tree node needs an integer val.');\n      to.val = from.val;\n      for (const side of ['left', 'right']) {\n        const next = from[side] === undefined ? null : from[side];\n        if (next === null) continue;\n        if (!isNode(next)) throw new Error('left and right must be TreeNodes or null.');\n        to[side] = new kit.TreeNode();\n        stack.push([next, to[side]]);\n      }\n    }\n  }\n  const rebuilt = new solve().decode(copy);\n  if (rebuilt === undefined) throw new Error('decode did not return a value.');\n  if (rebuilt === null) return [];\n  // Write the rebuilt tree in LeetCode's level order, checking that it is a fresh, finite tree.\n  const used = new Set(original);\n  const visited = new Set();\n  const out = [rebuilt.val, null];\n  const queue = [rebuilt];\n  for (let head = 0; head < queue.length; head++) {\n    const node = queue[head];\n    if (!isNode(node)) throw new Error('Every child must be a node object.');\n    if (used.has(node)) throw new Error('decode must build new nodes from the binary tree, not return the original ones.');\n    if (visited.has(node) || queue.length > values.length + 2000) throw new Error('The rebuilt tree contains a cycle, a shared node, or too many nodes.');\n    visited.add(node);\n    const children = node.children == null ? [] : node.children;\n    if (!Array.isArray(children)) throw new Error('children must be an array of nodes.');\n    for (const child of children) {\n      if (!isNode(child)) throw new Error('Every child must be a node object.');\n      out.push(child.val === undefined ? null : child.val);\n      queue.push(child);\n    }\n    out.push(null);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class Codec {\n  encode(root) {\n    if (root === null) {\n      return null;\n    }\n    const node = new TreeNode(root.val);\n    let previous = null;\n    for (const child of root.children) {\n      const encoded = this.encode(child);\n      if (previous === null) {\n        node.left = encoded;\n      } else {\n        previous.right = encoded;\n      }\n      previous = encoded;\n    }\n    return node;\n  }\n\n  decode(data) {\n    if (data === null) {\n      return null;\n    }\n    const node = new Node(data.val, []);\n    let child = data.left;\n    while (child !== null) {\n      node.children.push(this.decode(child));\n      child = child.right;\n    }\n    return node;\n  }\n}",
+  "brute": "class Codec {\n  // The mirror-image scheme, built with explicit stacks: right holds the first child, left the next sibling.\n  encode(root) {\n    if (!root) return null;\n    const top = new TreeNode(root.val);\n    const stack = [[root, top]];\n    while (stack.length) {\n      const [nary, binary] = stack.pop();\n      let last = null;\n      for (const child of nary.children) {\n        const made = new TreeNode(child.val);\n        if (last) last.left = made;\n        else binary.right = made;\n        last = made;\n        stack.push([child, made]);\n      }\n    }\n    return top;\n  }\n\n  decode(data) {\n    if (!data) return null;\n    const top = new Node(data.val, []);\n    const stack = [[data, top]];\n    while (stack.length) {\n      const [binary, nary] = stack.pop();\n      for (let link = binary.right; link; link = link.left) {\n        const made = new Node(link.val, []);\n        nary.children.push(made);\n        stack.push([link, made]);\n      }\n    }\n    return top;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const n = large ? 850 + pick(100) : pick(13);\n  if (n === 0) return [[\"Codec\", \"encode\"], [[], [[]]]];\n  const maxValue = large || rand() < 0.5 ? 10000 : 4;\n  const values = Array.from({ length: n }, () => pick(maxValue + 1));\n  // style 0 attaches anywhere, 1 grows deep and thin, 2 hangs many children on a few nodes, 3 is a single chain.\n  const style = pick(4);\n  const parents = [-1];\n  for (let i = 1; i < n; i++) {\n    if (style === 0) parents.push(pick(i));\n    else if (style === 1) parents.push(Math.max(0, i - 1 - pick(2)));\n    else if (style === 2) parents.push(pick(Math.min(i, 3)));\n    else parents.push(i - 1);\n  }\n  const children = values.map(() => []);\n  for (let i = 1; i < n; i++) children[parents[i]].push(i);\n  const root = [values[0], null];\n  const queue = [0];\n  for (let head = 0; head < queue.length; head++) {\n    for (const child of children[queue[head]]) {\n      root.push(values[child]);\n      queue.push(child);\n    }\n    root.push(null);\n  }\n  while (root[root.length - 1] === null) root.pop();\n  return [[\"Codec\", \"encode\"], [[], [root]]];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["Codec","encode"],[[],[[1,null,3,2,4,null,5,6]]]],"expected":[1,null,3,2,4,null,5,6]},
+    {"name":"Example 2","input":[["Codec","encode"],[[],[[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]]]],"expected":[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]},
+    {"name":"Example 3","input":[["Codec","encode"],[[],[[]]]],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["Codec","encode"],[[],[[0]]]]},
+    {"name":"Test 2","input":[["Codec","encode"],[[],[[10000,null,0,10000,0]]]]},
+    {"name":"Test 3","input":[["Codec","encode"],[[],[[5,null,5,null,5,null,5,null,5]]]]},
+    {"name":"Test 4","input":[["Codec","encode"],[[],[[1,null,2,null,3,4,null,null,5,6,7]]]]},
+    {"name":"Test 5","input":[["Codec","encode"],[[],[[7,null,1,2,3,null,null,null,4,5,6]]]]},
+    {"name":"Test 6","input":[["Codec","encode"],[[],[[12,null,345,6789,null,10,null,2,20,200]]]]},
+    {"name":"Test 7","input":[["Codec","encode"],[[],[[3,null,2,1,null,0,null,9,8]]]]},
+    {"name":"Test 8","input":[["Codec","encode"],[[],[[0,null,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]]]]},
+    {"name":"Test 9","input":[["Codec","encode"],[[],[[8,null,8,8,null,8,null,8,8,null,null,8]]]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA binary node has only two links, but an N-ary node may have any number of children. The trick is to stop thinking of \"all my children\" and use two relations instead: **my first child** and **my next sibling**. Every N-ary node has at most one of each, so they fit exactly into `left` and `right`. This is the classic left-child, right-sibling representation: the children of a node become a chain that starts at its `left` and continues through `right` links.\n\n## Approach\n\n1. `encode(root)`: an empty tree becomes `null`. Otherwise create a `TreeNode` with the same value.\n2. Encode each child in order. The first encoded child goes into `node.left`; every later one hangs off the `right` of the `previous` encoded child.\n3. Return `node`. Recursion handles each child's own children the same way.\n4. `decode(data)`: `null` gives `null`. Otherwise create a `Node` with the same value.\n5. Start at `data.left` (the first child) and follow `right` links; decode each `child` on the chain and push it onto `node.children`.\n6. Return `node`.\n\n## Example 1, step by step\n\nRoot `1` has children `3, 2, 4`, and `3` has children `5, 6`. `encode` makes binary `1` with `left = 3`; then `3.right = 2` and `2.right = 4`. Inside `3`, `3.left = 5` and `5.right = 6`. `decode` starts at binary `1`, walks `1.left = 3 → 2 → 4`, so `1` gets three children. Decoding `3` walks `5 → 6`, while `2`, `4`, `5` and `6` have no `left` and get no children. The tree `[1,null,3,2,4,null,5,6]` comes back.\n\n## Complexity\n\n- Time: O(n): each node is encoded once and decoded once.\n- Space: O(n) for the new tree, plus O(h) recursion for an N-ary tree of height h.\n\n## Pitfalls\n\n- Siblings must stay in order: link each new child to the `previous` one, not to the parent's `right`.\n- In `decode`, `right` of a binary node means \"next sibling\", never \"child\"; only `left` starts a child list.\n- Keep `encode` stateless; the judge decodes with a fresh `Codec` and only sees `val`, `left` and `right`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `node` | the new binary node (in `encode`) or N-ary node (in `decode`) |\n| `child` | in `encode`, an N-ary child; in `decode`, the current binary node on the child chain |\n| `encoded` | the binary subtree built for `child` |\n| `previous` | the last encoded child, whose `right` takes the next sibling |",
+  "narration": {
+    "3": "An empty N-ary tree is encoded as an empty binary tree.",
+    "6": "Every N-ary node becomes one binary node with the same value.",
+    "7": "previous remembers the last child already linked, so the next sibling can hang off it.",
+    "8": "Visit the children in their order so the sibling chain keeps that order.",
+    "9": "Encode the child's whole subtree first; it comes back as one binary node.",
+    "10": "No child has been linked yet, so this is the first child...",
+    "11": "...and the first child goes into left.",
+    "13": "Every later child becomes the right link of the child before it: its next sibling.",
+    "15": "This child is now the end of the sibling chain.",
+    "17": "Return the binary node that stands for this N-ary subtree.",
+    "21": "An empty binary tree decodes to an empty N-ary tree.",
+    "24": "Rebuild the N-ary node with the same value and no children yet.",
+    "25": "left holds the first child, if there is one.",
+    "26": "Follow the sibling chain until it ends.",
+    "27": "Decode this child's own subtree and append it, keeping the order.",
+    "28": "right leads to the next sibling.",
+    "30": "All children are attached; return the rebuilt node."
+  }
+}

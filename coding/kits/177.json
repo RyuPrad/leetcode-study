@@ -1,0 +1,57 @@
+{
+  "number": 177,
+  "title": "Nth Highest Salary",
+  "spec": "leetcode",
+  "statement": "One table lists what each employee earns, and a second one-row table carries the argument:\n\n- `Employee(id, salary)`: one row per employee; `id` is unique. Several employees may earn the same salary.\n- `Params(N)`: exactly one row holding a whole number `N` (at least 1). On LeetCode this problem is a MySQL function `getNthHighestSalary(N)` whose body returns the value; here the argument is stored in `Params` instead, so you write an ordinary query.\n\nFind the `N`-th largest **distinct** salary: list the different salary values from largest to smallest, counting equal salaries once, and take the one in position `N`. For salaries `300, 300, 200` and `N = 2` the answer is `200`. If there are fewer than `N` distinct salaries (including an empty table), the answer is `null`.\n\nReturn exactly one row with one column named `getNthHighestSalary(N)` (with the letter `N`; quote the name with backticks).",
+  "constraints": [
+    "id is unique in Employee",
+    "salary is never null",
+    "Params has exactly one row, and N >= 1",
+    "The result always has exactly one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["salary","INT"]],
+    "Params": [["N","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [], Params = [] }] = input;\n  if (Params.length !== 1) return 'Params must hold exactly one row.';\n  if (Params[0][0] === null || Params[0][0] < 1) return 'N must be at least 1.';\n  const ids = new Set();\n  for (const [id, salary] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Employee.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH distinct_salaries AS (\n  SELECT DISTINCT salary\n  FROM Employee\n),\nranked AS (\n  SELECT d.salary,\n         (SELECT COUNT(*)\n          FROM distinct_salaries AS higher\n          WHERE higher.salary > d.salary) + 1 AS salary_rank\n  FROM distinct_salaries AS d\n)\nSELECT (\n  SELECT r.salary\n  FROM ranked AS r\n  JOIN Params AS p\n    ON r.salary_rank = p.N\n) AS `getNthHighestSalary(N)`;",
+  "brute": "SELECT MAX(ranked.salary) AS `getNthHighestSalary(N)`\nFROM (\n  SELECT e.salary,\n         DENSE_RANK() OVER (ORDER BY e.salary DESC) AS rnk\n  FROM Employee AS e\n) AS ranked\nWHERE ranked.rnk = (SELECT N FROM Params)",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const Employee = [];\n  if (size === 'small') {\n    const salaries = [100, 200, 300, 400, 500];\n    const count = pick(9);\n    for (let i = 0; i < count; i++) Employee.push([i * 2 + 1, salaries[pick(salaries.length)]]);\n    return [{ Employee, Params: [[1 + pick(5)]] }];\n  }\n  for (let i = 0; i < 2000; i++) Employee.push([i + 1, 1000 + pick(3000)]);\n  return [{ Employee, Params: [[1 + pick(1800)]] }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,100],[2,200],[3,300]],"Params":[[2]]}],"expected":{"columns":["getNthHighestSalary(N)"],"rows":[[200]]}},
+    {"name":"Example 2","input":[{"Employee":[[1,100]],"Params":[[2]]}],"expected":{"columns":["getNthHighestSalary(N)"],"rows":[[null]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[[1,100],[2,300],[3,200]],"Params":[[1]]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,300],[2,300],[3,200],[4,100]],"Params":[[2]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,100],[2,100]],"Params":[[2]]}]},
+    {"name":"Test 4","input":[{"Employee":[],"Params":[[1]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,100],[2,200],[3,300]],"Params":[[3]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,500],[2,500],[3,500],[4,400]],"Params":[[2]]}]},
+    {"name":"Test 7","input":[{"Employee":[[4,0],[9,10],[2,50]],"Params":[[3]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,700],[2,100],[3,400],[4,700],[5,250],[6,400],[7,900]],"Params":[[4]]}]},
+    {"name":"Test 9","input":[{"Employee":[[12,4200]],"Params":[[1]]}]},
+    {"name":"Test 10","input":[{"Employee":[[1,10],[2,20],[3,30],[4,40],[5,50],[6,60]],"Params":[[10]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The N-th highest distinct salary\" is the distinct salary that has exactly N − 1 **distinct** salaries above it. So give every distinct salary its position (one plus how many distinct salaries beat it), then **filter** for the position equal to N. Wrapping that lookup in a scalar subquery turns \"no such position\" into a single `null` row, which is what the problem wants when there are fewer than N distinct values.\n\nOn LeetCode the usual function body is `SET N = N - 1; RETURN (SELECT DISTINCT salary ... ORDER BY salary DESC LIMIT 1 OFFSET N)`. Here `N` lives in a table, and MySQL's `LIMIT`/`OFFSET` accept only constants, not subqueries, so the position is computed and compared instead.\n\n## Approach\n\n1. `distinct_salaries`: `SELECT DISTINCT salary` so ties count once.\n2. `ranked`: for each distinct salary `d`, a correlated subquery counts the distinct salaries `higher` than it; adding 1 gives `salary_rank` (the largest salary has rank 1).\n3. The final `SELECT ( ... )` joins `ranked` with `Params` on `salary_rank = N`. As a scalar subquery it yields that salary, or `null` when no rank equals N, always in exactly one row named `getNthHighestSalary(N)`.\n\n## Example 1, step by step\n\n- `distinct_salaries` holds 100, 200 and 300.\n- `ranked`: 300 has 0 salaries above it (rank 1), 200 has 1 (rank 2), 100 has 2 (rank 3).\n- `Params` holds `N = 2`; the row with `salary_rank = 2` is 200, the answer.\n\nIn Example 2 there is only one distinct salary (rank 1), nothing matches `N = 2`, and the scalar subquery returns `null`.\n\n## Complexity\n\n- Time: O(n) to collect the d distinct salaries of n employees, then O(d²) for the correlated counts; a window function or sorting would make it O(n log n).\n- Space: O(d) for the intermediate tables.\n\n## Pitfalls\n\n- Without `DISTINCT`, equal salaries take several positions: for 300, 300, 200 and N = 2 you would answer 300 instead of 200 (Test 2).\n- Selecting the filtered rows directly, without the outer `SELECT ( ... )`, returns **no row** instead of one `null` row when N is too large (Tests 3, 4, 10).\n- `LIMIT 1 OFFSET (SELECT N - 1 FROM Params)` is not valid MySQL; offsets must be constants or, inside a function, variables.\n- Counting all higher salaries instead of distinct higher ones breaks ties the same way as forgetting `DISTINCT`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `distinct_salaries` | each salary value once |\n| `d` | one distinct salary being ranked |\n| `higher` | the distinct salaries strictly above `d` |\n| `ranked` | each distinct salary with its `salary_rank`, 1 for the largest |\n| `r`, `p` | `ranked` and the one-row `Params` table holding `N` |",
+  "narration": {
+    "1": "The first stage keeps each salary value once, so ties do not take extra positions.",
+    "5": "The second stage gives every distinct salary its rank among the distinct values.",
+    "7": "A correlated subquery counts the distinct salaries above this one.",
+    "9": "One more than the number of higher salaries is the rank, so the largest salary is rank 1.",
+    "12": "The outer scalar subquery always yields one row: the salary found, or null when there is none.",
+    "14": "Candidates come from ranked, one row per distinct salary.",
+    "15": "Params supplies N; joining it on the rank keeps only the salary in position N.",
+    "16": "The rank must equal N exactly, so N beyond the number of distinct salaries matches nothing.",
+    "17": "The single column carries the name the problem asks for."
+  }
+}

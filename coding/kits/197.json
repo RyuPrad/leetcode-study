@@ -1,0 +1,51 @@
+{
+  "number": 197,
+  "title": "Rising Temperature",
+  "spec": "leetcode",
+  "statement": "One table holds daily temperature readings:\n\n- `Weather(id, recordDate, temperature)`: one reading per row; `id` is unique, and no two rows share the same `recordDate`. The ids need not follow the order of the dates, and some calendar days may have no reading at all.\n\nFind every reading that is **warmer than the day before**: its `temperature` is strictly greater than the temperature of the row whose `recordDate` is exactly one calendar day earlier. A reading whose previous calendar day has no row is never reported, even if an older reading was colder.\n\nReturn a single column `id`. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Weather",
+    "recordDate is unique in Weather (at most one reading per day)",
+    "recordDate is a valid date written as YYYY-MM-DD",
+    "Days can be missing, and ids are not ordered by date"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Weather": [["id","INT"],["recordDate","DATE"],["temperature","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Weather = [] }] = input;\n  const ids = new Set(), days = new Set();\n  for (const [id, day, temperature] of Weather) {\n    if (id === null || day === null || temperature === null) return 'Every reading needs an id, a recordDate and a temperature.';\n    if (ids.has(id)) return `id ${id} appears twice in Weather.`;\n    ids.add(id);\n    const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(day);\n    const d = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));\n    if (!d || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) return `recordDate ${day} is not a valid YYYY-MM-DD date.`;\n    if (days.has(day)) return `recordDate ${day} appears twice in Weather.`;\n    days.add(day);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT today.id\nFROM Weather AS today\nJOIN Weather AS yesterday\n  ON yesterday.recordDate = DATE_SUB(today.recordDate, INTERVAL 1 DAY)\nWHERE today.temperature > yesterday.temperature;",
+  "brute": "WITH by_date AS (\n  SELECT id, recordDate, temperature,\n         LAG(recordDate) OVER (ORDER BY recordDate) AS prevDate,\n         LAG(temperature) OVER (ORDER BY recordDate) AS prevTemperature\n  FROM Weather\n)\nSELECT id\nFROM by_date\nWHERE DATEDIFF(recordDate, prevDate) = 1\n  AND temperature > prevTemperature",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const dayText = (base, offset) => new Date(base + offset * 86400000).toISOString().slice(0, 10);\n  const shuffle = (list) => { for (let i = list.length - 1; i > 0; i--) { const j = pick(i + 1); [list[i], list[j]] = [list[j], list[i]]; } return list; };\n  const Weather = [];\n  if (size === 'small') {\n    // A short window around a month, leap-day or year boundary; gaps and repeated temperatures are common.\n    const bases = [Date.UTC(2015, 0, 1), Date.UTC(2016, 1, 26), Date.UTC(2014, 11, 28), Date.UTC(2019, 3, 28)];\n    const base = bases[pick(bases.length)];\n    const offsets = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, pick(9));\n    const ids = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);\n    offsets.forEach((offset, i) => Weather.push([ids[i], dayText(base, offset), pick(6) - 1]));\n  } else {\n    // Mostly consecutive days with occasional gaps, listed in a shuffled id order.\n    const ids = shuffle(Array.from({ length: 2000 }, (_, i) => i + 1));\n    let offset = 0;\n    for (let i = 0; i < 2000; i++) {\n      Weather.push([ids[i], dayText(Date.UTC(2010, 0, 1), offset), pick(51) - 10]);\n      offset += rand() < 0.8 ? 1 : 2 + pick(3);\n    }\n  }\n  return [{ Weather }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Weather":[[1,"2015-01-01",10],[2,"2015-01-02",25],[3,"2015-01-03",20],[4,"2015-01-04",30]]}],"expected":{"columns":["id"],"rows":[[2],[4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Weather":[]}]},
+    {"name":"Test 2","input":[{"Weather":[[1,"2020-06-15",31]]}]},
+    {"name":"Test 3","input":[{"Weather":[[1,"2015-01-01",10],[2,"2015-01-02",10],[3,"2015-01-03",9]]}]},
+    {"name":"Test 4","input":[{"Weather":[[1,"2015-01-01",10],[2,"2015-01-03",20],[3,"2015-01-06",30],[4,"2015-01-07",25]]}]},
+    {"name":"Test 5","input":[{"Weather":[[1,"2015-01-03",30],[2,"2015-01-01",10],[3,"2015-01-02",20]]}]},
+    {"name":"Test 6","input":[{"Weather":[[1,"2014-12-31",-5],[2,"2015-01-01",-2],[3,"2015-01-31",4],[4,"2015-02-01",7],[5,"2015-02-28",3],[6,"2015-03-01",8]]}]},
+    {"name":"Test 7","input":[{"Weather":[[10,"2016-02-28",1],[11,"2016-02-29",2],[12,"2016-03-01",3],[13,"2017-02-28",0],[14,"2017-03-01",5]]}]},
+    {"name":"Test 8","input":[{"Weather":[[1,"2019-05-01",20],[2,"2019-05-02",15],[3,"2019-05-03",10],[4,"2019-05-04",5]]}]},
+    {"name":"Test 9","input":[{"Weather":[[5,"2018-07-04",22],[3,"2018-07-02",18],[8,"2018-07-03",18],[1,"2018-07-01",25],[2,"2018-07-06",30]]}]},
+    {"name":"Test 10","input":[{"Weather":[[1,"2015-01-01",1],[2,"2015-01-02",2],[3,"2015-01-03",3],[4,"2015-01-04",4],[5,"2015-01-05",5]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach reading has to be compared with a *different row* of the same table: the one dated one calendar day earlier. Pairing rows of a table with other rows of that same table is a **self-join**. Give the table two aliases, `today` and `yesterday`, join them when the dates are exactly one day apart, and keep the pairs where `today` is warmer.\n\nThe day-apart test must use real date arithmetic. Neighbouring ids, or the previous row in date order, are not the same thing as yesterday: ids can be shuffled and days can be missing.\n\n## Approach\n\n1. Read `Weather` as `today`, the reading that may be reported.\n2. Join `Weather` again as `yesterday`, matching the row whose `recordDate` equals `DATE_SUB(today.recordDate, INTERVAL 1 DAY)`. Since dates are unique, each reading finds at most one partner, and the first day (or a day after a gap) finds none and drops out of the inner join.\n3. Keep the pairs with `today.temperature > yesterday.temperature` and select `today.id`.\n\n## Example 1, step by step\n\nThe join produces three pairs (the 1st has no earlier day):\n\n| today.id | today | yesterday.id | yesterday | warmer? |\n| --- | --- | --- | --- | --- |\n| 2 | 2015-01-02, 25 | 1 | 2015-01-01, 10 | yes |\n| 3 | 2015-01-03, 20 | 2 | 2015-01-02, 25 | no |\n| 4 | 2015-01-04, 30 | 3 | 2015-01-03, 20 | yes |\n\nThe filter keeps ids 2 and 4.\n\n## Complexity\n\n- Time: the condition compares the bare column `yesterday.recordDate` with a value computed from `today`, so the database can look yesterday up through an index or hash on `recordDate`: about O(n log n) for n readings. The popular `DATEDIFF(today.recordDate, yesterday.recordDate) = 1` is also correct, but it wraps both columns in a function and forces a check of every pair, O(n²).\n- Space: O(n) for the result.\n\n## Pitfalls\n\n- Joining on `today.id = yesterday.id + 1` assumes ids follow the dates; Test 5 shuffles them.\n- Comparing with the previous row (`LAG` over `recordDate`) without checking the gap reports a day whose real yesterday is missing.\n- `recordDate - 1` is not date arithmetic in MySQL: it turns `2015-03-01` into the number 20150300, which breaks at month and year boundaries. Use `DATEDIFF`, `DATE_SUB` or `INTERVAL`.\n- The comparison is strict: an equal temperature is not a rise.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `today` | the reading that may be reported |\n| `yesterday` | the reading dated one day before `today` |\n| `DATE_SUB(d, INTERVAL 1 DAY)` | the calendar day before `d`, across month and year ends |\n| `WHERE` | keeps only pairs where the temperature rose |",
+  "narration": {
+    "1": "Only the id of the warmer day is reported.",
+    "2": "The alias today stands for the reading we may report.",
+    "3": "Weather is joined to itself; the second copy, yesterday, supplies the reading to compare against.",
+    "4": "Each day is paired with the row dated exactly one calendar day earlier, so shuffled ids and missing days do not matter.",
+    "5": "Only pairs where the temperature strictly rose survive."
+  }
+}

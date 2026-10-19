@@ -1,0 +1,59 @@
+{
+  "number": 563,
+  "title": "Binary Tree Tilt",
+  "spec": "leetcode",
+  "statement": "`root` is the root of a binary tree, which may be empty. The **tilt** of a node is the absolute value of the difference between the sum of all values in its left subtree and the sum of all values in its right subtree; an absent child counts as a subtree whose sum is 0.\n\nReturn the tilts of all the nodes added together (0 for an empty tree).",
+  "constraints": [
+    "The tree has between 0 and 10^4 nodes",
+    "-1000 <= Node.val <= 1000"
+  ],
+  "signature": "int findTilt(TreeNode root)",
+  "entry": "findTilt",
+  "kind": "function",
+  "parameters": [
+    "root"
+  ],
+  "validator": "function validate([root]) {\n  if (!Array.isArray(root)) return 'root must be a level-order list.';\n  if (root.length && root[0] === null) return 'A non-empty tree must start with a value.';\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10^4 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -1000 || v > 1000)) return 'Each node value is a whole number from -1000 to 1000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findTilt(root) {\n  let total = 0;\n\n  function subtreeSum(node) {\n    if (node === null) {\n      return 0;\n    }\n    const leftSum = subtreeSum(node.left);\n    const rightSum = subtreeSum(node.right);\n    total += Math.abs(leftSum - rightSum);\n    return leftSum + rightSum + node.val;\n  }\n\n  subtreeSum(root);\n  return total;\n}",
+  "brute": "function findTilt(root) {\n  // For every node, add up each of its two subtrees from scratch with an explicit stack.\n  const sumOf = (start) => {\n    let sum = 0;\n    const stack = start ? [start] : [];\n    while (stack.length) {\n      const node = stack.pop();\n      sum += node.val;\n      if (node.left) stack.push(node.left);\n      if (node.right) stack.push(node.right);\n    }\n    return sum;\n  };\n  let answer = 0;\n  const all = root ? [root] : [];\n  while (all.length) {\n    const node = all.pop();\n    answer += Math.abs(sumOf(node.left) - sumOf(node.right));\n    if (node.left) all.push(node.left);\n    if (node.right) all.push(node.right);\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 850 + Math.floor(rand() * 100) : Math.floor(rand() * 12);\n  if (n === 0) return [[]];\n  // Attach each new node to a free child slot; a high bias keeps extending the newest slots,\n  // which makes long, lopsided branches, while a low bias gives bushy trees.\n  const bias = rand();\n  const nodes = [{ val: 0, left: null, right: null }], slots = [[0, 'left'], [0, 'right']];\n  for (let i = 1; i < n; i++) {\n    const k = rand() < bias ? slots.length - 1 - Math.floor(rand() * Math.min(2, slots.length)) : Math.floor(rand() * slots.length);\n    const [parent, side] = slots[k];\n    slots[k] = slots[slots.length - 1];\n    slots.pop();\n    nodes[parent][side] = i;\n    nodes.push({ val: 0, left: null, right: null });\n    slots.push([i, 'left'], [i, 'right']);\n  }\n  const span = size === 'large' || rand() < 0.2 ? 1000 : 6;\n  for (const node of nodes) node.val = Math.floor(rand() * (2 * span + 1)) - span;\n  // Level-order serialisation with null for missing children, trailing nulls removed.\n  const out = [], queue = [0];\n  for (let q = 0; q < queue.length; q++) {\n    if (queue[q] === null) { out.push(null); continue; }\n    const node = nodes[queue[q]];\n    out.push(node.val);\n    queue.push(node.left, node.right);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  return [out];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3]],"expected":1},
+    {"name":"Example 2","input":[[4,2,9,3,5,null,7]],"expected":15},
+    {"name":"Example 3","input":[[21,7,14,1,1,2,2,3,3]],"expected":9}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[]]},
+    {"name":"Test 2","input":[[5]]},
+    {"name":"Test 3","input":[[1,2]]},
+    {"name":"Test 4","input":[[1,null,-3]]},
+    {"name":"Test 5","input":[[-1000,1000,-1000]]},
+    {"name":"Test 6","input":[[2,2,2,2,2,2,2]]},
+    {"name":"Test 7","input":[[1,null,2,null,3,null,4]]},
+    {"name":"Test 8","input":[[0,-5,5]]},
+    {"name":"Test 9","input":[[1000,1000,null,1000,null,1000,null,1000]]},
+    {"name":"Test 10","input":[[3,-2,7,4,null,-6,1,null,8,0,null,null,-9]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA node's tilt needs the sums of its two subtrees, and a subtree's sum is built from *its* children's sums. That is a bottom-up (post-order) job: if a recursive helper returns the sum of the subtree it was called on, the parent receives both child sums for free, can record its own tilt, and pass its own sum upward. The naive way recomputes both subtree sums from scratch at every node, which costs O(n²) on a long chain.\n\n## Approach\n\n1. Keep a running `total` of tilts outside the helper.\n2. `subtreeSum(node)` returns 0 for a missing node.\n3. Otherwise it first gets `leftSum` and `rightSum` from the two children.\n4. It adds this node's tilt, `|leftSum - rightSum|`, to `total`.\n5. It returns `leftSum + rightSum + node.val`, the sum of the whole subtree, to its parent.\n6. Call it on `root` and return `total`.\n\n## Example 1, step by step\n\n`root = [1, 2, 3]`.\n\n- `subtreeSum(2)`: both children are missing, so `leftSum = rightSum = 0`, tilt 0, returns 2.\n- `subtreeSum(3)`: likewise tilt 0, returns 3.\n- Back at the root: `leftSum = 2`, `rightSum = 3`, so `total += |2 - 3| = 1`; it returns 6, which is not needed.\n\nThe answer is `total = 1`.\n\n## Complexity\n\n- Time: O(n): each node is visited once and does constant work.\n- Space: O(h) for the recursion stack, where `h` is the tree's height (up to n for a chain).\n\n## Pitfalls\n\n- The tilt uses the sums of whole subtrees, not just the two children's values (Example 2's root: `|10 - 16|`, not `|2 - 9|`).\n- The helper must return the subtree **sum**, while the answer is the **tilt total**; mixing the two is the usual bug.\n- Values can be negative, so take the absolute difference rather than assuming the left side is larger.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | sum of the tilts found so far |\n| `subtreeSum(node)` | sum of all values in `node`'s subtree |\n| `leftSum`, `rightSum` | sums of the left and right subtrees of `node` |",
+  "narration": {
+    "2": "The answer accumulates here as each node reports its tilt.",
+    "4": "The helper returns the sum of all values in the subtree rooted at node.",
+    "5": "An empty subtree adds nothing...",
+    "6": "...so its sum is 0.",
+    "8": "First get the total of everything in the left subtree.",
+    "9": "Then the total of the right subtree; both children are finished before this node.",
+    "10": "This node's tilt is the gap between the two subtree sums; add it to the answer.",
+    "11": "Report this whole subtree's sum to the parent, including this node's own value.",
+    "14": "Run the post-order pass from the root; its returned sum is not needed.",
+    "15": "Every node has added its tilt, so return the total."
+  }
+}

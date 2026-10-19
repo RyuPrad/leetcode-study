@@ -27,7 +27,7 @@ self.onmessage=async({data}:MessageEvent<DebugCommand>)=>{
       const module=await newQuickJSAsyncWASMModuleFromVariant(newVariant(RELEASE_ASYNC,{wasmLocation:asyncWasm}));
       const result=await debugEvaluate(module,data.problem,data.source,data.test,recorder,hooks,data.language);
       send({type:'recorded',sessionId,frames,truncated,actual:result.actual,...(truncated||!result.error?{}:{error:result.error}),logs:result.logs,executableLines:lines});
-    }catch(error){send({type:'recorded',sessionId,frames,truncated,error:String(error).replace(/^Error: /,'').slice(0,8000),logs:[],executableLines:lines});}
+    }catch(error){send({type:'recorded',sessionId,frames,truncated,...(truncated?{}:{error:String(error).replace(/^Error: /,'').slice(0,8000)}),logs:[],executableLines:lines});}
     return;
   }
   if(data.type!=='start'){

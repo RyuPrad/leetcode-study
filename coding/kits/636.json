@@ -1,0 +1,68 @@
+{
+  "number": 636,
+  "title": "Exclusive Time of Functions",
+  "spec": "leetcode",
+  "statement": "A program with `n` functions, numbered `0` to `n - 1`, runs on one single-threaded CPU. Calls nest like a call stack: starting a call puts it on top, ending a call removes it from the top, and only the call on top runs at any moment. A function may be called many times, including from inside itself.\n\nEach entry of `logs` is a string `\"{id}:{start|end}:{timestamp}\"`, and the entries appear in the order the events happened. A start at time `t` takes effect at the beginning of time unit `t`; an end at time `t` takes effect at the end of time unit `t`. So `\"1:start:2\"` followed by `\"1:end:5\"` with nothing in between is a call that runs for 4 units.\n\nThe exclusive time of function `i` counts the time units in which some call of `i` was the running (topmost) call, summed over all of its calls. Return an array of length `n` holding these totals, entry `i` for function `i`. The logs are always consistent: every start has a matching end that closes the most recent unfinished call.",
+  "constraints": [
+    "1 <= n <= 100",
+    "2 <= logs.length <= 500",
+    "0 <= function_id < n",
+    "0 <= timestamp <= 10^9",
+    "No two start events share a timestamp",
+    "No two end events share a timestamp",
+    "Every start log has a matching end log"
+  ],
+  "signature": "int[] exclusiveTime(int n, List<String> logs)",
+  "entry": "exclusiveTime",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "logs"
+  ],
+  "validator": "function validate([n, logs]) {\n  if (!Number.isInteger(n) || n < 1 || n > 100) return 'n is between 1 and 100.';\n  if (!Array.isArray(logs) || logs.length < 2 || logs.length > 500) return 'logs needs 2 to 500 entries.';\n  const stack = [];\n  let prevPos = -1, prevType = '';\n  for (const log of logs) {\n    const match = /^(0|[1-9]\\d*):(start|end):(0|[1-9]\\d*)$/.exec(log);\n    if (!match) return 'Each log looks like \"id:start:time\" or \"id:end:time\".';\n    const id = Number(match[1]), type = match[2], time = Number(match[3]);\n    if (id >= n) return 'Function ids are between 0 and n - 1.';\n    if (time > 1e9) return 'Timestamps are between 0 and 10^9.';\n    // A start begins its unit and an end finishes its unit, so compare the moments they mark.\n    const moment = type === 'start' ? time : time + 1;\n    if (moment < prevPos || (moment === prevPos && !(type === 'start' && prevType === 'end'))) return 'Logs must be in time order, with no two starts or two ends at the same timestamp.';\n    if (type === 'start') stack.push(id);\n    else if (stack.length === 0 || stack.pop() !== id) return 'Each end must close the most recent unfinished call of the same function.';\n    prevPos = moment;\n    prevType = type;\n  }\n  if (stack.length > 0) return 'Every start needs a matching end.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function exclusiveTime(n, logs) {\n  const result = new Array(n).fill(0);\n  const stack = [];\n  let prev = 0;\n  for (const log of logs) {\n    const [idText, type, timeText] = log.split(':');\n    const id = Number(idText);\n    const time = Number(timeText);\n    if (type === 'start') {\n      if (stack.length > 0) {\n        result[stack[stack.length - 1]] += time - prev;\n      }\n      stack.push(id);\n      prev = time;\n    } else {\n      result[stack.pop()] += time - prev + 1;\n      prev = time + 1;\n    }\n  }\n  return result;\n}",
+  "brute": "function exclusiveTime(n, logs) {\n  const events = logs.map(log => {\n    const parts = log.split(':');\n    return { id: +parts[0], start: parts[1] === 'start', time: +parts[2] };\n  });\n  // Pair each start with its end by scanning forward with a depth counter.\n  const calls = [];\n  for (let i = 0; i < events.length; i++) {\n    if (!events[i].start) continue;\n    let depth = 0;\n    for (let j = i + 1; j < events.length; j++) {\n      if (events[j].start) depth++;\n      else if (depth === 0) { calls.push({ id: events[i].id, from: events[i].time, to: events[j].time }); break; }\n      else depth--;\n    }\n  }\n  // Between consecutive boundaries the same call runs: the innermost (latest-starting) call covering that unit.\n  const cuts = [...new Set(calls.flatMap(c => [c.from, c.to + 1]))].sort((a, b) => a - b);\n  const total = new Array(n).fill(0);\n  for (let k = 0; k + 1 < cuts.length; k++) {\n    const unit = cuts[k];\n    let owner = null;\n    for (const c of calls) if (c.from <= unit && unit <= c.to && (owner === null || c.from > owner.from)) owner = c;\n    if (owner) total[owner.id] += cuts[k + 1] - cuts[k];\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 100 : 1 + Math.floor(rand() * 3);\n  const callCount = size === 'large' ? 250 : 1 + Math.floor(rand() * 6);\n  const spread = size === 'large' ? (rand() < 0.5 ? 1000000 : 3) : 3;\n  const gap = () => Math.floor(rand() * (spread + 1));\n  const logs = [], stack = [];\n  let pos = Math.floor(rand() * 5), last = 'none', started = 0;\n  while (started < callCount || stack.length > 0) {\n    const canStart = started < callCount;\n    if (canStart && (stack.length === 0 || rand() < 0.5)) {\n      const time = pos + gap() + (last === 'start' ? 1 : 0);\n      const id = Math.floor(rand() * n);\n      logs.push(`${id}:start:${time}`);\n      stack.push(id);\n      started++;\n      pos = time;\n      last = 'start';\n    } else {\n      const time = pos + gap();\n      logs.push(`${stack.pop()}:end:${time}`);\n      pos = time + 1;\n      last = 'end';\n    }\n  }\n  return [n, logs];\n}",
+  "examples": [
+    {"name":"Example 1","input":[2,["0:start:0","1:start:2","1:end:5","0:end:6"]],"expected":[3,4]},
+    {"name":"Example 2","input":[1,["0:start:0","0:start:2","0:end:5","0:start:6","0:end:6","0:end:7"]],"expected":[8]},
+    {"name":"Example 3","input":[2,["0:start:0","0:start:2","0:end:5","1:start:6","1:end:6","0:end:7"]],"expected":[7,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,["0:start:0","0:end:0"]]},
+    {"name":"Test 2","input":[1,["0:start:0","0:end:1000000000"]]},
+    {"name":"Test 3","input":[3,["0:start:0","0:end:2","1:start:5","1:end:5","2:start:9","2:end:12"]]},
+    {"name":"Test 4","input":[3,["0:start:0","1:start:3","2:start:4","2:end:10","1:end:11","0:end:20"]]},
+    {"name":"Test 5","input":[2,["0:start:0","1:start:1","1:end:1","1:start:2","1:end:4","0:end:5"]]},
+    {"name":"Test 6","input":[4,["2:start:3","2:end:7"]]},
+    {"name":"Test 7","input":[1,["0:start:0","0:start:1","0:start:2","0:end:3","0:end:4","0:end:5"]]},
+    {"name":"Test 8","input":[2,["1:start:0","0:start:500000000","0:end:999999999","1:end:1000000000"]]},
+    {"name":"Test 9","input":[3,["0:start:0","1:start:2","1:end:3","2:start:4","0:start:6","0:end:6","2:end:9","0:end:10","1:start:11","1:end:15"]]},
+    {"name":"Test 10","input":[2,["0:start:0","0:end:0","1:start:1","1:end:1","0:start:2","0:end:2"]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly the call on top of the stack is running, so the logs say exactly when control changes hands. Between two consecutive logs, the CPU belongs to whoever was on top after the first one. Keep the stack of active calls and a marker `prev` for the first time unit not yet charged to anyone; each log charges the units since `prev` to the right function. A brute force could pair every start with its end and, for each stretch of time, look for the innermost call covering it, which costs O(L²) for L logs.\n\n## Approach\n\n1. Make `result` with `n` zeros, an empty `stack` and `prev = 0`.\n2. Split each log into `id`, `type` and `time`.\n3. On a start: the function on top (if any) ran from `prev` up to, but not including, unit `time`, so add `time - prev` to it. Push `id` and set `prev = time`.\n4. On an end: the function on top ran from `prev` through unit `time` inclusive, so pop it and add `time - prev + 1`. The next unit to charge is `time + 1`.\n5. Return `result`.\n\n## Example 1, step by step\n\n`\"0:start:0\"`: stack empty, push 0, `prev = 0`. `\"1:start:2\"`: function 0 ran units 0 and 1, so `result[0] = 2`; push 1, `prev = 2`. `\"1:end:5\"`: pop 1, add `5 - 2 + 1 = 4`, `prev = 6`. `\"0:end:6\"`: pop 0, add `6 - 6 + 1 = 1`, so `result[0] = 3`. The answer is `[3, 4]`.\n\n## Complexity\n\n- Time: O(L) for L logs, each parsed and handled once.\n- Space: O(L) for the stack in the worst (fully nested) case, plus O(n) for `result`.\n\n## Pitfalls\n\n- An end covers its own unit, so it adds `time - prev + 1` and moves `prev` to `time + 1`; a start adds `time - prev` and sets `prev = time`.\n- Charge the function on top before pushing a new one, not the one being started.\n- Gaps when nothing is running belong to no function; only charge when the stack is non-empty.\n- Recursive calls push the same id several times; each pop still charges that id.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `result` | exclusive time of each function so far |\n| `stack` | ids of the unfinished calls, innermost on top |\n| `prev` | first time unit not yet charged to any function |\n| `idText`, `type`, `timeText` | the three fields of the current log, as text |\n| `id`, `time` | the function id and timestamp as numbers |",
+  "narration": {
+    "2": "Every function starts with zero exclusive time.",
+    "3": "The stack holds the ids of unfinished calls; the top one is running.",
+    "4": "prev is the first time unit not yet charged to any function.",
+    "5": "Handle the logs in the order the events happened.",
+    "6": "Split the log into its id, its kind and its timestamp.",
+    "9": "A new call starts at the beginning of unit time.",
+    "10": "If some call was running until now...",
+    "11": "...it ran from prev up to time - 1, so charge it time - prev units.",
+    "13": "The new call is now on top of the stack and running.",
+    "14": "Units from time onward are not charged yet.",
+    "16": "The call on top ends after unit time: it ran from prev through time, which is time - prev + 1 units.",
+    "17": "The caller (if any) resumes at the next unit.",
+    "20": "Every unit of running time has been charged to its function."
+  }
+}

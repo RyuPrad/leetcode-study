@@ -1,0 +1,50 @@
+{
+  "number": 196,
+  "title": "Delete Duplicate Emails",
+  "spec": "leetcode",
+  "statement": "One table stores email addresses:\n\n- `Person(id, email)`: one row per person; `id` is unique. `email` is never null and contains no uppercase letters, but the same address may appear in several rows.\n\nYour answer is one `DELETE` statement that changes `Person` in place; a query that only lists the surviving rows changes nothing and is not enough. For each `email`, the row with the **smallest** `id` must survive and every other row with that address must be removed. Rows whose address appears once stay untouched. What gets judged is `Person` itself once your statement has run, with its columns `id` and `email`; the order of its rows does not matter.",
+  "constraints": [
+    "id is unique in Person",
+    "email is never null and has no uppercase letters",
+    "The answer is a DELETE statement; Person afterwards is judged"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Person": [["id","INT"],["email","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "modifies": "Person",
+  "validator": "function validate(input) {\n  const [{ Person = [] }] = input;\n  const ids = new Set();\n  for (const [id, email] of Person) {\n    if (id === null) return 'Every row needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Person.`;\n    if (email === null) return `Row ${id} needs an email.`;\n    if (email !== email.toLowerCase()) return `Email ${email} has uppercase letters.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "DELETE p\nFROM Person AS p\nJOIN Person AS keeper\n  ON keeper.email = p.email\n  AND keeper.id < p.id;",
+  "brute": "DELETE FROM Person\nWHERE id NOT IN (\n  SELECT keep_id\n  FROM (\n    SELECT MIN(id) AS keep_id\n    FROM Person\n    GROUP BY email\n  ) AS keepers\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // A small address pool makes repeats common; ids are shuffled so the smallest id is not always inserted first.\n  const pool = small ? ['john@example.com', 'bob@example.com', 'ana@leetcode.com', 'kim@mail.org'] : Array.from({ length: 600 }, (_, i) => `user${i}@example.com`);\n  const ids = Array.from({ length: small ? 20 : count }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Person = [];\n  for (let i = 0; i < count; i++) Person.push([ids[i], pool[Math.floor(rand() * pool.length)]]);\n  return [{ Person }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Person":[[1,"john@example.com"],[2,"bob@example.com"],[3,"john@example.com"]]}],"expected":{"columns":["id","email"],"rows":[[1,"john@example.com"],[2,"bob@example.com"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Person":[]}]},
+    {"name":"Test 2","input":[{"Person":[[1,"a@b.com"]]}]},
+    {"name":"Test 3","input":[{"Person":[[1,"a@b.com"],[2,"c@d.com"],[3,"e@f.com"]]}]},
+    {"name":"Test 4","input":[{"Person":[[4,"x@y.com"],[2,"x@y.com"],[7,"x@y.com"],[3,"x@y.com"]]}]},
+    {"name":"Test 5","input":[{"Person":[[9,"john@example.com"],[5,"john@example.com"]]}]},
+    {"name":"Test 6","input":[{"Person":[[1,"a@b.com"],[2,"c@d.com"],[3,"a@b.com"],[4,"c@d.com"],[5,"e@f.com"],[6,"a@b.com"]]}]},
+    {"name":"Test 7","input":[{"Person":[[10,"bob@example.com"],[3,"ana@leetcode.com"],[8,"bob@example.com"],[1,"kim@mail.org"],[6,"ana@leetcode.com"]]}]},
+    {"name":"Test 8","input":[{"Person":[[1,"a@b.com"],[2,"a@b.co"],[3,"a.b@c.com"],[4,"a@b.com"]]}]},
+    {"name":"Test 9","input":[{"Person":[[100,"z@z.com"],[1,"z@z.com"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA row should be deleted exactly when another row has the **same email and a smaller id**: such a row proves it is not the one to keep. Joining `Person` to itself finds those proofs directly, and MySQL's multi-table `DELETE` removes the rows on the side being proven redundant. The row with the smallest id never finds a smaller partner, so it survives.\n\n## Approach\n\n1. `DELETE p` names which copy of the table loses rows: `p`, a row that may be a duplicate.\n2. `JOIN Person AS keeper` pairs each row with the other rows of the table.\n3. The join condition keeps pairs with the same `email` where `keeper.id < p.id`. Every `p` that appears in at least one such pair is deleted, once, however many smaller-id twins it has.\n\n## Example 1, step by step\n\n- Row 3 (`john@example.com`) pairs with row 1, which has the same address and a smaller id, so row 3 is deleted.\n- Row 1 has no smaller-id row with its address; it finds no partner and stays.\n- Row 2 (`bob@example.com`) has no twin at all and stays.\n\n`Person` ends with rows 1 and 2, as expected.\n\n## Complexity\n\n- Time: O(P) expected with an index or hash on `email` for P rows; a plain nested-loop join costs O(P²), and a group of k equal addresses produces about k²/2 pairs either way.\n- Space: O(P) for the set of rows marked for deletion.\n\n## Pitfalls\n\n- Writing `keeper.id > p.id` keeps the largest id instead of the smallest.\n- Writing `keeper.id <> p.id` deletes every copy of a repeated address, including the one to keep.\n- In MySQL a `DELETE` cannot read the table it changes in a plain subquery (`WHERE id NOT IN (SELECT MIN(id) FROM Person ...)` fails with error 1093); the subquery must be wrapped in a derived table, or the self-join used instead.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | the copy of `Person` whose matching rows are deleted |\n| `keeper` | a row with the same address and a smaller id, proof that `p` is a duplicate |\n| `DELETE p` | removes rows from `p`'s table only, never from `keeper` |",
+  "narration": {
+    "1": "Delete rows of the copy aliased p: those are the rows proven to be duplicates.",
+    "2": "p ranges over every row of Person.",
+    "3": "Join Person to itself; keeper is another row that could prove p redundant.",
+    "4": "The partner must have the same email address.",
+    "5": "The partner must also have a smaller id, so the row with the smallest id never finds one and is kept."
+  }
+}

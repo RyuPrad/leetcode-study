@@ -1,0 +1,73 @@
+{
+  "number": 499,
+  "title": "The Maze III",
+  "spec": "recalled",
+  "statement": "A ball sits in a maze given as an `m x n` grid `maze`, where `0` is an empty cell and `1` is a wall; everything outside the grid also acts as a wall. The ball starts at `ball = [row, col]` and a hole is at `hole = [row, col]`.\n\n- The ball is moved by pushing it up (`'u'`), down (`'d'`), left (`'l'`) or right (`'r'`). It then keeps rolling through empty cells in that direction until the next cell is a wall, and only then can it be pushed again. Every push must move the ball at least one cell.\n- If the ball rolls onto the hole, it drops in and stops there, even in the middle of a roll.\n- The distance of a route is the number of cells the ball rolls over, counting the hole but not the starting cell.\n\nReturn the pushes, written as a string of those letters, that drop the ball into the hole with the smallest total distance. If several strings reach that smallest distance, return the lexicographically smallest one. If the ball can never drop into the hole, return `\"impossible\"`.",
+  "constraints": [
+    "m == maze.length, n == maze[i].length",
+    "1 <= m, n <= 100",
+    "maze[i][j] is 0 or 1",
+    "ball.length == 2 and hole.length == 2",
+    "0 <= ball[0], hole[0] < m and 0 <= ball[1], hole[1] < n",
+    "ball and hole are both on empty cells, at different positions",
+    "The maze has at least 2 empty cells"
+  ],
+  "signature": "String findShortestWay(int[][] maze, int[] ball, int[] hole)",
+  "entry": "findShortestWay",
+  "kind": "function",
+  "parameters": [
+    "maze",
+    "ball",
+    "hole"
+  ],
+  "validator": "function validate([maze, ball, hole]) {\n  if (!Array.isArray(maze) || maze.length < 1 || maze.length > 100) return 'maze needs 1 to 100 rows.';\n  const cols = Array.isArray(maze[0]) ? maze[0].length : 0;\n  if (cols < 1 || cols > 100) return 'maze needs 1 to 100 columns.';\n  let empty = 0;\n  for (const row of maze) {\n    if (!Array.isArray(row) || row.length !== cols) return 'Every row of maze has the same length.';\n    for (const cell of row) {\n      if (cell !== 0 && cell !== 1) return 'Each cell is 0 (empty) or 1 (wall).';\n      if (cell === 0) empty++;\n    }\n  }\n  if (empty < 2) return 'The maze needs at least 2 empty cells.';\n  for (const [name, point] of [['ball', ball], ['hole', hole]]) {\n    if (!Array.isArray(point) || point.length !== 2 || !Number.isInteger(point[0]) || !Number.isInteger(point[1])) return `${name} is a [row, col] pair.`;\n    if (point[0] < 0 || point[0] >= maze.length || point[1] < 0 || point[1] >= cols) return `${name} must be inside the maze.`;\n    if (maze[point[0]][point[1]] !== 0) return `${name} must be on an empty cell.`;\n  }\n  if (ball[0] === hole[0] && ball[1] === hole[1]) return 'ball and hole must be at different cells.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findShortestWay(maze, ball, hole) {\n  const rows = maze.length;\n  const cols = maze[0].length;\n  const moves = [['d', 1, 0], ['l', 0, -1], ['r', 0, 1], ['u', -1, 0]];\n  const open = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && maze[r][c] === 0;\n  const before = (a, b) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);\n  const heap = [];\n  const swap = (x, y) => { [heap[x], heap[y]] = [heap[y], heap[x]]; };\n  const push = (entry) => {\n    heap.push(entry);\n    let child = heap.length - 1;\n    while (child > 0 && before(heap[child], heap[(child - 1) >> 1])) {\n      swap(child, (child - 1) >> 1);\n      child = (child - 1) >> 1;\n    }\n  };\n  const pop = () => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    heap[0] = last;\n    let parent = 0;\n    for (;;) {\n      const left = 2 * parent + 1;\n      let next = parent;\n      if (left < heap.length && before(heap[left], heap[next])) next = left;\n      if (left + 1 < heap.length && before(heap[left + 1], heap[next])) next = left + 1;\n      if (next === parent) return top;\n      swap(parent, next);\n      parent = next;\n    }\n  };\n  const settled = new Set();\n  push([0, '', ball[0], ball[1]]);\n  while (heap.length > 0) {\n    const [distance, path, row, col] = pop();\n    if (row === hole[0] && col === hole[1]) return path;\n    if (settled.has(row * cols + col)) continue;\n    settled.add(row * cols + col);\n    for (const [letter, dr, dc] of moves) {\n      let r = row;\n      let c = col;\n      let steps = 0;\n      while (open(r + dr, c + dc) && (r !== hole[0] || c !== hole[1])) {\n        r += dr;\n        c += dc;\n        steps++;\n      }\n      if (steps > 0 && !settled.has(r * cols + c)) push([distance + steps, path + letter, r, c]);\n    }\n  }\n  return 'impossible';\n}",
+  "brute": "function findShortestWay(maze, ball, hole) {\n  // Bellman-Ford style: relax every stopping cell in every direction until nothing improves.\n  const m = maze.length, n = maze[0].length;\n  const best = maze.map(row => row.map(() => null));\n  best[ball[0]][ball[1]] = [0, ''];\n  const dirs = { u: [-1, 0], d: [1, 0], l: [0, -1], r: [0, 1] };\n  let changed = true;\n  while (changed) {\n    changed = false;\n    for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) {\n      if (!best[i][j] || (i === hole[0] && j === hole[1])) continue;\n      for (const key of Object.keys(dirs)) {\n        const [di, dj] = dirs[key];\n        let x = i, y = j, d = 0;\n        while (x + di >= 0 && x + di < m && y + dj >= 0 && y + dj < n && maze[x + di][y + dj] === 0) {\n          x += di; y += dj; d++;\n          if (x === hole[0] && y === hole[1]) break;\n        }\n        if (d === 0) continue;\n        const candidate = [best[i][j][0] + d, best[i][j][1] + key], current = best[x][y];\n        if (!current || candidate[0] < current[0] || (candidate[0] === current[0] && candidate[1] < current[1])) { best[x][y] = candidate; changed = true; }\n      }\n    }\n  }\n  return best[hole[0]][hole[1]] ? best[hole[0]][hole[1]][1] : 'impossible';\n}",
+  "generator": "function generate(rand, size) {\n  for (;;) {\n    const m = size === 'large' ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 7);\n    const n = size === 'large' ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 7);\n    const density = 0.1 + rand() * 0.3;\n    const maze = Array.from({ length: m }, () => Array.from({ length: n }, () => (rand() < density ? 1 : 0)));\n    const empty = [];\n    for (let r = 0; r < m; r++) for (let c = 0; c < n; c++) if (maze[r][c] === 0) empty.push([r, c]);\n    if (empty.length < 2) continue;\n    const first = Math.floor(rand() * empty.length);\n    let second = Math.floor(rand() * (empty.length - 1));\n    if (second >= first) second++;\n    return [maze, empty[first], empty[second]];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,0,0,0,0],[1,1,0,0,1],[0,0,0,0,0],[0,1,0,0,1],[0,1,0,0,0]],[4,3],[0,1]],"expected":"lul"},
+    {"name":"Example 2","input":[[[0,0,0,0,0],[1,1,0,0,1],[0,0,0,0,0],[0,1,0,0,1],[0,1,0,0,0]],[4,3],[3,0]],"expected":"impossible"},
+    {"name":"Example 3","input":[[[0,0,0,0,0,0,0],[0,0,1,0,0,1,0],[0,0,0,0,1,0,0],[0,0,0,0,0,0,1]],[0,4],[3,5]],"expected":"dldr"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0]],[0,0],[0,1]]},
+    {"name":"Test 2","input":[[[0],[0],[0]],[2,0],[0,0]]},
+    {"name":"Test 3","input":[[[0,0,0,0,0]],[0,0],[0,2]]},
+    {"name":"Test 4","input":[[[0,0,0],[0,0,0],[0,0,0]],[0,0],[1,1]]},
+    {"name":"Test 5","input":[[[0,0,0],[0,0,0],[0,0,0]],[0,0],[2,2]]},
+    {"name":"Test 6","input":[[[0,1,0],[1,0,0]],[0,0],[1,2]]},
+    {"name":"Test 7","input":[[[0,1,0,0,0,0],[0,0,0,0,1,0],[0,0,0,0,0,0],[1,0,0,0,1,0],[0,0,1,0,0,0]],[4,5],[1,1]]},
+    {"name":"Test 8","input":[[[0,0,1,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,1]],[3,4],[5,3]]},
+    {"name":"Test 9","input":[[[0,0,0,0,0,1],[0,1,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[1,0,0,0,0,0]],[0,1],[3,5]]},
+    {"name":"Test 10","input":[[[1,0,0,1,0,0],[0,0,0,1,0,0],[0,0,1,1,1,0],[1,0,0,0,0,0]],[2,5],[1,2]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe ball can only come to rest next to a wall or in the hole, so those resting cells are the nodes of a graph and each push is an edge whose weight is the number of cells rolled. The weights differ, so counting pushes with plain BFS gives wrong answers; this is a shortest-path problem for Dijkstra's algorithm. The only twist is the ranking: a route is better if its distance is smaller, or if the distances tie and its string is lexicographically smaller. Every push rolls at least one cell, so two equal-distance routes to the same cell can never have one string be a prefix of the other, and adding the same pushes to both keeps their order. That is exactly what Dijkstra needs to stay correct with this ranking.\n\n## Approach\n\n1. Keep a min-heap of entries `[distance, path, row, col]`, ordered by `before`: smaller `distance` first, then smaller `path`.\n2. Push the start `[0, '', ball[0], ball[1]]`.\n3. Pop the best entry. If it is the hole, its `path` is the answer, because no entry left in the heap can rank lower.\n4. If the cell is already in `settled`, a better route got there first; skip it. Otherwise settle it.\n5. For each direction in `moves`, roll while the next cell is `open` and the ball is not on the hole, counting `steps`.\n6. If the ball moved and its new cell is not settled, push `[distance + steps, path + letter, r, c]`.\n7. If the heap runs dry, the hole is unreachable: return `\"impossible\"`.\n\n## Example 1, step by step\n\nThe ball is at `(4,3)` and the hole at `(0,1)`. The first pushes give `l` to `(4,2)` and `r` to `(4,4)` (distance 1 each) and `u` to `(0,3)` (distance 4). Settling `(4,2)` adds `lu` to `(0,2)` at distance 5. Settling `(0,3)` adds `ul`, which rolls left and drops into the hole at distance 6. Settling `(0,2)` adds `lul`, also reaching the hole at distance 6. The two hole entries tie on distance and `\"lul\" < \"ul\"`, so `lul` is popped first and returned.\n\n## Complexity\n\n- Time: O(m·n·(m + n + log(m·n))), ignoring the cost of copying path strings: each of the m·n cells is settled once, rolls in four directions across at most max(m, n) cells, and pushes at most four heap entries.\n- Space: O(m·n) for `settled` and the heap entries (plus their path strings).\n\n## Pitfalls\n\n- The hole stops the ball in the middle of a roll; check for it after every step, not only where the ball would hit a wall.\n- Fewer pushes is not the tie-breaker: `\"lul\"` beats `\"ul\"` because strings are compared letter by letter.\n- Return when the hole is **popped**, not when it is pushed; a later push can still produce a better entry.\n- A push that does not move the ball is not a move; skip `steps === 0`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `moves` | each direction's letter with its row and column step |\n| `open(r, c)` | whether `(r, c)` is inside the grid and empty |\n| `before(a, b)` | whether entry `a` ranks ahead of entry `b` |\n| `heap`, `push`, `pop` | the binary min-heap of entries |\n| `settled` | cells whose best route is final, keyed by `row * cols + col` |\n| `distance`, `path` | the popped entry's cells rolled and push letters |\n| `r`, `c`, `steps` | where a roll ends and how many cells it covered |",
+  "narration": {
+    "4": "The four pushes in alphabetical order of their letters, each with its row and column step.",
+    "5": "A cell is open if it is inside the grid and not a wall.",
+    "6": "Rank entries by distance first and by the instruction string on a tie.",
+    "12": "Sift the new entry up while it ranks ahead of its parent.",
+    "26": "While sifting down, pick the better-ranked child of the current position.",
+    "28": "Neither child ranks ahead, so the heap order is restored.",
+    "34": "Start from the ball's cell with distance 0 and no pushes.",
+    "35": "Keep going while there are routes left to extend.",
+    "36": "Take the best-ranked route found so far.",
+    "37": "The first time the hole comes out of the heap, its route is the best possible.",
+    "38": "A cell can be pushed several times; only its first, best entry is used.",
+    "39": "Mark the cell as final.",
+    "40": "Try pushing the ball in each of the four directions.",
+    "44": "Roll while the next cell is open, but stop as soon as the ball is on the hole.",
+    "47": "Count every cell the ball rolls over.",
+    "49": "If the ball moved to a cell that is not final, record the longer route.",
+    "52": "The heap ran dry without reaching the hole."
+  }
+}

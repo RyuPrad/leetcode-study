@@ -1,0 +1,58 @@
+{
+  "number": 401,
+  "title": "Binary Watch",
+  "spec": "leetcode",
+  "statement": "A binary watch shows the hour (0 to 11) on 4 lights and the minute (0 to 59) on 6 lights. Each light is one bit of the value, with the lowest bit on the right, and a lit light means that bit is 1. Ignore AM/PM.\n\nGiven `turnedOn`, the number of lights that are lit, return every time the watch could be showing. A time is valid only if its hour is at most 11 and its minute is at most 59. Write each time as `\"H:MM\"`:\n\n- the hour has no leading zero (`\"1:00\"`, never `\"01:00\"`);\n- the minute always has two digits (`\"10:02\"`, never `\"10:2\"`).\n\nThe times may be returned in any order. If no time uses exactly `turnedOn` lights, return an empty list.",
+  "constraints": [
+    "0 <= turnedOn <= 10"
+  ],
+  "signature": "List<String> readBinaryWatch(int turnedOn)",
+  "entry": "readBinaryWatch",
+  "kind": "function",
+  "parameters": [
+    "turnedOn"
+  ],
+  "compare": "unordered",
+  "validator": "function validate([turnedOn]) {\n  if (!Number.isInteger(turnedOn)) return 'turnedOn must be a whole number.';\n  if (turnedOn < 0 || turnedOn > 10) return 'turnedOn is between 0 and 10.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function readBinaryWatch(turnedOn) {\n  if (turnedOn === 0) {\n    return ['0:00'];\n  }\n  const times = [];\n  let mask = (1 << turnedOn) - 1;\n  while (mask < 1 << 10) {\n    const hour = mask >> 6;\n    const minute = mask & 63;\n    if (hour < 12 && minute < 60) {\n      times.push(hour + ':' + (minute < 10 ? '0' : '') + minute);\n    }\n    const lowest = mask & -mask;\n    const ripple = mask + lowest;\n    const changed = ripple ^ mask;\n    mask = ripple | ((changed / lowest) >> 2);\n  }\n  return times;\n}",
+  "brute": "function readBinaryWatch(turnedOn) {\n  // Choose which of the 10 lights are lit, one light at a time.\n  const weights = [8, 4, 2, 1, 32, 16, 8, 4, 2, 1];\n  const result = [];\n  const pick = (index, left, hours, minutes) => {\n    if (left === 0) {\n      if (hours <= 11 && minutes <= 59) result.push(`${hours}:${String(minutes).padStart(2, '0')}`);\n      return;\n    }\n    if (index === weights.length) return;\n    if (index < 4) pick(index + 1, left - 1, hours + weights[index], minutes);\n    else pick(index + 1, left - 1, hours, minutes + weights[index]);\n    pick(index + 1, left, hours, minutes);\n  };\n  pick(0, turnedOn, 0, 0);\n  return result;\n}",
+  "generator": "function generate(rand, size) {\n  // The whole input is one small count; large inputs favour the busier middle counts.\n  if (size === 'large') return [2 + Math.floor(rand() * 5)];\n  return [Math.floor(rand() * 11)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1],"expected":["0:01","0:02","0:04","0:08","0:16","0:32","1:00","2:00","4:00","8:00"]},
+    {"name":"Example 2","input":[9],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0]},
+    {"name":"Test 2","input":[2]},
+    {"name":"Test 3","input":[3]},
+    {"name":"Test 4","input":[4]},
+    {"name":"Test 5","input":[5]},
+    {"name":"Test 6","input":[6]},
+    {"name":"Test 7","input":[7]},
+    {"name":"Test 8","input":[8]},
+    {"name":"Test 9","input":[10]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe 10 lights form one 10-bit number: the hour in the top 4 bits and the minute in the low 6, so a reading lights exactly as many lights as that number has 1 bits. Checking all 12 × 60 readings and counting bits works, and so does backtracking over which lights are on. Smarter still: list only the 10-bit numbers that have exactly `turnedOn` set bits, in increasing order, with the classic \"next number with the same bit count\" trick (Gosper's hack). There are at most C(10, 5) = 252 of them.\n\n## Approach\n\n1. With no lights on, the only reading is `\"0:00\"`; return it (the trick below needs at least one set bit).\n2. Start `mask` at the smallest number with `turnedOn` set bits: the lowest `turnedOn` bits all on.\n3. While `mask` still fits in 10 bits, split it into `hour = mask >> 6` and `minute = mask & 63`. Keep it if `hour < 12` and `minute < 60`, writing the minute with two digits.\n4. Step to the next mask: `lowest` is its lowest set bit; `ripple = mask + lowest` carries through the lowest run of 1s and sets the 0 just above it. `changed` marks the bits that flipped (the run plus that new bit). Dividing by `lowest` slides them to the bottom and `>> 2` drops two, so the run minus one bit is put back at the very bottom.\n5. Return `times`.\n\n## Example 1, step by step\n\n`turnedOn = 1`, so `mask` starts at 1. With one set bit, `ripple` is just `mask * 2` and `changed / lowest` is 3, so `3 >> 2` adds nothing: `mask` runs 1, 2, 4, 8, 16, 32 (minutes, giving `\"0:01\"` to `\"0:32\"`), then 64, 128, 256, 512 (hours 1, 2, 4, 8, giving `\"1:00\"` to `\"8:00\"`). Next comes 1024, which no longer fits, so the 10 times are returned.\n\n## Complexity\n\n- Time: O(C(10, turnedOn)), at most 252 masks, each handled in constant time.\n- Space: O(1) besides the answer.\n\n## Pitfalls\n\n- Bits allow hours 12 to 15 and minutes 60 to 63; filter them out.\n- Pad the minute to two digits but never the hour: `\"3:05\"`, not `\"03:05\"` or `\"3:5\"`.\n- `turnedOn = 0` must be handled first: a mask of 0 has no lowest bit and would never advance.\n- 9 or 10 lights fit no real time (the most is 3 + 5 = 8, as in `\"11:59\"`), so the answer is empty.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `times` | the valid readings found so far |\n| `mask` | the current 10-bit pattern of lit lights |\n| `hour`, `minute` | the top 4 and low 6 bits of `mask` |\n| `lowest` | the lowest set bit of `mask` |\n| `ripple` | `mask` with its lowest run of 1s carried one place up |\n| `changed` | the bits that differ between `mask` and `ripple` |",
+  "narration": {
+    "2": "With no lights on, midnight is the only reading.",
+    "6": "The smallest pattern with turnedOn lights is the lowest turnedOn bits all on.",
+    "7": "Patterns are visited in increasing order until they need an 11th bit.",
+    "8": "The top 4 bits are the hour lights.",
+    "9": "The low 6 bits are the minute lights.",
+    "10": "Bits can spell 12 to 15 hours or 60 to 63 minutes; only real times count.",
+    "11": "Write the minute with two digits and the hour as it is.",
+    "13": "mask & -mask isolates the lowest set bit.",
+    "14": "Adding it carries through the lowest run of 1s and lights the next 0 above.",
+    "15": "XOR marks every bit the carry flipped: the old run plus the new bit.",
+    "16": "Slide those bits to the bottom, drop two, and add them back so the count of 1s is unchanged.",
+    "18": "Every pattern with the right number of lights was checked."
+  }
+}

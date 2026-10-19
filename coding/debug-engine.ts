@@ -62,6 +62,8 @@ export class DebugController {
     const pause=this.shouldPause;this.first=false;
     const presentation=!pause&&this.motion==='play'&&this.presentation==='detailed'?new Promise<void>(resolve=>{this.presentationIndex=frame.index;this.presentResolve=resolve;}):null;
     this.hooks.frame(frame,pause,this.reason);
+    // A hook may stop the session (the walkthrough's step limit) before any resolver exists to wake.
+    if(this.stopped)throw new Error('Debug session stopped.');
     if(pause){this.pauseRequested=false;this.waitingForCommand=true;await new Promise<void>(resolve=>{this.resume=resolve;});this.waitingForCommand=false;}
     else if(presentation){await presentation;if(this.pauseRequested&&!this.stopped){this.pauseRequested=false;this.waitingForCommand=true;this.hooks.frame(frame,true,'Paused');await new Promise<void>(resolve=>{this.resume=resolve;});this.waitingForCommand=false;}}
     else if(this.motion==='play')await new Promise<void>(resolve=>{const timer=setTimeout(resolve,1000/this.speed);this.resume=()=>{clearTimeout(timer);resolve();};});

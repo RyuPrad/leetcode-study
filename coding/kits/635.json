@@ -1,0 +1,84 @@
+{
+  "number": 635,
+  "title": "Design Log Storage System",
+  "spec": "recalled",
+  "statement": "Build a class `LogSystem` that stores log records and lists the ones that fall in a time range at a chosen precision. A timestamp is a string `\"Year:Month:Day:Hour:Minute:Second\"` whose fields are zero-padded decimal numbers: four digits for the year and two for every other field, for instance `\"2017:01:01:23:59:59\"`.\n\n- `LogSystem()` creates a system with no logs.\n- `put(id, timestamp)` stores one log with that `id` and `timestamp`. No two logs share an `id`.\n- `retrieve(start, end, granularity)` returns the `id` of every stored log whose timestamp lies between `start` and `end`, both ends included, when all three timestamps are compared only down to the unit named by `granularity` (`\"Year\"`, `\"Month\"`, `\"Day\"`, `\"Hour\"`, `\"Minute\"` or `\"Second\"`). Units finer than `granularity` are ignored everywhere: with `\"Day\"`, only the year, month and day of each timestamp matter. If `start` is later than `end` at that precision, no log matches. The ids may be returned in any order.",
+  "constraints": [
+    "1 <= id <= 500",
+    "2000 <= Year <= 2017",
+    "1 <= Month <= 12",
+    "1 <= Day <= 31",
+    "0 <= Hour <= 23",
+    "0 <= Minute, Second <= 59",
+    "granularity is one of \"Year\", \"Month\", \"Day\", \"Hour\", \"Minute\", \"Second\"",
+    "At most 500 calls in total are made to put and retrieve"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "LogSystem",
+    "constructor": "LogSystem()",
+    "methods": [
+      "void put(int id, String timestamp)",
+      "List<Integer> retrieve(String start, String end, String granularity)"
+    ]
+  },
+  "entry": "LogSystem",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [],
+    "put": [
+      "id",
+      "timestamp"
+    ],
+    "retrieve": [
+      "start",
+      "end",
+      "granularity"
+    ]
+  },
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  if (!Array.isArray(actual) || actual.length !== expected.length) return false;\n  const byValue = (a, b) => a - b;\n  return expected.every((want, i) => {\n    const got = actual[i];\n    if (want === null) return got === null;\n    if (!Array.isArray(got) || got.length !== want.length) return false;\n    const sortedGot = [...got].sort(byValue);\n    const sortedWant = [...want].sort(byValue);\n    return sortedWant.every((id, j) => sortedGot[j] === id);\n  });\n}",
+  "validator": "function validate([operations, args]) {\n  if (!Array.isArray(operations) || !Array.isArray(args) || operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'LogSystem' || !Array.isArray(args[0]) || args[0].length !== 0) return 'Start with LogSystem and no arguments.';\n  if (operations.length - 1 > 500) return 'At most 500 calls to put and retrieve.';\n  const units = ['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second'];\n  const limits = [[2000, 2017], [1, 12], [1, 31], [0, 23], [0, 59], [0, 59]];\n  const validStamp = text => typeof text === 'string' && /^\\d{4}(:\\d{2}){5}$/.test(text) && text.split(':').every((part, i) => +part >= limits[i][0] && +part <= limits[i][1]);\n  const ids = new Set();\n  for (let i = 1; i < operations.length; i++) {\n    const params = args[i];\n    if (!Array.isArray(params)) return 'Each call needs a list of arguments.';\n    if (operations[i] === 'put') {\n      const [id, timestamp] = params;\n      if (params.length !== 2 || !Number.isInteger(id) || id < 1 || id > 500) return 'put takes an id from 1 to 500 and a timestamp.';\n      if (ids.has(id)) return 'Every log needs a different id.';\n      ids.add(id);\n      if (!validStamp(timestamp)) return 'Timestamps look like \"2017:01:01:23:59:59\" with fields in range.';\n    } else if (operations[i] === 'retrieve') {\n      const [start, end, granularity] = params;\n      if (params.length !== 3 || !validStamp(start) || !validStamp(end)) return 'retrieve takes two valid timestamps and a granularity.';\n      if (!units.includes(granularity)) return 'granularity is Year, Month, Day, Hour, Minute or Second.';\n    } else return 'Only put and retrieve can follow the constructor.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class LogSystem {\n  constructor() {\n    this.logs = [];\n    this.prefixLength = { Year: 4, Month: 7, Day: 10, Hour: 13, Minute: 16, Second: 19 };\n  }\n\n  put(id, timestamp) {\n    this.logs.push([id, timestamp]);\n  }\n\n  retrieve(start, end, granularity) {\n    const length = this.prefixLength[granularity];\n    const low = start.slice(0, length);\n    const high = end.slice(0, length);\n    const result = [];\n    for (const [id, timestamp] of this.logs) {\n      const key = timestamp.slice(0, length);\n      if (key >= low && key <= high) {\n        result.push(id);\n      }\n    }\n    return result;\n  }\n}",
+  "brute": "class LogSystem {\n  constructor() {\n    this.entries = [];\n  }\n  put(id, timestamp) {\n    this.entries.push({ id, timestamp });\n  }\n  retrieve(start, end, granularity) {\n    const keep = ['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second'].indexOf(granularity) + 1;\n    // Fields past the granularity become 0 for the lower bound and 99 for the upper bound.\n    const encode = (text, count, fill) => text.split(':').map(Number).reduce((total, part, i) => total * 100 + (i < count ? part : fill), 0);\n    const lowest = encode(start, keep, 0);\n    const highest = encode(end, keep, 99);\n    return this.entries.filter(entry => {\n      const moment = encode(entry.timestamp, 6, 0);\n      return moment >= lowest && moment <= highest;\n    }).map(entry => entry.id);\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pad = (value, width) => String(value).padStart(width, '0');\n  const between = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const choose = list => list[Math.floor(rand() * list.length)];\n  const units = ['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second'];\n  // Small (and some large) inputs reuse a few values per field so that ranges hit their edges.\n  const tight = size === 'small' || rand() < 0.3;\n  const stamp = () => {\n    const fields = tight\n      ? [choose([2000, 2016, 2017]), choose([1, 2, 12]), choose([1, 2, 31]), choose([0, 1, 23]), choose([0, 1, 59]), choose([0, 1, 59])]\n      : [between(2000, 2017), between(1, 12), between(1, 31), between(0, 23), between(0, 59), between(0, 59)];\n    return fields.map((value, i) => pad(value, i === 0 ? 4 : 2)).join(':');\n  };\n  const ids = Array.from({ length: 500 }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [ids[i], ids[j]] = [ids[j], ids[i]];\n  }\n  const operations = ['LogSystem'];\n  const args = [[]];\n  const stored = [];\n  const calls = size === 'large' ? 499 : 1 + Math.floor(rand() * 12);\n  const putRate = 0.4 + rand() * 0.4;\n  for (let i = 0; i < calls; i++) {\n    if (rand() < putRate) {\n      const timestamp = stored.length > 0 && rand() < 0.15 ? choose(stored) : stamp();\n      stored.push(timestamp);\n      operations.push('put');\n      args.push([ids.pop(), timestamp]);\n      continue;\n    }\n    let start = stored.length > 0 && rand() < 0.4 ? choose(stored) : stamp();\n    let end = stored.length > 0 && rand() < 0.4 ? choose(stored) : stamp();\n    if (start > end && rand() < 0.8) [start, end] = [end, start];\n    operations.push('retrieve');\n    args.push([start, end, choose(units)]);\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["LogSystem","put","put","put","retrieve","retrieve"],[[],[1,"2017:01:01:23:59:59"],[2,"2017:01:01:22:59:59"],[3,"2016:01:01:00:00:00"],["2016:01:01:01:01:01","2017:01:01:23:00:00","Year"],["2016:01:01:01:01:01","2017:01:01:23:00:00","Hour"]]],"expected":[null,null,null,null,[3,2,1],[2,1]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["LogSystem","retrieve"],[[],["2000:01:01:00:00:00","2017:12:31:23:59:59","Year"]]]},
+    {"name":"Test 2","input":[["LogSystem","put","retrieve","retrieve","retrieve"],[[],[5,"2010:06:15:12:30:45"],["2010:06:15:12:30:45","2010:06:15:12:30:45","Second"],["2010:06:15:12:30:46","2010:06:15:12:31:00","Second"],["2010:06:15:12:30:46","2010:06:15:12:31:00","Minute"]]]},
+    {"name":"Test 3","input":[["LogSystem","put","put","put","retrieve","retrieve"],[[],[1,"2017:02:28:23:59:59"],[2,"2017:03:01:00:00:00"],[3,"2017:01:31:23:59:59"],["2017:02:15:00:00:00","2017:02:20:00:00:00","Month"],["2017:02:15:00:00:00","2017:03:20:00:00:00","Day"]]]},
+    {"name":"Test 4","input":[["LogSystem","put","put","retrieve","retrieve","retrieve"],[[],[7,"2016:05:10:09:30:00"],[8,"2016:05:10:10:15:00"],["2016:05:10:10:00:00","2016:05:10:09:00:00","Hour"],["2016:05:10:10:00:00","2016:05:10:09:00:00","Day"],["2016:05:10:10:00:00","2016:05:10:09:00:00","Second"]]]},
+    {"name":"Test 5","input":[["LogSystem","put","put","put","retrieve","retrieve"],[[],[10,"2000:01:01:00:00:00"],[20,"2017:12:31:23:59:59"],[30,"2008:07:04:12:00:00"],["2000:12:31:23:59:59","2017:01:01:00:00:00","Year"],["2000:12:31:23:59:59","2017:01:01:00:00:00","Month"]]]},
+    {"name":"Test 6","input":[["LogSystem","put","retrieve","put","retrieve","put","retrieve"],[[],[3,"2012:03:04:05:06:07"],["2012:01:01:00:00:00","2012:12:31:23:59:59","Second"],[4,"2012:03:04:05:06:08"],["2012:03:04:05:06:00","2012:03:04:05:06:07","Second"],[500,"2012:03:04:05:07:00"],["2012:03:04:05:06:59","2012:03:04:05:06:00","Minute"]]]},
+    {"name":"Test 7","input":[["LogSystem","put","put","put","retrieve","retrieve"],[[],[1,"2015:11:11:11:11:11"],[2,"2015:11:11:11:11:11"],[3,"2015:11:11:11:11:12"],["2015:11:11:11:11:11","2015:11:11:11:11:11","Second"],["2015:11:11:11:11:59","2015:11:11:11:11:00","Minute"]]]},
+    {"name":"Test 8","input":[["LogSystem","put","put","put","put","retrieve","retrieve","retrieve"],[[],[11,"2014:12:31:23:59:59"],[12,"2015:01:01:00:00:00"],[13,"2015:01:31:00:00:00"],[14,"2015:02:01:00:00:00"],["2015:01:15:00:00:00","2015:01:15:00:00:00","Month"],["2014:12:31:00:00:00","2015:01:01:00:00:00","Day"],["2014:06:01:00:00:00","2015:06:01:00:00:00","Year"]]]},
+    {"name":"Test 9","input":[["LogSystem","put","put","put","retrieve","retrieve","retrieve"],[[],[42,"2009:09:09:09:09:09"],[43,"2009:09:09:10:00:00"],[44,"2009:09:09:08:59:59"],["2009:09:09:09:59:59","2009:09:09:09:00:00","Hour"],["2009:09:09:09:00:00","2009:09:09:09:59:59","Second"],["2009:09:09:08:00:00","2009:09:09:10:00:00","Hour"]]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":21,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery field of a timestamp has a fixed width and is zero-padded, so comparing two timestamps as plain strings gives the same order as comparing them in time. Granularity then becomes a question of how many characters to look at: `\"Year\"` keeps the first 4 characters, `\"Month\"` the first 7 (`\"2017:01\"`), and so on down to all 19 for `\"Second\"`. Cutting the start, the end and each log to that prefix turns the query into an ordinary inclusive range check, with no date parsing at all.\n\n## Approach\n\n1. Keep `logs`, a list of `[id, timestamp]` pairs, and `prefixLength`, the number of characters each granularity keeps (4, 7, 10, 13, 16, 19).\n2. `put(id, timestamp)`: append the pair to `logs`.\n3. `retrieve(start, end, granularity)`: look up `length`, then cut `start` and `end` to `low` and `high`.\n4. For each stored log, cut its timestamp to `key`; if `low <= key <= high` as strings, add its `id` to `result`.\n5. Return `result`.\n\n## Example 1, step by step\n\nAfter the three `put` calls, `logs` holds ids 1, 2, 3. With `\"Year\"`, `length = 4`, `low = \"2016\"` and `high = \"2017\"`; the keys are `\"2017\"`, `\"2017\"` and `\"2016\"`, all in range, so the ids are 1, 2 and 3. With `\"Hour\"`, `length = 13`, `low = \"2016:01:01:01\"` and `high = \"2017:01:01:23\"`. Keys `\"2017:01:01:23\"` and `\"2017:01:01:22\"` fit, but `\"2016:01:01:00\"` is before `low`, so only ids 1 and 2 come back.\n\n## Complexity\n\n- Time: `put` is O(1); `retrieve` is O(n) for n stored logs (each prefix has at most 19 characters).\n- Space: O(n) for the stored logs.\n\n## Pitfalls\n\n- Cut `end` to the granularity too: comparing full timestamps would drop `\"2017:01:01:23:30:00\"` from an `\"Hour\"` range ending at `\"2017:01:01:23:00:00\"`.\n- The prefix lengths include the colons (`\"Month\"` is 7 characters, not 6).\n- String comparison is only safe because every field is zero-padded; parsed numbers need their own field-by-field order.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `logs` | every stored `[id, timestamp]` pair |\n| `prefixLength` | characters kept for each granularity |\n| `length` | characters kept for this query |\n| `low`, `high` | `start` and `end` cut to `length` characters |\n| `key` | a log's timestamp cut to `length` characters |\n| `result` | ids of the logs in range |",
+  "narration": {
+    "3": "Every log is kept as an [id, timestamp] pair.",
+    "4": "How many characters of a timestamp each granularity looks at, colons included.",
+    "8": "Storing a log is a single append.",
+    "12": "Pick the prefix length for the requested granularity.",
+    "13": "Cut start down to the units that matter...",
+    "14": "...and cut end the same way, so the whole of its last unit is included.",
+    "16": "Check every stored log.",
+    "17": "Cut the log's timestamp to the same precision.",
+    "18": "Zero-padded strings compare like times, so this is an inclusive range test.",
+    "19": "The log falls in the range; report its id.",
+    "22": "Return the ids of all logs in range."
+  }
+}

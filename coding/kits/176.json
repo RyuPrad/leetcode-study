@@ -1,0 +1,51 @@
+{
+  "number": 176,
+  "title": "Second Highest Salary",
+  "spec": "leetcode",
+  "statement": "One table lists what each employee earns:\n\n- `Employee(id, salary)`: one row per employee; `id` is unique. Several employees may share the same salary.\n\nReport the second largest **distinct** salary as a single row with one column named `SecondHighestSalary`. Equal salaries count once, so in `300, 300, 200` the answer is `200`. When fewer than two distinct salaries exist (including an empty table), still return exactly one row, holding `null`.",
+  "constraints": [
+    "id is unique in Employee",
+    "salary is never null",
+    "The result always has exactly one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["salary","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const ids = new Set();\n  for (const [id, salary] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Employee.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH distinct_salaries AS (\n  SELECT DISTINCT salary\n  FROM Employee\n)\nSELECT (\n  SELECT salary\n  FROM distinct_salaries\n  ORDER BY salary DESC\n  LIMIT 1 OFFSET 1\n) AS SecondHighestSalary;",
+  "brute": "SELECT MAX(salary) AS SecondHighestSalary\nFROM Employee\nWHERE salary < (SELECT MAX(salary) FROM Employee)",
+  "generator": "function generate(rand, size) {\n  const Employee = [];\n  if (size === 'small') {\n    // A tiny salary pool makes repeated top salaries and single-salary tables common.\n    const pool = [0, 100, 200, 300];\n    const rows = Math.floor(rand() * 9);\n    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].sort(() => rand() - 0.5);\n    for (let i = 0; i < rows; i++) Employee.push([ids[i], pool[Math.floor(rand() * pool.length)]]);\n  } else {\n    for (let id = 1; id <= 2000; id++) Employee.push([id, Math.floor(rand() * 500) * 100]);\n  }\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,100],[2,200],[3,300]]}],"expected":{"columns":["SecondHighestSalary"],"rows":[[200]]}},
+    {"name":"Example 2","input":[{"Employee":[[1,100]]}],"expected":{"columns":["SecondHighestSalary"],"rows":[[null]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,500],[2,500],[3,500]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,300],[2,300],[3,200]]}]},
+    {"name":"Test 4","input":[{"Employee":[[1,300],[2,200],[3,200],[4,100]]}]},
+    {"name":"Test 5","input":[{"Employee":[[7,0],[3,50]]}]},
+    {"name":"Test 6","input":[{"Employee":[[4,100],[2,400],[9,300],[1,400],[5,300],[6,100]]}]},
+    {"name":"Test 7","input":[{"Employee":[[1,0],[2,0]]}]},
+    {"name":"Test 8","input":[{"Employee":[[10,1000],[20,999],[30,1],[40,1000],[50,999]]}]},
+    {"name":"Test 9","input":[{"Employee":[[1,200],[2,100]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Second highest\" is about salary values, not people: duplicates of the top salary must not push it into second place. Collapsing the salaries to their distinct values and skipping the largest one leaves the answer at the top of what remains. The second difficulty is the empty case: a query that simply finds no row returns an empty table, but the task wants one row holding `null`. Wrapping the lookup in a **scalar subquery** fixes that, because a scalar subquery that finds nothing evaluates to `null`.\n\n## Approach\n\n1. `distinct_salaries`: keep each salary value once with `SELECT DISTINCT`.\n2. In a scalar subquery, sort those values from high to low and take one row after skipping one (`LIMIT 1 OFFSET 1`).\n3. The outer `SELECT` has no `FROM`, so it always yields exactly one row; name that value `SecondHighestSalary`.\n\n## Example 1, step by step\n\n- `distinct_salaries` holds 100, 200 and 300 (all different already).\n- Sorted descending: 300, 200, 100. Skipping one row and taking one gives 200.\n- The outer `SELECT` reports `SecondHighestSalary = 200`.\n\nIn Example 2, `distinct_salaries` holds only 100; after skipping it nothing is left, the scalar subquery becomes `null`, and the single output row is `null`.\n\n## Complexity\n\n- Time: O(E log E) for E employees, to deduplicate and sort the salaries (an index on `salary` makes it cheaper).\n- Space: O(E) for the distinct salaries.\n\n## Pitfalls\n\n- Forgetting `DISTINCT`: with salaries 300, 300, 200 the plain `OFFSET 1` returns 300 again.\n- Leaving out the scalar-subquery wrapper: on a table with one salary the query returns no rows instead of one `null` row.\n- Using `MAX(salary)` alone returns the highest salary; the second one needs the top value excluded first, as in `WHERE salary < (SELECT MAX(salary) ...)`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `distinct_salaries` | each salary value from `Employee` once |\n| `ORDER BY salary DESC` | largest value first |\n| `LIMIT 1 OFFSET 1` | skip the largest value, keep the next |\n| `SecondHighestSalary` | the scalar subquery's value, `null` when it finds no row |",
+  "narration": {
+    "1": "The first stage collects the salary values.",
+    "2": "DISTINCT keeps each salary once, so a repeated top salary cannot also be second.",
+    "5": "The outer SELECT has no FROM, so it always returns exactly one row; its value comes from a scalar subquery.",
+    "8": "Sort the distinct salaries from largest to smallest.",
+    "9": "Skip the largest value and keep the next one; if nothing is left the scalar subquery is null.",
+    "10": "Name the single output column SecondHighestSalary."
+  }
+}

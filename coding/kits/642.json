@@ -1,0 +1,92 @@
+{
+  "number": 642,
+  "title": "Design Search Autocomplete System",
+  "spec": "recalled",
+  "statement": "Build the autocomplete part of a search box. It remembers sentences typed in the past together with how often each one was typed (its **hot count**), and while the user types a new sentence one character at a time it suggests the most popular past sentences that start with what has been typed so far.\n\n- `AutocompleteSystem(sentences, times)` loads the history: sentence `sentences[i]` has hot count `times[i]`. The sentences are all different.\n- `input(c)` records one typed character `c` and returns a list of sentences:\n  - If `c` is `'#'`, the sentence being typed is complete. Save it to the history (its hot count goes up by 1, or it is added with count 1 if it is new), start the next sentence from empty, and return an empty list.\n  - Otherwise, append `c` to the sentence being typed. Return the history sentences whose beginning equals the whole text typed so far for this sentence: order them by hot count from largest to smallest, break ties by ASCII order (the smaller string first, so `\"ab\"` comes before `\"ab c\"`, which comes before `\"abc\"`), and keep only the first 3. Return fewer if fewer match, and an empty list if none do.\n\nThe sentence still being typed is not part of the history until its `'#'` arrives.",
+  "constraints": [
+    "sentences.length == times.length",
+    "1 <= sentences.length <= 100",
+    "1 <= sentences[i].length <= 100",
+    "sentences[i] are distinct and made of lowercase English letters, with single spaces between words",
+    "1 <= times[i] <= 50",
+    "c is a lowercase English letter, a space ' ' or '#'",
+    "Every typed sentence has 1 to 200 characters before its '#', with single spaces between words",
+    "At most 5000 calls are made to input"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "AutocompleteSystem",
+    "constructor": "AutocompleteSystem(String[] sentences, int[] times)",
+    "methods": [
+      "List<String> input(char c)"
+    ]
+  },
+  "entry": "AutocompleteSystem",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "sentences",
+      "times"
+    ],
+    "input": [
+      "c"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  if (operations[0] !== 'AutocompleteSystem' || !Array.isArray(args[0]) || args[0].length !== 2) return 'Start with AutocompleteSystem(sentences, times).';\n  const [sentences, times] = args[0];\n  if (!Array.isArray(sentences) || !Array.isArray(times) || sentences.length !== times.length) return 'sentences and times need the same length.';\n  if (sentences.length < 1 || sentences.length > 100) return 'Give 1 to 100 sentences.';\n  const words = /^[a-z]+( [a-z]+)*$/;\n  if (sentences.some(s => typeof s !== 'string' || s.length > 100 || !words.test(s))) return 'Each sentence has 1 to 100 characters: lowercase words separated by single spaces.';\n  if (new Set(sentences).size !== sentences.length) return 'The sentences must be distinct.';\n  if (times.some(t => !Number.isInteger(t) || t < 1 || t > 50)) return 'Each times value is between 1 and 50.';\n  if (operations.length - 1 > 5000) return 'At most 5000 calls to input.';\n  let typed = '';\n  for (let i = 1; i < operations.length; i++) {\n    if (operations[i] !== 'input') return 'Only input can follow the constructor.';\n    const c = args[i][0];\n    if (typeof c !== 'string' || !/^[a-z #]$/.test(c)) return 'c is one lowercase letter, a space or #.';\n    if (c === '#') {\n      if (!words.test(typed) || typed.length > 200) return 'Each typed sentence has 1 to 200 characters of single-spaced lowercase words before #.';\n      typed = '';\n    } else {\n      typed += c;\n      if (typed.length > 200 || typed[0] === ' ' || typed.includes('  ')) return 'Typed sentences use single spaces between words and stay within 200 characters.';\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class AutocompleteSystem {\n  constructor(sentences, times) {\n    this.root = { children: new Map(), sentences: new Set() };\n    this.counts = new Map();\n    this.typed = '';\n    this.node = this.root;\n    for (let i = 0; i < sentences.length; i++) {\n      this.add(sentences[i], times[i]);\n    }\n  }\n\n  add(sentence, times) {\n    this.counts.set(sentence, (this.counts.get(sentence) || 0) + times);\n    let node = this.root;\n    for (const ch of sentence) {\n      if (!node.children.has(ch)) {\n        node.children.set(ch, { children: new Map(), sentences: new Set() });\n      }\n      node = node.children.get(ch);\n      node.sentences.add(sentence);\n    }\n  }\n\n  input(c) {\n    if (c === '#') {\n      this.add(this.typed, 1);\n      this.typed = '';\n      this.node = this.root;\n      return [];\n    }\n    this.typed += c;\n    if (this.node !== null) {\n      this.node = this.node.children.get(c) || null;\n    }\n    if (this.node === null) {\n      return [];\n    }\n    const matches = [...this.node.sentences];\n    matches.sort((a, b) => this.counts.get(b) - this.counts.get(a) || (a < b ? -1 : 1));\n    return matches.slice(0, 3);\n  }\n}",
+  "brute": "class AutocompleteSystem {\n  constructor(sentences, times) {\n    this.history = new Map();\n    sentences.forEach((s, i) => this.history.set(s, times[i]));\n    this.current = '';\n  }\n  input(c) {\n    if (c === '#') {\n      this.history.set(this.current, (this.history.get(this.current) || 0) + 1);\n      this.current = '';\n      return [];\n    }\n    this.current += c;\n    // Scan the whole history and rank the matches by count, then by character codes.\n    const found = [...this.history.entries()].filter(([s]) => s.slice(0, this.current.length) === this.current);\n    found.sort((x, y) => {\n      if (x[1] !== y[1]) return y[1] - x[1];\n      for (let i = 0; i < Math.min(x[0].length, y[0].length); i++) {\n        if (x[0].charCodeAt(i) !== y[0].charCodeAt(i)) return x[0].charCodeAt(i) - y[0].charCodeAt(i);\n      }\n      return x[0].length - y[0].length;\n    });\n    return found.slice(0, 3).map(([s]) => s);\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = m => Math.floor(rand() * m);\n  const large = size === 'large';\n  const letters = large ? 'abcde' : 'ab';\n  const vocab = [];\n  while (vocab.length < (large ? 14 : 5)) {\n    const word = Array.from({ length: 1 + pick(large ? 5 : 2) }, () => letters[pick(letters.length)]).join('');\n    if (!vocab.includes(word)) vocab.push(word);\n  }\n  const makeSentence = (maxWords, maxLength) => {\n    let sentence = vocab[pick(vocab.length)];\n    const words = 1 + pick(maxWords);\n    for (let w = 1; w < words; w++) {\n      const next = sentence + ' ' + vocab[pick(vocab.length)];\n      if (next.length > maxLength) break;\n      sentence = next;\n    }\n    return sentence;\n  };\n  const count = large ? 60 + pick(41) : 1 + pick(4);\n  const sentences = [];\n  for (let tries = 0; sentences.length < count && tries < 5000; tries++) {\n    const sentence = makeSentence(large ? 30 : 3, 100);\n    if (!sentences.includes(sentence)) sentences.push(sentence);\n  }\n  const times = sentences.map(() => 1 + pick(large ? 50 : 3));\n  const operations = ['AutocompleteSystem'];\n  const args = [[sentences, times]];\n  const limit = large ? 500 : 6 + pick(20);\n  while (operations.length < limit) {\n    const roll = rand();\n    const text = roll < 0.4 ? sentences[pick(sentences.length)] : makeSentence(large ? 8 : 3, 200);\n    const cut = roll > 0.85 ? 1 + pick(text.length) : text.length;\n    for (const c of text.slice(0, cut).trimEnd() + '#') {\n      if (operations.length >= limit) break;\n      operations.push('input');\n      args.push([c]);\n    }\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["AutocompleteSystem","input","input","input","input"],[[["i love you","island","iroman","i love leetcode"],[5,3,2,2]],["i"],[" "],["a"],["#"]]],"expected":[null,["i love you","island","i love leetcode"],["i love you","i love leetcode"],[],[]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["AutocompleteSystem","input","input","input","input","input","input"],[[["a"],[1]],["a"],["#"],["a"],["b"],["#"],["a"]]]},
+    {"name":"Test 2","input":[["AutocompleteSystem","input","input","input"],[[["abc","abd","ab c","ab","abcd"],[3,3,3,3,3]],["a"],["b"],["c"]]]},
+    {"name":"Test 3","input":[["AutocompleteSystem","input","input","input","input","input","input","input","input","input","input","input","input","input","input"],[[["hello world","hello"],[2,1]],["h"],["e"],["l"],["l"],["o"],["#"],["h"],["e"],["l"],["l"],["o"],["#"],["h"],["e"]]]},
+    {"name":"Test 4","input":[["AutocompleteSystem","input","input","input","input","input","input","input"],[[["xyz"],[5]],["a"],[" "],["b"],["#"],["a"],["#"],["x"]]]},
+    {"name":"Test 5","input":[["AutocompleteSystem","input","input","input","input","input","input"],[[["i love you","island","ironman","i love leetcode","is"],[1,4,4,2,9]],["i"],["s"],["#"],["i"],[" "],["l"]]]},
+    {"name":"Test 6","input":[["AutocompleteSystem","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input"],[[["ab","abc","abcd"],[1,2,3]],["a"],["b"],["x"],["#"],["a"],["b"],["c"],["d"],["#"],["a"],["b"],["c"],["#"],["a"],["b"],["c"],["#"],["a"],["b"]]]},
+    {"name":"Test 7","input":[["AutocompleteSystem","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input","input"],[[["zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz","zz","z"],[50,50,49]],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["z"],["#"],["z"]]]},
+    {"name":"Test 8","input":[["AutocompleteSystem","input","input","input","input","input","input","input","input","input","input","input","input","input"],[[["a","b","c","d","e","f"],[6,5,4,3,2,1]],["f"],["#"],["f"],["#"],["f"],["#"],["f"],["#"],["f"],["#"],["f"],["#"],["f"]]]},
+    {"name":"Test 9","input":[["AutocompleteSystem","input","input","input","input","input","input","input"],[[["go home","go","good","gone girl","go go"],[2,2,2,2,2]],["g"],["o"],[" "],["g"],["#"],["g"],["o"]]]},
+    {"name":"Test 10","input":[["AutocompleteSystem","input","input","input","input","input","input","input","input","input","input"],[[["cat","car","cart"],[3,3,1]],["q"],["#"],["c"],["a"],["r"],["t"],["#"],["c"],["a"],["r"]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe simple way is to scan the whole history on every keystroke and keep the sentences that start with the typed text. That works, but it re-checks every sentence from scratch each time. A **trie** walks one step per character instead: after typing `\"i \"`, we are already standing at the node for that prefix. If every node also remembers which sentences pass through it, the candidates are ready the moment we arrive, and only those few need ranking.\n\n## Approach\n\n1. Keep a trie whose nodes have `children` (next character to node) and `sentences` (every history sentence going through that node), plus `counts`, the hot count of each sentence.\n2. `add(sentence, times)` raises the sentence's count and walks the trie, creating missing nodes and putting the sentence into each node's set.\n3. The constructor calls `add` for every given sentence.\n4. `input(c)` with a letter or space appends `c` to `typed` and steps `node` to the child for `c`. Once a step fails, `node` stays `null` until `'#'`, because no longer text can match either.\n5. Sort the node's sentences by count (descending), then by string order, and return the first 3.\n6. `input('#')` saves `typed` with `add(typed, 1)`, resets `typed` and `node`, and returns `[]`.\n\n## Example 1, step by step\n\nCounts: \"i love you\" 5, \"island\" 3, \"iroman\" 2, \"i love leetcode\" 2.\n\n- `input('i')`: the node for `\"i\"` holds all four. Ranked: \"i love you\" (5), \"island\" (3), then the two 2s, where \"i love leetcode\" wins because a space comes before `r`. Result `[\"i love you\", \"island\", \"i love leetcode\"]`.\n- `input(' ')`: the node for `\"i \"` holds only the two \"i love\" sentences, giving `[\"i love you\", \"i love leetcode\"]`.\n- `input('a')`: `\"i \"` has no child `a`, so `node` becomes `null` and the answer is `[]`.\n- `input('#')`: `\"i a\"` is saved with count 1, typing restarts, and the answer is `[]`.\n\n## Complexity\n\n- Time: `add` is O(L) for a sentence of length L. A letter costs O(1) to step plus O(m log m) to rank the m sentences under the node.\n- Space: O(total length of all sentences): each node's set holds the sentences that pass through it.\n\n## Pitfalls\n\n- Break ties by plain character order: the space (code 32) sorts before every letter, and a prefix sorts before a longer string.\n- Once the typed text leaves the trie, keep answering `[]` for the rest of that sentence; do not restart the search from the root.\n- Save the typed sentence only on `'#'`, and add 1 to its count if it already exists rather than replacing it.\n- Reset both `typed` and `node` after `'#'`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `root` | the trie's empty-prefix node |\n| `children`, `sentences` | a node's next-character map and the history sentences passing through it |\n| `counts` | hot count of every sentence in the history |\n| `typed` | the part of the current sentence typed so far |\n| `node` | trie node for `typed`, or `null` once nothing matches |\n| `matches` | the candidate sentences being ranked |",
+  "narration": {
+    "3": "The trie's root stands for the empty prefix; each node knows its children and the sentences passing through it.",
+    "4": "Hot count of every sentence in the history.",
+    "5": "Nothing typed yet for the current sentence.",
+    "6": "The trie node matching the typed text starts at the root.",
+    "7": "Load every past sentence with its count.",
+    "13": "Increase the sentence's hot count, starting from 0 if it is new.",
+    "15": "Walk the sentence one character at a time.",
+    "16": "Create the next node if this prefix has not been seen before.",
+    "19": "Step down to the node for the longer prefix.",
+    "20": "This sentence passes through the node, so it is a candidate for that prefix.",
+    "25": "'#' ends the sentence being typed.",
+    "26": "Save it to the history with one more use.",
+    "27": "Clear the typed text for the next sentence.",
+    "28": "Go back to the root of the trie.",
+    "29": "Finishing a sentence never returns suggestions.",
+    "31": "Extend the typed text by the new character.",
+    "32": "Only step if the typed text still matches some prefix in the trie.",
+    "33": "Follow the child for c, or record that nothing matches anymore.",
+    "35": "No history sentence starts with the typed text.",
+    "38": "The sentences passing through this node are exactly those with the typed prefix.",
+    "39": "Rank by hot count, highest first, and then by character order.",
+    "40": "Return the top three, or fewer if there are not that many."
+  }
+}

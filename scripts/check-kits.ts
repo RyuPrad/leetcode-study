@@ -96,17 +96,18 @@ async function check(number: number): Promise<string[]> {
   const verdict = await judge(sync, problem, wrong, cases);
   if (verdict.verdict === 'Accepted') errors.push('A solution that always returns -12345 is accepted; the cases or comparison are too weak.');
   // The walkthrough records the first example: an events kit as its traced events, any other kit step by step.
+  let truncated = false;
   if (problem.io?.events) {
     const run = evaluate(sync, problem, problem.reference, problem.examples[0].input);
     if ((run.trace ?? []).length < 2) errors.push(`The walkthrough traces ${(run.trace ?? []).length} events on ${problem.examples[0].name}; call kit.trace for each call, timer and result.`);
   } else try {
-    const frames: unknown[] = []; let controller: DebugController, truncated = false;
+    const frames: unknown[] = []; let controller: DebugController;
     const hooks = { started: () => {}, running: () => {}, frame: (frame: unknown, paused: boolean) => { frames.push(frame); if (frames.length >= WALKTHROUGH_FRAME_LIMIT) { truncated = true; controller.stop(); return; } if (paused) queueMicrotask(() => controller.command('into')); } };
     controller = new DebugController(hooks);
     const result = await debugEvaluate(asyncModule, problem, problem.reference, problem.examples[0], controller, hooks);
     if (!truncated && result.error) errors.push(`The walkthrough fails on ${problem.examples[0].name}: ${result.error}`);
     if (frames.length < 2) errors.push('The walkthrough recorded fewer than 2 steps.');
-  } catch (error) { errors.push(`The walkthrough fails: ${error}`); }
+  } catch (error) { if (!truncated) errors.push(`The walkthrough fails: ${error}`); }
   for (const language of problem.languages ?? []) try { starter(problem, language); contractLine(problem, language); } catch (error) { errors.push(`The ${language} starter fails: ${error}`); }
   return errors;
 }

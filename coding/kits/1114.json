@@ -1,0 +1,67 @@
+{
+  "number": 1114,
+  "title": "Print in Order",
+  "spec": "leetcode",
+  "statement": "On LeetCode this is a multithreading problem. Here each thread is an asynchronous task, and you coordinate the tasks with promises.\n\nWrite a class `Foo` with three methods: `first(printFirst)`, `second(printSecond)` and `third(printThird)`. Each method receives a callback that prints its own word (`\"first\"`, `\"second\"` or `\"third\"`) and must call it exactly once. A single `Foo` instance is shared by three threads; each thread calls one of the methods, and the threads may start in any order. Guarantee that `\"first\"` is printed before `\"second\"`, and `\"second\"` before `\"third\"`, however the calls arrive. A method may be `async` and wait on promises before it prints.\n\nEach case gives `nums` and `starts`: thread `i` starts at `starts[i]` ms and calls method number `nums[i]` (1 = `first`, 2 = `second`, 3 = `third`). Threads with the same start time start in index order. The answer is `{ output, times }`: the printed words joined together, and the time in ms of each print, in the order the prints happened. Every word must be printed as soon as it is allowed, that is, once its own thread has started and the previous word has been printed, so wait on promises rather than on timers.",
+  "constraints": [
+    "nums is a permutation of [1, 2, 3]",
+    "starts.length == 3",
+    "0 <= starts[i] <= 1000"
+  ],
+  "signature": "Object Foo(int[] nums, int[] starts)",
+  "entry": "Foo",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "starts"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [nums, starts] = input;\n  if (nums.length !== 3 || [...nums].sort((a, b) => a - b).join() !== '1,2,3') return 'nums must be a permutation of [1, 2, 3].';\n  if (starts.length !== 3) return 'starts needs 3 start times, one per thread.';\n  if (!starts.every((t) => t >= 0 && t <= 1000)) return 'Each start time is from 0 to 1000 ms.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [nums, starts] = input, start = Date.now(), prints = [];\n  const names = ['first', 'second', 'third'], threads = ['A', 'B', 'C'];\n  const foo = new solve();\n  for (const name of names) if (!foo || typeof foo[name] !== 'function') throw new Error(`Foo needs a method ${name}.`);\n  nums.forEach((number, i) => {\n    const name = names[number - 1];\n    const print = () => {\n      prints.push({ text: name, t: Date.now() - start });\n      kit.trace(`\"${name}\" is printed`);\n    };\n    setTimeout(() => {\n      kit.trace(`Thread ${threads[i]} starts and calls ${name}()`);\n      foo[name](print);\n    }, starts[i]);\n  });\n  // A correct solution has printed everything by the last start; the extra time shows late prints.\n  return new Promise((resolve) => setTimeout(() => resolve({\n    output: prints.map((p) => p.text).join(''),\n    times: prints.map((p) => p.t),\n  }), Math.max(...starts) + 50));\n}",
+  "starters": {
+    "javascript": "class Foo {\n  constructor() {\n    // Write your code here.\n  }\n\n  /** @param {() => void} printFirst prints \"first\" */\n  async first(printFirst) {\n    printFirst();\n  }\n\n  /** @param {() => void} printSecond prints \"second\" */\n  async second(printSecond) {\n    printSecond();\n  }\n\n  /** @param {() => void} printThird prints \"third\" */\n  async third(printThird) {\n    printThird();\n  }\n}\n",
+    "typescript": "class Foo {\n  constructor() {\n    // Write your code here.\n  }\n\n  async first(printFirst: () => void): Promise<void> {\n    printFirst();\n  }\n\n  async second(printSecond: () => void): Promise<void> {\n    printSecond();\n  }\n\n  async third(printThird: () => void): Promise<void> {\n    printThird();\n  }\n}\n"
+  },
+  "api": "class Foo { first(printFirst: () => void): void | Promise<void>; second(printSecond: () => void): void | Promise<void>; third(printThird: () => void): void | Promise<void> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class Foo {\n  constructor() {\n    this.firstDone = new Promise((resolve) => {\n      this.markFirstDone = resolve;\n    });\n    this.secondDone = new Promise((resolve) => {\n      this.markSecondDone = resolve;\n    });\n  }\n\n  first(printFirst) {\n    printFirst();\n    this.markFirstDone();\n  }\n\n  async second(printSecond) {\n    await this.firstDone;\n    printSecond();\n    this.markSecondDone();\n  }\n\n  async third(printThird) {\n    await this.secondDone;\n    printThird();\n  }\n}",
+  "brute": "class Foo {\n  constructor() {\n    this.turn = 1;\n    this.parked = [];\n  }\n\n  // Park the print under its turn number, then run every print whose turn has come.\n  take(order, print) {\n    this.parked[order] = print;\n    while (this.parked[this.turn]) {\n      const next = this.parked[this.turn];\n      this.parked[this.turn] = null;\n      this.turn += 1;\n      next();\n    }\n  }\n\n  first(printFirst) { this.take(1, printFirst); }\n  second(printSecond) { this.take(2, printSecond); }\n  third(printThird) { this.take(3, printThird); }\n}",
+  "generator": "function generate(rand, size) {\n  const nums = [1, 2, 3];\n  for (let i = 2; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [nums[i], nums[j]] = [nums[j], nums[i]];\n  }\n  const top = size === 'small' ? 30 : 1000, roll = rand();\n  const same = Math.floor(rand() * (top + 1));\n  const starts = nums.map(() => (roll < 0.15 ? 0 : roll < 0.3 ? same : Math.floor(rand() * (top + 1))));\n  return [nums, starts];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3],[0,0,0]],"expected":{"output":"firstsecondthird","times":[0,0,0]}},
+    {"name":"Example 2","input":[[1,3,2],[0,0,0]],"expected":{"output":"firstsecondthird","times":[0,0,0]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[3,2,1],[0,0,0]]},
+    {"name":"Test 2","input":[[1,2,3],[0,10,20]]},
+    {"name":"Test 3","input":[[3,2,1],[0,10,20]]},
+    {"name":"Test 4","input":[[2,3,1],[5,0,40]]},
+    {"name":"Test 5","input":[[1,3,2],[0,100,50]]},
+    {"name":"Test 6","input":[[2,1,3],[1000,0,500]]},
+    {"name":"Test 7","input":[[3,1,2],[7,7,3]]},
+    {"name":"Test 8","input":[[1,2,3],[1000,1000,1000]]},
+    {"name":"Test 9","input":[[2,3,1],[0,0,0]]},
+    {"name":"Test 10","input":[[3,1,2],[1,200,999]]},
+    {"name":"Test 11","input":[[1,3,2],[300,0,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach method needs to know one fact before it may print: `second` needs \"first has printed\", `third` needs \"second has printed\". `first` needs nothing. So there are exactly two one-time signals, and each is a promise created up front: a method that must wait `await`s its signal, and the method before it resolves that signal right after printing. Because the promises exist from the constructor on, it does not matter which thread arrives first. (The brute force instead parks each print under its turn number and runs the turns in order.)\n\n## Approach\n\n1. In the constructor, create `firstDone` and `secondDone`, keeping their resolve functions as `markFirstDone` and `markSecondDone`.\n2. `first` prints right away, then calls `markFirstDone()`.\n3. `second` awaits `firstDone`, prints, then calls `markSecondDone()`.\n4. `third` awaits `secondDone` and prints.\n\nWith real threads, the same design uses two semaphores (or countdown latches) that start at 0: `first` prints and releases semaphore 1; `second` acquires semaphore 1, prints and releases semaphore 2; `third` acquires semaphore 2 and prints. Awaiting a promise plays the part of acquire, and calling its resolve function the part of release.\n\n## Example 1, step by step\n\n`nums = [1, 2, 3]`, all threads start at 0 ms.\n\n- Thread A calls `first`: `\"first\"` is printed and `firstDone` resolves.\n- Thread B calls `second`: `firstDone` is already resolved, so the `await` resumes at once and `\"second\"` is printed; `secondDone` resolves.\n- Thread C calls `third`: `secondDone` is resolved, so `\"third\"` is printed.\n- The answer is `{ output: \"firstsecondthird\", times: [0, 0, 0] }`.\n\n## Complexity\n\n- Time: O(1) per call.\n- Space: O(1): two promises and their resolve functions.\n\n## Pitfalls\n\n- Creating a promise inside `first` instead of the constructor: `second` may run before `first` and would find nothing to wait on.\n- Polling a flag with `setTimeout` prints late, and with threads a busy-wait loop burns CPU; wait on the signal itself.\n- With threads, releasing before printing lets `second` race ahead of `\"first\"`. Print, then signal.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `firstDone` | promise that resolves once `\"first\"` is printed |\n| `markFirstDone` | resolve function of `firstDone` |\n| `secondDone` | promise that resolves once `\"second\"` is printed |\n| `markSecondDone` | resolve function of `secondDone` |\n| `printFirst`, `printSecond`, `printThird` | callbacks that print each word |",
+  "narration": {
+    "3": "Create the first signal now, before any thread arrives, so second() always has something to wait on.",
+    "4": "Keep its resolve function: calling it later announces that \"first\" has been printed.",
+    "6": "The second signal works the same way and guards third().",
+    "12": "first() never waits: it prints immediately.",
+    "13": "Announce that \"first\" is out, which wakes a second() that may already be waiting.",
+    "17": "second() pauses here until first() has printed; if that already happened it continues at once.",
+    "18": "Now it is safe to print \"second\".",
+    "19": "Announce that \"second\" is out so third() can go.",
+    "23": "third() waits for the second signal, which also implies \"first\" came before.",
+    "24": "Print \"third\", last of the three."
+  }
+}

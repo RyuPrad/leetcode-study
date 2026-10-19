@@ -1,0 +1,52 @@
+{
+  "number": 185,
+  "title": "Department Top Three Salaries",
+  "spec": "leetcode",
+  "statement": "Two tables describe staff and the departments they belong to:\n\n- `Employee(id, name, salary, departmentId)`: one row per employee; `id` is unique, and `departmentId` always names a row of `Department`. No two employees share the same `name`, `salary` and `departmentId` all at once.\n- `Department(id, name)`: one row per department; `id` is unique.\n\nWithin each department, look at its **distinct** salary values and take the three largest (fewer if the department has fewer distinct values). Report every employee whose salary is one of those values, so employees tied on a salary are all included. Output the columns `Department` (the department's name), `Employee` (the employee's name) and `Salary`. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Employee and in Department",
+    "Employee.departmentId always exists in Department",
+    "(name, salary, departmentId) is unique in Employee",
+    "salary is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["name","VARCHAR(255)"],["salary","INT"],["departmentId","INT"]],
+    "Department": [["id","INT"],["name","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [], Department = [] }] = input;\n  const departments = new Set(), employees = new Set(), triples = new Set();\n  for (const [id] of Department) {\n    if (id === null) return 'Every department needs an id.';\n    if (departments.has(id)) return `Department id ${id} appears twice.`;\n    departments.add(id);\n  }\n  for (const [id, name, salary, departmentId] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (employees.has(id)) return `Employee id ${id} appears twice.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    if (!departments.has(departmentId)) return `Employee ${id} names department ${departmentId}, which is not in Department.`;\n    const triple = JSON.stringify([String(name).toLowerCase(), salary, departmentId]);\n    if (triples.has(triple)) return `Two employees share name ${name}, salary ${salary} and department ${departmentId}.`;\n    employees.add(id);\n    triples.add(triple);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    departmentId,\n    name,\n    salary,\n    DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC) AS salary_rank\n  FROM Employee\n)\nSELECT d.name AS Department, r.name AS Employee, r.salary AS Salary\nFROM ranked AS r\nJOIN Department AS d\n  ON d.id = r.departmentId\nWHERE r.salary_rank <= 3;",
+  "brute": "SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary\nFROM Employee AS e, Department AS d\nWHERE d.id = e.departmentId\n  AND (\n    SELECT COUNT(DISTINCT higher.salary)\n    FROM Employee AS higher\n    WHERE higher.departmentId = e.departmentId\n      AND higher.salary > e.salary\n  ) < 3",
+  "generator": "function generate(rand, size) {\n  const deptNames = ['IT', 'Sales', 'HR', 'Ops', 'Legal'];\n  const names = ['Joe', 'Henry', 'Sam', 'Max', 'Janet', 'Randy', 'Will', 'Ana'];\n  const small = size === 'small';\n  const deptCount = small ? Math.floor(rand() * 4) : 20;\n  const Department = [];\n  for (let id = 1; id <= deptCount; id++) Department.push([id, small ? deptNames[id - 1] : `Dept${id}`]);\n  const Employee = [];\n  if (deptCount > 0) {\n    const count = small ? Math.floor(rand() * 9) : 2000;\n    // Few salary levels in small tables give ties at every rank.\n    const levels = small ? [100, 200, 300, 400, 500] : Array.from({ length: 40 }, (_, i) => 1000 * (i + 1));\n    const seen = new Set();\n    for (let id = 1; Employee.length < count && id <= count * 3; id++) {\n      const name = small ? names[Math.floor(rand() * names.length)] : `Emp${id}`;\n      const salary = levels[Math.floor(rand() * levels.length)];\n      const departmentId = 1 + Math.floor(rand() * deptCount);\n      const key = `${name}|${salary}|${departmentId}`;\n      if (seen.has(key)) continue;\n      seen.add(key);\n      Employee.push([id, name, salary, departmentId]);\n    }\n  }\n  return [{ Employee, Department }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,"Joe",85000,1],[2,"Henry",80000,2],[3,"Sam",60000,2],[4,"Max",90000,1],[5,"Janet",69000,1],[6,"Randy",85000,1],[7,"Will",70000,1]],"Department":[[1,"IT"],[2,"Sales"]]}],"expected":{"columns":["Department","Employee","Salary"],"rows":[["IT","Max",90000],["IT","Joe",85000],["IT","Randy",85000],["IT","Will",70000],["Sales","Henry",80000],["Sales","Sam",60000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[],"Department":[[1,"IT"]]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,"Ana",500,1]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,"Ana",100,1],[2,"Lee",200,1],[3,"Kim",300,1],[4,"Max",400,1],[5,"Sam",500,1]],"Department":[[1,"IT"]]}]},
+    {"name":"Test 4","input":[{"Employee":[[1,"Ana",900,1],[2,"Lee",900,1],[3,"Kim",800,1],[4,"Max",700,1],[5,"Sam",600,1]],"Department":[[1,"IT"]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,"Ana",300,1],[2,"Lee",300,1],[3,"Kim",300,1],[4,"Max",300,1]],"Department":[[1,"IT"]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,"Ana",400,1],[2,"Lee",300,1],[3,"Kim",200,1],[4,"Max",200,1],[5,"Sam",100,1]],"Department":[[1,"IT"]]}]},
+    {"name":"Test 7","input":[{"Employee":[[1,"Ana",100,1],[2,"Lee",200,1],[3,"Kim",300,1],[4,"Max",400,1],[5,"Sam",50,2],[6,"Joe",60,2],[7,"Will",70,2],[8,"Ravi",80,2]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,"Ana",900,2],[2,"Lee",100,1],[3,"Kim",800,2],[4,"Max",700,2],[5,"Sam",600,2]],"Department":[[1,"IT"],[2,"Sales"],[3,"HR"]]}]},
+    {"name":"Test 9","input":[{"Employee":[[1,"Joe",500,1],[2,"Joe",400,1],[3,"Joe",500,2],[4,"Joe",300,1],[5,"Joe",200,1]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Top three unique salaries\" is a ranking in which equal salaries share a place and the next distinct salary takes the very next place. That is exactly what `DENSE_RANK()` computes. Ranking separately inside each department (`PARTITION BY departmentId`) and keeping places 1 to 3 selects every high earner, ties included; a join then swaps the department id for its name.\n\n## Approach\n\n1. `ranked`: for every employee, compute `salary_rank`, the dense rank of their salary within their department, highest first.\n2. Join `ranked` (alias `r`) to `Department` (alias `d`) on the department id to get the department name.\n3. Keep rows with `salary_rank <= 3` and output `Department`, `Employee` and `Salary`.\n\n## Example 1, step by step\n\n- IT (department 1) salaries, highest first: Max 90000 gets rank 1; Joe and Randy, both 85000, share rank 2; Will 70000 gets rank 3; Janet 69000 gets rank 4.\n- Sales (department 2): Henry 80000 gets rank 1 and Sam 60000 rank 2.\n- Filtering to ranks 1 to 3 drops only Janet, leaving the six rows of the expected output with `IT` and `Sales` as department names.\n\n## Complexity\n\n- Time: O(E log E) for E employees, to sort each department's salaries for the window; the join to D departments is O(E + D) with a hash or index.\n- Space: O(E) for the ranked rows.\n\n## Pitfalls\n\n- `RANK()` leaves gaps after ties: with salaries 900, 900, 800, 700 it numbers them 1, 1, 3, 4 and drops 700, which is the third distinct salary.\n- `ROW_NUMBER()` gives tied employees different places and cuts one of them off.\n- Without `PARTITION BY departmentId` the ranking runs across the whole company, so a department of low earners loses its top three.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every employee with `salary_rank` inside their department |\n| `salary_rank` | dense rank of the salary, 1 for the department's highest |\n| `r` | alias for `ranked` in the final query |\n| `d` | `Department`, supplying the department name |",
+  "narration": {
+    "1": "The first stage ranks every employee inside their own department.",
+    "6": "DENSE_RANK restarts per department and gives equal salaries the same rank with no gaps, so ranks 1 to 3 are the three largest distinct salaries.",
+    "9": "Report the department name, the employee name and the salary under the required column names.",
+    "11": "Join the ranked rows to Department to turn the department id into its name.",
+    "12": "Match each employee to their department by id.",
+    "13": "Keep only employees whose salary is among the top three distinct salaries of their department."
+  }
+}

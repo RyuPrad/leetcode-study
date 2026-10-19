@@ -1,0 +1,65 @@
+{
+  "number": 464,
+  "title": "Can I Win",
+  "spec": "leetcode",
+  "statement": "Two players share a pool holding each whole number from 1 to `maxChoosableInteger` once. A running total starts at 0, and the players alternate turns; on each turn the current player takes one number that is still in the pool (it cannot be taken again) and adds it to the total. The player whose number brings the total to `desiredTotal` or beyond wins. Both players play perfectly. Return `true` if the player who moves first can guarantee a win, and `false` otherwise.\n\nTwo edge cases: when `desiredTotal` is 0 the first player is considered to have won already (`true`), and when the whole pool adds up to less than `desiredTotal` nobody can ever win, so the answer is `false`.",
+  "constraints": [
+    "1 <= maxChoosableInteger <= 20",
+    "0 <= desiredTotal <= 300"
+  ],
+  "signature": "boolean canIWin(int maxChoosableInteger, int desiredTotal)",
+  "entry": "canIWin",
+  "kind": "function",
+  "parameters": [
+    "maxChoosableInteger",
+    "desiredTotal"
+  ],
+  "validator": "function validate([maxChoosableInteger, desiredTotal]) {\n  if (maxChoosableInteger < 1 || maxChoosableInteger > 20) return 'maxChoosableInteger is between 1 and 20.';\n  if (desiredTotal < 0 || desiredTotal > 300) return 'desiredTotal is between 0 and 300.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function canIWin(maxChoosableInteger, desiredTotal) {\n  if (desiredTotal <= 0) return true;\n  const sum = maxChoosableInteger * (maxChoosableInteger + 1) / 2;\n  if (sum < desiredTotal) return false;\n  // memo[used]: 0 = not solved yet, 1 = the player to move wins, 2 = the player to move loses.\n  const memo = new Int8Array(1 << maxChoosableInteger);\n  const canWin = (used, remaining) => {\n    if (memo[used] !== 0) return memo[used] === 1;\n    for (let pick = maxChoosableInteger; pick >= 1; pick--) {\n      const bit = 1 << (pick - 1);\n      if ((used & bit) !== 0) continue;\n      if (pick >= remaining || !canWin(used | bit, remaining - pick)) {\n        memo[used] = 1;\n        return true;\n      }\n    }\n    memo[used] = 2;\n    return false;\n  };\n  return canWin(0, desiredTotal);\n}",
+  "brute": "function canIWin(maxChoosableInteger, desiredTotal) {\n  if (desiredTotal === 0) return true;\n  // Plain minimax over the remaining pool: +1 the mover wins, 0 nobody wins, -1 the mover loses.\n  const pool = Array.from({ length: maxChoosableInteger }, (_, i) => i + 1);\n  if (pool.reduce((a, b) => a + b, 0) < desiredTotal) return false;\n  const value = (left, total) => {\n    let best = left.length === 0 ? 0 : -1;\n    for (let i = 0; i < left.length; i++) {\n      const score = total + left[i] >= desiredTotal ? 1 : -value(left.filter((_, j) => j !== i), total + left[i]);\n      if (score > best) best = score;\n      if (best === 1) break;\n    }\n    return best;\n  };\n  return value(pool, 0) === 1;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const max = size === 'large' ? 16 + pick(5) : 1 + pick(8);\n  const sum = max * (max + 1) / 2;\n  // Totals cluster around the interesting range (up to the pool's sum), with a few beyond it and a few at 0.\n  const roll = rand();\n  const total = roll < 0.08 ? 0 : roll < 0.16 ? Math.min(300, sum + 1 + pick(10)) : 1 + pick(Math.min(300, sum));\n  return [max, total];\n}",
+  "examples": [
+    {"name":"Example 1","input":[10,11],"expected":false},
+    {"name":"Example 2","input":[10,0],"expected":true},
+    {"name":"Example 3","input":[10,1],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[1,2]},
+    {"name":"Test 3","input":[2,3]},
+    {"name":"Test 4","input":[3,4]},
+    {"name":"Test 5","input":[4,6]},
+    {"name":"Test 6","input":[5,50]},
+    {"name":"Test 7","input":[20,300]},
+    {"name":"Test 8","input":[20,20]},
+    {"name":"Test 9","input":[20,0]},
+    {"name":"Test 10","input":[10,40]},
+    {"name":"Test 11","input":[9,30]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe brute force plays out every possible order of picks, which is factorial. But a position depends only on which numbers are already gone: the total so far is just their sum. With at most 20 numbers, the set of used numbers fits in a bitmask, so there are at most 2^20 distinct positions, and each one is solved once. A position is winning for the player to move if some available number either reaches the target right away or hands the opponent a losing position.\n\n## Approach\n\n1. If `desiredTotal` is 0, return `true`; if `1 + 2 + ... + maxChoosableInteger` is below it, return `false`.\n2. `memo[used]` caches the result for the mask `used` (bit `pick - 1` set means `pick` is taken).\n3. `canWin(used, remaining)` tries every free `pick`, largest first.\n4. If `pick >= remaining` the mover wins at once; if `canWin(used | bit, remaining - pick)` is false the opponent is left losing. Either way store a win and return `true`.\n5. If no pick works, store a loss and return `false`. The answer is `canWin(0, desiredTotal)`.\n\n## Example 1, step by step\n\n`maxChoosableInteger = 10`, `desiredTotal = 11`. No first pick reaches 11. After the first player takes `pick`, `remaining = 11 - pick` is between 1 and 10, so the opponent can reach it in one move: number 10 when `pick = 1`, or `11 - pick` itself otherwise, which is still free. Every `canWin(bit, 11 - pick)` returns `true`, so `canWin(0, 11)` stores a loss and returns `false`.\n\n## Complexity\n\n- Time: O(2^m · m) for `m = maxChoosableInteger`: each mask is solved once and scans m numbers.\n- Space: O(2^m) for `memo`, plus recursion at most m deep.\n\n## Pitfalls\n\n- Handle `desiredTotal = 0` (first player wins) and an unreachable total (`false`) before searching; without the sum check, positions where nobody can win would be called losses for one side.\n- The mask alone identifies a position, because the running total is the sum of the used numbers; do not add the total to the memo key.\n- A Map with a million keys is slow and heavy; a typed array indexed by the mask is enough.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `sum` | total of the whole pool |\n| `memo` | result for each mask: 0 unknown, 1 win, 2 loss for the player to move |\n| `used` | bitmask of numbers already taken |\n| `remaining` | how much the total still needs to reach `desiredTotal` |\n| `pick`, `bit` | the number being tried and its bit in the mask |",
+  "narration": {
+    "2": "A target of 0 is already met, so the first player wins without moving.",
+    "3": "Add up the whole pool, 1 + 2 + ... + maxChoosableInteger.",
+    "4": "If even the whole pool falls short, nobody can ever win, so the first player cannot force a win.",
+    "6": "One cache slot per bitmask of used numbers; there are 2^maxChoosableInteger of them.",
+    "7": "canWin answers: with these numbers used and this much still needed, does the player to move win?",
+    "8": "A position seen before is answered straight from the cache.",
+    "9": "Try every number, largest first, since big numbers finish the game soonest.",
+    "10": "The bit that marks this number as taken.",
+    "11": "Skip numbers that are already gone.",
+    "12": "Taking pick wins if it reaches the target now, or if it leaves the opponent in a losing position.",
+    "13": "Remember that this position is a win for the player to move.",
+    "14": "One winning move is enough.",
+    "17": "Every move lets the opponent win, so this position is a loss; cache it.",
+    "18": "Report the loss to the caller.",
+    "20": "Start from an empty mask with the full target still needed."
+  }
+}

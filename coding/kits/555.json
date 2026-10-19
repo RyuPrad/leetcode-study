@@ -1,0 +1,61 @@
+{
+  "number": 555,
+  "title": "Split Concatenated Strings",
+  "spec": "recalled",
+  "statement": "You are given an array of lowercase strings `strs`. First build a loop: keep the strings in their given order, optionally replace any of them by its reverse (each string decides independently), join them end to end, and connect the last character back to the first so the text is circular. Then cut the loop between any two neighbouring characters; reading once around the loop, starting at the character just after the cut, gives an ordinary string as long as all of `strs` together.\n\nOver every choice of reversals and every cut position, return the lexicographically largest string that can be produced.",
+  "constraints": [
+    "1 <= strs.length <= 1000",
+    "1 <= strs[i].length <= 1000",
+    "1 <= sum of strs[i].length <= 1000",
+    "strs[i] consists of lowercase English letters"
+  ],
+  "signature": "String splitLoopedString(String[] strs)",
+  "entry": "splitLoopedString",
+  "kind": "function",
+  "parameters": [
+    "strs"
+  ],
+  "validator": "function validate([strs]) {\n  if (strs.length < 1 || strs.length > 1000) return 'strs needs 1 to 1000 strings.';\n  if (strs.some(s => s.length < 1 || s.length > 1000)) return 'Each string has 1 to 1000 letters.';\n  if (strs.reduce((sum, s) => sum + s.length, 0) > 1000) return 'All strings together have at most 1000 letters.';\n  if (strs.some(s => !/^[a-z]+$/.test(s))) return 'Strings use lowercase English letters only.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function splitLoopedString(strs) {\n  const best = strs.map(s => {\n    const reversed = s.split('').reverse().join('');\n    return reversed > s ? reversed : s;\n  });\n  let answer = '';\n  for (let i = 0; i < best.length; i++) {\n    const rest = best.slice(i + 1).join('') + best.slice(0, i).join('');\n    const flipped = best[i].split('').reverse().join('');\n    for (const piece of [best[i], flipped]) {\n      for (let cut = 0; cut < piece.length; cut++) {\n        const candidate = piece.slice(cut) + rest + piece.slice(0, cut);\n        if (candidate > answer) {\n          answer = candidate;\n        }\n      }\n    }\n  }\n  return answer;\n}",
+  "brute": "function splitLoopedString(strs) {\n  // Try every combination of reversals and every rotation of the joined loop.\n  const n = strs.length;\n  let top = '';\n  for (let mask = 0; mask < 1 << n; mask++) {\n    let loop = '';\n    for (let i = 0; i < n; i++) loop += mask & (1 << i) ? [...strs[i]].reverse().join('') : strs[i];\n    for (let k = 0; k < loop.length; k++) {\n      const rotated = loop.slice(k) + loop.slice(0, k);\n      if (rotated > top) top = rotated;\n    }\n  }\n  return top;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const letters = 'abcdefghijklmnopqrstuvwxyz'.slice(0, [2, 3, 26][pick(3)]);\n  const word = length => Array.from({ length }, () => letters[pick(letters.length)]).join('');\n  if (!large) {\n    const n = 1 + pick(6);\n    return [Array.from({ length: n }, () => word(1 + pick(4)))];\n  }\n  // Large: many short strings, a handful of long ones, or a mix, within 1000 letters in all.\n  const shape = pick(3);\n  const strs = [];\n  let total = 0;\n  for (;;) {\n    const length = shape === 0 ? 1 + pick(4) : shape === 1 ? 50 + pick(250) : 1 + pick(60);\n    if (total + length > 1000) break;\n    strs.push(word(length));\n    total += length;\n  }\n  if (strs.length === 0) strs.push(word(1000));\n  return [strs];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["abc","xyz"]],"expected":"zyxcba"},
+    {"name":"Example 2","input":[["abc"]],"expected":"cba"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["a"]]},
+    {"name":"Test 2","input":[["ab"]]},
+    {"name":"Test 3","input":[["zzz","zzz"]]},
+    {"name":"Test 4","input":[["lc","evol","cdy"]]},
+    {"name":"Test 5","input":[["a","b","c","d","e"]]},
+    {"name":"Test 6","input":[["zab","c"]]},
+    {"name":"Test 7","input":[["abcd","dcba","x"]]},
+    {"name":"Test 8","input":[["az","by","cx"]]},
+    {"name":"Test 9","input":[["ba","ab","ab","aab"]]},
+    {"name":"Test 10","generate":{"seed":55510,"size":"large"}},
+    {"name":"Test 11","input":[["abab","baba","bb","a","aba","ab","ba","b","abb","bba"]]},
+    {"name":"Test 12","generate":{"seed":55512,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every choice of reversals and every cut costs O(2^n · L²) for n strings of total length L. Look at where the cut falls instead. If it is inside string `i` (or just before it), the result is the tail of string `i`, then every other string whole in loop order, then the head of string `i`. Each other string fills a block of fixed length at a fixed place, so its orientation only changes its own block: the larger of the string and its reverse is always the better choice. Only the cut string needs real search: both of its orientations and every cut position.\n\n## Approach\n\n1. Replace each string by the larger of itself and its reverse; call the list `best`.\n2. For each index `i`, join the other strings in loop order (`i + 1` to the end, then `0` to `i - 1`) into `rest`.\n3. For both orientations of string `i` (`best[i]` and `flipped`), try every `cut`: the `candidate` is `piece.slice(cut) + rest + piece.slice(0, cut)`.\n4. Keep the largest `candidate` in `answer` and return it.\n\n## Example 1, step by step\n\n`best = [\"cba\", \"zyx\"]`. With `i = 0`, `rest = \"zyx\"`; the candidates from `\"cba\"` and `\"abc\"` are `cbazyx`, `bazyxc`, `azyxcb`, `abczyx`, `bczyxa` and `czyxab`, so `answer = \"czyxab\"`. With `i = 1`, `rest = \"cba\"`; the piece `\"zyx\"` at `cut = 0` gives `\"zyxcba\"`, which is larger, and nothing later beats it. The answer is `\"zyxcba\"`.\n\n## Complexity\n\n- Time: O(L²): there are 2L cut positions in all, and each builds and compares a string of length L. Building `rest` for every `i` adds O(n · L).\n- Space: O(L) for `best`, `rest` and the current `candidate`.\n\n## Pitfalls\n\n- The cut string must try both orientations: in `[\"zab\", \"c\"]` the best result `\"zcba\"` cuts the reversed `\"baz\"`, even though `\"zab\"` is its larger form.\n- Cutting between two strings is the case `cut = 0`; do not skip it.\n- After the cut, the other strings keep their loop order: those after `i` come first, then those before it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `best` | each string in its larger orientation |\n| `answer` | the largest string found so far |\n| `i` | index of the string that contains the cut |\n| `rest` | the other strings, joined in loop order after string `i` |\n| `flipped` | `best[i]` reversed |\n| `piece` | the orientation of string `i` being tried |\n| `cut` | where the loop opens inside `piece` |\n| `candidate` | the string produced by this cut |",
+  "narration": {
+    "2": "Every string that is not cut keeps its larger orientation.",
+    "4": "Choose whichever of the string and its reverse is larger.",
+    "6": "No string has been produced yet; the empty string is smaller than all of them.",
+    "7": "Try each string as the one that contains the cut.",
+    "8": "The other strings follow in loop order: those after i, then those before it.",
+    "9": "The cut string may also be used the other way round.",
+    "10": "Try both orientations of the cut string.",
+    "11": "Try every cut position inside it, including just before its first letter.",
+    "12": "Read from the cut: the tail of the piece, the rest of the loop, then the head of the piece.",
+    "13": "Is this the largest string seen so far?",
+    "14": "Keep it.",
+    "19": "Every cut has been tried; return the largest result."
+  }
+}

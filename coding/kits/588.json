@@ -1,0 +1,96 @@
+{
+  "number": 588,
+  "title": "Design In-Memory File System",
+  "spec": "recalled",
+  "statement": "Build a class `FileSystem` that keeps a small file system in memory. It begins with nothing but the root directory `\"/\"`. Every path is absolute: it starts with `\"/\"`, separates names with `\"/\"`, and never ends with `\"/\"` unless it is the root itself. Names use lowercase letters only, and one directory never holds a file and a subdirectory with the same name.\n\n- `FileSystem()` creates the file system with only the empty root.\n- `ls(path)`: when `path` is a file, return a list holding only that file's name. When it is a directory, return the names of all files and directories directly inside it, sorted lexicographically (an empty list if it has none).\n- `mkdir(path)`: create the directory `path`, which does not exist yet, together with any missing directories on the way to it.\n- `addContentToFile(filePath, content)`: if no file exists at `filePath`, create one whose contents are `content`; otherwise add `content` to the end of the file's current contents. The directory that holds the file always exists already.\n- `readContentFromFile(filePath)`: return everything stored in the file at `filePath`.\n\nAll calls are valid: `ls` and `readContentFromFile` only name existing paths (and `readContentFromFile` always a file), and no path continues below a file as if it were a directory.",
+  "constraints": [
+    "1 <= path.length, filePath.length <= 100",
+    "path and filePath start with '/' and do not end with '/', except the root path \"/\"",
+    "Directory and file names contain only lowercase English letters",
+    "No directory holds a file and a subdirectory with the same name",
+    "1 <= content.length <= 50",
+    "mkdir is only called on a path that does not exist yet",
+    "At most 300 calls in total are made to ls, mkdir, addContentToFile and readContentFromFile"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "FileSystem",
+    "constructor": "FileSystem()",
+    "methods": [
+      "List<String> ls(String path)",
+      "void mkdir(String path)",
+      "void addContentToFile(String filePath, String content)",
+      "String readContentFromFile(String filePath)"
+    ]
+  },
+  "entry": "FileSystem",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [],
+    "ls": [
+      "path"
+    ],
+    "mkdir": [
+      "path"
+    ],
+    "addContentToFile": [
+      "filePath",
+      "content"
+    ],
+    "readContentFromFile": [
+      "filePath"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  if (operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'FileSystem' || args[0].length !== 0) return 'Start with FileSystem and no arguments.';\n  if (operations.length - 1 > 300) return 'At most 300 calls after the constructor.';\n  const shape = /^\\/$|^(\\/[a-z]+)+$/;\n  const kind = new Map([['/', 'dir']]);\n  for (let i = 1; i < operations.length; i++) {\n    const op = operations[i];\n    if (!['ls', 'mkdir', 'addContentToFile', 'readContentFromFile'].includes(op)) return `Call ${i}: unknown operation ${op}.`;\n    const count = op === 'addContentToFile' ? 2 : 1;\n    if (!Array.isArray(args[i]) || args[i].length !== count) return `Call ${i}: ${op} takes ${count} argument${count > 1 ? 's' : ''}.`;\n    const [path, content] = args[i];\n    if (typeof path !== 'string' || path.length > 100 || !shape.test(path)) return `Call ${i}: a path starts with / and joins lowercase names with /, in at most 100 characters.`;\n    if (op === 'ls' && !kind.has(path)) return `Call ${i}: ls needs a path that exists.`;\n    if (op === 'readContentFromFile' && kind.get(path) !== 'file') return `Call ${i}: readContentFromFile needs an existing file.`;\n    if (op === 'mkdir') {\n      if (kind.has(path)) return `Call ${i}: mkdir needs a path that does not exist yet.`;\n      let prefix = '';\n      for (const part of path.split('/').slice(1)) {\n        prefix += '/' + part;\n        if (kind.get(prefix) === 'file') return `Call ${i}: mkdir cannot go below a file.`;\n        kind.set(prefix, 'dir');\n      }\n    }\n    if (op === 'addContentToFile') {\n      if (typeof content !== 'string' || content.length < 1 || content.length > 50) return `Call ${i}: content needs 1 to 50 characters.`;\n      if (path === '/' || kind.get(path) === 'dir') return `Call ${i}: addContentToFile needs a file path, not a directory.`;\n      if (kind.get(path.slice(0, path.lastIndexOf('/')) || '/') !== 'dir') return `Call ${i}: the file's directory must already exist.`;\n      kind.set(path, 'file');\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class FileSystem {\n  constructor() {\n    this.root = this.createNode();\n  }\n\n  createNode() {\n    return { children: new Map(), isFile: false, content: '' };\n  }\n\n  walk(path) {\n    const parts = path.split('/').filter(part => part.length > 0);\n    let node = this.root;\n    for (const part of parts) {\n      if (!node.children.has(part)) {\n        node.children.set(part, this.createNode());\n      }\n      node = node.children.get(part);\n    }\n    return node;\n  }\n\n  ls(path) {\n    const node = this.walk(path);\n    if (node.isFile) {\n      return [path.slice(path.lastIndexOf('/') + 1)];\n    }\n    return [...node.children.keys()].sort();\n  }\n\n  mkdir(path) {\n    this.walk(path);\n  }\n\n  addContentToFile(filePath, content) {\n    const node = this.walk(filePath);\n    node.isFile = true;\n    node.content += content;\n  }\n\n  readContentFromFile(filePath) {\n    return this.walk(filePath).content;\n  }\n}",
+  "brute": "class FileSystem {\n  constructor() {\n    this.entries = new Map([['/', { isFile: false, content: '' }]]);\n  }\n  ls(path) {\n    const entry = this.entries.get(path);\n    if (entry.isFile) return [path.split('/').pop()];\n    const prefix = path === '/' ? '/' : path + '/';\n    const names = [];\n    for (const key of this.entries.keys()) {\n      if (key === '/' || !key.startsWith(prefix)) continue;\n      const rest = key.slice(prefix.length);\n      if (!rest.includes('/')) names.push(rest);\n    }\n    return names.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));\n  }\n  mkdir(path) {\n    const parts = path.split('/');\n    for (let end = 2; end <= parts.length; end++) {\n      const prefix = parts.slice(0, end).join('/');\n      if (!this.entries.has(prefix)) this.entries.set(prefix, { isFile: false, content: '' });\n    }\n  }\n  addContentToFile(filePath, content) {\n    const entry = this.entries.get(filePath);\n    if (entry) entry.content = entry.content + content;\n    else this.entries.set(filePath, { isFile: true, content });\n  }\n  readContentFromFile(filePath) {\n    return this.entries.get(filePath).content;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = size === 'large' ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'doc', 'src', 'lib', 'bin', 'tmp', 'x', 'y', 'zz'] : ['a', 'b', 'c', 'ab'];\n  const join = (dir, name) => (dir === '/' ? '/' + name : dir + '/' + name);\n  const word = () => {\n    let text = '';\n    const length = 1 + Math.floor(rand() * (size === 'large' ? 50 : 4));\n    for (let k = 0; k < length; k++) text += 'abcdexyz'[Math.floor(rand() * 8)];\n    return text;\n  };\n  const kind = new Map([['/', 'dir']]);\n  const dirs = ['/'], files = [];\n  const operations = ['FileSystem'], args = [[]];\n  const calls = size === 'large' ? 300 : 1 + Math.floor(rand() * 12);\n  while (operations.length - 1 < calls) {\n    const roll = rand();\n    if (roll < 0.3) {\n      let path = pick(dirs), blocked = false;\n      const depth = 1 + Math.floor(rand() * 3);\n      for (let k = 0; k < depth && !blocked; k++) {\n        path = join(path, pick(names));\n        if (kind.get(path) === 'file') blocked = true;\n      }\n      if (blocked || kind.has(path) || path.length > 100) continue;\n      let prefix = '';\n      for (const part of path.split('/').slice(1)) {\n        prefix += '/' + part;\n        if (!kind.has(prefix)) { kind.set(prefix, 'dir'); dirs.push(prefix); }\n      }\n      operations.push('mkdir'); args.push([path]);\n    } else if (roll < 0.55) {\n      const path = files.length && rand() < 0.3 ? pick(files) : join(pick(dirs), pick(names));\n      if (kind.get(path) === 'dir' || path.length > 100) continue;\n      if (!kind.has(path)) { kind.set(path, 'file'); files.push(path); }\n      operations.push('addContentToFile'); args.push([path, word()]);\n    } else if (roll < 0.85) {\n      operations.push('ls'); args.push([files.length && rand() < 0.25 ? pick(files) : pick(dirs)]);\n    } else if (files.length) {\n      operations.push('readContentFromFile'); args.push([pick(files)]);\n    }\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["FileSystem","ls","mkdir","addContentToFile","ls","readContentFromFile"],[[],["/"],["/a/b/c"],["/a/b/c/d","hello"],["/"],["/a/b/c/d"]]],"expected":[null,[],null,null,["a"],"hello"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["FileSystem","ls"],[[],["/"]]]},
+    {"name":"Test 2","input":[["FileSystem","mkdir","ls","ls","ls","ls"],[[],["/a/b/c"],["/"],["/a"],["/a/b"],["/a/b/c"]]]},
+    {"name":"Test 3","input":[["FileSystem","addContentToFile","addContentToFile","readContentFromFile","ls","ls","addContentToFile","readContentFromFile"],[[],["/f","ab"],["/f","cd"],["/f"],["/f"],["/"],["/f","e"],["/f"]]]},
+    {"name":"Test 4","input":[["FileSystem","mkdir","mkdir","addContentToFile","mkdir","addContentToFile","ls"],[[],["/zeta"],["/alpha"],["/beta","x"],["/alphabet"],["/a","y"],["/"]]]},
+    {"name":"Test 5","input":[["FileSystem","mkdir","addContentToFile","ls","ls","readContentFromFile"],[[],["/x/y"],["/x/y/note","hi"],["/x/y/note"],["/x/y"],["/x/y/note"]]]},
+    {"name":"Test 6","input":[["FileSystem","mkdir","addContentToFile","addContentToFile","ls","ls","ls","readContentFromFile","readContentFromFile"],[[],["/a/a/a"],["/a/a/a/a","deep"],["/a/b","shallow"],["/a"],["/a/a/a"],["/a/a/a/a"],["/a/a/a/a"],["/a/b"]]]},
+    {"name":"Test 7","input":[["FileSystem","mkdir","mkdir","mkdir","ls","ls","ls","ls"],[[],["/a"],["/a/b"],["/a/c/d"],["/a"],["/a/c"],["/a/b"],["/"]]]},
+    {"name":"Test 8","input":[["FileSystem","mkdir","addContentToFile","ls","readContentFromFile","ls"],[[],["/abcdefghij/klmnopqrst/uvwxyzabcd/efghijklmn/opqrstuvwx/yzabcdefgh/ijklmnopqr/stuvwxyzab/cdefghijk"],["/abcdefghij/klmnopqrst/uvwxyzabcd/efghijklmn/opqrstuvwx/yzabcdefgh/ijklmnopqr/stuvwxyzab/cdefghijk/z","abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx"],["/abcdefghij/klmnopqrst/uvwxyzabcd/efghijklmn/opqrstuvwx/yzabcdefgh/ijklmnopqr/stuvwxyzab/cdefghijk"],["/abcdefghij/klmnopqrst/uvwxyzabcd/efghijklmn/opqrstuvwx/yzabcdefgh/ijklmnopqr/stuvwxyzab/cdefghijk/z"],["/abcdefghij"]]]},
+    {"name":"Test 9","input":[["FileSystem","addContentToFile","mkdir","addContentToFile","addContentToFile","ls","ls","readContentFromFile","readContentFromFile"],[[],["/b","one"],["/c/d"],["/c/a","two"],["/c/a","three"],["/"],["/c"],["/c/a"],["/b"]]]},
+    {"name":"Test 10","input":[["FileSystem","mkdir","mkdir","mkdir","mkdir","addContentToFile","addContentToFile","ls","ls"],[[],["/m/q"],["/m/b"],["/m/aa"],["/m/a"],["/m/ba","x"],["/m/ab","y"],["/m"],["/m/ba"]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA file system is a tree: every directory is a node whose children are keyed by name, and a file is a leaf that also carries text. Storing it as a trie keyed by path segments means every operation is just a walk from the root, one name at a time. A brute force could keep a flat map from full path to entry and scan every key to answer `ls`, which costs time proportional to everything stored.\n\n## Approach\n\n1. Each node holds a `children` map, an `isFile` flag and a `content` string. The constructor makes the empty `root`.\n2. `walk(path)` splits the path on `\"/\"`, drops the empty pieces, and follows (or creates) one child per name, returning the last node. The root path gives no pieces, so it returns `root`.\n3. `ls`: walk to the node. A file answers with its own name, cut from the path after the last `\"/\"`; a directory answers with its children's names, sorted.\n4. `mkdir`: walk the path; any missing directories are created on the way.\n5. `addContentToFile`: walk to the node, mark it as a file and append `content`.\n6. `readContentFromFile`: walk to the node and return its `content`.\n\n## Example 1, step by step\n\n`ls(\"/\")` walks no names and the root has no children, so it returns `[]`. `mkdir(\"/a/b/c\")` creates nodes `a`, `b` and `c`. `addContentToFile(\"/a/b/c/d\", \"hello\")` walks to `c`, creates `d`, marks it a file and stores `\"hello\"`. `ls(\"/\")` now sees the single child `[\"a\"]`, and `readContentFromFile(\"/a/b/c/d\")` returns `\"hello\"`. Output: `[null, [], null, null, [\"a\"], \"hello\"]`.\n\n## Complexity\n\n- Time: O(L) per call for a path of length L, plus O(k log k) for `ls` on a directory with k entries.\n- Space: O(total path names + total content stored).\n\n## Pitfalls\n\n- `ls` on a file returns the file's own name in a list, not its contents and not an empty list.\n- `\"/\".split(\"/\")` gives two empty strings; filter them out or the root lookup breaks.\n- Appending must keep the old text: use `+=`, not `=`.\n- Sort the names before returning; insertion order is not lexicographic.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `root` | node for the directory `\"/\"` |\n| `children` | map from a name to the child node |\n| `isFile` | whether the node is a file |\n| `content` | the file's text so far |\n| `parts` | the non-empty names of a path |\n| `node` | the current node during a walk |",
+  "narration": {
+    "3": "The file system starts as a single empty node for the root directory.",
+    "7": "A node keeps its children by name, whether it is a file, and a file's text.",
+    "11": "Split the path into its names; the empty pieces around the slashes are dropped, so \"/\" gives none.",
+    "12": "Every walk starts at the root.",
+    "13": "Follow the path one name at a time.",
+    "14": "Is there no child with this name yet?",
+    "15": "Create it, so mkdir and new files build the missing levels.",
+    "17": "Step down into the child.",
+    "19": "The node at the end of the path is the answer.",
+    "23": "Find the node the path names.",
+    "24": "A file lists as just itself...",
+    "25": "...so return its name, the part after the last slash.",
+    "27": "A directory lists its children's names in lexicographic order.",
+    "31": "Walking the path creates every directory that is missing.",
+    "35": "Walk to the file, creating its node if it is new.",
+    "36": "Mark the node as a file.",
+    "37": "Append the new text after anything already stored.",
+    "41": "Walk to the file and return its text."
+  }
+}

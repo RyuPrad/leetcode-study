@@ -1,0 +1,116 @@
+{
+  "number": 631,
+  "title": "Design Excel Sum Formula",
+  "spec": "recalled",
+  "statement": "Design a class `Excel` for a small spreadsheet of integers. Rows are numbered `1` to `height`, columns are the letters `'A'` to `width`, and every cell starts at `0`. A cell is named by its column letter followed by its row number, such as `\"B3\"`.\n\n- `Excel(height, width)` creates the sheet.\n- `set(row, column, val)` stores `val` in that cell. If the cell had a formula, the formula is removed.\n- `get(row, column)` returns the cell's current value.\n- `sum(row, column, numbers)` gives the cell a formula (replacing any earlier one) and returns its value: the total of the cells listed in `numbers`. Each entry is either a single cell like `\"F7\"` or a rectangle like `\"B3:F7\"`, written as its top-left cell, a colon, then its bottom-right cell; `\"B3:F7\"` covers every cell in rows 3 to 7 of columns B to F. A cell that is listed more than once, directly or through overlapping rectangles, is added once per listing.\n\nA formula stays live: whenever a cell it uses changes, the formula's cell changes with it. The formula lasts until its own cell is overwritten by `set` or by another `sum`. Formulas never refer back to their own cell, directly or through other formulas.",
+  "constraints": [
+    "1 <= height <= 26",
+    "'A' <= width <= 'Z'",
+    "1 <= row <= height",
+    "'A' <= column <= width",
+    "-100 <= val <= 100",
+    "1 <= numbers.length <= 5",
+    "numbers[i] is \"ColRow\" or \"ColRow1:ColRow2\" inside the sheet, with the first cell at the top-left of the second",
+    "No formula depends on its own cell, directly or indirectly",
+    "Every cell value fits in a 32-bit signed integer",
+    "At most 100 calls are made to set, get and sum"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "Excel",
+    "constructor": "Excel(int height, char width)",
+    "methods": [
+      "void set(int row, char column, int val)",
+      "int get(int row, char column)",
+      "int sum(int row, char column, String[] numbers)"
+    ]
+  },
+  "entry": "Excel",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "height",
+      "width"
+    ],
+    "set": [
+      "row",
+      "column",
+      "val"
+    ],
+    "get": [
+      "row",
+      "column"
+    ],
+    "sum": [
+      "row",
+      "column",
+      "numbers"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  if (!Array.isArray(operations) || !Array.isArray(args) || operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'Excel' || !Array.isArray(args[0]) || args[0].length !== 2) return 'Start with Excel(height, width).';\n  if (operations.length - 1 > 100) return 'At most 100 calls to set, get and sum.';\n  const [height, width] = args[0];\n  if (!Number.isInteger(height) || height < 1 || height > 26) return 'height is between 1 and 26.';\n  if (typeof width !== 'string' || !/^[A-Z]$/.test(width)) return 'width is one capital letter from A to Z.';\n  const inside = (row, column) => Number.isInteger(row) && row >= 1 && row <= height && typeof column === 'string' && /^[A-Z]$/.test(column) && column <= width;\n  const formulas = new Map();\n  const plain = new Map();\n  for (let i = 1; i < operations.length; i++) {\n    const [row, column, extra] = args[i] ?? [];\n    if (!inside(row, column)) return 'Every cell must lie inside the sheet.';\n    const cell = column + row;\n    if (operations[i] === 'get') continue;\n    if (operations[i] === 'set') {\n      if (!Number.isInteger(extra) || extra < -100 || extra > 100) return 'set takes a value from -100 to 100.';\n      formulas.delete(cell);\n      plain.set(cell, extra);\n    } else if (operations[i] === 'sum') {\n      if (!Array.isArray(extra) || extra.length < 1 || extra.length > 5) return 'sum takes 1 to 5 references.';\n      const counts = new Map();\n      for (const ref of extra) {\n        const match = typeof ref === 'string' && ref.match(/^([A-Z])([1-9]\\d?)(?::([A-Z])([1-9]\\d?))?$/);\n        if (!match) return 'Each reference looks like \"B3\" or \"B3:F7\".';\n        const [, c1, r1, c2 = c1, r2 = r1] = match;\n        if (!inside(Number(r1), c1) || !inside(Number(r2), c2)) return 'References must lie inside the sheet.';\n        if (c1 > c2 || Number(r1) > Number(r2)) return 'A range goes from its top-left to its bottom-right cell.';\n        for (let r = Number(r1); r <= Number(r2); r++) for (let c = c1.charCodeAt(0); c <= c2.charCodeAt(0); c++) counts.set(String.fromCharCode(c) + r, (counts.get(String.fromCharCode(c) + r) ?? 0) + 1);\n      }\n      const stack = [...counts.keys()];\n      const seen = new Set();\n      while (stack.length) {\n        const next = stack.pop();\n        if (next === cell) return 'A formula cannot depend on its own cell.';\n        if (seen.has(next)) continue;\n        seen.add(next);\n        for (const source of formulas.get(next)?.keys() ?? []) stack.push(source);\n      }\n      formulas.set(cell, counts);\n    } else return 'Only set, get and sum can follow the constructor.';\n    const memo = new Map();\n    const value = (key) => {\n      if (!formulas.has(key)) return plain.get(key) ?? 0;\n      if (memo.has(key)) return memo.get(key);\n      let total = 0;\n      for (const [source, times] of formulas.get(key)) total += times * value(source);\n      memo.set(key, total);\n      return total;\n    };\n    for (const key of formulas.keys()) if (Math.abs(value(key)) > 2147483647) return 'Every cell value must fit in a 32-bit integer.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class Excel {\n  constructor(height, width) {\n    this.values = new Map();\n    this.formulas = new Map();\n    this.dependents = new Map();\n  }\n\n  set(row, column, val) {\n    const cell = column + row;\n    this.clearFormula(cell);\n    this.values.set(cell, val);\n    this.propagate(cell);\n  }\n\n  get(row, column) {\n    return this.values.get(column + row) ?? 0;\n  }\n\n  sum(row, column, numbers) {\n    const cell = column + row;\n    this.clearFormula(cell);\n    const counts = new Map();\n    for (const part of numbers) {\n      const [from, to = from] = part.split(':');\n      for (let r = Number(from.slice(1)); r <= Number(to.slice(1)); r++) {\n        for (let c = from.charCodeAt(0); c <= to.charCodeAt(0); c++) {\n          const source = String.fromCharCode(c) + r;\n          counts.set(source, (counts.get(source) ?? 0) + 1);\n        }\n      }\n    }\n    this.formulas.set(cell, counts);\n    for (const source of counts.keys()) {\n      if (!this.dependents.has(source)) this.dependents.set(source, new Set());\n      this.dependents.get(source).add(cell);\n    }\n    this.propagate(cell);\n    return this.values.get(cell);\n  }\n\n  clearFormula(cell) {\n    for (const source of this.formulas.get(cell)?.keys() ?? []) this.dependents.get(source).delete(cell);\n    this.formulas.delete(cell);\n  }\n\n  propagate(start) {\n    const order = [];\n    const visited = new Set([start]);\n    const visit = (cell) => {\n      for (const next of this.dependents.get(cell) ?? []) {\n        if (visited.has(next)) continue;\n        visited.add(next);\n        visit(next);\n      }\n      order.push(cell);\n    };\n    visit(start);\n    for (let i = order.length - 1; i >= 0; i--) {\n      const counts = this.formulas.get(order[i]);\n      if (!counts) continue;\n      let total = 0;\n      for (const [source, times] of counts) total += times * (this.values.get(source) ?? 0);\n      this.values.set(order[i], total);\n    }\n  }\n}",
+  "brute": "class Excel {\n  constructor(height, width) {\n    this.grid = Array.from({ length: height + 1 }, () => Array.from({ length: 26 }, () => ({ value: 0, refs: null })));\n  }\n  set(row, column, val) {\n    this.grid[row][column.charCodeAt(0) - 65] = { value: val, refs: null };\n  }\n  get(row, column) {\n    return this.evaluate(row, column.charCodeAt(0) - 65, new Map());\n  }\n  sum(row, column, numbers) {\n    this.grid[row][column.charCodeAt(0) - 65] = { value: 0, refs: numbers.slice() };\n    return this.get(row, column);\n  }\n  // Recompute from scratch on every read, expanding each listed reference again.\n  evaluate(row, col, memo) {\n    const entry = this.grid[row][col];\n    if (!entry.refs) return entry.value;\n    const key = row * 26 + col;\n    if (memo.has(key)) return memo.get(key);\n    let total = 0;\n    for (const ref of entry.refs) {\n      const ends = ref.split(':');\n      const first = ends[0], last = ends[ends.length - 1];\n      for (let r = parseInt(first.slice(1), 10); r <= parseInt(last.slice(1), 10); r++)\n        for (let c = first.charCodeAt(0) - 65; c <= last.charCodeAt(0) - 65; c++) total += this.evaluate(r, c, memo);\n    }\n    memo.set(key, total);\n    return total;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (n) => Math.floor(rand() * n);\n  const height = large ? 26 : 1 + pick(4);\n  const lastCol = large ? 25 : pick(4);\n  const letter = (c) => String.fromCharCode(65 + c);\n  const calls = large ? 100 : 1 + pick(10);\n  const operations = ['Excel'];\n  const args = [[height, letter(lastCol)]];\n  const formulas = new Map();\n  const plain = new Map();\n  // Does any cell in `starts` use `target`, directly or through other formulas?\n  const reaches = (starts, target) => {\n    const stack = [...starts];\n    const seen = new Set();\n    while (stack.length) {\n      const cell = stack.pop();\n      if (cell === target) return true;\n      if (seen.has(cell)) continue;\n      seen.add(cell);\n      for (const source of formulas.get(cell)?.keys() ?? []) stack.push(source);\n    }\n    return false;\n  };\n  // Keep every value inside the 32-bit range.\n  const fits = () => {\n    const memo = new Map();\n    const value = (cell) => {\n      if (!formulas.has(cell)) return plain.get(cell) ?? 0;\n      if (memo.has(cell)) return memo.get(cell);\n      let total = 0;\n      for (const [source, times] of formulas.get(cell)) total += times * value(source);\n      memo.set(cell, total);\n      return total;\n    };\n    for (const cell of formulas.keys()) if (Math.abs(value(cell)) > 1e9) return false;\n    return true;\n  };\n  while (operations.length <= calls) {\n    const row = 1 + pick(height);\n    const col = pick(lastCol + 1);\n    const cell = letter(col) + row;\n    const kind = rand();\n    if (kind < 0.3) {\n      operations.push('get');\n      args.push([row, letter(col)]);\n      continue;\n    }\n    const oldFormula = formulas.get(cell);\n    const oldPlain = plain.get(cell);\n    const restore = () => {\n      if (oldFormula) formulas.set(cell, oldFormula); else formulas.delete(cell);\n      if (oldPlain === undefined) plain.delete(cell); else plain.set(cell, oldPlain);\n    };\n    if (kind < 0.6) {\n      const val = rand() < 0.15 ? (rand() < 0.5 ? -100 : 100) : pick(201) - 100;\n      formulas.delete(cell);\n      plain.set(cell, val);\n      if (!fits()) { restore(); continue; }\n      operations.push('set');\n      args.push([row, letter(col), val]);\n      continue;\n    }\n    const numbers = [];\n    const counts = new Map();\n    const parts = 1 + pick(large ? 5 : 3);\n    const existing = [...formulas.keys()];\n    for (let i = 0; i < parts; i++) {\n      if (existing.length && rand() < 0.4) {\n        const used = existing[pick(existing.length)];\n        numbers.push(used);\n        counts.set(used, (counts.get(used) ?? 0) + 1);\n        continue;\n      }\n      const top = 1 + pick(height);\n      const bottom = top + pick(Math.min(height - top + 1, large ? 6 : 3));\n      const left = pick(lastCol + 1);\n      const right = left + pick(Math.min(lastCol - left + 1, large ? 6 : 3));\n      const single = top === bottom && left === right && rand() < 0.7;\n      numbers.push(single ? letter(left) + top : letter(left) + top + ':' + letter(right) + bottom);\n      for (let r = top; r <= bottom; r++) for (let c = left; c <= right; c++) counts.set(letter(c) + r, (counts.get(letter(c) + r) ?? 0) + 1);\n    }\n    if (reaches(counts.keys(), cell)) continue;\n    formulas.set(cell, counts);\n    if (!fits()) { restore(); continue; }\n    operations.push('sum');\n    args.push([row, letter(col), numbers]);\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["Excel","set","sum","set","get"],[[3,"C"],[1,"A",2],[3,"C",["A1","A1:B2"]],[2,"B",2],[3,"C"]]],"expected":[null,null,4,null,6]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["Excel","get","set","get","set","get"],[[1,"A"],[1,"A"],[1,"A",5],[1,"A"],[1,"A",-100],[1,"A"]]]},
+    {"name":"Test 2","input":[["Excel","set","sum","set","get","set","set","get"],[[2,"B"],[1,"A",3],[2,"B",["A1"]],[1,"A",7],[2,"B"],[2,"B",1],[1,"A",9],[2,"B"]]]},
+    {"name":"Test 3","input":[["Excel","set","sum","sum","set","get","get"],[[1,"C"],[1,"A",1],[1,"B",["A1"]],[1,"C",["B1","A1"]],[1,"A",10],[1,"C"],[1,"B"]]]},
+    {"name":"Test 4","input":[["Excel","set","sum","set","get"],[[3,"B"],[1,"A",-4],[3,"B",["A1","A1","A1:A1"]],[1,"A",6],[3,"B"]]]},
+    {"name":"Test 5","input":[["Excel","set","set","sum","sum","set","get","set","get"],[[1,"C"],[1,"A",50],[1,"B",-8],[1,"C",["A1"]],[1,"C",["B1"]],[1,"A",-50],[1,"C"],[1,"B",8],[1,"C"]]]},
+    {"name":"Test 6","input":[["Excel","sum","sum","sum","set","get","set","get"],[[2,"D"],[1,"D",["B1","C1"]],[1,"B",["A1"]],[1,"C",["A1:A2"]],[1,"A",4],[1,"D"],[2,"A",-1],[1,"D"]]]},
+    {"name":"Test 7","input":[["Excel","set","set","set","set","sum","set","get"],[[26,"Z"],[1,"A",100],[26,"Y",-100],[13,"M",37],[25,"Z",5],[26,"Z",["A1:Y26","Z1:Z25"]],[1,"A",99],[26,"Z"]]]},
+    {"name":"Test 8","input":[["Excel","sum","get","set","get","set","get"],[[4,"D"],[4,"D",["A1:C3"]],[4,"D"],[2,"B",9],[4,"D"],[3,"C",-9],[4,"D"]]]},
+    {"name":"Test 9","input":[["Excel","set","sum","sum","sum","get","set","get"],[[3,"C"],[1,"A",2],[2,"B",["A1:A1","A1"]],[3,"C",["B2","B2","A1"]],[2,"B",["A1"]],[3,"C"],[1,"A",-3],[3,"C"]]]},
+    {"name":"Test 10","input":[["Excel","set","set","sum","sum","set","get","sum","get"],[[5,"E"],[1,"A",1],[1,"B",2],[2,"A",["A1:B1"]],[3,"A",["A2","A2:A2"]],[1,"B",-1],[3,"A"],[2,"A",["E5"]],[3,"A"]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA plain spreadsheet could recompute a formula every time it is read, expanding all its ranges again; with chains of formulas that repeats the same work on every `get`. Instead, keep every cell's value up to date when something changes, so `get` is a lookup. A change to one cell must flow to the formulas that use it, then to the formulas that use those, and so on. Those cells form a dependency graph with no cycles, so recomputing them in **topological order** guarantees each formula sees its inputs already updated, even when two paths lead to the same cell.\n\nEach formula is stored as a multiset: a map from source cell to how many times it is listed, so `[\"A1\", \"A1:B2\"]` counts `A1` twice.\n\n## Approach\n\n1. Keep `values` (cell name to value), `formulas` (cell name to a source-count map) and `dependents` (cell name to the set of formula cells that use it).\n2. `set`: drop the cell's formula (`clearFormula` removes its edges), store the value, then `propagate`.\n3. `sum`: drop the old formula, expand every reference into `counts`, store it, add an edge from each source to the cell, then `propagate` and return the new value.\n4. `propagate(start)`: a depth-first search over `dependents` records cells in post-order; reading that list backwards is a topological order starting at `start`. Recompute every formula cell in that order as the sum of `times * value` over its sources.\n\n## Example 1, step by step\n\n- `set(1, \"A\", 2)`: `values` has `A1 = 2`; nobody depends on `A1` yet.\n- `sum(3, \"C\", [\"A1\", \"A1:B2\"])`: `counts` is `A1 → 2, A2 → 1, B1 → 1, B2 → 1`. Propagating from `C3` recomputes it: `2·2 + 0 + 0 + 0 = 4`, which is returned.\n- `set(2, \"B\", 2)`: `B2 = 2`. Its dependents are `{C3}`, so the order is `B2, C3` and `C3` becomes `2·2 + 2 = 6`.\n- `get(3, \"C\")` reads `6`.\n\n## Complexity\n\n- Time: `get` is O(1). `sum` costs O(R) to expand R referenced cells (at most 5 · 676) plus a propagation; a propagation visits each affected formula once and recomputes it in O(its distinct sources), so at most O(F · C) for F formulas over C cells.\n- Space: O(F · C) for the source maps and the reverse edges.\n\n## Pitfalls\n\n- A repeated cell must count twice; use counts, not a set of sources.\n- Overwriting a formula cell (by `set` or `sum`) must remove its old edges, or stale formulas keep changing it.\n- Pushing a change to each dependent recursively, in no particular order, can revisit a cell many times through diamond-shaped dependencies (exponentially often in the worst case); a topological order recomputes each affected cell once.\n- When a new formula feeds cells that already depend on it, those cells must update too, so `sum` propagates as well.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `values` | current value of every cell that was written (missing means `0`) |\n| `formulas` | for a formula cell, its map from source cell to repeat count |\n| `dependents` | for a cell, the formula cells that read it |\n| `cell` | name like `\"C3\"` built from `column + row` |\n| `counts` | the formula being built: source cell to repeat count |\n| `order` | cells in DFS post-order; reversed it is a topological order |\n| `visited` | cells the search has already reached |\n| `total` | a formula cell's recomputed value |",
+  "narration": {
+    "3": "Every written cell's value, keyed by a name like \"C3\".",
+    "4": "Each formula cell's sources, with how many times each is listed.",
+    "5": "The reverse edges: for every cell, the formulas that read it.",
+    "9": "Name the cell the way formulas refer to it, such as \"A1\".",
+    "10": "A plain value replaces any formula this cell had.",
+    "11": "Store the new value.",
+    "12": "Push the change through every formula that depends on this cell.",
+    "16": "Values are kept current, so reading is a lookup; unwritten cells are 0.",
+    "21": "Writing a new formula replaces the old one, so remove its edges first.",
+    "22": "The new formula as a multiset of source cells.",
+    "23": "Expand each reference in turn.",
+    "24": "A single cell is a range whose two corners coincide.",
+    "25": "Walk the rows of the rectangle...",
+    "26": "...and its columns, by letter code.",
+    "28": "Count the cell once more, so repeated listings add up.",
+    "32": "Remember the formula for this cell.",
+    "33": "Record that each source now feeds this cell.",
+    "37": "Compute this cell and everything downstream of it in dependency order.",
+    "38": "The formula's value is now stored for this cell.",
+    "42": "Detach the cell from every source its old formula read; a plain cell has none.",
+    "43": "Forget the old formula itself.",
+    "48": "Mark the start cell so the search never re-enters it.",
+    "50": "Depth-first search over the formulas that read the current cell.",
+    "51": "A cell already reached through another path is skipped.",
+    "53": "Go deeper before finishing this cell.",
+    "55": "Post-order: a cell is recorded only after every cell that depends on it.",
+    "57": "Search from the cell that just changed.",
+    "58": "Read the post-order backwards: every cell comes before the formulas that use it.",
+    "60": "Plain values need no recomputation.",
+    "62": "Add each source's value as many times as it was listed.",
+    "63": "Store the fresh total so cells later in the order see it."
+  }
+}

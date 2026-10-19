@@ -1,0 +1,54 @@
+{
+  "number": 553,
+  "title": "Optimal Division",
+  "spec": "leetcode",
+  "statement": "Write the integers of `nums` in their given order with a `/` between every two neighbours. Read from left to right, this expression divides them one after another using exact (real-number) division. You may insert parentheses anywhere to change the order in which the divisions are done. Return, as a string, the expression whose value is as large as possible.\n\n- The string keeps the numbers in their original order and uses only digits, `/`, `(` and `)`, with no spaces.\n- It must not contain redundant parentheses: no pair may be removable without changing the order of evaluation (this includes a pair around the whole expression or around a single number).\n- If `nums` holds one number, the expression is just that number.\n- The input guarantees that exactly one expression gives the largest value.",
+  "constraints": [
+    "1 <= nums.length <= 10",
+    "2 <= nums[i] <= 1000",
+    "Exactly one optimal division exists for the given input."
+  ],
+  "signature": "String optimalDivision(int[] nums)",
+  "entry": "optimalDivision",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 10) return 'nums needs 1 to 10 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 2 || v > 1000)) return 'Each value is an integer between 2 and 1000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function optimalDivision(nums) {\n  if (nums.length === 1) {\n    return String(nums[0]);\n  }\n  if (nums.length === 2) {\n    return nums[0] + '/' + nums[1];\n  }\n  const denominator = nums.slice(1).join('/');\n  return nums[0] + '/(' + denominator + ')';\n}",
+  "brute": "function optimalDivision(nums) {\n  // Interval DP over every way to split a range into (left) / (right), tracking the largest and smallest\n  // value of each range together with its expression; the left side never needs parentheses.\n  const memo = new Map();\n  const solve = (i, j) => {\n    const key = i * 16 + j;\n    if (memo.has(key)) return memo.get(key);\n    let res;\n    if (i === j) res = { hi: [nums[i], String(nums[i])], lo: [nums[i], String(nums[i])] };\n    else {\n      res = { hi: [-Infinity, ''], lo: [Infinity, ''] };\n      for (let m = i; m < j; m++) {\n        const left = solve(i, m), right = solve(m + 1, j);\n        const wrap = (text) => (m + 1 === j ? text : '(' + text + ')');\n        const big = left.hi[0] / right.lo[0];\n        if (big > res.hi[0]) res.hi = [big, left.hi[1] + '/' + wrap(right.lo[1])];\n        const small = left.lo[0] / right.hi[0];\n        if (small < res.lo[0]) res.lo = [small, left.lo[1] + '/' + wrap(right.hi[1])];\n      }\n    }\n    memo.set(key, res);\n    return res;\n  };\n  return solve(0, nums.length - 1).hi[1];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 10 : 1 + Math.floor(rand() * 6);\n  const top = size === 'large' || rand() < 0.5 ? 1000 : 10;\n  return [Array.from({ length: n }, () => 2 + Math.floor(rand() * (top - 1)))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1000,100,10,2]],"expected":"1000/(100/10/2)"},
+    {"name":"Example 2","input":[[2,3,4]],"expected":"2/(3/4)"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[2]]},
+    {"name":"Test 2","input":[[1000]]},
+    {"name":"Test 3","input":[[2,3]]},
+    {"name":"Test 4","input":[[1000,2]]},
+    {"name":"Test 5","input":[[2,2,2]]},
+    {"name":"Test 6","input":[[3,1000,2]]},
+    {"name":"Test 7","input":[[7,3,9,2,5]]},
+    {"name":"Test 8","input":[[2,1000,2,1000]]},
+    {"name":"Test 9","input":[[2,2,2,2,2,2,2,2,2,2]]},
+    {"name":"Test 10","input":[[1000,999,998,997,996,995,994,993,992,991]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nHowever the parentheses are placed, `nums[0]` always ends up in the numerator and `nums[1]` always in the denominator. Every later number could land on either side, and since each one is at least `2`, the value is largest when **all** of them are in the numerator. Grouping everything after the first number does exactly that: `b/c/d` equals `b/(c·d)`, so `a/(b/c/d)` equals `a·c·d/b`. An interval DP that tries every split (the brute force) reaches the same answer in O(n³).\n\n## Approach\n\n1. One number: return it as it is.\n2. Two numbers: there is only one expression, `nums[0]/nums[1]`; parentheses would be redundant.\n3. Otherwise join `nums[1..]` with `/` into `denominator`; inside it, left-to-right order is already correct, so it needs no inner parentheses.\n4. Return `nums[0]` divided by `denominator` in one pair of parentheses.\n\n## Example 1, step by step\n\n`nums = [1000, 100, 10, 2]` has more than two numbers. `denominator = \"100/10/2\"`, and the result is `\"1000/(100/10/2)\"`, which evaluates to `1000 · 10 · 2 / 100 = 200`. Other placements are smaller, for example `1000/(100/(10/2)) = 50` because it moves `2` into the denominator.\n\n## Complexity\n\n- Time: O(n) to build the string.\n- Space: O(n) for the result.\n\n## Pitfalls\n\n- `\"2/(3)\"` is wrong for two numbers: parentheses around a single number are redundant.\n- Nesting more parentheses inside the denominator, like `100/(10/2)`, moves numbers back into the denominator and lowers the value.\n- The answer is a string; there is no need to evaluate any division.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `nums` | the numbers, in their fixed order |\n| `denominator` | everything after the first number, joined with `/` |",
+  "narration": {
+    "2": "A single number is already the whole expression.",
+    "3": "Return it as text with no operators.",
+    "5": "With two numbers there is only one possible division.",
+    "6": "Parentheses here would be redundant, so write it plainly.",
+    "8": "Join every number after the first with slashes; left-to-right order inside is already right.",
+    "9": "Divide the first number by that whole group, which puts every later number except nums[1] in the numerator."
+  }
+}
