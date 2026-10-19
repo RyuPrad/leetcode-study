@@ -58,7 +58,9 @@ async function check(number: number): Promise<string[]> {
       else if (!accepted(sync, problem, test.input, brute.actual, run.actual)) errors.push(`Brute force ${show(brute.actual)} and reference ${show(run.actual)} disagree on ${test.name} ${show(test.input)}.`);
     }
   }
-  if (new Set(outputs.map(o => JSON.stringify(o))).size < Math.min(3, outputs.length)) errors.push('The cases produce fewer than 3 distinct answers; vary the tests.');
+  // Varied answers catch solutions that return a constant; a yes/no problem has only two.
+  const variety = outputs.every(o => typeof o === 'boolean') ? 2 : 3;
+  if (new Set(outputs.map(o => JSON.stringify(o))).size < Math.min(variety, outputs.length)) errors.push(`The cases produce fewer than ${variety} distinct answers; vary the tests.`);
   // Random small inputs compare the reference with the brute force, and must pass validation.
   if (record.generator) {
     for (let seed = 1; seed <= FUZZ && errors.length < 12; seed++) {
