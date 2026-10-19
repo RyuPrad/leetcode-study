@@ -1,0 +1,65 @@
+{
+  "number": 421,
+  "title": "Maximum XOR of Two Numbers in an Array",
+  "spec": "leetcode",
+  "statement": "You are given an integer array `nums` of length `n`. Over all index pairs with `0 <= i <= j < n`, find the largest value of `nums[i] XOR nums[j]` (bitwise exclusive or) and return it. The two indices may be equal, so the answer is never below 0.",
+  "constraints": [
+    "1 <= nums.length <= 2 * 10^5",
+    "0 <= nums[i] <= 2^31 - 1"
+  ],
+  "signature": "int findMaximumXOR(int[] nums)",
+  "entry": "findMaximumXOR",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 200000) return 'nums needs 1 to 200000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v > 2147483647)) return 'Each value is a whole number from 0 to 2^31 - 1.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMaximumXOR(nums) {\n  let largest = 0;\n  for (const num of nums) {\n    largest = Math.max(largest, num);\n  }\n  const highBit = largest.toString(2).length - 1;\n  const root = [null, null];\n  let best = 0;\n\n  for (const num of nums) {\n    let node = root;\n    for (let bit = highBit; bit >= 0; bit--) {\n      const digit = (num >> bit) & 1;\n      if (node[digit] === null) {\n        node[digit] = [null, null];\n      }\n      node = node[digit];\n    }\n\n    let probe = root;\n    let current = 0;\n    for (let bit = highBit; bit >= 0; bit--) {\n      const digit = (num >> bit) & 1;\n      const want = 1 - digit;\n      if (probe[want] !== null) {\n        current |= 1 << bit;\n        probe = probe[want];\n      } else {\n        probe = probe[digit];\n      }\n    }\n    best = Math.max(best, current);\n  }\n  return best;\n}",
+  "brute": "function findMaximumXOR(nums) {\n  let best = 0;\n  for (let i = 0; i < nums.length; i++) {\n    for (let j = i; j < nums.length; j++) {\n      const value = Number(BigInt(nums[i]) ^ BigInt(nums[j]));\n      if (value > best) best = value;\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const full = 2147483648;\n  if (size === 'large') {\n    const n = 2000;\n    const style = Math.floor(rand() * 3);\n    if (style === 0) return [Array.from({ length: n }, () => Math.floor(rand() * full))];\n    if (style === 1) {\n      // Every number shares the same high bits, so only the low bits decide the answer.\n      const base = Math.floor(rand() * 1024) * 2097152;\n      return [Array.from({ length: n }, () => base + Math.floor(rand() * 2097152))];\n    }\n    return [Array.from({ length: n }, () => Math.floor(rand() * 1000))];\n  }\n  const n = 1 + Math.floor(rand() * 10);\n  const pick = rand();\n  const span = pick < 0.4 ? 16 : pick < 0.7 ? 1024 : full;\n  return [Array.from({ length: n }, () => Math.floor(rand() * span))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,10,5,25,2,8]],"expected":28},
+    {"name":"Example 2","input":[[14,70,53,83,49,91,36,80,92,51,66,70]],"expected":127}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0]]},
+    {"name":"Test 2","input":[[7]]},
+    {"name":"Test 3","input":[[5,5,5]]},
+    {"name":"Test 4","input":[[0,2147483647]]},
+    {"name":"Test 5","input":[[1,2,4,8,16]]},
+    {"name":"Test 6","input":[[2147483647,2147483646,2147483645]]},
+    {"name":"Test 7","input":[[8,10,2]]},
+    {"name":"Test 8","input":[[1073741824,1073741823]]},
+    {"name":"Test 9","input":[[536870912,0,268435456,134217728]]},
+    {"name":"Test 10","input":[[0,1,2,3,4,5,6,7]]},
+    {"name":"Test 11","generate":{"seed":42111,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":42112,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every pair costs O(n²), too slow for 2 · 10^5 numbers. XOR rewards differing bits, and a higher bit is worth more than all lower bits together. So for each number we want a partner that differs from it at the highest bit possible, then at the next one, and so on. A binary trie storing every number's bits from the top down lets us make those choices greedily, one bit at a time.\n\n## Approach\n\n1. Find the `largest` value and its top bit position `highBit`; no number has a 1 above it, so every trie path covers bits `highBit` down to 0 (at most 31 bits).\n2. Keep a trie whose nodes are pairs `[child for 0, child for 1]`, starting from `root`.\n3. For each `num`, insert it: walk from the top bit, creating the child for each `digit` when it is missing.\n4. Then query with `probe` from the root: at each bit, prefer the opposite digit `want`. If that branch exists, this bit of the XOR is 1, so set it in `current` and follow it; otherwise follow the same digit.\n5. `current` is now the largest XOR of `num` with any number seen so far (itself included); keep the maximum in `best`.\n6. Every pair is checked when its later number arrives, so return `best`.\n\n## Example 1, step by step\n\nThe largest value is 25, so `highBit = 4` and the numbers read `3 = 00011`, `10 = 01010`, `5 = 00101`, `25 = 11001`, `2 = 00010`, `8 = 01000`. After 3 the best is `0`; 10 pairs with 3 for `9`. For 5 the walk follows 10 the whole way and gets `01111 = 15`. For 25 the top bit can differ, then bit 3 can differ too (towards 3 or 5), then bit 2 leads to 5: `11100 = 28`. Later, 2 reaches `27` with 25 and 8 reaches `17`, so the answer stays `28`.\n\n## Complexity\n\n- Time: O(n · L), where L ≤ 31 is the bit length of the largest value: each number is inserted and queried along one path.\n- Space: O(n · L): at most L new trie nodes per number.\n\n## Pitfalls\n\n- Walk from the most significant bit down; deciding low bits first can trade away a high bit.\n- Give every number the same bit width, leading zeros included, so paths for different numbers line up.\n- The values reach 2^31 - 1, so the top bit is at most 30. Shifting `1 << 31` would turn negative in JavaScript and overflow a 32-bit int.\n- Inserting `num` before querying guarantees one of the two branches always exists.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `largest` | the biggest value in `nums` |\n| `highBit` | position of its highest 1 bit (0 when every value is 0) |\n| `root` | the trie's root; each node is `[zeroChild, oneChild]` |\n| `best` | largest XOR found so far |\n| `num` | the number being inserted and queried |\n| `node` | current trie node while inserting |\n| `bit` | bit position, from `highBit` down to 0 |\n| `digit` | the value of `num` at that bit |\n| `probe` | current trie node while querying |\n| `want` | the opposite digit, which would make this XOR bit 1 |\n| `current` | the best XOR of `num` with a number already in the trie |",
+  "narration": {
+    "4": "Track the biggest value, which decides how many bits matter.",
+    "6": "The position of its highest 1 bit: no number has a 1 above it.",
+    "7": "The trie's root holds a child slot for bit value 0 and one for 1.",
+    "8": "The largest XOR seen so far; i may equal j, so 0 is always reachable.",
+    "10": "Handle the numbers one at a time: insert each, then find its best partner.",
+    "12": "Insert along the bits from the most significant one down to bit 0.",
+    "13": "Read this bit of the number.",
+    "14": "If no earlier number shares this path, create the missing node.",
+    "17": "Step down to the child for this bit.",
+    "20": "Start the query from the root as well.",
+    "21": "current collects the XOR of num with its best partner, bit by bit.",
+    "24": "The opposite digit is the one that would make this XOR bit 1.",
+    "25": "Can some stored number differ from num at this bit, given the choices above it?",
+    "26": "Yes: this bit of the XOR is 1, worth more than all lower bits combined.",
+    "27": "Follow the differing branch.",
+    "29": "No: follow the matching branch, which exists because num itself was inserted.",
+    "32": "Keep the largest XOR found for any number.",
+    "34": "Every pair has been considered; return the maximum."
+  }
+}

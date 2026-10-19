@@ -10,12 +10,13 @@ export type Contract =
   | { kind: 'design'; name: string; constructor: Param[]; methods: Method[]; }
   | { kind: 'codec'; name: string; methods: Method[]; };
 
-const scalar = new Set(['int', 'long', 'double', 'boolean', 'char', 'String', 'void', 'ListNode', 'TreeNode', 'Node', 'MountainArray']);
+// Object is any JSON value, for generated JavaScript kits; the Java and C judges do not offer it.
+const scalar = new Set(['int', 'long', 'double', 'boolean', 'char', 'String', 'void', 'ListNode', 'TreeNode', 'Node', 'MountainArray', 'Object']);
 export function isType(type: string): boolean {
   if (scalar.has(type)) return true;
   if (type.endsWith('[]')) return isType(type.slice(0, -2)) && type !== 'void[]';
   const list = /^List<(.+)>$/.exec(type);
-  return !!list && ['Integer', 'Long', 'Double', 'Character', 'String', 'Boolean', 'TreeNode', 'ListNode'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
+  return !!list && ['Integer', 'Long', 'Double', 'Character', 'String', 'Boolean', 'TreeNode', 'ListNode', 'Object'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
 }
 /** Element type of an array or list, with boxed names unboxed. */
 export function element(type: string): string | undefined {
@@ -65,7 +66,7 @@ export function tsType(type: string): string {
   const inner = element(type);
   if (inner) { const t = tsType(inner); return /[| ]/.test(t) ? `Array<${t}>` : `${t}[]`; }
   return ({ int: 'number', long: 'number', double: 'number', boolean: 'boolean', char: 'string', String: 'string', void: 'void',
-    ListNode: 'ListNode | null', TreeNode: 'TreeNode | null', Node: '_Node | null', MountainArray: 'MountainArray' } as Record<string, string>)[type];
+    ListNode: 'ListNode | null', TreeNode: 'TreeNode | null', Node: '_Node | null', MountainArray: 'MountainArray', Object: 'any' } as Record<string, string>)[type];
 }
 const tsParams = (params: Param[]) => params.map(p => `${p.name}: ${tsType(p.type)}`).join(', ');
 const todo = (_returns: string, indent: string) => `${indent}// Write your code here.\n${indent}throw new Error("Not implemented");`;
@@ -183,12 +184,17 @@ function cStarter(problem: CodingProblem, c: Contract): string {
 }
 
 export function starter(problem: CodingProblem, language: Language): string {
-  if (language === 'javascript') return problem.starter;
+  if (problem.starters?.[language]) return problem.starters[language]!;
+  if (language === 'javascript' || problem.kind === 'sql') return problem.starter;
+  if (language === 'sql') throw new Error('SQL is offered by database problems only.');
   const c = contract(problem);
   return language === 'typescript' ? typescriptStarter(problem, c) : language === 'java' ? javaStarter(problem, c) : cStarter(problem, c);
 }
 /** One-line contract for the description panel. */
 export function contractLine(problem: CodingProblem, language: Language): string {
+  if (problem.kind === 'sql') return Object.entries(problem.schema ?? {}).map(([name, columns]) => `${name}(${columns.map(([column, type]) => `${column} ${type}`).join(', ')})`).join('\n');
+  if (language === 'sql') throw new Error('SQL is offered by database problems only.');
+  if (problem.api && (language === 'javascript' || language === 'typescript')) return problem.api;
   if (language === 'javascript') return problem.kind === 'design' ? problem.entry : `${problem.entry}(${problem.parameters.join(', ')})`;
   const c = contract(problem);
   const methods = c.kind === 'function' ? [c.method] : c.methods;

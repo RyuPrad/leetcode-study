@@ -1,0 +1,62 @@
+{
+  "number": 471,
+  "title": "Encode String with Shortest Length",
+  "spec": "recalled",
+  "statement": "Compress the string `s` of lowercase letters into the shortest possible text. A block written as `k[t]` stands for the text `t` repeated exactly `k` times, where `k` is a positive integer written in decimal and `t` may itself contain blocks; a letter outside any block stands for itself.\n\nReturn an encoded text of minimum length that decodes back to `s`, following these rules:\n\n- A block may be used only where its written form is strictly shorter than the letters it decodes to, so a string that cannot be shortened is returned unchanged (for example `\"aaaa\"` stays `\"aaaa\"`, not `\"4[a]\"`).\n- When several encodings reach the minimum length, any one of them is accepted.",
+  "constraints": [
+    "1 <= s.length <= 150",
+    "s consists only of lowercase English letters"
+  ],
+  "signature": "String encode(String s)",
+  "entry": "encode",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const s = input[0];\n  if (typeof actual !== 'string' || typeof expected !== 'string' || actual.length !== expected.length) return false;\n  let pos = 0;\n  let valid = true;\n  // Decode a run of letters and blocks, stopping at a closing bracket or the end.\n  const decode = () => {\n    let out = '';\n    while (valid && pos < actual.length && actual[pos] !== ']') {\n      const ch = actual[pos];\n      if (ch >= 'a' && ch <= 'z') { out += ch; pos++; }\n      else if (ch >= '1' && ch <= '9') {\n        const start = pos;\n        while (pos < actual.length && actual[pos] >= '0' && actual[pos] <= '9') pos++;\n        const count = Number(actual.slice(start, pos));\n        if (actual[pos] !== '[') { valid = false; break; }\n        pos++;\n        const inner = decode();\n        if (!valid || actual[pos] !== ']') { valid = false; break; }\n        pos++;\n        // The block must decode to text that fits in s and must be strictly shorter than that text.\n        if (count * inner.length > s.length || pos - start >= count * inner.length) { valid = false; break; }\n        out += inner.repeat(count);\n      } else { valid = false; break; }\n      if (out.length > s.length) valid = false;\n    }\n    return out;\n  };\n  const decoded = decode();\n  return valid && pos === actual.length && decoded === s;\n}",
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 150) return 's needs 1 to 150 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function encode(s) {\n  const n = s.length;\n  const dp = Array.from({ length: n }, () => new Array(n).fill(''));\n  for (let length = 1; length <= n; length++) {\n    for (let i = 0; i + length <= n; i++) {\n      const j = i + length - 1;\n      const sub = s.slice(i, j + 1);\n      dp[i][j] = sub;\n      if (length < 5) continue;\n      for (let split = i; split < j; split++) {\n        const joined = dp[i][split] + dp[split + 1][j];\n        if (joined.length < dp[i][j].length) {\n          dp[i][j] = joined;\n        }\n      }\n      const period = (sub + sub).indexOf(sub, 1);\n      if (period < length) {\n        const packed = length / period + '[' + dp[i][i + period - 1] + ']';\n        if (packed.length < dp[i][j].length) {\n          dp[i][j] = packed;\n        }\n      }\n    }\n  }\n  return dp[0][n - 1];\n}",
+  "brute": "function encode(s) {\n  // Top-down search over every way to write a piece: as is, cut in two, or as count[unit] for any unit that tiles it.\n  const memo = new Map();\n  const best = text => {\n    if (memo.has(text)) return memo.get(text);\n    let answer = text;\n    for (let cut = 1; cut < text.length; cut++) {\n      const option = best(text.slice(0, cut)) + best(text.slice(cut));\n      if (option.length < answer.length) answer = option;\n    }\n    for (let size = 1; size < text.length; size++) {\n      if (text.length % size !== 0) continue;\n      const unit = text.slice(0, size);\n      if (unit.repeat(text.length / size) !== text) continue;\n      const option = `${text.length / size}[${best(unit)}]`;\n      if (option.length < answer.length) answer = option;\n    }\n    memo.set(text, answer);\n    return answer;\n  };\n  return best(s);\n}",
+  "generator": "function generate(rand, size) {\n  const target = size === 'large' ? 150 : 1 + Math.floor(rand() * 16);\n  const alphabet = 'abc'.slice(0, 1 + Math.floor(rand() * 3));\n  const letters = count => {\n    let text = '';\n    for (let i = 0; i < count; i++) text += alphabet[Math.floor(rand() * alphabet.length)];\n    return text;\n  };\n  // Build from repeated (and sometimes nested) units so that real savings exist.\n  const piece = (limit, depth) => {\n    if (depth >= 3 || limit < 2 || rand() < 0.35) return letters(1 + Math.floor(rand() * Math.min(3, limit)));\n    const unit = piece(Math.max(1, Math.floor(limit / 2)), depth + 1);\n    const most = Math.max(2, Math.floor(limit / unit.length));\n    return unit.repeat(2 + Math.floor(rand() * (most - 1)));\n  };\n  let s = '';\n  while (s.length < target) s += piece(target - s.length, 0);\n  return [s.slice(0, target)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["aaa"],"expected":"aaa"},
+    {"name":"Example 2","input":["aaaaa"],"expected":"5[a]"},
+    {"name":"Example 3","input":["aaaaaaaaaa"],"expected":"10[a]"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["aaaa"]},
+    {"name":"Test 3","input":["aaaaab"]},
+    {"name":"Test 4","input":["aabcaabcd"]},
+    {"name":"Test 5","input":["abbbabbbcabbbabbbc"]},
+    {"name":"Test 6","input":["abcabcabc"]},
+    {"name":"Test 7","input":["abcdefghij"]},
+    {"name":"Test 8","input":["aaaaabbbbb"]},
+    {"name":"Test 9","input":["ababababab"]},
+    {"name":"Test 10","input":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+    {"name":"Test 11","input":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+    {"name":"Test 12","input":["ababababcababababcababababcababababcababababcababababcxyz"]},
+    {"name":"Test 13","input":["xyzxyzxyzxyzqqqqqqqqqqqqrstrstrstrstrstrst"]}
+  ],
+  "notes": "## Intuition\n\nThe best encoding of any piece of `s` is built from best encodings of smaller pieces: a piece is either written as is, cut into two parts encoded separately, or, when it is a whole number of copies of a shorter unit, written as `count[unit]` with the unit encoded as well as possible. That makes this an interval DP over all substrings, filled from short to long. Trying every cut and every unit length by recursion works too, but the DP keeps it to O(n³) with a fast repeat test.\n\n## Approach\n\n1. Let `dp[i][j]` be the shortest encoding of `s[i..j]`. Fill it by increasing `length`.\n2. Start each entry as the plain substring `sub`. Pieces shorter than 5 letters can never be shortened, so stop there for them.\n3. Try every `split`: `dp[i][split] + dp[split + 1][j]` replaces the entry when it is strictly shorter.\n4. Find the smallest `period` of `sub` with `(sub + sub).indexOf(sub, 1)`. If it is less than `length`, `sub` is `length / period` copies of its first `period` letters, so `packed` = count `[` best unit `]` is a candidate.\n5. Keep `packed` only when it is strictly shorter, and return `dp[0][n - 1]`.\n\n## Example 1, step by step\n\n`s = \"aaa\"`, so `n = 3`. Every substring has `length` below 5, so each `dp[i][j]` is just `sub`: `\"a\"`, then `\"aa\"`, then `dp[0][2] = \"aaa\"`, which is returned. For comparison, with `\"aaaaa\"` the full piece has `period = 1`, so `packed = \"5[a]\"`, one letter shorter than the plain text.\n\n## Complexity\n\n- Time: O(n³): O(n²) substrings, each with O(n) splits and an O(n) repeat test (string building adds a factor bounded by the encoding lengths).\n- Space: O(n³) characters in the worst case for the stored encodings, O(n²) entries.\n\n## Pitfalls\n\n- Replace only on a strictly shorter candidate; `\"aaaa\"` must stay `\"aaaa\"`, since `\"4[a]\"` saves nothing.\n- Encode the repeated unit with `dp`, not as raw text, so nested blocks such as `2[2[abbb]c]` are found.\n- The count can have two or three digits (`150[a]`); measure the real text, not a fixed overhead.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[i][j]` | shortest encoding found for `s[i..j]` |\n| `length`, `i`, `j` | size and ends of the current substring |\n| `sub` | the substring itself |\n| `split` | last index of the left part in a cut |\n| `joined` | encoding made by joining the two parts |\n| `period` | length of the smallest unit that tiles `sub` |\n| `packed` | the `count[unit]` candidate |",
+  "narration": {
+    "3": "dp[i][j] will hold the shortest encoding of s[i..j].",
+    "4": "Handle substrings from shortest to longest so their parts are already solved.",
+    "6": "j is the last index of the substring that starts at i.",
+    "8": "The plain text is always a valid encoding to start from.",
+    "9": "Anything shorter than 5 letters cannot be shortened, so keep it as is.",
+    "10": "Try every place to cut the substring in two.",
+    "11": "Join the best encodings of the two parts.",
+    "12": "Keep the cut only if it is strictly shorter.",
+    "16": "The first place sub reappears in sub + sub is its smallest repeating unit.",
+    "17": "A unit shorter than sub means sub is several copies of it.",
+    "18": "Write the copy count, then the unit's best encoding in brackets.",
+    "19": "Use the block only when it is strictly shorter than the best so far.",
+    "25": "The whole string's shortest encoding."
+  }
+}

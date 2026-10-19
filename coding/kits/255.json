@@ -1,0 +1,57 @@
+{
+  "number": 255,
+  "title": "Verify Preorder Sequence in Binary Search Tree",
+  "spec": "recalled",
+  "statement": "You get an array `preorder` of distinct integers. Decide whether some binary search tree, when walked in preorder (the node itself first, then its whole left subtree, then its whole right subtree), would list exactly these values in exactly this order. In a binary search tree every value in a node's left subtree is smaller than the node and every value in its right subtree is larger. Return `true` if such a tree exists and `false` if none does.\n\nFollow-up: can you do it with only constant extra space?",
+  "constraints": [
+    "1 <= preorder.length <= 10^4",
+    "1 <= preorder[i] <= 10^4",
+    "All values in preorder are distinct"
+  ],
+  "signature": "boolean verifyPreorder(int[] preorder)",
+  "entry": "verifyPreorder",
+  "kind": "function",
+  "parameters": [
+    "preorder"
+  ],
+  "validator": "function validate([preorder]) {\n  if (preorder.length < 1 || preorder.length > 10000) return 'preorder needs 1 to 10,000 values.';\n  if (preorder.some(v => v < 1 || v > 10000)) return 'Each value is between 1 and 10,000.';\n  if (new Set(preorder).size !== preorder.length) return 'The values must be distinct.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function verifyPreorder(preorder) {\n  const stack = [];\n  let lower = -Infinity;\n\n  for (const value of preorder) {\n    if (value < lower) {\n      return false;\n    }\n    while (stack.length > 0 && stack[stack.length - 1] < value) {\n      lower = stack.pop();\n    }\n    stack.push(value);\n  }\n  return true;\n}",
+  "brute": "function verifyPreorder(preorder) {\n  // Insert the values in the given order; a valid preorder rebuilds a tree whose own preorder is the same list.\n  const root = { val: preorder[0], left: null, right: null };\n  for (let i = 1; i < preorder.length; i++) {\n    let node = root;\n    for (;;) {\n      const side = preorder[i] < node.val ? 'left' : 'right';\n      if (node[side] === null) { node[side] = { val: preorder[i], left: null, right: null }; break; }\n      node = node[side];\n    }\n  }\n  const walk = [], pending = [root];\n  while (pending.length) {\n    const node = pending.pop();\n    walk.push(node.val);\n    if (node.right) pending.push(node.right);\n    if (node.left) pending.push(node.left);\n  }\n  return walk.every((v, i) => v === preorder[i]);\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 2000 : 1 + Math.floor(rand() * 7);\n  const pool = Array.from({ length: large ? 10000 : 12 }, (_, i) => i + 1);\n  for (let i = pool.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [pool[i], pool[j]] = [pool[j], pool[i]];\n  }\n  const values = pool.slice(0, n);\n  // A random order is usually not a preorder; otherwise build a BST from it and emit its real preorder.\n  if (rand() < 0.4) return [values];\n  const left = new Map(), right = new Map();\n  for (const v of values.slice(1)) {\n    let node = values[0];\n    for (;;) {\n      const side = v < node ? left : right;\n      if (!side.has(node)) { side.set(node, v); break; }\n      node = side.get(node);\n    }\n  }\n  const order = [], stack = [values[0]];\n  while (stack.length) {\n    const node = stack.pop();\n    order.push(node);\n    if (right.has(node)) stack.push(right.get(node));\n    if (left.has(node)) stack.push(left.get(node));\n  }\n  // Sometimes swap two neighbours, which may or may not break the order.\n  if (n > 1 && rand() < 0.3) {\n    const k = Math.floor(rand() * (n - 1));\n    [order[k], order[k + 1]] = [order[k + 1], order[k]];\n  }\n  return [order];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[5,2,1,3,6]],"expected":true},
+    {"name":"Example 2","input":[[5,2,6,1,3]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[1,2,3,4,5]]},
+    {"name":"Test 3","input":[[5,4,3,2,1]]},
+    {"name":"Test 4","input":[[3,1,2]]},
+    {"name":"Test 5","input":[[2,3,1]]},
+    {"name":"Test 6","input":[[4,2,3,1]]},
+    {"name":"Test 7","input":[[8,5,1,7,10,12]]},
+    {"name":"Test 8","input":[[10,5,1,7,6,40,8]]},
+    {"name":"Test 9","input":[[10,5,1,7,6,40,50,45]]},
+    {"name":"Test 10","input":[[6,3,1,2,5,4,9,7,8,10]]},
+    {"name":"Test 11","generate":{"seed":25511,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":25512,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA brute force rebuilds the tree by inserting the values in order and checks that its preorder matches, O(n²) in the worst case. The faster view: in a preorder walk, once you move from a node into its right subtree, nothing after that point may be smaller than that node. So the only thing to track is a lower bound, the largest node whose right subtree we have entered. A stack of the nodes whose left side we are still walking tells us when we turn right: a value bigger than the stack's top means we have left that node's left subtree.\n\n## Approach\n\n1. Keep `stack`, a decreasing stack of ancestors still waiting for their right subtree, and `lower`, starting at minus infinity.\n2. For each `value`: if it is below `lower`, it would land in a left subtree we already finished, so return `false`.\n3. While the top of `stack` is smaller than `value`, pop it into `lower`: `value` is in that node's right subtree.\n4. Push `value`; it is now the deepest open node.\n5. If no value broke the bound, return `true`.\n\n## Example 1, step by step\n\n`[5, 2, 1, 3, 6]`: push `5`, `2`, `1` (each smaller than the top). `3` pops `1` and `2`, so `lower = 2`; push `3`, giving `[5, 3]`. `6` pops `3` and `5`, so `lower = 5`; push `6`. Nothing fell below `lower`, so the answer is `true`. In Example 2, `6` raises `lower` to `5`, and the next value `1` is below it, so the answer is `false`.\n\n## Complexity\n\n- Time: O(n): each value is pushed once and popped at most once.\n- Space: O(n) for the stack in the worst case (a strictly decreasing list). The follow-up reuses the front of `preorder` itself as the stack for O(1) extra space.\n\n## Pitfalls\n\n- Popping must update `lower` to the last popped value, the closest ancestor we turned right at, not the first one.\n- The check against `lower` comes before popping; a value smaller than the stack's top is still fine.\n- Comparing only neighbouring values is not enough: `[10, 5, 1, 7, 6, 40, 8]` fails only at the final `8`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stack` | ancestors whose right subtree has not started, largest at the bottom |\n| `lower` | every later value must be bigger than this |\n| `value` | the current value of `preorder` |",
+  "narration": {
+    "2": "The stack holds ancestors whose right subtree we have not entered yet.",
+    "3": "No lower bound at the start: any first value is fine.",
+    "5": "Read the preorder values one at a time.",
+    "6": "A value below the bound would belong to a left subtree that is already finished.",
+    "7": "That is impossible in a preorder walk, so the answer is false.",
+    "9": "While the top of the stack is smaller, this value lies in that ancestor's right subtree...",
+    "10": "...so pop it, and from now on nothing may be smaller than it.",
+    "12": "The value becomes the deepest open node.",
+    "14": "Every value respected its bound, so a matching tree exists."
+  }
+}

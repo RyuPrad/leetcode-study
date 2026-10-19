@@ -1,0 +1,63 @@
+{
+  "number": 483,
+  "title": "Smallest Good Base",
+  "spec": "leetcode",
+  "statement": "The integer `n` arrives as a decimal string. An integer base `k >= 2` is called *good* for `n` when writing `n` in base `k` produces only the digit 1, that is, `n = 1 + k + k^2 + ... + k^(m-1)` for some number of digits `m`. Return the smallest good base of `n`, written as a decimal string. A good base always exists, because `n` is \"11\" in base `n - 1`.",
+  "constraints": [
+    "n is the decimal form of an integer between 3 and 10^18",
+    "n has no leading zeros"
+  ],
+  "signature": "String smallestGoodBase(String n)",
+  "entry": "smallestGoodBase",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (typeof n !== 'string' || !/^[1-9][0-9]*$/.test(n)) return 'n must be a decimal string without leading zeros.';\n  if (n.length > 19) return 'n must be between 3 and 10^18.';\n  const value = BigInt(n);\n  if (value < 3n || value > 10n ** 18n) return 'n must be between 3 and 10^18.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function smallestGoodBase(n) {\n  const target = BigInt(n);\n  const maxDigits = target.toString(2).length;\n\n  for (let digits = maxDigits; digits >= 3; digits--) {\n    const power = BigInt(digits - 1);\n    let base = BigInt(Math.floor(Number(target) ** (1 / (digits - 1))));\n    while (base ** power > target) base--;\n    while ((base + 1n) ** power <= target) base++;\n\n    let sum = 0n;\n    let term = 1n;\n    for (let i = 0; i < digits; i++) {\n      sum += term;\n      term *= base;\n    }\n    if (sum === target) {\n      return base.toString();\n    }\n  }\n  return (target - 1n).toString();\n}",
+  "brute": "function smallestGoodBase(n) {\n  // For every digit count, most digits first, binary search a base whose all-ones number equals n.\n  const value = BigInt(n);\n  const repunit = (base, count) => {\n    let total = 0n;\n    for (let i = 0; i < count; i++) {\n      total = total * base + 1n;\n      if (total > value) return total;\n    }\n    return total;\n  };\n  for (let count = 64; count >= 2; count--) {\n    let lo = 2n, hi = value - 1n;\n    while (lo <= hi) {\n      const mid = (lo + hi) / 2n;\n      const total = repunit(mid, count);\n      if (total === value) return mid.toString();\n      if (total < value) lo = mid + 1n; else hi = mid - 1n;\n    }\n  }\n  return 'none';\n}",
+  "generator": "function generate(rand, size) {\n  const LIMIT = 10n ** 18n;\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const bigBelow = (limit) => {\n    // A random BigInt in [0, limit) built from random decimal digits.\n    let digits = '';\n    for (let i = 0; i < 19; i++) digits += String(int(0, 9));\n    return BigInt(digits) % limit;\n  };\n  const repunit = (base, count) => {\n    let total = 0n;\n    for (let i = 0; i < count; i++) total = total * base + 1n;\n    return total;\n  };\n  if (size === 'small') {\n    const r = rand();\n    if (r < 0.5) return [String(int(3, 400))];\n    for (;;) {\n      const base = BigInt(int(2, 12));\n      const count = int(2, 6);\n      const value = repunit(base, count);\n      if (value >= 3n && value <= 100000n) return [String(value)];\n    }\n  }\n  const r = rand();\n  if (r < 0.4) {\n    const value = 3n + bigBelow(LIMIT - 2n);\n    return [String(value)];\n  }\n  for (;;) {\n    const count = int(3, 60);\n    const top = Math.floor(1e18 ** (1 / (count - 1)));\n    const base = BigInt(int(2, Math.max(2, top)));\n    const value = repunit(base, count);\n    if (value >= 3n && value <= LIMIT) return [String(value)];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["13"],"expected":"3"},
+    {"name":"Example 2","input":["4681"],"expected":"8"},
+    {"name":"Example 3","input":["1000000000000000000"],"expected":"999999999999999999"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["3"]},
+    {"name":"Test 2","input":["4"]},
+    {"name":"Test 3","input":["7"]},
+    {"name":"Test 4","input":["31"]},
+    {"name":"Test 5","input":["43"]},
+    {"name":"Test 6","input":["121"]},
+    {"name":"Test 7","input":["100"]},
+    {"name":"Test 8","input":["1000000007"]},
+    {"name":"Test 9","input":["1001001001001001"]},
+    {"name":"Test 10","input":["576460752303423487"]},
+    {"name":"Test 11","input":["999999999000000001"]},
+    {"name":"Test 12","input":["999999999999999999"]},
+    {"name":"Test 13","input":["470988884881403701"]}
+  ],
+  "notes": "## Intuition\n\nIf `n` is written as `m` ones in base `k`, then `n = 1 + k + ... + k^(m-1)`. A smaller base needs more digits to reach the same `n`, so the smallest good base belongs to the largest digit count that works. The digit count is at most the length of `n` in binary (base 2 gives the most digits), so there are only about 60 counts to try.\n\nFor a fixed count `m >= 3`, the base is pinned down exactly: `n` is larger than `k^(m-1)` (its top term) but smaller than `(k+1)^(m-1)` (whose binomial expansion contains every term of the sum and more). So `k` must be the integer `(m-1)`-th root of `n`, rounded down. Compute that one candidate and check it. Binary searching the base for each count also works, at an extra log factor. If no count of 3 or more works, `n - 1` is the answer, since `n` is \"11\" in that base.\n\n## Approach\n\n1. Convert `n` to the BigInt `target`; `maxDigits` is its bit length.\n2. For `digits` from `maxDigits` down to 3, estimate `base` as the `(digits - 1)`-th root with floating point.\n3. Fix the estimate with exact BigInt powers until `base^power <= target < (base + 1)^power`.\n4. Add up `1 + base + ... + base^(digits-1)` in `sum`; if it equals `target`, return `base`.\n5. Otherwise return `target - 1`.\n\n## Example 1, step by step\n\n`n = \"13\"`, binary `1101`, so `maxDigits = 4`. With `digits = 4`, the cube root of 13 is about 2.35, so `base = 2` and `sum = 1 + 2 + 4 + 8 = 15`, not 13. With `digits = 3`, the square root is about 3.61, so `base = 3` and `sum = 1 + 3 + 9 = 13`. It matches, and the answer is `\"3\"`.\n\n## Complexity\n\n- Time: O(log² n): up to log n digit counts, each summing up to log n terms (plus a few root corrections).\n- Space: O(1) numbers.\n\n## Pitfalls\n\n- `n` can reach 10^18, beyond exact doubles; use BigInt (or 64-bit integers) for the sums and powers.\n- `Math.pow` can be off by one near a perfect power; adjust the root with exact arithmetic before trusting it.\n- Try the largest digit count first; stopping at the first match is what makes the base smallest.\n- In Java or C, powers of a too-large base overflow 64 bits; keep every candidate at or below the root (or stop once the sum passes `n`) so no product leaves the range.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `target` | `n` as a BigInt |\n| `maxDigits` | bit length of `n`, the most ones any base can give |\n| `digits`, `power` | the digit count being tried, and `digits - 1` |\n| `base` | the only possible base for that digit count |\n| `sum`, `term` | the running `1 + base + ...` and the next power of `base` |",
+  "narration": {
+    "2": "n can reach 10^18, so work with an exact BigInt.",
+    "3": "Base 2 gives the most ones, so the bit length of n bounds the digit count.",
+    "5": "Try the most digits first: more digits means a smaller base, so the first match is the answer.",
+    "6": "With this many digits, the top term of the sum is base to the power digits - 1.",
+    "7": "The only possible base is the (digits - 1)-th root of n rounded down; estimate it with floating point.",
+    "8": "If the estimate is too big, step it down until base^power fits under n.",
+    "9": "If it is too small, step it up while the next base still fits; now base is the exact integer root.",
+    "11": "Start the all-ones number 1 + base + base^2 + ... at zero.",
+    "13": "Add one term per digit.",
+    "14": "Add the current power of base.",
+    "15": "Move to the next power of base.",
+    "17": "Did this base write n as all ones?",
+    "18": "Yes: with the most possible digits, this base is the smallest good one.",
+    "21": "No count of 3 or more digits worked, and n is always 11 in base n - 1."
+  }
+}

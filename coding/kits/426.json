@@ -1,0 +1,65 @@
+{
+  "number": 426,
+  "title": "Convert Binary Search Tree to Sorted Doubly Linked List",
+  "spec": "recalled",
+  "statement": "You are given `root`, the root of a binary search tree whose values are all distinct (it may be empty). Rewire the tree's own nodes into a **circular, sorted, doubly linked list** and return the node holding the smallest value:\n\n- reuse each node's `left` field as the link to the previous (smaller) node and its `right` field as the link to the next (larger) node;\n- the list wraps around: the smallest node's `left` points to the largest node, and the largest node's `right` points to the smallest;\n- work in place: create no new nodes, so every node of the tree appears in the list exactly once;\n- for an empty tree, return `null`.\n\nEach case is written as `[root]`: the tree as a level-order array with `null` for missing children. Your function receives the root node object. The result is shown as the values met by starting at the returned node and following `right` once around the circle; the judge also checks that every `left` link points back to the previous node.",
+  "constraints": [
+    "The tree has between 0 and 2000 nodes",
+    "-1000 <= Node.val <= 1000",
+    "All Node.val are unique",
+    "root is a valid binary search tree"
+  ],
+  "signature": "TreeNode treeToDoublyList(TreeNode root)",
+  "entry": "treeToDoublyList",
+  "kind": "function",
+  "parameters": [
+    "root"
+  ],
+  "validator": "function validate([root]) {\n  if (!Array.isArray(root)) return 'root is a level-order array with null for missing children.';\n  if (root.length > 0 && root[0] === null) return 'An empty tree is written as [].';\n  const values = root.filter(v => v !== null);\n  if (values.length > 2000) return 'The tree has at most 2000 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -1000 || v > 1000)) return 'Node values are whole numbers from -1000 to 1000.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  // range[i] holds the open interval the value at position i must fall in to keep the search-tree order.\n  const range = [[-Infinity, Infinity]];\n  for (let i = 0; i < root.length; i++) {\n    if (range[i] === undefined) return 'Every value after the root needs a parent in the level-order array.';\n    const value = root[i];\n    if (value === null) continue;\n    const [low, high] = range[i];\n    if (value <= low || value >= high) return 'The tree must be a binary search tree.';\n    range.push([low, value], [value, high]);\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values] = input;\n  const root = kit.toTree(values);\n  // Collect the original nodes with an explicit stack so deep trees need no recursion here.\n  const nodes = [];\n  const stack = root ? [root] : [];\n  while (stack.length) {\n    const node = stack.pop();\n    nodes.push(node);\n    if (node.right) stack.push(node.right);\n    if (node.left) stack.push(node.left);\n  }\n  const head = solve(root);\n  if (head === undefined) throw new Error('The solution did not return a value.');\n  if (nodes.length === 0) {\n    if (head !== null) throw new Error('An empty tree gives null.');\n    return [];\n  }\n  const original = new Set(nodes);\n  if (!original.has(head)) throw new Error('Return a node of the tree; do not create new nodes.');\n  // Walk right from the head once around the circle, checking each left link on the way.\n  const out = [];\n  const visited = new Set();\n  let node = head;\n  do {\n    if (!original.has(node)) throw new Error('Every right link must point to a node of the tree.');\n    if (visited.has(node)) throw new Error('Following right comes back to a node before reaching the head again.');\n    visited.add(node);\n    if (node.right === null || node.right === undefined) throw new Error('The list must be circular: no right link may be null.');\n    if (node.right.left !== node) throw new Error('Each node\\'s right neighbour must point back to it through left.');\n    out.push(node.val);\n    node = node.right;\n  } while (node !== head);\n  if (out.length !== nodes.length) throw new Error('The list must contain every node of the tree.');\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function treeToDoublyList(root) {\n  if (root === null) {\n    return null;\n  }\n  const stack = [];\n  let first = null;\n  let last = null;\n  let node = root;\n  while (node !== null || stack.length > 0) {\n    while (node !== null) {\n      stack.push(node);\n      node = node.left;\n    }\n    node = stack.pop();\n    if (last === null) {\n      first = node;\n    } else {\n      last.right = node;\n      node.left = last;\n    }\n    last = node;\n    node = node.right;\n  }\n  last.right = first;\n  first.left = last;\n  return first;\n}",
+  "brute": "function treeToDoublyList(root) {\n  if (!root) return null;\n  // Gather every node in any order, sort them by value, then link neighbours around a circle.\n  const nodes = [];\n  const pending = [root];\n  while (pending.length) {\n    const node = pending.pop();\n    nodes.push(node);\n    if (node.left) pending.push(node.left);\n    if (node.right) pending.push(node.right);\n  }\n  nodes.sort((a, b) => a.val - b.val);\n  const n = nodes.length;\n  for (let i = 0; i < n; i++) {\n    nodes[i].right = nodes[(i + 1) % n];\n    nodes[i].left = nodes[(i + n - 1) % n];\n  }\n  return nodes[0];\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const n = large ? 900 + pick(90) : pick(9);\n  const span = large || rand() < 0.5 ? 1000 : 12;\n  const used = new Set();\n  const keys = [];\n  while (keys.length < n) {\n    const v = pick(2 * span + 1) - span;\n    if (!used.has(v)) { used.add(v); keys.push(v); }\n  }\n  // Random insertion order gives a bushy tree; sorted or reversed order gives a chain.\n  const shape = pick(4);\n  if (shape === 2) keys.sort((a, b) => a - b);\n  if (shape === 3) keys.sort((a, b) => b - a);\n  let root = null;\n  for (const val of keys) {\n    const fresh = { val, left: null, right: null };\n    if (!root) { root = fresh; continue; }\n    let node = root;\n    for (;;) {\n      const side = val < node.val ? 'left' : 'right';\n      if (!node[side]) { node[side] = fresh; break; }\n      node = node[side];\n    }\n  }\n  const level = [];\n  const queue = [root];\n  for (let k = 0; k < queue.length; k++) {\n    level.push(queue[k] ? queue[k].val : null);\n    if (queue[k]) queue.push(queue[k].left, queue[k].right);\n  }\n  while (level.length && level[level.length - 1] === null) level.pop();\n  return [level];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[4,2,5,1,3]],"expected":[1,2,3,4,5]},
+    {"name":"Example 2","input":[[2,1,3]],"expected":[1,2,3]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[]]},
+    {"name":"Test 2","input":[[1]]},
+    {"name":"Test 3","input":[[1,null,2,null,3,null,4]]},
+    {"name":"Test 4","input":[[0,-1,null,-2,null,-3]]},
+    {"name":"Test 5","input":[[-1000,null,1000]]},
+    {"name":"Test 6","input":[[1000,-1000]]},
+    {"name":"Test 7","input":[[10,2,null,null,7,5,null,null,6]]},
+    {"name":"Test 8","input":[[8,4,12,2,6,10,14,1,3,5,7,9,11,13,15]]},
+    {"name":"Test 9","input":[[50,20,80,-10,30,60,90,-40,0,25,45,null,70,null,100]]},
+    {"name":"Test 10","generate":{"seed":42610,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":42611,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIn a binary search tree, an in-order traversal (left subtree, node, right subtree) meets the values in increasing order, which is exactly the order the list needs. So if we remember the node visited just before the current one, we can join the two with `last.right = node` and `node.left = last` as we go. After the traversal, the first and last nodes visited are the smallest and largest, and joining them closes the circle.\n\nThe simple alternative is to copy every node into an array, sort it by value and link neighbours. That works but ignores the search-tree order and costs O(n log n).\n\n## Approach\n\n1. If `root` is `null`, return `null`.\n2. Do an iterative in-order traversal with a `stack`: push `node` and keep going left; when you cannot, pop the next node in sorted order.\n3. For the first popped node, record it as `first`. For every later one, link `last.right = node` and `node.left = last`.\n4. Set `last = node` and continue with `node.right`.\n5. After the loop, close the circle with `last.right = first` and `first.left = last`, then return `first`.\n\nOverwriting `node.left` is safe because its left subtree was finished before `node` was popped, and `last.right` is overwritten only after it was read.\n\n## Example 1, step by step\n\nThe tree is `4` with children `2` and `5`, and `2` has children `1` and `3`.\n\n- Push `4`, `2`, `1`. Pop `1`: `first = 1`, `last = 1`.\n- Pop `2`: link `1 ⇄ 2`, `last = 2`, move to `3`. Push and pop `3`: link `2 ⇄ 3`.\n- Pop `4`: link `3 ⇄ 4`, move to `5`. Push and pop `5`: link `4 ⇄ 5`, `last = 5`.\n- Close the circle: `5.right = 1`, `1.left = 5`. Returning `1` reads `[1, 2, 3, 4, 5]`.\n\n## Complexity\n\n- Time: O(n): every node is pushed and popped once.\n- Space: O(h) for the stack, where h is the tree's height (O(n) for a chain).\n\n## Pitfalls\n\n- Forgetting to close the circle: the list must wrap from the largest node back to the smallest in both directions.\n- Only rewrite links the traversal no longer needs: `node.left` and `last.right` are safe to change, but `node.right` must be followed before anything overwrites it.\n- Return the smallest node, not `root`; and return `null`, not a new node, for an empty tree.\n- A single node must link to itself: both its `left` and `right` point to it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stack` | nodes whose left subtree is still being visited |\n| `node` | the node being explored or just popped |\n| `first` | the smallest node, head of the list |\n| `last` | the node visited just before `node`, tail of the list so far |",
+  "narration": {
+    "2": "An empty tree has no nodes to link, so the answer is null.",
+    "5": "The stack holds nodes whose left subtree is still being visited.",
+    "6": "first will be the smallest node, the head of the list.",
+    "7": "last is the node visited just before the current one, the list's tail so far.",
+    "9": "Keep going while there is a subtree to explore or a node waiting on the stack.",
+    "10": "Slide down to the leftmost unvisited node...",
+    "11": "...remembering each node on the way...",
+    "12": "...and stepping to its left child.",
+    "14": "Pop the next node in sorted order: everything smaller has been visited.",
+    "15": "Is this the very first node visited?",
+    "16": "Yes: it holds the smallest value, so it becomes the head.",
+    "18": "Otherwise the previous node's successor is this node...",
+    "19": "...and this node's predecessor is the previous node.",
+    "21": "This node is now the tail of the list.",
+    "22": "Continue with the right subtree, which holds the next larger values.",
+    "24": "Close the circle: the largest node points forward to the smallest...",
+    "25": "...and the smallest node points back to the largest.",
+    "26": "Return the head, the node with the smallest value."
+  }
+}

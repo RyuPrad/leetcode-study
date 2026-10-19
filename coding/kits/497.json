@@ -1,0 +1,82 @@
+{
+  "number": 497,
+  "title": "Random Point in Non-overlapping Rectangles",
+  "spec": "leetcode",
+  "statement": "Write a class `Solution` that samples lattice points from a set of disjoint rectangles whose sides are parallel to the axes.\n\n- `new Solution(rects)` receives `rects`, where `rects[i] = [a, b, x, y]` describes a rectangle with lower-left corner `(a, b)` and upper-right corner `(x, y)`. No two rectangles share any point.\n- `pick()` returns `[u, v]`, a point with integer coordinates that lies inside one of the rectangles or on its border. Across all such points of all rectangles, each one must be returned with the same probability, and every call makes a new choice.\n\nUse `Math.random()` for randomness; in this app it follows a fixed seed, so runs repeat exactly. Since many outputs are correct, an answer is accepted when the constructor gives `null`, every `pick()` result is an integer point covered by some rectangle, and across the calls of a case the points spread over the rectangles (and inside small rectangles) about as evenly as a fair pick would (a generous statistical check).",
+  "constraints": [
+    "1 <= rects.length <= 100",
+    "rects[i].length == 4",
+    "-10^9 <= a < x <= 10^9",
+    "-10^9 <= b < y <= 10^9",
+    "x - a <= 2000",
+    "y - b <= 2000",
+    "The rectangles do not overlap",
+    "At most 10^4 calls are made to pick (at most 499 per case here)"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "Solution",
+    "constructor": "Solution(int[][] rects)",
+    "methods": [
+      "int[] pick()"
+    ]
+  },
+  "entry": "Solution",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "rects"
+    ],
+    "pick": []
+  },
+  "io": {
+    "seed": 497
+  },
+  "compare": "checker",
+  "checker": "function check([operations, args], actual, expected) {\n  const rects = args[0][0];\n  if (!Array.isArray(actual) || actual.length !== operations.length || actual[0] !== null) return false;\n  const sizes = rects.map(([a, b, x, y]) => (x - a + 1) * (y - b + 1));\n  const total = sizes.reduce((sum, s) => sum + s, 0);\n  const hits = rects.map(() => []);\n  for (let i = 1; i < actual.length; i++) {\n    const point = actual[i];\n    if (!Array.isArray(point) || point.length !== 2 || !Number.isInteger(point[0]) || !Number.isInteger(point[1])) return false;\n    const [u, v] = point;\n    const r = rects.findIndex(([a, b, x, y]) => a <= u && u <= x && b <= v && v <= y);\n    if (r === -1) return false;\n    hits[r].push([u - rects[r][0], v - rects[r][1]]);\n  }\n  const calls = actual.length - 1;\n  // A count of a fair choice with probability p over n tries stays within 5.5 standard deviations (+3 slack).\n  const fair = (seen, n, p) => Math.abs(seen - n * p) <= 5.5 * Math.sqrt(n * p * (1 - p)) + 3;\n  // Each rectangle gets about its share of the points; a chi-square over the well-filled rectangles adds power.\n  let chi = 0, cells = 0;\n  for (let r = 0; r < rects.length; r++) {\n    const p = sizes[r] / total, mean = calls * p;\n    if (!fair(hits[r].length, calls, p)) return false;\n    if (mean >= 5) { chi += (hits[r].length - mean) ** 2 / mean; cells++; }\n  }\n  if (cells > 1 && chi > cells + 6 * Math.sqrt(2 * cells) + 8) return false;\n  // Inside a rectangle with enough hits: every point of a small one, each row and column of a narrow side,\n  // and the average offset of a wide side must look uniform.\n  for (let r = 0; r < rects.length; r++) {\n    const seen = hits[r].length;\n    if (seen < 30) continue;\n    const width = rects[r][2] - rects[r][0] + 1, height = rects[r][3] - rects[r][1] + 1;\n    if (width * height <= 25) {\n      const grid = new Map();\n      for (const [du, dv] of hits[r]) grid.set(du * height + dv, (grid.get(du * height + dv) || 0) + 1);\n      for (let cell = 0; cell < width * height; cell++) if (!fair(grid.get(cell) || 0, seen, 1 / (width * height))) return false;\n    }\n    for (const [axis, span] of [[0, width], [1, height]]) {\n      if (span <= 10) {\n        for (let k = 0; k < span; k++) if (!fair(hits[r].filter(h => h[axis] === k).length, seen, 1 / span)) return false;\n      } else {\n        const average = hits[r].reduce((sum, h) => sum + h[axis] / (span - 1), 0) / seen;\n        if (Math.abs(average - 0.5) > 6 * Math.sqrt(0.11 / seen) + 0.02) return false;\n      }\n    }\n  }\n  return true;\n}",
+  "validator": "function validate([operations, args]) {\n  const rects = args[0][0];\n  if (rects.length < 1 || rects.length > 100) return 'rects needs 1 to 100 rectangles.';\n  for (const rect of rects) {\n    if (rect.length !== 4) return 'Each rectangle is [a, b, x, y].';\n    const [a, b, x, y] = rect;\n    if ([a, b, x, y].some(c => c < -1e9 || c > 1e9)) return 'Coordinates are between -10^9 and 10^9.';\n    if (a >= x || b >= y) return 'Each rectangle needs a < x and b < y.';\n    if (x - a > 2000 || y - b > 2000) return 'Each side is at most 2000 long.';\n  }\n  for (let i = 0; i < rects.length; i++)\n    for (let j = i + 1; j < rects.length; j++) {\n      const [a1, b1, x1, y1] = rects[i], [a2, b2, x2, y2] = rects[j];\n      if (a1 <= x2 && a2 <= x1 && b1 <= y2 && b2 <= y1) return 'Rectangles must not overlap or touch.';\n    }\n  if (operations.slice(1).some(op => op !== 'pick')) return 'After the constructor, only pick is called.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class Solution {\n  constructor(rects) {\n    this.rects = rects;\n    this.prefix = [];\n    let total = 0;\n    for (const [a, b, x, y] of rects) {\n      total += (x - a + 1) * (y - b + 1);\n      this.prefix.push(total);\n    }\n    this.total = total;\n  }\n\n  pick() {\n    const target = Math.floor(Math.random() * this.total);\n    let left = 0;\n    let right = this.prefix.length - 1;\n    while (left < right) {\n      const mid = (left + right) >> 1;\n      if (this.prefix[mid] > target) {\n        right = mid;\n      } else {\n        left = mid + 1;\n      }\n    }\n    const [a, b, x] = this.rects[left];\n    const offset = target - (left === 0 ? 0 : this.prefix[left - 1]);\n    const width = x - a + 1;\n    return [a + (offset % width), b + Math.floor(offset / width)];\n  }\n}",
+  "brute": "class Solution {\n  constructor(rects) {\n    this.rects = rects;\n    this.counts = rects.map(([a, b, x, y]) => (x - a + 1) * (y - b + 1));\n  }\n  pick() {\n    // Walk the rectangles with a weighted roll, then draw each coordinate on its own.\n    let roll = Math.random() * this.counts.reduce((s, c) => s + c, 0);\n    let i = 0;\n    while (i < this.counts.length - 1 && roll >= this.counts[i]) roll -= this.counts[i++];\n    const [a, b, x, y] = this.rects[i];\n    return [a + Math.floor(Math.random() * (x - a + 1)), b + Math.floor(Math.random() * (y - b + 1))];\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const count = large ? 100 : 1 + Math.floor(rand() * 4);\n  const maxSide = large ? 2000 : 1 + Math.floor(rand() * 4);\n  const far = !large && rand() < 0.2;\n  const rects = [];\n  // Rectangles go left to right with a gap of at least one unit, so none share a point.\n  let start = far ? 1e9 - 30 - 4 * maxSide : Math.floor(rand() * 21) - 10;\n  if (far && rand() < 0.5) start = -1e9;\n  for (let i = 0; i < count; i++) {\n    const width = 1 + Math.floor(rand() * maxSide), height = 1 + Math.floor(rand() * maxSide);\n    const b = large ? Math.floor(rand() * (2e9 - 2000)) - 1e9 : Math.floor(rand() * 7) - 3;\n    rects.push([start, b, start + width, b + height]);\n    start += width + 1 + Math.floor(rand() * (large ? 1000000 : 3));\n  }\n  const calls = large ? 499 : 1 + Math.floor(rand() * 300);\n  return [[\"Solution\", ...Array(calls).fill(\"pick\")], [[rects], ...Array.from({ length: calls }, () => [])]];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["Solution","pick","pick","pick","pick","pick"],[[[[-2,-2,1,1],[2,2,4,6]]],[],[],[],[],[]]],"expected":[null,[1,-2],[1,-1],[-1,-2],[-2,-2],[0,0]]}
+  ],
+  "tests": [
+    {"name":"Test 1","generate":{"seed":49701,"size":"large"}},
+    {"name":"Test 2","generate":{"seed":49702,"size":"large"}},
+    {"name":"Test 3","generate":{"seed":49703,"size":"large"}},
+    {"name":"Test 4","input":[["Solution","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick","pick"],[[[[-1000000000,-1000000000,-999998000,-999998000],[999999999,999999999,1000000000,1000000000]]],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]]},
+    {"name":"Test 5","generate":{"seed":49705,"size":"large"}},
+    {"name":"Test 6","generate":{"seed":49706,"size":"large"}},
+    {"name":"Test 7","generate":{"seed":49707,"size":"large"}},
+    {"name":"Test 8","input":[["Solution","pick"],[[[[-5,-5,-4,-3]]],[]]]},
+    {"name":"Test 9","generate":{"seed":49709,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":49710,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":49711,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":49712,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery lattice point should be equally likely, so a rectangle must be chosen in proportion to how many lattice points it holds, not uniformly and not by its area. A `w`-by-`h` rectangle (sides `x - a` and `y - b`) holds `(x - a + 1) * (y - b + 1)` points because both borders count. The brute-force idea lists every point in one big array and picks a random index, but a rectangle can hold four million points. Instead, number the points `0 .. total - 1` implicitly: rectangle 0 owns the first block of numbers, rectangle 1 the next, and so on. One random number then names a single point, prefix sums tell which block it falls in, and binary search finds that block quickly.\n\n## Approach\n\n1. In the constructor, walk `rects`, add each rectangle's point count to `total`, and store the running sum in `prefix`.\n2. In `pick()`, draw `target` uniformly from `0 .. total - 1`.\n3. Binary search for the first index `left` with `prefix[left] > target`; that rectangle owns `target`.\n4. Subtract the points of the earlier rectangles to get `offset` inside this one.\n5. Read `offset` row by row: the column is `offset % width` and the row is `Math.floor(offset / width)`; add them to `a` and `b`.\n\n## Example 1, step by step\n\n`[-2, -2, 1, 1]` is 4 by 4 lattice points (16) and `[2, 2, 4, 6]` is 3 by 5 (15), so `prefix = [16, 31]` and `total = 31`. If `target = 20`, the search stops at `left = 1` because `prefix[0] = 16 <= 20`. Then `offset = 4`, `width = 3`, and the point is `[2 + 1, 2 + 1] = [3, 3]`. If `target = 3`, it lands in rectangle 0 with `offset = 3` and `width = 4`, giving `[-2 + 3, -2 + 0] = [1, -2]`, LeetCode's first sample answer. The seeded run here produces its own valid sequence.\n\n## Complexity\n\n- Time: O(n) for the constructor and O(log n) per `pick()`, where n is the number of rectangles.\n- Space: O(n) for `prefix`.\n\n## Pitfalls\n\n- Weighting by area `(x - a) * (y - b)` undercounts border points; thin rectangles then come up too rarely.\n- `Math.floor(Math.random() * (x - a))` never reaches the right edge; the count of choices is `x - a + 1`.\n- Choosing the rectangle uniformly favours the points of small rectangles.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rects` | the rectangles, kept for decoding a point |\n| `prefix` | `prefix[i]` = lattice points in rectangles `0..i` |\n| `total` | lattice points in all rectangles |\n| `target` | the random point number in `0 .. total - 1` |\n| `left`, `right`, `mid` | binary search bounds over `prefix` |\n| `offset` | the point's number inside its rectangle |\n| `width` | lattice points per row of that rectangle |",
+  "narration": {
+    "4": "prefix[i] will hold how many lattice points rectangles 0..i contain together.",
+    "6": "Visit the rectangles in order to give each a block of point numbers.",
+    "7": "Both borders count, so a rectangle holds (x - a + 1) * (y - b + 1) lattice points.",
+    "8": "Store the running total: rectangle i owns numbers prefix[i - 1] .. prefix[i] - 1.",
+    "14": "Choose one point number uniformly from 0 to total - 1.",
+    "17": "Binary search for the first rectangle whose running total passes target.",
+    "19": "This rectangle's block ends after target, so the answer is here or further left.",
+    "20": "Keep mid as a candidate.",
+    "22": "target is beyond mid's block, so look to the right.",
+    "25": "left now names the rectangle that owns target.",
+    "26": "Remove the points of the earlier rectangles to number the point inside this one.",
+    "27": "Each row of the rectangle has x - a + 1 lattice points.",
+    "28": "Decode the number row by row: the remainder is the column and the quotient is the row."
+  }
+}

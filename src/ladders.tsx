@@ -2,6 +2,8 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { KitRecord } from '../coding/kits';
+import type { SqlResult } from '../coding/sql-engine';
+import { SqlInputTables, SqlTable } from './coding/SqlWalkthrough';
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ExternalLink, Info, ListOrdered, Lock, SkipForward } from 'lucide-react';
 import type { Difficulty, Entry, Progress, SolutionMethod } from '../shared/types';
 
@@ -96,7 +98,9 @@ export function ProblemOverview({ entry, lookup, progress, onNavigate, onOpenLad
     {entry.kit && (record ? <div className="markdown kit-notes">
       <h2>Problem</h2><ReactMarkdown remarkPlugins={[remarkGfm]}>{record.statement}</ReactMarkdown>
       {record.constraints.length > 0 && <ul>{record.constraints.map((rule, i) => <li key={i}>{rule}</li>)}</ul>}
-      {record.examples.map((example, i) => <div key={i} className="kit-example"><h3>{example.name}</h3><pre>{`Input:    ${JSON.stringify(example.input)}\nExpected: ${JSON.stringify(example.expected)}`}</pre></div>)}
+      {record.examples.map((example, i) => <div key={i} className="kit-example"><h3>{example.name}</h3>{record.kind === 'sql'
+        ? <><SqlInputTables schema={record.schema} input={example.input}/><SqlTable name="Expected result" table={example.expected as unknown as SqlResult}/></>
+        : <pre>{`Input:    ${JSON.stringify(example.input)}\nExpected: ${JSON.stringify(example.expected)}`}</pre>}</div>)}
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{record.notes}</ReactMarkdown>
     </div> : <p className={recordError ? 'error-text' : 'muted'} role={recordError ? 'alert' : 'status'}>{recordError || 'Loading the study notes…'}</p>)}
     {entry.tags?.length ? <><h3>LeetCode tags</h3><ul className="overview-tags">{entry.tags.map(tag => <li key={tag} className="topic-chip">{tag}</li>)}</ul></> : null}

@@ -1,0 +1,65 @@
+{
+  "number": 391,
+  "title": "Perfect Rectangle",
+  "spec": "leetcode",
+  "statement": "Each entry `rectangles[i] = [x_i, y_i, a_i, b_i]` describes a rectangle whose sides are parallel to the axes, with lower-left corner `(x_i, y_i)` and upper-right corner `(a_i, b_i)`.\n\nReturn `true` if the rectangles fit together into one larger rectangle with nothing missing and nothing doubled: their union is exactly a rectangle, no point inside that rectangle is left uncovered, and no two of the rectangles share any area (touching along edges or at corners is fine). Otherwise return `false`.",
+  "constraints": [
+    "1 <= rectangles.length <= 2 * 10^4",
+    "rectangles[i].length == 4",
+    "-10^5 <= x_i < a_i <= 10^5",
+    "-10^5 <= y_i < b_i <= 10^5"
+  ],
+  "signature": "boolean isRectangleCover(int[][] rectangles)",
+  "entry": "isRectangleCover",
+  "kind": "function",
+  "parameters": [
+    "rectangles"
+  ],
+  "validator": "function validate([rectangles]) {\n  if (!Array.isArray(rectangles) || rectangles.length < 1 || rectangles.length > 20000) return 'rectangles needs 1 to 20000 entries.';\n  for (const r of rectangles) {\n    if (!Array.isArray(r) || r.length !== 4 || !r.every(Number.isInteger)) return 'Each rectangle is [x, y, a, b] of integers.';\n    if (r.some(v => v < -100000 || v > 100000)) return 'Coordinates are between -10^5 and 10^5.';\n    if (r[0] >= r[2] || r[1] >= r[3]) return 'Each rectangle needs x < a and y < b.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isRectangleCover(rectangles) {\n  let minX = Infinity;\n  let minY = Infinity;\n  let maxX = -Infinity;\n  let maxY = -Infinity;\n  let area = 0;\n  const corners = new Set();\n\n  for (const [x, y, a, b] of rectangles) {\n    minX = Math.min(minX, x);\n    minY = Math.min(minY, y);\n    maxX = Math.max(maxX, a);\n    maxY = Math.max(maxY, b);\n    area += (a - x) * (b - y);\n    for (const corner of [`${x},${y}`, `${x},${b}`, `${a},${y}`, `${a},${b}`]) {\n      if (corners.has(corner)) {\n        corners.delete(corner);\n      } else {\n        corners.add(corner);\n      }\n    }\n  }\n\n  if (area !== (maxX - minX) * (maxY - minY)) {\n    return false;\n  }\n  if (corners.size !== 4) {\n    return false;\n  }\n  return corners.has(`${minX},${minY}`) && corners.has(`${minX},${maxY}`)\n    && corners.has(`${maxX},${minY}`) && corners.has(`${maxX},${maxY}`);\n}",
+  "brute": "function isRectangleCover(rectangles) {\n  // Cut the plane along every rectangle edge and count how often each small cell is covered.\n  const xs = [...new Set(rectangles.flatMap(r => [r[0], r[2]]))].sort((p, q) => p - q);\n  const ys = [...new Set(rectangles.flatMap(r => [r[1], r[3]]))].sort((p, q) => p - q);\n  const count = xs.map(() => ys.map(() => 0));\n  for (const [x, y, a, b] of rectangles) {\n    for (let i = xs.indexOf(x); xs[i] < a; i++) {\n      for (let j = ys.indexOf(y); ys[j] < b; j++) count[i][j]++;\n    }\n  }\n  for (let i = 0; i + 1 < xs.length; i++) {\n    for (let j = 0; j + 1 < ys.length; j++) if (count[i][j] !== 1) return false;\n  }\n  return true;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  const width = large ? int(30, 40) : int(1, 5);\n  const height = large ? int(30, 50) : int(1, 5);\n  const lines = count => {\n    const out = [large ? int(-100000, -50000) : int(-3, 2)];\n    for (let i = 0; i < count; i++) out.push(out[i] + (large ? int(1, 3000) : int(1, 2)));\n    return out;\n  };\n  const xs = lines(width), ys = lines(height);\n  // Tile a width x height grid of cells with random rectangles (pinwheels included).\n  const used = Array.from({ length: height }, () => new Array(width).fill(false));\n  let rects = [];\n  for (let r = 0; r < height; r++) {\n    for (let c = 0; c < width; c++) {\n      if (used[r][c]) continue;\n      let maxW = 0;\n      while (c + maxW < width && !used[r][c + maxW]) maxW++;\n      const w = int(1, Math.min(maxW, 3));\n      let maxH = 0;\n      while (r + maxH < height && used[r + maxH].slice(c, c + w).every(u => !u)) maxH++;\n      const h = int(1, Math.min(maxH, 3));\n      for (let i = r; i < r + h; i++) for (let j = c; j < c + w; j++) used[i][j] = true;\n      rects.push([xs[c], ys[r], xs[c + w], ys[r + h]]);\n    }\n  }\n  for (let i = rects.length - 1; i > 0; i--) {\n    const j = int(0, i);\n    [rects[i], rects[j]] = [rects[j], rects[i]];\n  }\n  // Half of the inputs stay perfect; the rest get one small defect.\n  if (rand() < 0.5) {\n    const mode = int(0, 3);\n    const pick = int(0, rects.length - 1);\n    if (mode === 0 && rects.length > 1) rects.splice(pick, 1);\n    else if (mode === 1 && rects.length < 2000) rects.push(rects[pick].slice());\n    else if (mode === 2) {\n      for (;;) {\n        const moved = rects[pick].slice();\n        moved[int(0, 3)] += rand() < 0.5 ? -1 : 1;\n        if (moved[0] < moved[2] && moved[1] < moved[3] && moved.every(v => v >= -100000 && v <= 100000)) { rects[pick] = moved; break; }\n      }\n    } else if (rects.length < 2000) {\n      const x = int(xs[0], xs[width] - 1), y = int(ys[0], ys[height] - 1);\n      rects.splice(pick, 0, [x, y, int(x + 1, xs[width]), int(y + 1, ys[height])]);\n    }\n  }\n  return [rects];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,1,3,3],[3,1,4,2],[3,2,4,4],[1,3,2,4],[2,3,3,4]]],"expected":true},
+    {"name":"Example 2","input":[[[1,1,2,3],[1,3,2,4],[3,1,4,2],[3,2,4,4]]],"expected":false},
+    {"name":"Example 3","input":[[[1,1,3,3],[3,1,4,2],[1,3,2,4],[2,2,4,4]]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0,1,1]]]},
+    {"name":"Test 2","input":[[[0,0,1,1],[0,0,1,1]]]},
+    {"name":"Test 3","input":[[[0,0,2,1],[2,0,3,2],[1,2,3,3],[0,1,1,3],[1,1,2,2]]]},
+    {"name":"Test 4","input":[[[0,0,1,1],[0,0,2,1],[1,0,2,1],[0,2,2,3]]]},
+    {"name":"Test 5","input":[[[0,0,3,1],[0,1,1,3],[1,1,3,2],[1,2,2,3],[1,2,2,3]]]},
+    {"name":"Test 6","input":[[[-100000,-100000,100000,100000]]]},
+    {"name":"Test 7","input":[[[-5,-5,0,5],[0,-5,5,5]]]},
+    {"name":"Test 8","input":[[[0,0,1,1],[1,0,2,1],[2,0,3,1],[3,0,4,1],[4,0,5,1],[5,0,6,1],[6,0,7,1],[7,0,8,1],[8,0,9,1],[9,0,10,1]]]},
+    {"name":"Test 9","input":[[[0,0,1,1],[1,0,2,1],[2,0,3,1],[3,0,4,1],[4,0,5,1],[6,0,7,1],[7,0,8,1],[8,0,9,1],[9,0,10,1]]]},
+    {"name":"Test 10","input":[[[0,1,3,2],[1,0,2,3]]]},
+    {"name":"Test 11","input":[[[-8,-15,-4,-13],[-4,-15,-2,-13],[-20,-15,-17,-12],[-20,-8,-17,-5],[-2,-2,5,1],[-17,-13,-15,-5],[-2,-15,1,-8],[-15,-2,-11,7],[-8,-13,-7,-8],[-7,-12,-4,-3],[-11,1,-7,7],[-8,-8,-7,-5],[-4,1,1,7],[-20,-12,-17,-8],[-20,-2,-15,7],[-20,-5,-11,-3],[-11,-2,-4,1],[-17,-15,-8,-13],[1,-15,5,-13],[1,1,5,7],[-7,1,-4,7],[-11,-5,-7,-2],[-4,-3,-2,1],[-4,-8,-2,-3],[-7,-3,-4,-2],[1,-13,5,-8],[-15,-13,-8,-5],[-20,-3,-11,-2],[-7,-13,-4,-12],[-2,-8,5,-2],[-4,-13,-2,-8]]]},
+    {"name":"Test 12","input":[[[-4,-9,-3,-6],[-20,-2,-17,3],[-8,6,-4,8],[-17,6,-8,8],[-2,-9,3,-6],[-18,-9,-14,-2],[-10,-13,-4,-12],[-20,-15,-18,-13],[-1,6,3,8],[-4,6,-2,8],[-20,-12,-18,-2],[-8,-15,-2,-13],[-2,-6,3,-2],[-14,-9,-10,-2],[-1,-15,3,-9],[-10,-12,-8,-6],[-17,-2,-10,6],[-4,-13,-2,-9],[-20,-13,-18,-12],[-8,-12,-4,-9],[-10,-6,-8,3],[-10,3,-2,6],[-2,3,-1,8],[-20,3,-17,8],[-1,-2,3,6],[-4,-6,-2,-2],[-8,-6,-4,-2],[-8,-9,-4,-6],[-2,-15,-1,-9],[-10,-15,-8,-13],[-18,-15,-10,-9],[-8,-2,-1,3]]]},
+    {"name":"Test 13","input":[[[99135,-99966,99211,-99940],[99068,-99966,99135,-99940],[99044,-100000,99058,-99940],[99036,-100000,99044,-99940],[99000,-100000,99036,-99966],[99000,-99966,99036,-99940],[99106,-99940,99211,-99893],[99065,-99870,99068,-99848],[99251,-100000,99261,-99940],[99106,-100000,99135,-99966],[99058,-100000,99068,-99940],[99065,-99893,99106,-99870],[99251,-99917,99261,-99848],[99068,-100000,99106,-99966],[99211,-99893,99251,-99870],[99036,-99893,99065,-99848],[99068,-99870,99135,-99848],[99000,-99940,99036,-99870],[99211,-99966,99251,-99917],[99135,-100000,99251,-99966],[99251,-99940,99261,-99917],[99135,-99870,99171,-99848],[99171,-99893,99211,-99848],[99000,-99870,99036,-99848],[99036,-99940,99065,-99893],[99211,-99917,99251,-99893],[99211,-99870,99251,-99848],[99106,-99893,99171,-99870],[99065,-99940,99106,-99893]]]},
+    {"name":"Test 14","input":[[[99135,-99966,99211,-99940],[99068,-99966,99135,-99940],[99044,-100000,99058,-99940],[99036,-100000,99044,-99940],[99000,-100000,99036,-99966],[99000,-99966,99036,-99940],[99106,-99940,99211,-99893],[99065,-99870,99068,-99848],[99251,-100000,99261,-99940],[99106,-100000,99135,-99966],[99058,-100000,99068,-99940],[99065,-99893,99106,-99870],[99251,-99917,99261,-99848],[99068,-100000,99106,-99966],[99211,-99893,99251,-99870],[99036,-99893,99065,-99848],[99068,-99870,99135,-99848],[99000,-99940,99036,-99870],[99211,-99966,99251,-99917],[99135,-100000,99251,-99966],[99251,-99940,99261,-99917],[99135,-99870,99171,-99848],[99171,-99893,99211,-99848],[99000,-99870,99036,-99848],[99036,-99940,99065,-99893],[99211,-99917,99251,-99893],[99211,-99870,99251,-99848],[99106,-99893,99171,-99870],[99065,-99940,99106,-99893],[99036,-100000,99044,-99940]]]}
+  ],
+  "notes": "## Intuition\n\nChecking every unit of area against every rectangle is far too slow for large coordinates. Two cheap facts describe a perfect tiling instead. First, the areas add up: the rectangles' total area equals the area of their bounding box. Second, look at corner points: at an interior meeting point, corners always come in pairs (two or four rectangles meet there), and only the four outer corners of the big rectangle belong to exactly one small rectangle. The area test alone is fooled when an overlap and a gap of the same size cancel; the corner test catches that.\n\n## Approach\n\n1. Track the bounding box `minX`, `minY`, `maxX`, `maxY` and the summed `area`.\n2. For each rectangle, toggle its four corners in the set `corners`: add a corner the first time, remove it the next, so the set keeps the points seen an odd number of times.\n3. If `area` differs from the bounding box area, return `false`.\n4. If anything other than exactly four points remains, return `false`.\n5. Return whether those four points are the bounding box's corners.\n\n## Example 1, step by step\n\nThe bounding box runs from `(1, 1)` to `(4, 4)`, area 9, and the areas are 4 + 1 + 2 + 1 + 1 = 9. Corner toggling: after `[1,1,3,3]` the set is {1,1; 1,3; 3,1; 3,3}. `[3,1,4,2]` removes 3,1 and adds 3,2; 4,1; 4,2. `[3,2,4,4]` removes 3,2 and 4,2, adds 3,4 and 4,4. `[1,3,2,4]` removes 1,3, adds 1,4; 2,3; 2,4. `[2,3,3,4]` removes 2,3; 2,4; 3,3; 3,4. Left: {1,1; 4,1; 4,4; 1,4}, exactly the box corners, so the answer is `true`.\n\n## Complexity\n\n- Time: O(n): each rectangle does constant work.\n- Space: O(n) for the corner set.\n\n## Pitfalls\n\n- The area test alone is not enough: one overlap can hide one gap of the same size.\n- Corner count 4 alone is not enough either; the four points must be the bounding box's corners.\n- Toggle (add or remove) instead of counting up, so points shared by 2 or 4 corners vanish.\n- Use a key like `\"x,y\"`; two numbers like `x * 1000 + y` can collide when coordinates are negative or large.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `minX`, `minY`, `maxX`, `maxY` | the bounding box of all rectangles |\n| `area` | sum of the rectangles' areas |\n| `corners` | corner points seen an odd number of times |\n| `x`, `y`, `a`, `b` | the current rectangle's lower-left and upper-right corners |",
+  "narration": {
+    "2": "Start the bounding box empty so the first rectangle sets it.",
+    "6": "area will hold the total area of all the rectangles.",
+    "7": "corners keeps the corner points seen an odd number of times.",
+    "9": "Read each rectangle's lower-left (x, y) and upper-right (a, b) corners.",
+    "10": "Grow the bounding box to include this rectangle.",
+    "14": "Add this rectangle's area to the total.",
+    "15": "Visit the rectangle's four corner points as \"x,y\" keys.",
+    "16": "Seen an odd number of times before?",
+    "17": "Then this occurrence pairs it up, so drop it.",
+    "19": "Otherwise it is now unpaired, so keep it.",
+    "24": "In a perfect tiling the areas add up to exactly the bounding box's area.",
+    "27": "Only the four outer corners may be left unpaired.",
+    "30": "Those four survivors must be exactly the bounding box's corners."
+  }
+}

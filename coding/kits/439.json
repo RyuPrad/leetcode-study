@@ -1,0 +1,60 @@
+{
+  "number": 439,
+  "title": "Ternary Expression Parser",
+  "spec": "recalled",
+  "statement": "`expression` is a conditional expression written with single characters only: the digits `0`–`9`, `T` (true), `F` (false), `?` and `:`. A piece of the form `c?x:y` has the value of `x` when the condition `c` is `T`, and the value of `y` when `c` is `F`. Either branch may itself be a conditional, and conditionals group from right to left, so `T?1:F?2:3` means `T?1:(F?2:3)` and `T?F?1:2:3` means `T?(F?1:2):3`.\n\nEvaluate the whole expression and return its value as a one-character string: a digit, `\"T\"` or `\"F\"`. The expression is always valid, every condition is `T` or `F`, and every number is a single digit.",
+  "constraints": [
+    "5 <= expression.length <= 10^4",
+    "expression contains only digits, 'T', 'F', '?' and ':'",
+    "expression is a valid conditional expression whose conditions are 'T' or 'F'",
+    "Every number in expression is a single digit"
+  ],
+  "signature": "String parseTernary(String expression)",
+  "entry": "parseTernary",
+  "kind": "function",
+  "parameters": [
+    "expression"
+  ],
+  "validator": "function validate([expression]) {\n  if (typeof expression !== 'string') return 'expression must be a string.';\n  if (expression.length < 5 || expression.length > 10000) return 'expression has 5 to 10^4 characters.';\n  let open = 0;\n  for (let i = 0; i < expression.length; i++) {\n    const ch = expression[i];\n    if (i % 2 === 0) {\n      if (!/[0-9TF]/.test(ch)) return 'Values (digits, T or F) and the symbols ? and : must alternate.';\n    } else if (ch === '?') {\n      if (expression[i - 1] !== 'T' && expression[i - 1] !== 'F') return 'Every condition before ? must be T or F.';\n      open++;\n    } else if (ch === ':') {\n      if (--open < 0) return 'Every : needs a matching ? before it.';\n    } else return 'Values (digits, T or F) and the symbols ? and : must alternate.';\n  }\n  if (expression.length % 2 === 0 || open !== 0) return 'Every ? needs a matching :.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function parseTernary(expression) {\n  const stack = [];\n  for (let i = expression.length - 1; i >= 0; i--) {\n    const ch = expression[i];\n    if (ch === ':') {\n      continue;\n    }\n    if (ch === '?') {\n      const onTrue = stack.pop();\n      const onFalse = stack.pop();\n      i--;\n      stack.push(expression[i] === 'T' ? onTrue : onFalse);\n    } else {\n      stack.push(ch);\n    }\n  }\n  return stack.pop();\n}",
+  "brute": "function parseTernary(expression) {\n  // Repeatedly collapse the rightmost \"c?x:y\": after the last '?' both branches are single values.\n  let s = expression;\n  while (s.length > 1) {\n    const q = s.lastIndexOf('?');\n    const value = s[q - 1] === 'T' ? s[q + 1] : s[q + 3];\n    s = s.slice(0, q - 1) + value + s.slice(q + 4);\n  }\n  return s;\n}",
+  "generator": "function generate(rand, size) {\n  const values = '0123456789TF';\n  const pick = text => text[Math.floor(rand() * text.length)];\n  const ops = size === 'large' ? 1500 + Math.floor(rand() * 1000) : 1 + Math.floor(rand() * 5);\n  const shape = Math.floor(rand() * 3);\n  // Build a tree with the requested number of conditionals; the shape decides where nested ones go.\n  const build = count => {\n    if (count === 0) return pick(values);\n    let inTrue;\n    if (shape === 0) inTrue = Math.floor(rand() * count);\n    else if (shape === 1) inTrue = rand() < 0.8 ? 0 : Math.floor(rand() * count);\n    else inTrue = rand() < 0.8 ? count - 1 : Math.floor(rand() * count);\n    return pick('TF') + '?' + build(inTrue) + ':' + build(count - 1 - inTrue);\n  };\n  return [build(ops)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["T?2:3"],"expected":"2"},
+    {"name":"Example 2","input":["F?1:T?4:5"],"expected":"4"},
+    {"name":"Example 3","input":["T?T?F:5:3"],"expected":"F"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["F?1:2"]},
+    {"name":"Test 2","input":["T?T:F"]},
+    {"name":"Test 3","input":["F?T?1:2:F?3:4"]},
+    {"name":"Test 4","input":["T?F?1:2:3"]},
+    {"name":"Test 5","input":["T?T?T?T?T?7:1:2:3:4:5"]},
+    {"name":"Test 6","input":["F?1:F?2:F?3:F?4:9"]},
+    {"name":"Test 7","input":["F?T?F?1:2:3:T?F?4:0:6"]},
+    {"name":"Test 8","input":["T?F?T:T:F?F:T"]},
+    {"name":"Test 9","generate":{"seed":43909,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":43910,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":43911,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBecause conditionals group from right to left, the innermost decisions sit furthest right. A brute force can keep collapsing the rightmost `c?x:y` into one character until a single value remains, but each collapse rebuilds the string, which is O(n²). Reading the expression from right to left with a stack does the same collapsing in one pass: by the time we reach a `?`, both of its branches have already been reduced to single values sitting on top of the stack.\n\n## Approach\n\n1. Walk `expression` from the last character to the first, keeping a `stack` of finished values.\n2. Skip every `:`; it only separates the two branches.\n3. Push any digit, `T` or `F` that is not a condition.\n4. On a `?`, pop `onTrue` (the branch nearest the `?`) and then `onFalse`, step `i` back to the condition, and push the branch the condition selects.\n5. When the scan ends, the single value left on the stack is the answer.\n\n## Example 1, step by step\n\n`expression = \"T?2:3\"`. Reading from the right: `3` is pushed (`stack = [3]`), `:` is skipped, `2` is pushed (`stack = [3, 2]`). At `?`, `onTrue = 2` and `onFalse = 3`; the condition at index 0 is `T`, so `2` is pushed and the loop ends. The answer is `\"2\"`.\n\n## Complexity\n\n- Time: O(n): each character is looked at once and each stack operation is O(1).\n- Space: O(n): the stack can hold about half of the characters when many values wait for their `?`.\n\n## Pitfalls\n\n- Scanning left to right with a stack mixes up grouping; the right-to-left order is what makes every `?` find finished branches.\n- Pop the true branch first: it is the value closest to the `?`, so it is on top.\n- After using a condition, skip it (`i--`) so it is not pushed as a value.\n- Return the character as a string; `T` and `F` can be results too, not only digits.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stack` | values whose conditional has not been decided yet |\n| `i` | index being read, moving from right to left |\n| `ch` | the character at `i` |\n| `onTrue`, `onFalse` | the two finished branches of the current `?` |",
+  "narration": {
+    "2": "The stack holds values that are waiting for the ? that will choose between them.",
+    "3": "Read the expression from right to left, so the innermost conditionals are finished first.",
+    "5": "A colon only separates two branches...",
+    "6": "...so there is nothing to do for it.",
+    "8": "A ? means both of its branches are already single values on the stack.",
+    "9": "The branch nearest the ? is the true branch, and it is on top.",
+    "10": "The value under it is the false branch.",
+    "11": "Step back to the condition character just before the ?.",
+    "12": "Keep only the branch the condition chooses; it now stands for this whole conditional.",
+    "14": "A digit, T or F that is not a condition is pushed as a finished value.",
+    "17": "After the scan exactly one value remains: the value of the whole expression."
+  }
+}

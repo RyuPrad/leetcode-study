@@ -1,0 +1,59 @@
+{
+  "number": 331,
+  "title": "Verify Preorder Serialization of a Binary Tree",
+  "spec": "leetcode",
+  "statement": "A binary tree can be written as text by visiting it in preorder (node, then its left subtree, then its right subtree): each real node is written as its integer value, and each missing child is written as `#`. The items are joined with commas, so an empty tree is just `\"#\"`.\n\nYou get such a comma-separated string `preorder`. Return `true` if it is exactly the preorder text of some binary tree, and `false` otherwise. Every item is either a non-negative integer or `#`, and the format itself is always well formed (for example, there are never two commas in a row). Try to decide without building the tree.",
+  "constraints": [
+    "1 <= preorder.length <= 10^4",
+    "preorder holds integers from 0 to 100 and '#', separated by commas"
+  ],
+  "signature": "boolean isValidSerialization(String preorder)",
+  "entry": "isValidSerialization",
+  "kind": "function",
+  "parameters": [
+    "preorder"
+  ],
+  "validator": "function validate([preorder]) {\n  if (typeof preorder !== 'string' || preorder.length < 1 || preorder.length > 10000) return 'preorder needs 1 to 10000 characters.';\n  for (const item of preorder.split(',')) {\n    if (!/^(#|0|[1-9]\\d?|100)$/.test(item)) return 'Each comma-separated item must be # or a whole number from 0 to 100.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isValidSerialization(preorder) {\n  const tokens = preorder.split(',');\n  let slots = 1;\n\n  for (const token of tokens) {\n    if (slots === 0) {\n      return false;\n    }\n    slots--;\n    if (token !== '#') {\n      slots += 2;\n    }\n  }\n  return slots === 0;\n}",
+  "brute": "function isValidSerialization(preorder) {\n  // Repeatedly collapse a finished subtree \"value,#,#\" into a single \"#\".\n  const stack = [];\n  for (const token of preorder.split(',')) {\n    stack.push(token);\n    while (stack.length >= 3 && stack[stack.length - 1] === '#' && stack[stack.length - 2] === '#' && stack[stack.length - 3] !== '#') {\n      stack.splice(stack.length - 3, 3, '#');\n    }\n  }\n  return stack.length === 1 && stack[0] === '#';\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const value = () => String(rand() < 0.1 ? (rand() < 0.5 ? 0 : 100) : pick(101));\n  const token = () => (rand() < 0.5 ? '#' : value());\n  let tokens = [];\n  if (size === 'small' && rand() < 0.15) {\n    const length = 1 + pick(6);\n    for (let i = 0; i < length; i++) tokens.push(token());\n    return [tokens.join(',')];\n  }\n  // A valid serialization: a number opens two slots, '#' closes one, and it ends when no slot is open.\n  let remaining = size === 'large' ? 1200 + pick(400) : pick(7);\n  const chance = 0.3 + rand() * 0.6;\n  let slots = 1;\n  while (slots > 0) {\n    if (remaining > 0 && (slots === 1 || rand() < chance)) {\n      tokens.push(value());\n      slots++;\n      remaining--;\n    } else {\n      tokens.push('#');\n      slots--;\n    }\n  }\n  const r = rand();\n  if (r < 0.45) {\n    // keep it valid\n  } else if (r < 0.55) {\n    tokens.push(token());\n  } else if (r < 0.65 && tokens.length > 1) {\n    tokens.pop();\n  } else if (r < 0.75 && tokens.length > 1) {\n    tokens.splice(pick(tokens.length), 1);\n  } else if (r < 0.85) {\n    tokens.splice(pick(tokens.length + 1), 0, token());\n  } else {\n    const i = pick(tokens.length);\n    tokens[i] = tokens[i] === '#' ? value() : '#';\n  }\n  return [tokens.join(',')];\n}",
+  "examples": [
+    {"name":"Example 1","input":["9,3,4,#,#,1,#,#,2,#,6,#,#"],"expected":true},
+    {"name":"Example 2","input":["1,#"],"expected":false},
+    {"name":"Example 3","input":["9,#,#,1"],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["#"]},
+    {"name":"Test 2","input":["#,#"]},
+    {"name":"Test 3","input":["1"]},
+    {"name":"Test 4","input":["1,#,#"]},
+    {"name":"Test 5","input":["#,1,#,#"]},
+    {"name":"Test 6","input":["9,#,92,#,#"]},
+    {"name":"Test 7","input":["1,#,#,#,#"]},
+    {"name":"Test 8","input":["7,2,#,2,#,#,#,6,#"]},
+    {"name":"Test 9","input":["9,3,4,#,#,1,#,#,#,2,#,6,#,#"]},
+    {"name":"Test 10","input":["100,0,#,#,100,#,#"]},
+    {"name":"Test 11","generate":{"seed":33111,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":33112,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":33113,"size":"large"}},
+    {"name":"Test 14","input":["1,#,#,1,#"]}
+  ],
+  "notes": "## Intuition\n\nThink of each serialization item as filling one empty position (a *slot*) where a node must go. At the start there is exactly one slot, for the root. A `#` fills a slot and opens nothing. A number fills a slot but opens two new ones for its children. The text describes a tree exactly when the slots never run out early and none are left at the end. Simulating this count needs no tree and no stack. (The stack version, used as the brute force, repeatedly collapses a finished subtree `x,#,#` into a single `#` and checks that one `#` remains.)\n\n## Approach\n\n1. Split `preorder` on commas into `tokens`. Start with `slots = 1`.\n2. For each `token`: if `slots` is already 0, the tree was complete before this item, so return `false`.\n3. Use one slot: `slots--`.\n4. If the token is a number, it brings two child slots: `slots += 2`.\n5. After the last token, return whether `slots` is exactly 0.\n\n## Example 1, step by step\n\nFor `\"9,3,4,#,#,1,#,#,2,#,6,#,#\"`, `slots` starts at 1. `9`, `3`, `4` each add one net slot: 2, 3, 4. `#`, `#` bring it to 2. `1` makes 3, then `#`, `#` make 1. `2` makes 2, `#` makes 1, `6` makes 2, and the final `#`, `#` make 0. Slots never ran out early and end at 0, so the answer is `true`.\n\n## Complexity\n\n- Time: O(n): one pass over the items.\n- Space: O(n) for the split list; scanning the characters directly would make it O(1).\n\n## Pitfalls\n\n- Check for `slots === 0` *before* using a slot, not only at the end: `\"1,#,#,1,#\"` finishes with 0 slots, yet the tree was already complete after the third item.\n- A lone `\"#\"` is valid (the empty tree), but a lone number like `\"1\"` is not: its two children are missing.\n- Values can have two or three digits, so work with the comma-separated items, not single characters.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `tokens` | the comma-separated items |\n| `slots` | positions still waiting for a node or `#` |\n| `token` | the item being read |",
+  "narration": {
+    "2": "Split the text into its items: numbers and # markers.",
+    "3": "Before reading anything, one slot is open: the place for the root.",
+    "5": "Read the items in preorder.",
+    "6": "If no slot is open, the tree was already complete.",
+    "7": "This item has nowhere to go, so the text is not a valid serialization.",
+    "9": "The item fills one open slot.",
+    "10": "Is it a real node rather than a missing child?",
+    "11": "A real node opens two slots for its left and right children.",
+    "14": "Valid exactly when every slot was filled and none is left over."
+  }
+}

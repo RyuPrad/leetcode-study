@@ -1,0 +1,74 @@
+{
+  "number": 346,
+  "title": "Moving Average from Data Stream",
+  "spec": "recalled",
+  "statement": "Integers arrive one at a time. Build a class `MovingAverage` that reports the mean of the most recent values, using a sliding window of fixed width.\n\n- `MovingAverage(size)` creates the object with window width `size`.\n- `next(val)` records `val` as the newest value and returns the average of the latest `size` values recorded so far. While fewer than `size` values have been recorded, it averages all of them.\n\nThe result is a floating-point number; answers within `10^-5` of the exact average are accepted.",
+  "constraints": [
+    "1 <= size <= 1000",
+    "-10^5 <= val <= 10^5",
+    "At most 10^4 calls are made to next"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "MovingAverage",
+    "constructor": "MovingAverage(int size)",
+    "methods": [
+      "double next(int val)"
+    ]
+  },
+  "entry": "MovingAverage",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "size"
+    ],
+    "next": [
+      "val"
+    ]
+  },
+  "compare": "float",
+  "validator": "function validate([operations, args]) {\n  if (operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'MovingAverage' || args[0].length !== 1) return 'Start with MovingAverage and the window size.';\n  const size = args[0][0];\n  if (!Number.isInteger(size) || size < 1 || size > 1000) return 'size is a whole number from 1 to 1000.';\n  if (operations.length - 1 > 10000) return 'At most 10^4 calls to next.';\n  for (let i = 1; i < operations.length; i++) {\n    if (operations[i] !== 'next') return 'Only next can follow the constructor.';\n    if (args[i].length !== 1) return 'next takes one value.';\n    const val = args[i][0];\n    if (!Number.isInteger(val) || val < -100000 || val > 100000) return 'Each value is a whole number from -10^5 to 10^5.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class MovingAverage {\n  constructor(size) {\n    this.size = size;\n    this.window = new Array(size).fill(0);\n    this.count = 0;\n    this.sum = 0;\n  }\n\n  next(val) {\n    const slot = this.count % this.size;\n    this.sum -= this.window[slot];\n    this.window[slot] = val;\n    this.sum += val;\n    this.count++;\n    const length = Math.min(this.count, this.size);\n    return this.sum / length;\n  }\n}",
+  "brute": "class MovingAverage {\n  constructor(size) {\n    // Keep the whole stream and re-add the last few values on every call.\n    this.size = size;\n    this.values = [];\n  }\n  next(val) {\n    this.values.push(val);\n    const recent = this.values.slice(-this.size);\n    let total = 0;\n    for (const v of recent) total += v;\n    return total / recent.length;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const width = large ? (rand() < 0.2 ? 1000 : 1 + pick(400)) : 1 + pick(5);\n  const span = large || rand() < 0.5 ? 100000 : 10;\n  const calls = large ? 499 : 1 + pick(12);\n  const operations = ['MovingAverage'];\n  const args = [[width]];\n  for (let i = 0; i < calls; i++) {\n    operations.push('next');\n    args.push([pick(2 * span + 1) - span]);\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["MovingAverage","next","next","next","next"],[[3],[1],[10],[3],[5]]],"expected":[null,1,5.5,4.66667,6]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["MovingAverage","next"],[[1],[-100000]]]},
+    {"name":"Test 2","input":[["MovingAverage","next","next","next","next"],[[1],[4],[-7],[0],[9]]]},
+    {"name":"Test 3","input":[["MovingAverage","next","next","next"],[[1000],[1],[2],[4]]]},
+    {"name":"Test 4","input":[["MovingAverage","next","next","next","next","next"],[[2],[5],[5],[5],[5],[5]]]},
+    {"name":"Test 5","input":[["MovingAverage","next","next","next","next","next","next"],[[3],[-1],[-2],[-3],[-4],[-5],[-6]]]},
+    {"name":"Test 6","input":[["MovingAverage","next","next","next","next"],[[2],[100000],[-100000],[100000],[100000]]]},
+    {"name":"Test 7","input":[["MovingAverage","next","next","next","next","next","next","next"],[[4],[3],[0],[0],[0],[0],[7],[1]]]},
+    {"name":"Test 8","input":[["MovingAverage","next","next","next"],[[3],[1],[2],[2]]]},
+    {"name":"Test 9","input":[["MovingAverage","next","next","next","next","next","next"],[[5],[10],[-10],[10],[-10],[10],[-10]]]},
+    {"name":"Test 10","generate":{"seed":34610,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":34611,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA direct version keeps every value and, on each call, adds up the last `size` of them: O(size) work per call. But consecutive windows share all but one value. When a new value arrives and the window is full, exactly one value, the oldest, falls out. Keeping a running `sum` and adjusting it by the value coming in and the value going out makes each call O(1).\n\nThe values in the window behave like a queue (first in, first out). A fixed array of length `size` used as a circular buffer is that queue: the newest value overwrites the slot of the value that is leaving.\n\n## Approach\n\n1. The constructor creates `window`, an array of `size` zeros, with `count = 0` and `sum = 0`.\n2. In `next(val)`, the slot to write is `count % size`. Whatever sits there is the oldest value in a full window (or a harmless 0 before the window fills), so subtract it from `sum`.\n3. Store `val` in that slot, add it to `sum`, and increase `count`.\n4. The window currently holds `min(count, size)` values; return `sum` divided by that.\n\n## Example 1, step by step\n\n`size = 3`, so `window = [0, 0, 0]`.\n\n- `next(1)`: slot 0, `sum = 1`, one value: returns `1`.\n- `next(10)`: slot 1, `sum = 11`, two values: `5.5`.\n- `next(3)`: slot 2, `sum = 14`, three values: `4.66667`.\n- `next(5)`: slot 0 holds `1`, the oldest value; `sum = 14 - 1 + 5 = 18`, three values: `6`.\n\n## Complexity\n\n- Time: O(1) per `next` call, O(size) once for the constructor.\n- Space: O(size) for the buffer.\n\n## Pitfalls\n\n- Divide by the number of values actually in the window, `min(count, size)`, not always by `size`.\n- Subtract the value leaving the window before overwriting its slot, or it is lost.\n- Return a real division; do not round or truncate the average.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `size` | the window width |\n| `window` | circular buffer holding the latest values |\n| `count` | how many values have arrived in total |\n| `sum` | sum of the values currently in the window |\n| `slot` | buffer position the new value goes into |\n| `length` | how many values the window holds right now |",
+  "narration": {
+    "3": "Remember how many values the window may hold.",
+    "4": "A fixed buffer of size slots acts as the queue; zeros make the first subtractions harmless.",
+    "5": "No values have arrived yet...",
+    "6": "...so the running sum starts at zero.",
+    "10": "The slots are reused in a cycle, so the new value lands on the oldest one.",
+    "11": "Take the value that leaves the window out of the running sum.",
+    "12": "Write the new value into its slot.",
+    "13": "Add the new value to the running sum.",
+    "14": "One more value has arrived.",
+    "15": "Before the buffer fills, only count values are in the window.",
+    "16": "The average is the running sum over the window's current length."
+  }
+}

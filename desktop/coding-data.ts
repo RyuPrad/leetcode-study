@@ -1,4 +1,4 @@
-import { CODE_LIMIT, INPUT_LIMIT, isLanguage, languages, verdicts } from '../shared/coding';
+import { CODE_LIMIT, INPUT_LIMIT, isLanguage, allLanguages, verdicts } from '../shared/coding';
 import type { CodeDraft, JudgeResult } from '../shared/coding';
 const object = (v: any) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const date = (v: any) => typeof v === 'string' && Number.isFinite(Date.parse(v));
@@ -11,7 +11,7 @@ export function validateDraft(v: any): CodeDraft {
     return {language:'javascript',sources:{javascript:v.source},cases:v.cases,updatedAt:v.updatedAt};
   }
   if (!isLanguage(v.language) || !object(v.sources) || Object.entries(v.sources).some(([k,source])=>!isLanguage(k) || typeof source !== 'string' || source.length > CODE_LIMIT)) throw new Error('Invalid code draft. Source and custom cases are limited to 256 KiB each.');
-  return {language:v.language,sources:Object.fromEntries(languages.filter(k=>typeof v.sources[k]==='string').map(k=>[k,v.sources[k]])),cases:v.cases,updatedAt:v.updatedAt};
+  return {language:v.language,sources:Object.fromEntries(allLanguages.filter(k=>typeof v.sources[k]==='string').map(k=>[k,v.sources[k]])),cases:v.cases,updatedAt:v.updatedAt};
 }
 export function validateResult(v: any): JudgeResult {
   if (!object(v) || !verdicts.includes(v.verdict) || !Number.isInteger(v.total) || v.total < 1 || v.total > 100 || !Number.isInteger(v.passed) || v.passed < 0 || v.passed > v.total || !duration(v.durationMs) || !Array.isArray(v.cases) || v.cases.length > v.total || JSON.stringify(v).length > 4*1024*1024) throw new Error('Invalid submission result.');

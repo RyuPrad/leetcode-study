@@ -1,0 +1,62 @@
+{
+  "number": 440,
+  "title": "K-th Smallest in Lexicographical Order",
+  "spec": "leetcode",
+  "statement": "Take every integer from `1` to `n` inclusive, write each one in decimal, and sort the resulting strings in dictionary order, so that `10` lands before `2` and `1` lands before `10`. Return the integer found at the `k`-th place of that sorted order, counting places from 1.",
+  "constraints": [
+    "1 <= k <= n <= 10^9"
+  ],
+  "signature": "int findKthNumber(int n, int k)",
+  "entry": "findKthNumber",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "k"
+  ],
+  "validator": "function validate([n, k]) {\n  if (!Number.isInteger(n) || !Number.isInteger(k)) return 'n and k must be whole numbers.';\n  if (n < 1 || n > 1e9) return 'n is between 1 and 10^9.';\n  if (k < 1 || k > n) return 'k is between 1 and n.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findKthNumber(n, k) {\n  let current = 1;\n  k -= 1;\n  while (k > 0) {\n    let count = 0;\n    let first = current;\n    let last = current;\n    while (first <= n) {\n      count += Math.min(n, last) - first + 1;\n      first *= 10;\n      last = last * 10 + 9;\n    }\n    if (count <= k) {\n      k -= count;\n      current += 1;\n    } else {\n      k -= 1;\n      current *= 10;\n    }\n  }\n  return current;\n}",
+  "brute": "function findKthNumber(n, k) {\n  if (n <= 20000) {\n    // Small enough to list every number as text and sort it.\n    const words = [];\n    for (let i = 1; i <= n; i++) words.push(String(i));\n    words.sort();\n    return Number(words[k - 1]);\n  }\n  // Otherwise pick the answer one digit at a time, counting the values in [1, n] that start with each prefix.\n  const top = String(n);\n  const withPrefix = prefix => {\n    let total = 0;\n    for (let length = prefix.length; length <= top.length; length++) {\n      const free = 10 ** (length - prefix.length);\n      if (length < top.length) total += free;\n      else {\n        const head = top.slice(0, prefix.length);\n        if (prefix < head) total += free;\n        else if (prefix === head) total += Number(top.slice(prefix.length) || '0') + 1;\n      }\n    }\n    return total;\n  };\n  let prefix = '';\n  let remaining = k;\n  for (;;) {\n    for (let d = prefix ? 0 : 1; d <= 9; d++) {\n      const size = withPrefix(prefix + d);\n      if (remaining <= size) { prefix += d; remaining -= 1; break; }\n      remaining -= size;\n    }\n    if (remaining === 0) return Number(prefix);\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pickK = n => 1 + Math.floor(rand() * n);\n  if (size === 'large') {\n    const n = 1 + Math.floor(rand() * 1e9);\n    return [n, pickK(n)];\n  }\n  const pick = rand();\n  let n;\n  if (pick < 0.3) n = 1 + Math.floor(rand() * 30);\n  else if (pick < 0.55) {\n    // Near a power of ten, where a new level of the tree opens up.\n    const power = 10 ** (1 + Math.floor(rand() * 4));\n    n = Math.max(1, power + Math.floor(rand() * 7) - 3);\n  } else if (pick < 0.85) n = 1 + Math.floor(rand() * 2000);\n  else n = 1 + Math.floor(rand() * 1e9);\n  const r = rand();\n  const k = r < 0.1 ? 1 : r < 0.2 ? n : pickK(n);\n  return [n, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[13,2],"expected":10},
+    {"name":"Example 2","input":[1,1],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[9,9]},
+    {"name":"Test 2","input":[10,10]},
+    {"name":"Test 3","input":[13,6]},
+    {"name":"Test 4","input":[100,3]},
+    {"name":"Test 5","input":[100,100]},
+    {"name":"Test 6","input":[1000000000,1]},
+    {"name":"Test 7","input":[1000000000,2]},
+    {"name":"Test 8","input":[1000000000,1000000000]},
+    {"name":"Test 9","input":[681692778,351251360]},
+    {"name":"Test 10","input":[1000000000,123456789]},
+    {"name":"Test 11","input":[200,120]},
+    {"name":"Test 12","input":[19,11]},
+    {"name":"Test 13","input":[999999999,500000000]}
+  ],
+  "notes": "## Intuition\n\nListing the numbers as strings and sorting them works for small `n`, but `n` can reach 10^9. Picture the numbers instead as a trie of digits: `1` has children `10`–`19`, `10` has children `100`–`109`, and so on. A preorder walk of this tree visits the numbers in exactly dictionary order. We never build the tree; we only need to know how many numbers in `[1, n]` sit under a given node, so that whole subtrees can be skipped at once.\n\n## Approach\n\n1. Start at `current = 1`, the first number in the order, and decrease `k` by one because that number is already used.\n2. While `k > 0`, count the numbers in `current`'s subtree: level by level, the subtree covers `first`..`last` (starting at `current`..`current`, then multiplying `first` by 10 and setting `last` to `last * 10 + 9`), clipped to `n`.\n3. If that `count` is at most `k`, the answer is not inside: skip the whole subtree (`k -= count`) and move to the next sibling (`current += 1`).\n4. Otherwise the answer is inside: step down to the first child (`current *= 10`), which uses up one place (`k -= 1`).\n5. When `k` reaches 0, `current` is the answer.\n\n## Example 1, step by step\n\n`n = 13`, `k = 2`. Start with `current = 1` and `k = 1`. The subtree of `1` holds `1` (level `1..1`) plus `10..13` (level `10..19` clipped to 13), so `count = 5`. Since `5 > 1`, step down: `current = 10`, `k = 0`. The loop stops and the answer is `10`.\n\n## Complexity\n\n- Time: O(log² n): there are about log₁₀ n levels, each with at most 10 sibling moves, and each count walks O(log n) levels.\n- Space: O(1): only a few numbers are kept.\n\n## Pitfalls\n\n- Subtract one from `k` before the loop, and again when stepping down; the node itself takes a place.\n- Clip each level with `Math.min(n, last)`, and stop when `first > n`, not when `last > n`.\n- In Java or C, `first` and `last` grow past 32 bits when `n` is near 10^9; use 64-bit integers for them and for `count`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `current` | the node (number) the walk is standing on |\n| `k` | how many more places to move in the order |\n| `count` | how many numbers in `[1, n]` lie in `current`'s subtree |\n| `first`, `last` | the smallest and largest numbers of the subtree at one level |",
+  "narration": {
+    "2": "The dictionary order starts at 1, the leftmost node of the digit trie.",
+    "3": "Standing on 1 already uses up the first place.",
+    "4": "Keep moving until no places are left to move.",
+    "5": "Count how many numbers in [1, n] sit in the subtree of current.",
+    "8": "Go down level by level while that level still has numbers not above n.",
+    "9": "This level spans first..last; clip it at n and add its size.",
+    "10": "The next level starts at first followed by a 0...",
+    "11": "...and ends at last followed by a 9.",
+    "13": "If the whole subtree fits within the remaining places, the answer is not in it.",
+    "14": "Skip every number of the subtree at once.",
+    "15": "Move to the next sibling, the number one larger.",
+    "17": "Otherwise the answer is inside; stepping onto the first child uses one place.",
+    "18": "Move down to the first child by appending a 0.",
+    "21": "No places are left, so current is the k-th number."
+  }
+}

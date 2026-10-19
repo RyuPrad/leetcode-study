@@ -1,0 +1,62 @@
+{
+  "number": 254,
+  "title": "Factor Combinations",
+  "spec": "recalled",
+  "statement": "Given an integer `n`, find every way to write it as a product of **two or more** integers, where each factor lies between `2` and `n - 1` inclusive. Two ways count as the same when they use the same factors the same number of times, whatever their order, so each way must appear exactly once. Return all of them as a list of lists; the order of the lists, and of the factors inside each list, does not matter. When `n` has no such factorization (for example when `n` is `1` or a prime), return an empty list.",
+  "constraints": [
+    "1 <= n <= 10^7"
+  ],
+  "signature": "List<List<Integer>> getFactors(int n)",
+  "entry": "getFactors",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "compare": "unordered-nested",
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 10000000) return 'n is an integer from 1 to 10^7.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function getFactors(n) {\n  const result = [];\n  const path = [];\n\n  function backtrack(remaining, start) {\n    for (let factor = start; factor * factor <= remaining; factor++) {\n      if (remaining % factor !== 0) {\n        continue;\n      }\n      path.push(factor);\n      result.push([...path, remaining / factor]);\n      backtrack(remaining / factor, factor);\n      path.pop();\n    }\n  }\n\n  backtrack(n, 2);\n  return result;\n}",
+  "brute": "function getFactors(n) {\n  // Build every sorted factorization of each divisor d of n from the smaller divisors, removing repeats with a map.\n  const divisors = [];\n  for (let d = 1; d * d <= n; d++) {\n    if (n % d === 0) {\n      divisors.push(d);\n      if (d * d !== n) divisors.push(n / d);\n    }\n  }\n  divisors.sort((a, b) => a - b);\n  const ways = new Map();\n  for (const d of divisors) {\n    if (d === 1) continue;\n    const unique = new Map([[String(d), [d]]]);\n    for (const f of divisors) {\n      if (f < 2 || f >= d || d % f !== 0) continue;\n      for (const rest of ways.get(d / f)) {\n        const combo = [f, ...rest].sort((a, b) => a - b);\n        unique.set(combo.join(','), combo);\n      }\n    }\n    ways.set(d, [...unique.values()]);\n  }\n  return n === 1 ? [] : ways.get(n).filter(combo => combo.length > 1);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  if (size === 'large') {\n    // Mostly random values near the limit, sometimes a product of small primes with many factorizations.\n    if (rand() < 0.5) return [9000000 + pick(1000001)];\n    // The output must stay small, so products with too many factorizations are drawn again.\n    const count = (remaining, start) => { let c = 0; for (let f = start; f * f <= remaining; f++) if (remaining % f === 0) c += 1 + count(remaining / f, f); return c; };\n    const primes = [2, 2, 2, 3, 3, 5, 7, 11, 13];\n    for (;;) {\n      let n = 1;\n      for (let p = primes[pick(primes.length)]; n * p <= 10000000; p = primes[pick(primes.length)]) n *= p;\n      if (count(n, 2) <= 5000) return [n];\n    }\n  }\n  const roll = rand();\n  if (roll < 0.15) return [1 + pick(3)];\n  if (roll < 0.35) return [2 ** pick(11)];\n  if (roll < 0.6) {\n    let n = 1;\n    const factors = 1 + pick(5);\n    for (let i = 0; i < factors; i++) n *= [2, 3, 5, 7][pick(4)];\n    return [n];\n  }\n  return [1 + pick(1000)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1],"expected":[]},
+    {"name":"Example 2","input":[12],"expected":[[2,6],[3,4],[2,2,3]]},
+    {"name":"Example 3","input":[37],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2]},
+    {"name":"Test 2","input":[4]},
+    {"name":"Test 3","input":[8]},
+    {"name":"Test 4","input":[36]},
+    {"name":"Test 5","input":[60]},
+    {"name":"Test 6","input":[625]},
+    {"name":"Test 7","input":[1024]},
+    {"name":"Test 8","input":[77]},
+    {"name":"Test 9","input":[5040]},
+    {"name":"Test 10","input":[999983]},
+    {"name":"Test 11","input":[1000000]},
+    {"name":"Test 12","input":[9999999]},
+    {"name":"Test 13","input":[8388608]},
+    {"name":"Test 14","input":[9699690]}
+  ],
+  "notes": "## Intuition\n\nDuplicates are the real difficulty: `2 × 6` and `6 × 2` are the same combination. Agreeing to write every combination with its factors in non-decreasing order gives each combination exactly one spelling, so a search that only ever picks a factor at least as large as the previous one can never produce a repeat.\n\nWhen the remaining value is `remaining` and the next factor is `factor`, the last factor of the combination is `remaining / factor`. Keeping the order non-decreasing means `factor <= remaining / factor`, so candidates only need to go up to the square root of `remaining`.\n\nA slower route builds the factorizations of every divisor of `n` from smaller divisors and removes repeats by sorting each one, which is how the brute force checks the answers.\n\n## Approach\n\n1. Keep the factors chosen so far in `path` and the finished combinations in `result`.\n2. `backtrack(remaining, start)` tries each `factor` from `start` while `factor * factor <= remaining`.\n3. Skip values that do not divide `remaining`.\n4. Otherwise push `factor`, record `path` plus `remaining / factor` as a finished combination, then recurse on `remaining / factor` with `start = factor` to split that last part further.\n5. Pop `factor` and try the next candidate. Start with `backtrack(n, 2)`.\n\n## Example 1, step by step\n\n`n = 1`: the first candidate is `factor = 2`, and `2 * 2 <= 1` is false, so the loop never runs and the answer is `[]`.\n\nFor Example 2, `n = 12`: `factor = 2` records `[2, 6]`, and the call on `6` records `[2, 2, 3]`. Back at the top, `factor = 3` records `[3, 4]`; the call on `4` starts at `3` and finds nothing. `factor = 4` fails `16 <= 12`, so the search ends with three combinations.\n\n## Complexity\n\n- Time: one call per combination found, each scanning candidates up to the square root of its `remaining`, so roughly O(C · √n) for C combinations.\n- Space: O(log n) for `path` and the recursion, since every factor is at least 2, plus the output.\n\n## Pitfalls\n\n- Starting each level at `2` instead of the previous factor produces the same combination in several orders.\n- Letting `factor` run all the way to `remaining` records a last factor of 1, or one smaller than `factor` (a repeat in another order); stopping at the square root avoids both.\n- `n` by itself is not a valid combination: every recorded list has at least two factors.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `result` | every finished combination |\n| `path` | factors chosen so far, in non-decreasing order |\n| `remaining` | the part of `n` still to be factored |\n| `start` | smallest factor allowed next (the previous factor) |\n| `factor` | the candidate being tried |",
+  "narration": {
+    "2": "result collects every finished combination.",
+    "3": "path holds the factors chosen so far, smallest first.",
+    "5": "backtrack splits remaining using factors no smaller than start.",
+    "6": "Try each factor up to the square root of remaining, so the last factor is never smaller than this one.",
+    "7": "A value that does not divide remaining cannot be a factor.",
+    "8": "Skip it and try the next candidate.",
+    "10": "Choose this factor.",
+    "11": "The chosen factors times remaining / factor form one complete combination.",
+    "12": "Now try splitting the last part further, never using a factor smaller than this one.",
+    "13": "Undo the choice before trying the next factor.",
+    "17": "Start the search on n with 2 as the smallest allowed factor.",
+    "18": "Every combination has been recorded exactly once."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 278,
+  "title": "First Bad Version",
+  "spec": "leetcode",
+  "statement": "A product has versions numbered `1` to `n`, built one on top of the next. From some version onward every version is broken: all versions before it are good and it and all later ones are bad. Find that first bad version.\n\nYou cannot see the answer directly. Instead, a global function `isBadVersion(version)` is available that returns `true` when `version` is bad and `false` when it is good. Your function is called as `firstBadVersion(n)`: each test case also lists `bad` (the hidden answer the judge uses to answer `isBadVersion`), but it is not passed to you, so the second parameter is `undefined`.\n\nUse as few calls to `isBadVersion` as you can; the judge stops a solution that makes more than 64 calls. At least one version is bad.",
+  "constraints": [
+    "1 <= bad <= n <= 2^31 - 1",
+    "isBadVersion may be called at most 64 times per case"
+  ],
+  "signature": "int firstBadVersion(int n, int bad)",
+  "entry": "firstBadVersion",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "bad"
+  ],
+  "validator": "function validate([n, bad]) {\n  if (!Number.isInteger(n) || !Number.isInteger(bad)) return 'n and bad must be whole numbers.';\n  if (n < 1 || n > 2147483647) return 'n is between 1 and 2^31 - 1.';\n  if (bad < 1 || bad > n) return 'bad is between 1 and n.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [n, bad] = input;\n  const limit = 64;\n  let calls = 0;\n  // LeetCode exposes the version check as a global API; the hidden answer stays inside it.\n  globalThis.isBadVersion = version => {\n    calls++;\n    if (calls > limit) throw new Error('isBadVersion was called more than 64 times; search with far fewer calls.');\n    return version >= bad;\n  };\n  return solve(n);\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function firstBadVersion(n) {\n  let low = 1;\n  let high = n;\n\n  while (low < high) {\n    const mid = low + Math.floor((high - low) / 2);\n    if (isBadVersion(mid)) {\n      high = mid;\n    } else {\n      low = mid + 1;\n    }\n  }\n  return low;\n}",
+  "brute": "function firstBadVersion(n) {\n  // Build the last good version one power of two at a time, from the largest step down.\n  let lastGood = 0;\n  for (let step = 2 ** 30; step >= 1; step /= 2) {\n    if (lastGood + step <= n && !isBadVersion(lastGood + step)) lastGood += step;\n  }\n  return lastGood + 1;\n}",
+  "generator": "function generate(rand, size) {\n  const MAX = 2147483647;\n  const n = size === 'large' ? MAX - Math.floor(rand() * 1000000000) : 1 + Math.floor(rand() * 12);\n  const roll = rand();\n  const bad = roll < 0.15 ? 1 : roll < 0.3 ? n : 1 + Math.floor(rand() * n);\n  return [n, bad];\n}",
+  "examples": [
+    {"name":"Example 1","input":[5,4],"expected":4},
+    {"name":"Example 2","input":[1,1],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,1]},
+    {"name":"Test 2","input":[2,2]},
+    {"name":"Test 3","input":[3,2]},
+    {"name":"Test 4","input":[10,1]},
+    {"name":"Test 5","input":[10,10]},
+    {"name":"Test 6","input":[64,33]},
+    {"name":"Test 7","input":[100,37]},
+    {"name":"Test 8","input":[1000000,999999]},
+    {"name":"Test 9","input":[2126753390,1702766719]},
+    {"name":"Test 10","input":[2147483647,1]},
+    {"name":"Test 11","input":[2147483647,2147483647]},
+    {"name":"Test 12","input":[2147483647,1073741824]}
+  ],
+  "notes": "## Intuition\n\nChecking versions 1, 2, 3, ... in order finds the answer, but may need billions of calls. The versions form a sorted pattern, good good ... good bad bad ... bad, so we are looking for the boundary in a monotone sequence. Binary search halves the candidate range with each call, needing about 31 calls even when `n` is `2^31 - 1`.\n\n## Approach\n\n1. Keep the answer inside `[low, high]`, starting with `low = 1` and `high = n` (version `n` is surely bad).\n2. While `low < high`, test the middle version `mid`.\n3. If `mid` is bad, the first bad version is `mid` or earlier, so set `high = mid` (keep `mid`, it might be the answer).\n4. If `mid` is good, the first bad version is after it, so set `low = mid + 1`.\n5. When the range shrinks to one version, `low` is the answer.\n\n## Example 1, step by step\n\nWith `n = 5` and the first bad version 4: `low = 1`, `high = 5`, `mid = 3` is good, so `low = 4`. Then `mid = 4` is bad, so `high = 4`. Now `low == high`, and the answer is `4` after just two calls.\n\n## Complexity\n\n- Time: O(log n): each call halves the range, so at most about 31 calls.\n- Space: O(1): three numbers.\n\n## Pitfalls\n\n- Use `high = mid`, not `mid - 1`, when `mid` is bad: `mid` itself may be the first bad version.\n- Compute the middle as `low + Math.floor((high - low) / 2)`. In languages with 32-bit ints, `(low + high) / 2` overflows near `2^31 - 1` (Test 9 is LeetCode's classic case for this).\n- Loop on `low < high`, not `low <= high`, with this update rule; otherwise `high = mid` can repeat forever.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `low` | smallest version that may still be the first bad one |\n| `high` | a version known to be bad (or `n`), the largest candidate |\n| `mid` | the version tested in this round |",
+  "narration": {
+    "2": "The first bad version is at least 1...",
+    "3": "...and at most n, since the last version is known to be bad.",
+    "5": "Keep halving until only one candidate remains.",
+    "6": "Pick the middle version without risking overflow from low + high.",
+    "7": "Ask the API whether the middle version is bad.",
+    "8": "Bad: the answer is mid or earlier, so keep mid as the new upper end.",
+    "10": "Good: every version up to mid is good, so the answer lies after it.",
+    "13": "low and high met at the first bad version."
+  }
+}

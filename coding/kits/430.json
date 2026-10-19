@@ -1,0 +1,59 @@
+{
+  "number": 430,
+  "title": "Flatten a Multilevel Doubly Linked List",
+  "spec": "leetcode",
+  "statement": "You get `head`, the first node of the top level of a multilevel doubly linked list. Each node has an integer `val`, links `prev` and `next` to its neighbours within its own level, and a link `child` that is either `null` or the first node of another doubly linked list one level lower, whose nodes may have children of their own. Relink the nodes into one single-level doubly linked list: whenever a node has a child list, that whole list (itself flattened) must come directly after the node and before the node's original `next`. When you finish, every `child` is `null` and every `prev` points to the node just before it (`null` for the first node). Reuse the original nodes and return the head of the flattened list, or `null` when the list is empty.\n\nEach case is written as `[head]`, the structure serialized row by row. The first row is the top level's values. Every later row is the child list of one node in the row just before it, and is written as a `null` that closes the previous row, then one `null` for each node of the previous row that comes before its owner (so no extra `null` means the first node owns it), then the row's values; trailing `null`s are left out. Your function receives the top level's first node, and the result is shown as the flattened list's values from head to tail. (The TypeScript starter types nodes as `_Node`, which does not list `prev` and `child`; the objects still have both.)",
+  "constraints": [
+    "The list has between 0 and 1000 nodes",
+    "1 <= Node.val <= 10^5"
+  ],
+  "signature": "Node flatten(Node head)",
+  "entry": "flatten",
+  "kind": "function",
+  "parameters": [
+    "head"
+  ],
+  "validator": "function validate([head]) {\n  if (!Array.isArray(head)) return 'head is a list of values and nulls.';\n  if (head.length === 0) return null;\n  if (head[0] === null) return 'The first row must start with a value.';\n  if (head[head.length - 1] === null) return 'Leave out trailing nulls.';\n  let count = 0;\n  let previous = 0;\n  let i = 0;\n  while (i < head.length) {\n    if (previous > 0) {\n      // Skip the null that closes the row above, then count the nulls that position this row.\n      i++;\n      let offset = 0;\n      while (head[i] === null) {\n        offset++;\n        i++;\n      }\n      if (offset >= previous) return 'Each row must hang from a node of the row above it.';\n    }\n    let length = 0;\n    while (i < head.length && head[i] !== null) {\n      const value = head[i];\n      if (!Number.isInteger(value) || value < 1 || value > 100000) return 'Node values are whole numbers from 1 to 10^5.';\n      length++;\n      i++;\n    }\n    count += length;\n    previous = length;\n  }\n  if (count > 1000) return 'The list has at most 1000 nodes.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values] = input;\n  class Node {\n    constructor(val) { this.val = val; this.prev = null; this.next = null; this.child = null; }\n  }\n  // Rebuild the rows; each row after the first becomes the child list of one node in the row above.\n  const nodes = [];\n  let row = [];\n  let i = 0;\n  while (i < values.length) {\n    let offset = 0;\n    if (row.length > 0) {\n      i++;\n      while (values[i] === null) {\n        offset++;\n        i++;\n      }\n    }\n    const above = row;\n    row = [];\n    while (i < values.length && values[i] !== null) {\n      const node = new Node(values[i]);\n      if (row.length > 0) {\n        row[row.length - 1].next = node;\n        node.prev = row[row.length - 1];\n      }\n      row.push(node);\n      nodes.push(node);\n      i++;\n    }\n    if (above.length > 0) above[offset].child = row[0];\n  }\n  const head = nodes.length > 0 ? nodes[0] : null;\n  const result = solve(head);\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result !== head) throw new Error('Return the first node of the top level, which heads the flattened list.');\n  // Walk the answer, checking that it reuses every node once with correct prev links and no children.\n  const known = new Set(nodes);\n  const seen = new Set();\n  const out = [];\n  let before = null;\n  for (let node = result; node != null; node = node.next) {\n    if (!known.has(node)) throw new Error('The flattened list must reuse the original nodes.');\n    if (seen.has(node)) throw new Error('The next pointers form a loop.');\n    seen.add(node);\n    if ((node.prev ?? null) !== before) throw new Error(`The prev pointer of the node after ${before === null ? 'nothing (the head)' : before.val} is wrong.`);\n    if (node.child != null) throw new Error(`A node with value ${node.val} still has a child.`);\n    out.push(node.val);\n    before = node;\n  }\n  if (out.length !== nodes.length) throw new Error('Some nodes are missing from the flattened list.');\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function flatten(head) {\n  let node = head;\n  while (node !== null) {\n    if (node.child !== null) {\n      const child = node.child;\n      let tail = child;\n      while (tail.next !== null) {\n        tail = tail.next;\n      }\n      tail.next = node.next;\n      if (node.next !== null) {\n        node.next.prev = tail;\n      }\n      node.next = child;\n      child.prev = node;\n      node.child = null;\n    }\n    node = node.next;\n  }\n  return head;\n}",
+  "brute": "function flatten(head) {\n  // Collect the nodes in final order with an explicit stack (child before next), then relink them all.\n  const order = [];\n  const stack = head ? [head] : [];\n  while (stack.length > 0) {\n    const node = stack.pop();\n    order.push(node);\n    if (node.next) stack.push(node.next);\n    if (node.child) stack.push(node.child);\n  }\n  for (let i = 0; i < order.length; i++) {\n    order[i].prev = i > 0 ? order[i - 1] : null;\n    order[i].next = i + 1 < order.length ? order[i + 1] : null;\n    order[i].child = null;\n  }\n  return order.length > 0 ? order[0] : null;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const total = size === 'large' ? 900 + pick(101) : pick(12);\n  if (total === 0) return [[]];\n  // Rows are long, short (deep and thin) or mixed; values are wide or tiny so duplicates appear.\n  const longest = size === 'large' ? 40 : [2, 4, 9][pick(3)];\n  const tiny = size === 'small' && rand() < 0.5;\n  const value = () => tiny ? 1 + pick(4) : 1 + pick(100000);\n  const out = [];\n  let left = total;\n  let previous = 0;\n  while (left > 0) {\n    const length = Math.min(left, 1 + pick(longest));\n    if (previous > 0) {\n      out.push(null);\n      const offset = pick(Math.min(previous, 20));\n      for (let k = 0; k < offset; k++) out.push(null);\n    }\n    for (let k = 0; k < length; k++) out.push(value());\n    left -= length;\n    previous = length;\n  }\n  return [out];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]],"expected":[1,2,3,7,8,11,12,9,10,4,5,6]},
+    {"name":"Example 2","input":[[1,2,null,3]],"expected":[1,3,2]},
+    {"name":"Example 3","input":[[]],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[1,2,3,4,5]]},
+    {"name":"Test 3","input":[[1,null,2,null,3]]},
+    {"name":"Test 4","input":[[1,2,3,null,null,null,4,5]]},
+    {"name":"Test 5","input":[[1,2,3,4,null,7,8,null,null,9,10,null,null,11]]},
+    {"name":"Test 6","input":[[5,5,5,null,null,5,5,null,5]]},
+    {"name":"Test 7","input":[[10,20,null,30,40,50,null,null,null,60]]},
+    {"name":"Test 8","input":[[100000,1,null,null,2,3]]},
+    {"name":"Test 9","input":[[1,2,null,3,4,null,5,6,null,7,8]]},
+    {"name":"Test 10","input":[[1,2,null,null,3,4,null,null,5,6,null,null,7,8]]}
+  ],
+  "notes": "## Intuition\n\nA brute force walks the structure depth first (a node, then its child list, then its `next`), stores the nodes in that order and relinks them all, which costs O(n) extra space. You can instead splice in place: when the walk reaches a node with a child, the child list must sit between that node and its old `next`. Only the child's own level has to be inserted at that moment; its deeper children are met and spliced later, because the walk continues straight into the inserted list.\n\n## Approach\n\n1. Walk the list with `node`, starting at `head`.\n2. When `node.child` is set, call it `child` and move `tail` to the last node of that child level.\n3. Hook `tail` to `node.next` (and point that node's `prev` back at `tail` when it exists).\n4. Make `child` the new `node.next`, set `child.prev = node`, and clear `node.child`.\n5. Step to `node.next`, which now enters the spliced list, and repeat until the end. Return `head`.\n\n## Example 1, step by step\n\n- Nodes `1` and `2` have no child. At `3`, `child = 7` and `tail` runs `7 → 8 → 9 → 10`. Linking `10 ↔ 4` and `3 ↔ 7` gives `1 2 3 7 8 9 10 4 5 6`.\n- The walk enters `7`, then `8`, whose child is `11`; `tail` stops at `12`. Linking `12 ↔ 9` and `8 ↔ 11` gives `1 2 3 7 8 11 12 9 10 4 5 6`.\n- No other node has a child, so that order is returned.\n\n## Complexity\n\n- Time: O(n): each level is scanned once to find its tail and once more by the main walk.\n- Space: O(1): only a few pointers are used.\n\n## Pitfalls\n\n- Clear `node.child` after splicing; the judge rejects any node that still has a child.\n- Fix the `prev` links on both seams, `child.prev` and the old next's `prev`, not just the `next` links.\n- The old `node.next` may be `null` (the child hangs from a level's last node); guard before touching its `prev`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `node` | current node of the walk |\n| `child` | first node of the child level being spliced in |\n| `tail` | last node of that child level |",
+  "narration": {
+    "2": "Start the walk at the head of the top level.",
+    "3": "Keep walking until the end of the (growing) flattened list.",
+    "4": "Does this node have a child list to splice in?",
+    "5": "Remember the first node of the child level.",
+    "6": "tail will find the last node of that level.",
+    "7": "Advance while the child level continues.",
+    "10": "Hook the child level's last node to whatever followed the current node.",
+    "11": "Was there a node after the current one?",
+    "12": "Then point its prev back at the tail of the child level.",
+    "14": "The child level now comes right after the current node.",
+    "15": "Link the child's prev back to the current node.",
+    "16": "Clear the child link; the level is now part of the single list.",
+    "18": "Move on; this enters the spliced child level, so deeper children are handled next.",
+    "20": "Every level has been spliced in; return the original head."
+  }
+}

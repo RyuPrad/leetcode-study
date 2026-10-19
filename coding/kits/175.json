@@ -1,0 +1,47 @@
+{
+  "number": 175,
+  "title": "Combine Two Tables",
+  "spec": "leetcode",
+  "statement": "Two tables describe people and where they live:\n\n- `Person(personId, firstName, lastName)`: one row per person; `personId` is unique.\n- `Address(addressId, personId, city, state)`: one row per address; `addressId` is unique. Its `personId` may name someone who is not in `Person`.\n\nProduce one row for **every** person in `Person` with the columns `firstName`, `lastName`, `city` and `state`. A person with no matching row in `Address` still appears, with `null` as `city` and `state`. Addresses of people missing from `Person` are not reported. Rows may come in any order.",
+  "constraints": [
+    "personId is unique in Person",
+    "addressId is unique in Address",
+    "Address.personId may not appear in Person"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Person": [["personId","INT"],["firstName","VARCHAR(255)"],["lastName","VARCHAR(255)"]],
+    "Address": [["addressId","INT"],["personId","INT"],["city","VARCHAR(255)"],["state","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Person = [], Address = [] }] = input;\n  const people = new Set(), addresses = new Set();\n  for (const [id] of Person) {\n    if (id === null) return 'Every person needs a personId.';\n    if (people.has(id)) return `personId ${id} appears twice in Person.`;\n    people.add(id);\n  }\n  for (const [id] of Address) {\n    if (id === null) return 'Every address needs an addressId.';\n    if (addresses.has(id)) return `addressId ${id} appears twice in Address.`;\n    addresses.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT p.firstName, p.lastName, a.city, a.state\nFROM Person AS p\nLEFT JOIN Address AS a\n  ON a.personId = p.personId;",
+  "brute": "SELECT p.firstName, p.lastName, a.city, a.state\nFROM Person AS p, Address AS a\nWHERE a.personId = p.personId\nUNION ALL\nSELECT firstName, lastName, NULL, NULL\nFROM Person\nWHERE NOT EXISTS (SELECT 1 FROM Address WHERE Address.personId = Person.personId)",
+  "generator": "function generate(rand, size) {\n  const names = ['Allen', 'Bob', 'Ana', 'Wang', 'Lee', 'Kim', 'Ravi', 'Sofia'];\n  const places = [['New York City', 'New York'], ['Austin', 'Texas'], ['Leetcode', 'California'], ['Boston', 'Massachusetts'], [null, null]];\n  const people = size === 'small' ? Math.floor(rand() * 7) : 1500;\n  const Person = [], Address = [];\n  for (let id = 1; id <= people; id++) Person.push([id, names[Math.floor(rand() * names.length)], names[Math.floor(rand() * names.length)]]);\n  // Addresses go to existing people, people who do not exist, or nobody; each person has at most one.\n  const owners = [];\n  for (let id = 1; id <= people + 3; id++) if (rand() < 0.6) owners.push(id);\n  owners.forEach((owner, i) => { const [city, state] = places[Math.floor(rand() * places.length)]; Address.push([i + 1, owner, city, state]); });\n  return [{ Person, Address }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Person":[[1,"Allen","Wang"],[2,"Bob","Alice"]],"Address":[[1,2,"New York City","New York"],[2,3,"Leetcode","California"]]}],"expected":{"columns":["firstName","lastName","city","state"],"rows":[["Allen","Wang",null,null],["Bob","Alice","New York City","New York"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Person":[],"Address":[[1,1,"Austin","Texas"]]}]},
+    {"name":"Test 2","input":[{"Person":[[1,"Ana","Lee"]],"Address":[]}]},
+    {"name":"Test 3","input":[{"Person":[[1,"Ana","Lee"],[2,"Ravi","Kim"]],"Address":[[1,1,"Austin","Texas"],[2,2,"Boston","Massachusetts"]]}]},
+    {"name":"Test 4","input":[{"Person":[[5,"Sofia","Wang"]],"Address":[[1,4,"Austin","Texas"],[2,6,"Boston","Massachusetts"]]}]},
+    {"name":"Test 5","input":[{"Person":[[1,"Ana","Lee"],[2,"Ana","Lee"]],"Address":[[7,2,"Austin","Texas"]]}]},
+    {"name":"Test 6","input":[{"Person":[[1,"Bob","Kim"]],"Address":[[1,1,null,"Texas"]]}]},
+    {"name":"Test 7","input":[{"Person":[[3,"Lee","Wang"],[1,"Kim","Ravi"],[2,"Ana","Bob"]],"Address":[[3,3,"Leetcode","California"],[1,1,"Austin","Texas"]]}]},
+    {"name":"Test 8","input":[{"Person":[[1,"Allen","Wang"],[2,"Bob","Alice"],[3,"Kim","Lee"],[4,"Ravi","Ana"]],"Address":[[1,2,"New York City","New York"],[2,3,"Leetcode","California"],[3,9,"Boston","Massachusetts"]]}]}
+  ],
+  "notes": "## Intuition\n\nEvery person must appear exactly once, whether or not an address exists. An inner join keeps only the people who have an address, so it would drop Allen in Example 1. A **left join** keeps every row of the left table (`Person`) and fills the right table's columns with `null` when nothing matches, which is exactly the required output.\n\n## Approach\n\n1. Read from `Person` (alias `p`), the table whose rows must all survive.\n2. `LEFT JOIN Address` (alias `a`) on matching `personId`.\n3. Select the four requested columns. Unmatched people get `null` city and state automatically; addresses that belong to nobody in `Person` never join, so they are not reported.\n\n## Example 1, step by step\n\n- Person 1 (Allen Wang) has no address row with `personId = 1`, so the join keeps him with `city = null`, `state = null`.\n- Person 2 (Bob Alice) matches address 1, giving New York City, New York.\n- Address 2 belongs to `personId = 3`, who is not in `Person`; nothing on the left matches it, so it is ignored.\n\nThe result is the two rows shown in the example.\n\n## Complexity\n\n- Time: with an index or hash on `Address.personId` the join is O(P + A) for P people and A addresses; without one a database may fall back to O(P · A).\n- Space: O(P) for the result.\n\n## Pitfalls\n\n- An inner `JOIN` (or `WHERE a.personId = p.personId`) silently drops people without an address.\n- Putting `Address` on the left of the left join reports addresses instead of people.\n- Filtering the right table in `WHERE` (for example `WHERE a.city IS NOT NULL`) turns the left join back into an inner join; such conditions belong in `ON`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Person`, the table every output row comes from |\n| `a` | `Address`, joined when `personId` matches |\n| `LEFT JOIN ... ON` | keeps people with no match, filling `a` with nulls |",
+  "narration": {
+    "1": "Choose the four output columns: the name from Person and the location from Address.",
+    "2": "Person is the left table, so every person produces at least one row.",
+    "3": "A left join keeps people who have no address and fills the Address columns with null.",
+    "4": "Rows are matched on personId; addresses of unknown people never match anyone."
+  }
+}

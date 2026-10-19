@@ -1,6 +1,7 @@
 import type { CodingProblem, Json, CodeCase } from '../shared/coding';
 import { CASE_LIMIT, INPUT_LIMIT } from '../shared/coding';
 import { contract } from './languages';
+import { sqlInvalid } from './sql-engine';
 const array = Array.isArray;
 const integer = (x: any) => Number.isSafeInteger(x);
 const sorted = (a: number[], strict = false) => a.every((v,i) => !i || (strict ? v > a[i-1] : v >= a[i-1]));
@@ -45,13 +46,16 @@ function kitShape(problem: CodingProblem, a: any[]): string | null {
   return bad >= 0 ? `${c.method.params[bad].name} must be ${c.method.params[bad].type}${c.method.params[bad].type === 'TreeNode' ? ' as a level-order array with null for missing children' : ''}.` : null;
 }
 export function validateInput(problem: CodingProblem, input: unknown): string | null {
+  if (problem.kind === 'sql') return sqlInvalid(problem.schema ?? {}, input);
   const fail = (message: string): never => { throw new Error(message); };
   try {
     if (!array(input) || input.length !== problem.parameters.length) fail(`Use an array of ${problem.parameters.length} arguments: ${problem.parameters.join(', ')}.`);
     if (JSON.stringify(input).length > INPUT_LIMIT) fail('Each case must be smaller than 256 KiB.');
     const a = input as any[], n = problem.number;
     let cells = 0;
-    function bounded(v: any, depth = 0) { if (++cells > 20000 || depth > 12) fail('Input is too large or too deeply nested.'); if (typeof v === 'number' && !Number.isFinite(v)) fail('Numbers must be finite.'); if (typeof v === 'string' && v.length > 10000) fail('Strings are limited to 10,000 characters.'); if (array(v)) { if (v.length > 2000) fail('Arrays are limited to 2,000 items.'); v.forEach(x => bounded(x,depth+1)); } else if (v !== null && !['number','string','boolean'].includes(typeof v)) fail('Use only JSON numbers, strings, booleans, null, and arrays.'); }
+    // Objects are allowed only where a generated kit's signature takes Object (any JSON value).
+    const objects = !!problem.generated && /\bObject\b/.test(JSON.stringify(problem.signature ?? ''));
+    function bounded(v: any, depth = 0) { if (++cells > 20000 || depth > 12) fail('Input is too large or too deeply nested.'); if (typeof v === 'number' && !Number.isFinite(v)) fail('Numbers must be finite.'); if (typeof v === 'string' && v.length > 10000) fail('Strings are limited to 10,000 characters.'); if (array(v)) { if (v.length > 2000) fail('Arrays are limited to 2,000 items.'); v.forEach(x => bounded(x,depth+1)); } else if (objects && v !== null && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) { const entries = Object.entries(v); if (entries.length > 2000) fail('Objects are limited to 2,000 keys.'); entries.forEach(([key, x]) => { if (key.length > 10000) fail('Keys are limited to 10,000 characters.'); bounded(x,depth+1); }); } else if (v !== null && !['number','string','boolean'].includes(typeof v)) fail(objects ? 'Use only JSON values.' : 'Use only JSON numbers, strings, booleans, null, and arrays.'); }
     bounded(a);
     if (problem.generated) { const message = kitShape(problem, a); if (message) fail(message); return null; }
     if (problem.kind === 'design') {

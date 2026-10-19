@@ -1,0 +1,63 @@
+{
+  "number": 114,
+  "title": "Flatten Binary Tree to Linked List",
+  "spec": "leetcode",
+  "statement": "Rearrange the binary tree whose root is `root` into a single chain, in place, reusing its own `TreeNode` objects:\n\n- every node's `left` pointer becomes `null`;\n- every node's `right` pointer leads to the node that follows it in a pre-order traversal of the original tree (the node itself, then its left subtree, then its right subtree), and the last node's `right` is `null`.\n\nThe function returns nothing; the tree reachable from `root` afterwards is the answer. An empty tree stays empty.",
+  "constraints": [
+    "The tree has between 0 and 2000 nodes",
+    "-100 <= Node.val <= 100"
+  ],
+  "signature": "void flatten(TreeNode root)",
+  "entry": "flatten",
+  "kind": "function",
+  "parameters": [
+    "root"
+  ],
+  "io": {
+    "mutates": 0
+  },
+  "validator": "function validate([root]) {\n  if (!Array.isArray(root)) return 'root must be a level-order list.';\n  if (root.length && root[0] === null) return 'A non-empty tree starts with its root value.';\n  let slots = root.length ? 1 : 0;\n  let nodes = 0;\n  for (const value of root) {\n    if (slots === 0) return 'The list has more entries than the tree has child slots.';\n    slots--;\n    if (value === null) continue;\n    if (!Number.isInteger(value) || value < -100 || value > 100) return 'Node values are integers between -100 and 100.';\n    nodes++;\n    slots += 2;\n  }\n  if (nodes > 2000) return 'The tree has at most 2000 nodes.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function flatten(root) {\n  const flattenTail = (node) => {\n    if (node === null) {\n      return null;\n    }\n    const leftTail = flattenTail(node.left);\n    const rightTail = flattenTail(node.right);\n    if (leftTail !== null) {\n      leftTail.right = node.right;\n      node.right = node.left;\n      node.left = null;\n    }\n    if (rightTail !== null) {\n      return rightTail;\n    }\n    if (leftTail !== null) {\n      return leftTail;\n    }\n    return node;\n  };\n  flattenTail(root);\n}",
+  "brute": "function flatten(root) {\n  // Collect the nodes in pre-order with an explicit stack, then relink them one after another.\n  const order = [];\n  const stack = root ? [root] : [];\n  while (stack.length) {\n    const node = stack.pop();\n    order.push(node);\n    if (node.right) stack.push(node.right);\n    if (node.left) stack.push(node.left);\n  }\n  for (let i = 0; i < order.length; i++) {\n    order[i].left = null;\n    order[i].right = i + 1 < order.length ? order[i + 1] : null;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  // A level-order list may hold at most 2,000 entries, nulls included, so large trees retry with fewer nodes.\n  for (let count = large ? 2000 : Math.floor(rand() * 9); ; count -= 100) {\n    const span = large ? 100 : 5;\n    const chain = !large && rand() < 0.25;\n    const nodes = [];\n    const open = [];\n    for (let k = 0; k < count; k++) {\n      const node = { val: Math.floor(rand() * (2 * span + 1)) - span, left: null, right: null };\n      if (nodes.length) {\n        // Attach to a random free child slot; a chain always extends the newest node.\n        const index = chain ? open.length - 1 - Math.floor(rand() * 2) : Math.floor(rand() * open.length);\n        const [parent, side] = open[index];\n        open.splice(index, 1);\n        parent[side] = node;\n      }\n      nodes.push(node);\n      open.push([node, 'left'], [node, 'right']);\n      if (chain && open.length > 2) open.splice(0, open.length - 2);\n    }\n    const out = [];\n    const queue = count ? [nodes[0]] : [];\n    for (let head = 0; head < queue.length; head++) {\n      const node = queue[head];\n      if (node === null) { out.push(null); continue; }\n      out.push(node.val);\n      queue.push(node.left, node.right);\n    }\n    while (out.length && out[out.length - 1] === null) out.pop();\n    if (out.length <= 2000) return [out];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,5,3,4,null,6]],"expected":[1,null,2,null,3,null,4,null,5,null,6]},
+    {"name":"Example 2","input":[[]],"expected":[]},
+    {"name":"Example 3","input":[[0]],"expected":[0]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2]]},
+    {"name":"Test 2","input":[[1,null,2]]},
+    {"name":"Test 3","input":[[1,2,null,3,null,4,null,5]]},
+    {"name":"Test 4","input":[[1,2,3]]},
+    {"name":"Test 5","input":[[1,2,3,4,5,6,7]]},
+    {"name":"Test 6","input":[[1,null,2,3]]},
+    {"name":"Test 7","input":[[5,-3,8,null,4,7,null,-100,100]]},
+    {"name":"Test 8","input":[[0,0,0,0,null,null,0]]},
+    {"name":"Test 9","input":[[3,9,20,null,null,15,7]]},
+    {"name":"Test 10","generate":{"seed":11410,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11411,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":11412,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIn the finished chain, a node is followed by its whole left subtree (already flattened) and then its whole right subtree (already flattened). So if a recursive call flattens a subtree and also reports the **last** node of the resulting chain, the parent can splice the two pieces together with three pointer changes. A simpler but less economical idea is to list the nodes in pre-order first and relink them; that needs O(n) extra memory.\n\n## Approach\n\n1. `flattenTail(node)` flattens the subtree at `node` and returns the last node of its chain (`null` for an empty subtree).\n2. Recursively flatten both children, keeping their tails in `leftTail` and `rightTail`.\n3. If there is a left chain, hang the right chain after its tail (`leftTail.right = node.right`), move the left chain to the right (`node.right = node.left`) and clear `node.left`.\n4. The tail of the whole chain is `rightTail` if the right part exists, else `leftTail`, else `node` itself.\n5. Call it on `root`; nothing is returned.\n\n## Example 1, step by step\n\nThe tree is `1` with left child `2` (children `3`, `4`) and right child `5` (right child `6`). Leaves `3` and `4` return themselves. At `2`, `leftTail = 3`, so `3.right = 4`, `2.right = 3`, giving `2 → 3 → 4`, and the tail is `4`. At `5` there is no left chain, so `5 → 6` stays and the tail is `6`. At `1`, `leftTail = 4`: `4.right = 5`, `1.right = 2`, `1.left = null`, which yields `1 → 2 → 3 → 4 → 5 → 6`.\n\n## Complexity\n\n- Time: O(n), each node is visited once and spliced in constant time.\n- Space: O(h) for the recursion, where h is the tree's height (up to n for a chain).\n\n## Pitfalls\n\n- Save the right subtree's chain before overwriting `node.right`; here the recursion has already flattened it and `leftTail.right = node.right` runs first.\n- Forgetting `node.left = null` leaves the old left pointers in place and the result is not a chain.\n- When a node has no left child, nothing is spliced, but the tail must still come from the right side.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `flattenTail` | flattens a subtree and returns its chain's last node |\n| `node` | root of the subtree being flattened |\n| `leftTail` | last node of the flattened left subtree, or `null` |\n| `rightTail` | last node of the flattened right subtree, or `null` |",
+  "narration": {
+    "2": "The helper flattens one subtree and returns the last node of the chain it makes.",
+    "3": "An empty subtree has no chain at all.",
+    "6": "Flatten the left subtree first and remember where its chain ends.",
+    "7": "Flatten the right subtree too and remember its last node.",
+    "8": "Only a node with a left chain needs any rewiring.",
+    "9": "Hang the right chain after the last node of the left chain.",
+    "10": "Move the left chain into the right pointer, right after this node.",
+    "11": "Clear the left pointer, as every node in the chain must have.",
+    "13": "If there was a right part, the chain now ends where it ended.",
+    "16": "Otherwise the chain ends with the left part's last node.",
+    "19": "A leaf is a chain of one, so it is its own tail.",
+    "21": "Flatten the whole tree; the result is left in place, nothing is returned."
+  }
+}

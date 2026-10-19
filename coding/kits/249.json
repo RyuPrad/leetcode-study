@@ -1,0 +1,59 @@
+{
+  "number": 249,
+  "title": "Group Shifted Strings",
+  "spec": "recalled",
+  "statement": "Shifting a lowercase string moves each of its letters one place forward in the alphabet, with `'z'` wrapping around to `'a'` (`\"abc\"` becomes `\"bcd\"`, `\"xyz\"` becomes `\"yza\"`). Shifting backward undoes this, so repeated shifts in either direction produce an endless cycle of strings called a shifting sequence.\n\nGiven the array `strings`, put together every pair of strings that lie in the same shifting sequence (one can be reached from the other by shifting), and return the list of groups. Each entry of `strings` lands in exactly one group, repeated entries included. The groups, and the strings inside each group, may come in any order.",
+  "constraints": [
+    "1 <= strings.length <= 200",
+    "1 <= strings[i].length <= 50",
+    "strings[i] contains only lowercase English letters"
+  ],
+  "signature": "List<List<String>> groupStrings(String[] strings)",
+  "entry": "groupStrings",
+  "kind": "function",
+  "parameters": [
+    "strings"
+  ],
+  "compare": "unordered-nested",
+  "validator": "function validate([strings]) {\n  if (!Array.isArray(strings) || strings.length < 1 || strings.length > 200) return 'strings needs 1 to 200 entries.';\n  for (const s of strings) {\n    if (typeof s !== 'string' || s.length < 1 || s.length > 50) return 'Each string has 1 to 50 characters.';\n    if (!/^[a-z]+$/.test(s)) return 'Strings use only lowercase English letters.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function groupStrings(strings) {\n  const groups = new Map();\n  for (const word of strings) {\n    const first = word.charCodeAt(0);\n    let key = '';\n    for (let i = 0; i < word.length; i++) {\n      const offset = (word.charCodeAt(i) - first + 26) % 26;\n      key += String.fromCharCode(97 + offset);\n    }\n    if (!groups.has(key)) {\n      groups.set(key, []);\n    }\n    groups.get(key).push(word);\n  }\n  return [...groups.values()];\n}",
+  "brute": "function groupStrings(strings) {\n  const shift = (s, by) => s.split('').map(c => String.fromCharCode(97 + (c.charCodeAt(0) - 97 + by) % 26)).join('');\n  const together = (a, b) => {\n    if (a.length !== b.length) return false;\n    for (let by = 0; by < 26; by++) if (shift(a, by) === b) return true;\n    return false;\n  };\n  const result = [];\n  for (const s of strings) {\n    const group = result.find(g => together(g[0], s));\n    if (group) group.push(s);\n    else result.push([s]);\n  }\n  return result;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (k) => Math.floor(rand() * k);\n  const letters = (len, span) => Array.from({ length: len }, () => String.fromCharCode(97 + pick(span))).join('');\n  const shift = (s, by) => s.split('').map(c => String.fromCharCode(97 + (c.charCodeAt(0) - 97 + by) % 26)).join('');\n  const large = size === 'large';\n  const n = large ? 200 : 1 + pick(8);\n  const span = large || rand() < 0.5 ? 26 : 3;\n  const bases = Array.from({ length: large ? 25 : 1 + pick(4) }, () => letters(1 + pick(large ? 50 : 3), span));\n  const strings = [];\n  for (let i = 0; i < n; i++) {\n    if (rand() < 0.2) strings.push(letters(1 + pick(large ? 50 : 3), span));\n    else strings.push(shift(bases[pick(bases.length)], pick(26)));\n  }\n  return [strings];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["abc","bcd","acef","xyz","az","ba","a","z"]],"expected":[["acef"],["a","z"],["abc","bcd","xyz"],["az","ba"]]},
+    {"name":"Example 2","input":[["a"]],"expected":[["a"]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["q","w","e","z"]]},
+    {"name":"Test 2","input":[["ab","ba","az","za","yx"]]},
+    {"name":"Test 3","input":[["abc","abd","abe"]]},
+    {"name":"Test 4","input":[["abc","abc","bcd"]]},
+    {"name":"Test 5","input":[["a","aa","aaa","bb","ccc"]]},
+    {"name":"Test 6","input":[["zab","abc","yza","xyz","bcd"]]},
+    {"name":"Test 7","input":[["acef","bdfg","zbde","aceg"]]},
+    {"name":"Test 8","input":[["aa","bb","ab","bc","ac"]]},
+    {"name":"Test 9","input":[["abcdefghijklmnopqrstuvwxyz","bcdefghijklmnopqrstuvwxyza","zabcdefghijklmnopqrstuvwxy","abcdefghijklmnopqrstuvwxyy"]]},
+    {"name":"Test 10","input":[["zz","az","za","aa","yz","zy"]]},
+    {"name":"Test 11","input":[["mno"]]},
+    {"name":"Test 12","input":[["ace","bdf","zbd","ywa","xvz","acf"]]}
+  ],
+  "notes": "## Intuition\n\nShifting changes every letter by the same amount, so what stays fixed is the **gap** from the first letter to each later letter, counted forward around the alphabet. `\"az\"` has gap 25 and so does `\"ba\"` (from `b` forward to `a` is 25 steps), which is why they share a sequence. If we shift every string until its first letter is `'a'`, two strings in the same sequence become the very same text. That text is a perfect hash key. The slow alternative compares each string with one member of every group found so far, trying all 26 shifts.\n\n## Approach\n\n1. Keep a map `groups` from a normalised key to the list of strings with that key.\n2. For each `word`, read the code of its `first` letter.\n3. Build `key`: for every position `i`, take the forward distance `offset` from the first letter (adding 26 before `% 26` keeps it non-negative) and append the letter `'a' + offset`.\n4. Create an empty list for a new key, then push `word` onto its key's list.\n5. Return all the lists in the map.\n\n## Example 1, step by step\n\n`\"abc\"`, `\"bcd\"` and `\"xyz\"` all normalise to `\"abc\"`. `\"acef\"` becomes `\"acef\"` and has no partner. `\"az\"` gives `\"az\"`, and `\"ba\"` gives offsets 0 and `(97 - 98 + 26) % 26 = 25`, also `\"az\"`. `\"a\"` and `\"z\"` both become `\"a\"`. So the map holds `abc → [abc, bcd, xyz]`, `acef → [acef]`, `az → [az, ba]`, `a → [a, z]`, which are the four expected groups.\n\n## Complexity\n\n- Time: O(total length): each letter is visited once to build its key, and map operations are O(key length).\n- Space: O(total length) for the keys and the grouped strings.\n\n## Pitfalls\n\n- `b - z` is negative; without `+ 26` the remainder in JavaScript stays negative and `\"ba\"` would not join `\"az\"`.\n- Strings of different lengths are never in the same sequence; the key keeps the length, so this is automatic.\n- Repeated strings must each appear in the output; push every occurrence, do not use a set.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `groups` | map from normalised key to the strings sharing it |\n| `word` | the string being placed |\n| `first` | character code of `word`'s first letter |\n| `key` | `word` shifted so that it starts with `'a'` |\n| `i`, `offset` | position in `word` and its forward distance from the first letter |",
+  "narration": {
+    "2": "The map sends each normalised key to the list of strings that share it.",
+    "3": "Place every string from the input, one at a time.",
+    "4": "Remember the first letter; every other letter is measured from it.",
+    "6": "Walk over the letters of the word to build its key.",
+    "7": "Forward distance from the first letter, wrapped into 0..25 so shifts that cross 'z' still match.",
+    "8": "Write that distance as a letter, so the key is the word shifted to start at 'a'.",
+    "10": "Is this the first string of its shifting sequence?",
+    "11": "Start an empty group for the new key.",
+    "13": "Add the word to the group of its key.",
+    "15": "Every group in the map is one shifting sequence; return them all."
+  }
+}

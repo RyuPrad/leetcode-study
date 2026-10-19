@@ -1,0 +1,64 @@
+{
+  "number": 1167,
+  "title": "Minimum Cost to Connect Sticks",
+  "spec": "recalled",
+  "statement": "Each value in `sticks` is the length of one stick, and every length is a positive integer. In one move you may pick any two sticks, of lengths `x` and `y`, and fuse them into a single stick of length `x + y`; that move costs `x + y`. Keep fusing until exactly one stick is left.\n\nReturn the smallest total cost needed to end with one stick. If there is only one stick to begin with, the cost is `0`.",
+  "constraints": [
+    "1 <= sticks.length <= 10^4",
+    "1 <= sticks[i] <= 10^4"
+  ],
+  "signature": "int connectSticks(int[] sticks)",
+  "entry": "connectSticks",
+  "kind": "function",
+  "parameters": [
+    "sticks"
+  ],
+  "validator": "function validate([sticks]) {\n  if (sticks.length < 1 || sticks.length > 10000) return 'sticks needs 1 to 10^4 lengths.';\n  if (sticks.some(v => !Number.isInteger(v) || v < 1 || v > 10000)) return 'Each length is between 1 and 10^4.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function connectSticks(sticks) {\n  const heap = [];\n  const push = (value) => {\n    heap.push(value);\n    let i = heap.length - 1;\n    while (i > 0) {\n      const parent = (i - 1) >> 1;\n      if (heap[parent] <= heap[i]) break;\n      [heap[parent], heap[i]] = [heap[i], heap[parent]];\n      i = parent;\n    }\n  };\n  const pop = () => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    heap[0] = last;\n    let i = 0;\n    while (true) {\n      const left = 2 * i + 1;\n      const right = left + 1;\n      let smallest = i;\n      if (left < heap.length && heap[left] < heap[smallest]) smallest = left;\n      if (right < heap.length && heap[right] < heap[smallest]) smallest = right;\n      if (smallest === i) break;\n      [heap[smallest], heap[i]] = [heap[i], heap[smallest]];\n      i = smallest;\n    }\n    return top;\n  };\n\n  for (const stick of sticks) push(stick);\n  let cost = 0;\n  while (heap.length > 1) {\n    const first = pop();\n    const second = pop();\n    cost += first + second;\n    push(first + second);\n  }\n  return cost;\n}",
+  "brute": "function connectSticks(sticks) {\n  // Up to 6 sticks: try every order of fusing (memoised on the sorted lengths).\n  if (sticks.length <= 6) {\n    const memo = new Map();\n    const best = (list) => {\n      if (list.length === 1) return 0;\n      const key = list.join(',');\n      if (memo.has(key)) return memo.get(key);\n      let result = Infinity;\n      for (let i = 0; i < list.length; i++)\n        for (let j = i + 1; j < list.length; j++) {\n          const rest = list.filter((_, k) => k !== i && k !== j);\n          rest.push(list[i] + list[j]);\n          rest.sort((a, b) => a - b);\n          result = Math.min(result, list[i] + list[j] + best(rest));\n        }\n      memo.set(key, result);\n      return result;\n    };\n    return best([...sticks].sort((a, b) => a - b));\n  }\n  // Larger inputs: re-sort every round and fuse the two shortest.\n  const list = [...sticks];\n  let total = 0;\n  while (list.length > 1) {\n    list.sort((a, b) => a - b);\n    const joined = list.shift() + list.shift();\n    total += joined;\n    list.push(joined);\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') return [Array.from({ length: 2000 }, () => 1 + Math.floor(rand() * 10000))];\n  const n = 1 + Math.floor(rand() * 6);\n  const top = rand() < 0.3 ? 10000 : 1 + Math.floor(rand() * 12);\n  return [Array.from({ length: n }, () => 1 + Math.floor(rand() * top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,4,3]],"expected":14},
+    {"name":"Example 2","input":[[1,8,3,5]],"expected":30},
+    {"name":"Example 3","input":[[5]],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,1]]},
+    {"name":"Test 2","input":[[10000]]},
+    {"name":"Test 3","input":[[1,2,3,4,5]]},
+    {"name":"Test 4","input":[[3,3,3,3]]},
+    {"name":"Test 5","input":[[9,7,5,3,1]]},
+    {"name":"Test 6","input":[[10000,10000,10000]]},
+    {"name":"Test 7","input":[[1,10000,1,10000,1]]},
+    {"name":"Test 8","input":[[20,4,8,2]]},
+    {"name":"Test 9","input":[[1,1,2,3,5,8,13,21,34,55,89,144]]},
+    {"name":"Test 10","input":[[3354,4316,3259,4904,4103,7794,8157,4092,8076,9200,2122,1755,470,5381,3925,1121,6337,6009,8215,2958]]},
+    {"name":"Test 11","input":[[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]]}
+  ],
+  "notes": "## Intuition\n\nEvery fusion pays for the full length of the stick it creates, and that new stick may be paid for again in later fusions. A stick's length is therefore counted once for every fusion it takes part in, so short sticks should be fused early and often while long ones should be touched as rarely as possible. This is exactly Huffman coding: always fuse the two shortest sticks available. Trying every order also works but grows factorially.\n\n## Approach\n\n1. Put every length into a min-heap `heap` (built by hand with `push` and `pop`).\n2. While more than one stick remains, `pop` the two shortest, `first` and `second`.\n3. Add `first + second` to `cost` and `push` the new stick back.\n4. When one stick is left, `cost` is the answer (it stays `0` if there was only one stick).\n\n## Example 1, step by step\n\n`sticks = [2, 4, 3]`. The heap holds 2, 3, 4. Pop 2 and 3, fuse them for 5, so `cost = 5` and the heap is 4, 5. Pop 4 and 5, fuse for 9, so `cost = 14` and one stick remains. The answer is `14`.\n\n## Complexity\n\n- Time: O(n log n): n pushes, then n - 1 rounds of two pops and one push, each O(log n).\n- Space: O(n) for the heap.\n\n## Pitfalls\n\n- Sorting once and fusing neighbours left to right is wrong: a fused stick can be longer than the next unused sticks, so it must go back into the heap.\n- Fusing the two longest sticks (or any fixed order) costs more; only the two shortest are safe.\n- With a single stick the loop never runs; return `0`, not the stick's length.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `heap` | min-heap of the current stick lengths |\n| `push`, `pop` | add a length / remove the shortest, restoring heap order |\n| `parent`, `left`, `right`, `smallest` | heap positions used while sifting |\n| `first`, `second` | the two shortest sticks of a round |\n| `cost` | total paid so far |",
+  "narration": {
+    "4": "push adds a length at the end of the heap array.",
+    "6": "Sift up: keep climbing until the new value reaches the root position.",
+    "8": "Stop once the parent is not larger; heap order holds.",
+    "9": "Otherwise swap the value with its parent and continue from there.",
+    "14": "pop returns the shortest stick, which sits at the root.",
+    "17": "Move the last value to the root, then sift it down.",
+    "23": "Is the left child smaller than the current value?",
+    "24": "Is the right child smaller still?",
+    "25": "Neither child is smaller, so heap order is restored.",
+    "26": "Swap down with the smaller child and continue from its position.",
+    "32": "Load every stick into the min-heap.",
+    "34": "Keep fusing until only one stick remains.",
+    "35": "Take the shortest stick...",
+    "36": "...and the next shortest.",
+    "37": "Fusing them costs their combined length.",
+    "38": "The fused stick goes back into the pool and may be fused again.",
+    "40": "All sticks are now one; return the total cost."
+  }
+}

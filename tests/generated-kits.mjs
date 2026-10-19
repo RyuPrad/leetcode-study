@@ -1,6 +1,8 @@
-// A generated study kit in a real browser: its Notes (statement, examples, notes), the Walkthrough
-// recorded from the reference solution with stepping and a seekable timeline, and the Code tab's
-// local judge accepting a correct solution and rejecting a wrong one.
+// Generated study kits in a real browser: a function kit's Notes (statement, examples, notes), the
+// Walkthrough recorded from the reference solution with stepping and a seekable timeline, and the Code
+// tab's local judge accepting the reference; then an SQL kit's example tables, its walkthrough of the
+// reference query's stages, and its MySQL judge; then an events kit's timeline walkthrough in virtual time
+// and its judge awaiting promises and timers.
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -13,13 +15,17 @@ const kits = (catalog.index ?? []).filter(e => e.kit);
 assert.ok(kits.length > 0, 'At least one generated kit exists');
 // The first function kit whose reference sorts in place is not required; any function kit works.
 const entry = kits.find(e => JSON.parse(fs.readFileSync(path.join(ROOT, KITS_PATH, `${e.number}.json`), 'utf8')).kind === 'function') ?? kits[0];
-const record = JSON.parse(fs.readFileSync(path.join(ROOT, KITS_PATH, `${entry.number}.json`), 'utf8'));
+const read = e => JSON.parse(fs.readFileSync(path.join(ROOT, KITS_PATH, `${e.number}.json`), 'utf8'));
+const record = read(entry);
+const sqlEntry = kits.find(e => read(e).kind === 'sql'), sqlRecord = sqlEntry && read(sqlEntry);
+const eventsEntry = kits.find(e => read(e).io?.events), eventsRecord = eventsEntry && read(eventsEntry);
 fs.mkdirSync(path.join(ROOT, 'test-results'), {recursive: true});
 // The built renderer (npm run build) with the desktop bridge replaced by an in-page stand-in that serves
 // this kit as main serves it and keeps submissions in memory. Workers and WebAssembly load as they do in the app.
 const renderer = path.join(ROOT, 'dist/renderer');
 assert.ok(fs.existsSync(path.join(renderer, 'index.html')), 'Run npm run build first.');
-const fixtures = {'/fixture/catalog.json': JSON.stringify(catalog), '/fixture/kit.json': JSON.stringify(record)};
+const fixtures = {'/fixture/catalog.json': JSON.stringify(catalog)};
+for (const kit of [record, sqlRecord, eventsRecord].filter(Boolean)) fixtures[`/fixture/kits/${kit.number}.json`] = JSON.stringify(kit);
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png'};
 const server = http.createServer((request, response) => {
   const url = decodeURIComponent(new URL(request.url, 'http://x').pathname);
@@ -40,7 +46,7 @@ await page.addInitScript(() => {
   window.study = {
     bootstrap: async () => ({catalog: await json('/fixture/catalog.json'), data, notice: null, version: 'test'}),
     setProgress: async () => data, selectProblem: async id => ({...timer, problemId: id}), activity() {},
-    loadKit: async id => { const kit = await json('/fixture/kit.json'); if (id !== 'leetcode:' + kit.number) throw new Error('Unknown study kit.'); return kit; },
+    loadKit: async id => { const response = await fetch(`/fixture/kits/${id.replace('leetcode:', '')}.json`); if (!response.ok) throw new Error('Unknown study kit.'); return response.json(); },
     saveDraft: async () => {}, recordSubmission: async (id, language, source, result) => { window.fixture.submissions.push({id, language, result}); return data; },
     nativeAvailability: async () => ({java: false, c: false}), runNative: async () => { throw new Error('No native toolchains in the browser test.'); }, cancelNative: async () => {},
     openExternal: async () => {}, onData: () => () => {}, onTimer: () => () => {}, onPlaybackPause: () => () => {}, onError: () => () => {}, onNativeProgress: () => () => {}
@@ -50,10 +56,13 @@ const shots = process.env.KIT_SCREENSHOTS, shot = async name => { if (shots) awa
 const report = {};
 try {
   await page.goto(base);
-  await page.getByRole('button', {name: /^All LeetCode \d+$/}).first().click();
-  await page.getByRole('searchbox', {name: 'Search problems'}).fill(String(entry.number));
-  await page.getByRole('button', {name: `Open ${entry.title}`, exact: true}).click();
-  await page.getByRole('heading', {name: entry.title, exact: true}).waitFor();
+  const open = async kit => {
+    await page.getByRole('button', {name: /^All LeetCode \d+$/}).first().click();
+    await page.getByRole('searchbox', {name: 'Search problems'}).fill(String(kit.number));
+    await page.getByRole('button', {name: `Open ${kit.title}`, exact: true}).click();
+    await page.getByRole('heading', {name: kit.title, exact: true}).waitFor();
+  };
+  await open(entry);
   assert.deepEqual((await page.getByRole('tab').allTextContents()).map(t => t.replace(/\d+$/, '')), ['Walkthrough', 'Code', 'Notes', 'Ladders', 'History']);
   // Notes: the statement, every example and the study notes.
   await page.locator('.kit-notes').waitFor();
@@ -100,6 +109,74 @@ try {
   assert.equal(submission.result.total, record.examples.length + record.tests.length);
   await shot('kit-code');
   report.code = `Submit judges all ${submission.result.total} local cases and accepts the reference`;
+
+  if (sqlEntry) {
+    await open(sqlEntry);
+    // Notes: the example's input tables and expected result table.
+    await page.locator('.kit-notes').waitFor();
+    const expected = sqlRecord.examples[0].expected;
+    await page.locator('.kit-notes figure.sql-table', {hasText: 'Expected result'}).first().waitFor();
+    const noteTables = await page.locator('.kit-notes .kit-example').first().textContent();
+    for (const name of Object.keys(sqlRecord.schema)) assert.ok(noteTables.includes(name), `Notes show the ${name} table`);
+    for (const column of expected.columns) assert.ok(noteTables.includes(column), `Notes show the ${column} column`);
+    // Walkthrough: input tables, each CTE, then the result beside the expected table.
+    await page.getByRole('tab', {name: 'Walkthrough'}).click();
+    await page.waitForFunction(() => /^Step 1 of \d+/.test(document.querySelector('.sql-walkthrough .debug-status')?.textContent ?? ''), null, {timeout: 60000});
+    const sqlStatus = page.locator('.sql-walkthrough .debug-status'), steps = Number((await sqlStatus.textContent()).match(/of (\d+)/)[1]);
+    assert.ok(steps >= 2);
+    await page.getByRole('slider', {name: 'Walkthrough timeline'}).fill(String(steps - 1));
+    await page.locator('.sql-walkthrough figure.sql-table', {hasText: 'Expected'}).waitFor();
+    const resultText = await page.locator('.sql-walkthrough .sql-tables').textContent();
+    for (const cell of expected.rows.flat().filter(v => v !== null)) assert.ok(resultText.includes(String(cell)), `The result step shows ${cell}`);
+    assert.ok((await page.locator('.sql-reference').textContent()).includes('SELECT'), 'The walkthrough shows the reference query');
+    await shot('kit-sql-walkthrough');
+    // Code: MySQL is the only language, the examples render as tables, and the reference query is accepted.
+    await page.getByRole('tab', {name: 'Code'}).click();
+    await page.locator('.problem-example .sql-table').first().waitFor();
+    assert.deepEqual(await page.getByRole('combobox', {name: 'Language'}).locator('option').allTextContents(), ['MySQL']);
+    await page.locator('.monaco-editor').first().waitFor();
+    await page.locator('.solution-button').click();
+    await page.getByRole('button', {name: 'Show solution'}).click();
+    await page.getByRole('button', {name: 'Use as draft'}).first().click();
+    await page.getByRole('button', {name: 'Use as draft'}).last().click();
+    await page.getByRole('button', {name: /^Submit/}).click();
+    await page.waitForFunction(() => window.fixture.submissions.length === 2, null, {timeout: 60000});
+    const sqlSubmission = await page.evaluate(() => window.fixture.submissions[1]);
+    assert.equal(sqlSubmission.language, 'sql');
+    assert.equal(sqlSubmission.result.verdict, 'Accepted', JSON.stringify(sqlSubmission.result.cases?.find(c => c.verdict !== 'Accepted')));
+    assert.equal(sqlSubmission.result.total, sqlRecord.examples.length + sqlRecord.tests.length);
+    await page.locator('.judge-summary').waitFor();
+    await shot('kit-sql-code');
+    report.sql = `SQL kit ${sqlEntry.number}: example tables in Notes, a ${steps}-step query walkthrough, and Submit accepts the reference on ${sqlSubmission.result.total} cases`;
+  }
+  if (eventsEntry) {
+    await open(eventsEntry);
+    await page.getByRole('tab', {name: 'Walkthrough'}).click();
+    await page.waitForFunction(() => /^Step 1 of \d+/.test(document.querySelector('.trace-walkthrough .debug-status')?.textContent ?? ''), null, {timeout: 60000});
+    const traceSteps = Number((await page.locator('.trace-walkthrough .debug-status').textContent()).match(/of (\d+)/)[1]);
+    assert.equal(await page.locator('.trace-timeline li').count(), traceSteps - 1, 'Every traced event is on the timeline');
+    assert.match(await page.locator('.walkthrough-narration').textContent(), /^t = \d+ ms/);
+    await page.getByRole('slider', {name: 'Walkthrough timeline'}).fill(String(traceSteps - 1));
+    await page.waitForFunction(() => document.querySelector('.walkthrough-narration')?.textContent?.includes('Finished.'));
+    assert.ok((await page.locator('.walkthrough-narration').textContent()).includes(JSON.stringify(eventsRecord.examples[0].expected)), 'The last step shows the scenario answer');
+    await shot('kit-events-walkthrough');
+    await page.getByRole('tab', {name: 'Code'}).click();
+    await page.locator('.monaco-editor').first().waitFor();
+    assert.deepEqual(await page.getByRole('combobox', {name: 'Language'}).locator('option').allTextContents(), ['JavaScript', 'TypeScript']);
+    assert.equal(await page.getByRole('button', {name: 'Debug', exact: true}).count(), 0, 'Events kits have no live debugger');
+    assert.ok((await page.locator('.contract').textContent()).includes(eventsRecord.api), 'The contract shows the API');
+    await page.locator('.solution-button').click();
+    await page.getByRole('button', {name: 'Show solution'}).click();
+    await page.getByRole('button', {name: 'Use as draft'}).first().click();
+    await page.getByRole('button', {name: 'Use as draft'}).last().click();
+    const before = await page.evaluate(() => window.fixture.submissions.length);
+    await page.getByRole('button', {name: /^Submit/}).click();
+    await page.waitForFunction(count => window.fixture.submissions.length === count + 1, before, {timeout: 60000});
+    const eventsSubmission = await page.evaluate(() => window.fixture.submissions.at(-1));
+    assert.equal(eventsSubmission.result.verdict, 'Accepted', JSON.stringify(eventsSubmission.result.cases?.find(c => c.verdict !== 'Accepted')));
+    assert.equal(eventsSubmission.result.total, eventsRecord.examples.length + eventsRecord.tests.length);
+    report.events = `Events kit ${eventsEntry.number}: a ${traceSteps}-step timeline walkthrough in virtual time, and Submit accepts the reference on ${eventsSubmission.result.total} cases, generated ones included`;
+  }
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(ROOT, 'test-results/generated-kits.json'), JSON.stringify({passed: true, kit: entry.number, ...report}, null, 2));
   for (const line of Object.values(report)) console.log(`PASS ${line}`);

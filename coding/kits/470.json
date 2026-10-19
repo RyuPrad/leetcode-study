@@ -1,0 +1,53 @@
+{
+  "number": 470,
+  "title": "Implement Rand10() Using Rand7()",
+  "spec": "leetcode",
+  "statement": "A global function `rand7()` is available; each call returns an integer from `1` to `7`, every value equally likely and independent of earlier calls. Write `rand10()`, which must return an integer from `1` to `10` with every value equally likely, independently on each call. Its only source of randomness may be `rand7()`: do not use `Math.random` or any other random generator.\n\nEach test case is one number `n`, the number of times the judge calls `rand10()`. It is not passed to your function (the `n` parameter is `undefined`); `rand10()` is simply called `n` times and the answer is the list of its results in order. Because many lists are correct, the judge accepts any list that fits:\n\n- it has `n` integers, each from `1` to `10`;\n- `rand7` is driven by a fixed seed, and when `n >= 2000` the counts of single results and of consecutive pairs must pass chi-square tests for uniformity;\n- `rand7` must be called often enough to make `n` uniform results possible: `7^calls >= 10^n`.",
+  "constraints": [
+    "1 <= n <= 10^5",
+    "rand10 may get randomness only from rand7"
+  ],
+  "signature": "int rand10(int n)",
+  "entry": "rand10",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [n] = input;\n  if (!Array.isArray(actual) || actual.length !== n) return false;\n  if (!actual.every(v => Number.isInteger(v) && v >= 1 && v <= 10)) return false;\n  // Short lists cannot be told apart from random ones; long ones must pass two chi-square tests.\n  if (n < 2000) return true;\n  const single = new Array(10).fill(0);\n  for (const v of actual) single[v - 1]++;\n  const pairs = new Array(100).fill(0);\n  for (let i = 0; i + 1 < n; i += 2) pairs[(actual[i] - 1) * 10 + actual[i + 1] - 1]++;\n  const chiSquare = (counts, total) => {\n    const each = total / counts.length;\n    return counts.reduce((sum, c) => sum + (c - each) ** 2 / each, 0);\n  };\n  // Thresholds with a false-alarm chance of about 1e-7 for 9 and 99 degrees of freedom.\n  return chiSquare(single, n) < 50 && chiSquare(pairs, Math.floor(n / 2)) < 200;\n}",
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 100000) return 'n is a whole number from 1 to 10^5.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [n] = input;\n  // rand7 comes from a seeded generator (mulberry32), so every run is repeatable.\n  let state = (0x2545f491 ^ Math.imul(n, 0x9e3779b1)) >>> 0;\n  let calls = 0;\n  globalThis.rand7 = () => {\n    calls++;\n    state = (state + 0x6d2b79f5) >>> 0;\n    let t = state;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return 1 + Math.floor((((t ^ (t >>> 14)) >>> 0) / 4294967296) * 7);\n  };\n  const random = Math.random;\n  Math.random = () => { throw new Error('Math.random is not allowed: build rand10 from rand7() only.'); };\n  const results = [];\n  try {\n    for (let i = 0; i < n; i++) results.push(solve());\n  } finally {\n    Math.random = random;\n  }\n  if (calls * Math.log(7) + 1e-9 < n * Math.log(10)) throw new Error(`rand7 was called ${calls} times for ${n} results; uniform results need 7^calls >= 10^n.`);\n  return results;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function rand10() {\n  while (true) {\n    const row = rand7();\n    const col = rand7();\n    const index = (row - 1) * 7 + col;\n    if (index <= 40) {\n      return 1 + (index - 1) % 10;\n    }\n  }\n}",
+  "brute": "function rand10() {\n  // A fair bit from 1..6 (parity) and a uniform 1..5, both by rejection, pick one of ten values.\n  let six;\n  do { six = rand7(); } while (six === 7);\n  let five;\n  do { five = rand7(); } while (five > 5);\n  return (six % 2) * 5 + five;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') return [50000 + Math.floor(rand() * 50001)];\n  return [1 + Math.floor(rand() * 30)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1],"expected":[2]},
+    {"name":"Example 2","input":[2],"expected":[2,8]},
+    {"name":"Example 3","input":[3],"expected":[3,8,10]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[4]},
+    {"name":"Test 2","input":[10]},
+    {"name":"Test 3","input":[25]},
+    {"name":"Test 4","input":[100]},
+    {"name":"Test 5","input":[1000]},
+    {"name":"Test 6","input":[2000]},
+    {"name":"Test 7","input":[5000]},
+    {"name":"Test 8","input":[20000]},
+    {"name":"Test 9","input":[50000]},
+    {"name":"Test 10","input":[100000]}
+  ],
+  "notes": "## Intuition\n\nOne call to `rand7` has only 7 outcomes, and 7 cannot be split evenly into 10 groups, so a single call is never enough. Two calls give 49 equally likely pairs. Number them `1..49`; the first 40 split evenly into ten groups of four, and the last 9 are thrown away and tried again. Throwing away keeps fairness: given that we stop, each of the 40 kept numbers is equally likely, so each result `1..10` is too. (The brute force builds a fair coin and a uniform `1..5` the same way, by rejecting values, and combines them.)\n\n## Approach\n\n1. Call `rand7` twice to get `row` and `col`.\n2. Turn the pair into `index = (row - 1) * 7 + col`, a uniform number from 1 to 49.\n3. If `index <= 40`, return `1 + (index - 1) % 10`; each result comes from exactly four indices.\n4. Otherwise reject the pair and repeat.\n\n## Example 1, step by step\n\nWith `n = 1`, `rand10()` runs once. The judge's seeded `rand7` returns `row = 3` and then `col = 5`, so `index = (3 - 1) * 7 + 5 = 19`. Since `19 <= 40`, the result is `1 + 18 % 10 = 9` and the answer is `[9]`. LeetCode's sample shows `[2]` because its random source differs; any single value from 1 to 10 is accepted for this case.\n\n## Complexity\n\n- Time: expected O(1). A round succeeds with probability 40/49, so it takes 49/40 rounds and 2.45 calls to `rand7` on average; the worst case is unbounded but exponentially unlikely.\n- Space: O(1).\n\n## Pitfalls\n\n- `rand7() + rand7()` and `rand7() * rand7()` are not uniform: middle sums and some products are far more likely.\n- Keeping all 49 indices with `index % 10` gives one result only four chances out of 49 and the others five.\n- Reject and retry rather than \"fixing\" a rejected index; any reuse must keep every outcome equally likely.\n- Follow-up: the 9 rejected values and later leftovers can seed the next round (9 × 7 = 63, then 3 × 7 = 21), cutting the average to about 2.2 calls.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `row` | first `rand7` result, picks a row of a 7 × 7 grid |\n| `col` | second `rand7` result, picks a column |\n| `index` | the pair's cell number, uniform from 1 to 49 |",
+  "narration": {
+    "2": "Repeat until a round lands in the part of the grid we keep.",
+    "3": "The first rand7 call chooses a row of a 7 by 7 grid.",
+    "4": "The second call chooses a column, so all 49 cells are equally likely.",
+    "5": "Number the cells 1 to 49, row by row.",
+    "6": "Keep only cells 1 to 40: 40 splits evenly into ten groups of four.",
+    "7": "Map the kept cell to 1..10; each result has exactly four cells."
+  }
+}

@@ -24,6 +24,7 @@ import 'monaco-editor/languages/definitions/javascript/register.js';
 import 'monaco-editor/languages/definitions/typescript/register.js';
 import 'monaco-editor/languages/definitions/java/register.js';
 import 'monaco-editor/languages/definitions/cpp/register.js';
+import 'monaco-editor/languages/definitions/mysql/register.js';
 import type { Language } from '../../shared/coding';
 import {language as javascriptTokens} from 'monaco-editor/languages/definitions/javascript/javascript.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
@@ -37,7 +38,7 @@ declare class _Node { val: any; next: _Node | null; random: _Node | null; left: 
 interface MountainArray { get(index: number): number; length(): number; }
 declare function guess(num: number): number;
 declare var console: { log(...data: any[]): void; info(...data: any[]): void; warn(...data: any[]): void; error(...data: any[]): void; debug(...data: any[]): void; };`,'study://types/leetcode.d.ts');
-const models:Record<Language,{id:string;extension:string;label:string}>={javascript:{id:'javascript',extension:'js',label:'JavaScript solution'},typescript:{id:'typescript',extension:'ts',label:'TypeScript solution'},java:{id:'java',extension:'java',label:'Java solution'},c:{id:'c',extension:'c',label:'C solution'}};
+const models:Record<Language,{id:string;extension:string;label:string}>={javascript:{id:'javascript',extension:'js',label:'JavaScript solution'},typescript:{id:'typescript',extension:'ts',label:'TypeScript solution'},java:{id:'java',extension:'java',label:'Java solution'},c:{id:'c',extension:'c',label:'C solution'},sql:{id:'mysql',extension:'sql',label:'SQL query'}};
 (self as any).MonacoEnvironment={getWorker:(_id: string,label: string)=>label==='typescript'||label==='javascript'?new TypeScriptWorker():new EditorWorker()};
 // Load the existing lexer synchronously so navigation also works on the first keypress.
 monaco.languages.setMonarchTokensProvider('javascript',javascriptTokens);

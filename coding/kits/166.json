@@ -1,0 +1,67 @@
+{
+  "number": 166,
+  "title": "Fraction to Recurring Decimal",
+  "spec": "leetcode",
+  "statement": "Return the exact value of the fraction `numerator / denominator` as a decimal string:\n\n- Start with `-` only when the value is negative (zero is `\"0\"`).\n- Write the integer part without leading zeros. If the value is a whole number, that is the whole answer: no decimal point.\n- Otherwise add `.` and the digits after the point. When those digits end in a block that repeats forever, write the block once at the end, wrapped in parentheses (one sixth is `\"0.1(6)\"`).\n- When the value has a finite decimal expansion, return that finite form, with no parentheses and no trailing zeros.\n\nIf a repeating value can be written in more than one such way (`\"0.(3)\"`, `\"0.3(3)\"`, `\"0.(33)\"`), any of them is accepted. The inputs guarantee that the answer is shorter than 10^4 characters.",
+  "constraints": [
+    "-2^31 <= numerator, denominator <= 2^31 - 1",
+    "denominator != 0",
+    "The answer has fewer than 10^4 characters"
+  ],
+  "signature": "String fractionToDecimal(int numerator, int denominator)",
+  "entry": "fractionToDecimal",
+  "kind": "function",
+  "parameters": [
+    "numerator",
+    "denominator"
+  ],
+  "compare": "checker",
+  "checker": "function check([numerator, denominator], actual, expected) {\n  if (typeof actual !== 'string') return false;\n  const match = /^(-?)(0|[1-9][0-9]*)(?:\\.([0-9]*)(?:\\(([0-9]+)\\))?)?$/.exec(actual);\n  if (!match) return false;\n  const [, minus, whole, fixed = '', cycle = ''] = match;\n  if (actual.includes('.') && fixed === '' && cycle === '') return false;\n  // A finite value must be written in its finite form, without trailing zeros.\n  const finite = !expected.includes('(');\n  if (finite && cycle !== '') return false;\n  if (cycle === '' && fixed.endsWith('0')) return false;\n  // whole.fixed(cycle) equals (wholefixedcycle - wholefixed) / (10^|fixed| * (10^|cycle| - 1)).\n  let top = BigInt(whole + fixed);\n  let bottom = 10n ** BigInt(fixed.length);\n  if (cycle !== '') {\n    top = BigInt(whole + fixed + cycle) - top;\n    bottom *= 10n ** BigInt(cycle.length) - 1n;\n  }\n  if (minus && top === 0n) return false;\n  if (minus) top = -top;\n  return top * BigInt(denominator) === BigInt(numerator) * bottom;\n}",
+  "validator": "function validate([numerator, denominator]) {\n  const MIN = -(2 ** 31), MAX = 2 ** 31 - 1;\n  if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) return 'Both values must be integers.';\n  if (numerator < MIN || numerator > MAX || denominator < MIN || denominator > MAX) return 'Both values must fit in a 32-bit signed integer.';\n  if (denominator === 0) return 'denominator must not be 0.';\n  const bottom = Math.abs(denominator);\n  let remainder = Math.abs(numerator) % bottom;\n  let length = String(Math.floor(Math.abs(numerator) / bottom)).length + ((numerator < 0) !== (denominator < 0) && numerator !== 0 ? 1 : 0);\n  if (remainder === 0) return null;\n  length += 1;\n  const seen = new Set();\n  while (remainder !== 0 && !seen.has(remainder)) {\n    seen.add(remainder);\n    remainder = (remainder * 10) % bottom;\n    length += 1;\n    if (length >= 10000) return 'The answer must be shorter than 10^4 characters.';\n  }\n  if (remainder !== 0 && length + 2 >= 10000) return 'The answer must be shorter than 10^4 characters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function fractionToDecimal(numerator, denominator) {\n  if (numerator === 0) {\n    return '0';\n  }\n  const parts = [];\n  if ((numerator < 0) !== (denominator < 0)) {\n    parts.push('-');\n  }\n  const top = Math.abs(numerator);\n  const bottom = Math.abs(denominator);\n  parts.push(String(Math.floor(top / bottom)));\n  let remainder = top % bottom;\n  if (remainder === 0) {\n    return parts.join('');\n  }\n  parts.push('.');\n  const seen = new Map();\n  while (remainder !== 0) {\n    if (seen.has(remainder)) {\n      parts.splice(seen.get(remainder), 0, '(');\n      parts.push(')');\n      return parts.join('');\n    }\n    seen.set(remainder, parts.length);\n    remainder *= 10;\n    parts.push(String(Math.floor(remainder / bottom)));\n    remainder %= bottom;\n  }\n  return parts.join('');\n}",
+  "brute": "function fractionToDecimal(numerator, denominator) {\n  let num = BigInt(numerator);\n  let den = BigInt(denominator);\n  const negative = num !== 0n && (num < 0n) !== (den < 0n);\n  if (num < 0n) num = -num;\n  if (den < 0n) den = -den;\n  const gcd = (a, b) => (b === 0n ? a : gcd(b, a % b));\n  const g = gcd(num, den);\n  num /= g;\n  den /= g;\n  const whole = (negative ? '-' : '') + (num / den).toString();\n  const rest = num % den;\n  if (rest === 0n) return whole;\n  // For a reduced fraction, the digits before the cycle come from the 2s and 5s of den,\n  // and the cycle length is the order of 10 modulo what is left.\n  let m = den, twos = 0, fives = 0;\n  while (m % 2n === 0n) { m /= 2n; twos++; }\n  while (m % 5n === 0n) { m /= 5n; fives++; }\n  const pre = Math.max(twos, fives);\n  let period = 0;\n  if (m > 1n) {\n    period = 1;\n    for (let power = 10n % m; power !== 1n; power = (power * 10n) % m) period++;\n  }\n  const digits = ((rest * 10n ** BigInt(pre + period)) / den).toString().padStart(pre + period, '0');\n  return whole + '.' + digits.slice(0, pre) + (period > 0 ? '(' + digits.slice(pre) + ')' : '');\n}",
+  "generator": "function generate(rand, size) {\n  const MIN = -(2 ** 31), MAX = 2 ** 31 - 1;\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const sign = () => (rand() < 0.5 ? -1 : 1);\n  const pick = (list) => list[int(0, list.length - 1)];\n  // The answer must stay under 10^4 characters; count its fractional digits by long division.\n  const shortEnough = (numerator, denominator) => {\n    const bottom = Math.abs(denominator);\n    let remainder = Math.abs(numerator) % bottom;\n    const seen = new Set();\n    let digits = 0;\n    while (remainder !== 0 && !seen.has(remainder)) {\n      seen.add(remainder);\n      remainder = (remainder * 10) % bottom;\n      digits++;\n      if (digits > 9950) return false;\n    }\n    return true;\n  };\n  for (;;) {\n    let numerator, denominator;\n    const mode = rand();\n    if (size === 'small') {\n      numerator = int(-60, 60);\n      denominator = int(-40, 40);\n      if (mode < 0.1) numerator = pick([MIN, MAX, 0, -1]);\n      else if (mode > 0.9) denominator = pick([MIN, MAX, -1, 1, 7, 81]);\n    } else if (mode < 0.35) {\n      numerator = int(MIN, MAX);\n      denominator = sign() * int(1000, 9900);\n    } else if (mode < 0.55) {\n      const twos = int(0, 30);\n      let bottom = 2 ** twos;\n      while (bottom * 5 <= MAX && rand() < 0.7) bottom *= 5;\n      numerator = int(MIN, MAX);\n      denominator = sign() * bottom;\n    } else if (mode < 0.7) {\n      denominator = sign() * int(1, 46000);\n      numerator = Math.abs(denominator) * int(-46000, 46000);\n    } else if (mode < 0.85) {\n      numerator = pick([MIN, MAX, MIN + 1, -1, 1, 0]);\n      denominator = pick([MIN, MAX, -1, 1, 2, -3, 7, 97, -9999, 65536]);\n    } else {\n      numerator = int(MIN, MAX);\n      denominator = sign() * pick([3, 6, 7, 9, 11, 12, 13, 17, 37, 41, 101, 333, 999, 1001, 7 * 1024, 3 * 78125]);\n    }\n    if (denominator === 0 || !shortEnough(numerator, denominator)) continue;\n    return [numerator, denominator];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,2],"expected":"0.5"},
+    {"name":"Example 2","input":[2,1],"expected":"2"},
+    {"name":"Example 3","input":[4,333],"expected":"0.(012)"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0,-5]},
+    {"name":"Test 2","input":[-50,8]},
+    {"name":"Test 3","input":[7,-12]},
+    {"name":"Test 4","input":[1,6]},
+    {"name":"Test 5","input":[22,7]},
+    {"name":"Test 6","input":[-2147483648,-1]},
+    {"name":"Test 7","input":[-2147483648,1]},
+    {"name":"Test 8","input":[1,-2147483648]},
+    {"name":"Test 9","input":[1,17]},
+    {"name":"Test 10","input":[-1,90]},
+    {"name":"Test 11","input":[1,81]},
+    {"name":"Test 12","input":[2147483647,37]},
+    {"name":"Test 13","input":[1,9887]}
+  ],
+  "notes": "## Intuition\n\nDo the long division you learned at school. After the integer part, each step multiplies the remainder by 10, writes the next digit and keeps a new remainder. The next digit and remainder depend **only** on the current remainder, so as soon as a remainder comes back, everything written since its first appearance repeats forever. Remainders are smaller than the denominator, so the division must either reach remainder 0 (a finite decimal) or revisit a remainder. A map from remainder to the position of the digit it produced tells us exactly where the repeating block starts.\n\n## Approach\n\n1. A zero numerator gives `\"0\"` straight away (this avoids `\"-0\"`).\n2. Push `-` when exactly one of the two inputs is negative, then work with `top = |numerator|` and `bottom = |denominator|`.\n3. Push the integer part `floor(top / bottom)` and keep `remainder = top % bottom`. If it is 0, the answer is a whole number.\n4. Otherwise push `.` and loop while `remainder` is not 0:\n   - If `seen` already has `remainder`, insert `(` at the stored position, push `)` and return.\n   - Store the position where this remainder's digit will go, multiply `remainder` by 10, push the digit `floor(remainder / bottom)` and keep `remainder % bottom`.\n5. If the loop ends because the remainder hit 0, the decimal is finite; join and return.\n\n## Example 1, step by step\n\n`numerator = 1`, `denominator = 2`. The signs agree, so there is no `-`. The integer part is `floor(1 / 2) = 0` and `remainder = 1`, so `parts = [\"0\", \".\"]`. In the loop, remainder 1 is new: `seen` records it at position 2, `remainder` becomes 10, the digit `5` is pushed and `remainder = 10 % 2 = 0`. The loop stops and the answer is `\"0.5\"`.\n\n## Complexity\n\n- Time: O(k), where k is the number of digits after the point; each remainder is visited at most once, so k < |denominator|.\n- Space: O(k) for `seen` and `parts`.\n\n## Pitfalls\n\n- Key the map by the remainder, not the digit: `1/17 = 0.(0588235294117647)` writes `8` twice before the cycle closes.\n- `0 / -5` is `\"0\"`, not `\"-0\"`; handle a zero numerator before choosing the sign.\n- In Java or C, `|-2^31|` overflows a 32-bit integer and `remainder * 10` can too; use 64-bit values there.\n- Record the position before pushing the digit, so `(` lands right before the first repeated digit.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parts` | the pieces of the answer, joined at the end |\n| `top`, `bottom` | absolute values of the numerator and denominator |\n| `remainder` | what is left to divide after the digits written so far |\n| `seen` | maps each remainder to the index in `parts` of the digit it produced |",
+  "narration": {
+    "2": "Zero is just \"0\"; handling it first keeps a negative denominator from producing \"-0\".",
+    "6": "The value is negative exactly when one input is negative and the other is not.",
+    "9": "Divide the absolute values; the sign is already written.",
+    "11": "The integer part is the whole number of times bottom fits into top.",
+    "12": "What is left over still has to be divided after the decimal point.",
+    "13": "Nothing left over: the value is a whole number, so no decimal point.",
+    "17": "seen maps each remainder to where its digit was written.",
+    "18": "Long division ends when the remainder reaches 0 (a finite decimal).",
+    "19": "A remainder seen before means every digit from there on repeats.",
+    "20": "Open the parenthesis right before the digit that remainder produced the first time.",
+    "21": "Close it after the last digit of the cycle.",
+    "24": "Remember where this remainder's digit is about to go.",
+    "25": "Bring down a zero, as in long division by hand.",
+    "26": "The next digit is how many times bottom fits into the new remainder.",
+    "27": "Keep what is left over for the next step.",
+    "29": "The remainder reached 0, so the decimal is finite."
+  }
+}

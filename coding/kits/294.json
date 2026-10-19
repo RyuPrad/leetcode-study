@@ -1,0 +1,63 @@
+{
+  "number": 294,
+  "title": "Flip Game II",
+  "spec": "recalled",
+  "statement": "Two players share the string `currentState`, made only of `'+'` and `'-'` characters, and take turns changing it. On a turn, a player chooses two **adjacent** `'+'` characters (a `\"++\"`) and replaces them with `\"--\"`. A player who has no such pair to flip on their turn loses, and the other player wins.\n\nReturn `true` if the player who moves first can guarantee a win however the opponent plays, and `false` otherwise. Both players may choose any legal move.",
+  "constraints": [
+    "1 <= currentState.length <= 60",
+    "currentState[i] is either '+' or '-'"
+  ],
+  "signature": "boolean canWin(String currentState)",
+  "entry": "canWin",
+  "kind": "function",
+  "parameters": [
+    "currentState"
+  ],
+  "validator": "function validate([currentState]) {\n  if (currentState.length < 1 || currentState.length > 60) return 'currentState has 1 to 60 characters.';\n  if (!/^[+-]+$/.test(currentState)) return \"currentState uses only '+' and '-'.\";\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function canWin(currentState) {\n  const n = currentState.length;\n  const grundy = new Array(n + 1).fill(0);\n\n  for (let size = 2; size <= n; size++) {\n    const reachable = new Set();\n    for (let left = 0; left + 2 <= size; left++) {\n      const right = size - 2 - left;\n      reachable.add(grundy[left] ^ grundy[right]);\n    }\n    let mex = 0;\n    while (reachable.has(mex)) {\n      mex++;\n    }\n    grundy[size] = mex;\n  }\n\n  let total = 0;\n  let run = 0;\n  for (const ch of currentState) {\n    if (ch === '+') {\n      run++;\n    } else {\n      total ^= grundy[run];\n      run = 0;\n    }\n  }\n  total ^= grundy[run];\n  return total !== 0;\n}",
+  "brute": "function canWin(currentState) {\n  // Plain minimax with memo: a position wins if some flip leaves the opponent a losing position.\n  // A position is stored as its sorted lengths of '+' runs (runs shorter than 2 allow no move).\n  const memo = new Map();\n  const wins = (runs) => {\n    const key = runs.join(',');\n    if (memo.has(key)) return memo.get(key);\n    let result = false;\n    for (let r = 0; r < runs.length && !result; r++) {\n      for (let i = 0; i + 2 <= runs[r] && !result; i++) {\n        const next = [...runs.slice(0, r), ...runs.slice(r + 1), i, runs[r] - 2 - i].filter(x => x >= 2).sort((a, b) => a - b);\n        if (!wins(next)) result = true;\n      }\n    }\n    memo.set(key, result);\n    return result;\n  };\n  return wins(currentState.split('-').map(s => s.length).filter(x => x >= 2).sort((a, b) => a - b));\n}",
+  "generator": "function generate(rand, size) {\n  const length = size === 'large' ? 60 : 1 + Math.floor(rand() * 12);\n  const plus = size === 'large' ? 0.85 : 0.5 + rand() * 0.5;\n  let state = '';\n  for (let i = 0; i < length; i++) state += rand() < plus ? '+' : '-';\n  return [state];\n}",
+  "examples": [
+    {"name":"Example 1","input":["++++"],"expected":true},
+    {"name":"Example 2","input":["+"],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["++"]},
+    {"name":"Test 2","input":["+++++"]},
+    {"name":"Test 3","input":["++-++"]},
+    {"name":"Test 4","input":["++++++"]},
+    {"name":"Test 5","input":["+++++++++"]},
+    {"name":"Test 6","input":["+++-++++-+++++"]},
+    {"name":"Test 7","input":["+++++++++++++++++++++"]},
+    {"name":"Test 8","input":["++++++++++-++++++++++"]},
+    {"name":"Test 9","input":["-+++++++-++-++++++++++++++-+++-+++++"]},
+    {"name":"Test 10","input":["+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-"]},
+    {"name":"Test 11","input":["++--++--++--++--++--++--++--++--++--++--++--++--++--++--++--"]},
+    {"name":"Test 12","input":["------------------------------------------------------------"]},
+    {"name":"Test 13","input":["++++++++++++-++++++++++++-++++++++++++"]},
+    {"name":"Test 14","input":["+++++++++++++++++++++++++++++++++++"]}
+  ],
+  "notes": "## Intuition\n\nThe backtracking view: a position is winning when **some** flip leaves the opponent in a losing position, and a position with no flip is lost. Trying every move recursively (even with a memo of seen strings) explores a number of positions that grows exponentially with the length, which answers the follow-up about its running time.\n\nGame theory does much better. A `'-'` never turns back into `'+'`, so every maximal run of `'+'` is a separate little game, and a turn is a move in exactly one of them. Flipping two characters inside a run of length `size`, with `left` characters before them, leaves two runs of lengths `left` and `size - 2 - left`. By the Sprague–Grundy theorem each run has a **Grundy number**: the smallest non-negative integer (the *mex*) that is not the Grundy number of any position one move away. Several independent games together are worth the XOR of their Grundy numbers, and the first player wins exactly when that XOR is not zero.\n\n## Approach\n\n1. Make `grundy` for run lengths `0..n`; lengths 0 and 1 allow no move, so they are 0.\n2. For each `size` from 2 up, put `grundy[left] ^ grundy[right]` for every split into `reachable`, then take the mex.\n3. Scan the string, counting the current `run` of `'+'`; at each `'-'`, XOR that run's Grundy number into `total` and reset.\n4. XOR in the last run, and return `total !== 0`.\n\n## Example 1, step by step\n\n`\"++++\"`, `n = 4`. `grundy[2]`: the only split gives `0 ^ 0 = 0`, so the mex is 1. `grundy[3]`: splits give `{0}`, so 1. `grundy[4]`: splits give `0 ^ 1 = 1`, `0 ^ 0 = 0`, `1 ^ 0 = 1`, so `reachable = {0, 1}` and the mex is 2. The scan never sees `'-'`; the final run of 4 makes `total = 2`, which is not zero, so the answer is `true` (flip the middle pair to leave `\"+--+\"`).\n\n## Complexity\n\n- Time: O(n²): each of the `n` sizes tries up to `n` splits, and the scan is O(n).\n- Space: O(n) for `grundy` and one `reachable` set at a time.\n\n## Pitfalls\n\n- Having a move does not mean winning: `\"+++++\"` is lost, because every flip hands the opponent a winning position.\n- Combine runs with XOR, not addition: `\"++-++\"` is `1 ^ 1 = 0`, a loss (the second player copies each move in the other run).\n- Do not forget the run that ends at the last character; it is added after the loop.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `grundy[size]` | Grundy number of a single run of `size` pluses |\n| `left`, `right` | lengths of the two runs left after a flip |\n| `reachable` | Grundy values one move away from a run of `size` |\n| `mex` | smallest value missing from `reachable` |\n| `run` | length of the current run of `'+'` in the scan |\n| `total` | XOR of the Grundy numbers of the finished runs |",
+  "narration": {
+    "3": "grundy[size] will hold the Grundy number of one run of size pluses; runs of 0 or 1 have no move, so they stay 0.",
+    "5": "Work out the Grundy numbers from short runs to long ones.",
+    "7": "Try every place to flip two pluses inside a run of this size.",
+    "8": "After the flip, left pluses remain on one side and right on the other.",
+    "9": "The two leftover runs form a pair of independent games, worth the XOR of their Grundy numbers.",
+    "12": "The mex is the smallest value no move can reach...",
+    "15": "...and that is the Grundy number of this run length.",
+    "18": "total will be the XOR of the Grundy numbers of all runs in the string.",
+    "20": "Scan the string to find its maximal runs of pluses.",
+    "22": "Another plus extends the current run.",
+    "24": "A minus closes the run: add its game to the total with XOR.",
+    "25": "Start counting a new run.",
+    "28": "Include the run that reaches the end of the string.",
+    "29": "A non-zero XOR means the first player has a winning move."
+  }
+}

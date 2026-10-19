@@ -1,0 +1,67 @@
+{
+  "number": 420,
+  "title": "Strong Password Checker",
+  "spec": "leetcode",
+  "statement": "Call a password strong when all three rules hold:\n\n- its length is between 6 and 20 characters, inclusive;\n- it has a lowercase letter, an uppercase letter and a digit (at least one of each);\n- no character occurs three or more times consecutively (`\"xyyyz1A\"` breaks this rule, `\"xyyzy1A\"` does not).\n\nA single step either inserts one character anywhere, deletes one character, or changes one character into any other character. Return the fewest steps that turn `password` into a strong password, which is `0` when it is strong already.",
+  "constraints": [
+    "1 <= password.length <= 50",
+    "password contains only English letters, digits, '.' and '!'"
+  ],
+  "signature": "int strongPasswordChecker(String password)",
+  "entry": "strongPasswordChecker",
+  "kind": "function",
+  "parameters": [
+    "password"
+  ],
+  "validator": "function validate([password]) {\n  if (typeof password !== 'string') return 'password must be a string.';\n  if (password.length < 1 || password.length > 50) return 'password needs 1 to 50 characters.';\n  if (!/^[A-Za-z0-9.!]+$/.test(password)) return \"Use only letters, digits, '.' and '!'.\";\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function strongPasswordChecker(password) {\n  const n = password.length;\n  let missing = 3;\n  if (/[a-z]/.test(password)) missing--;\n  if (/[A-Z]/.test(password)) missing--;\n  if (/[0-9]/.test(password)) missing--;\n  if (n < 6) {\n    return Math.max(missing, 6 - n);\n  }\n  const runs = [];\n  let start = 0;\n  for (let i = 1; i <= n; i++) {\n    if (i === n || password[i] !== password[start]) {\n      if (i - start >= 3) runs.push(i - start);\n      start = i;\n    }\n  }\n  const deletions = Math.max(0, n - 20);\n  let left = deletions;\n  for (let mod = 0; mod < 3; mod++) {\n    for (let k = 0; k < runs.length; k++) {\n      if (left > 0 && runs[k] >= 3 && runs[k] % 3 === mod) {\n        const cut = Math.min(left, mod < 2 ? mod + 1 : runs[k] - 2);\n        runs[k] -= cut;\n        left -= cut;\n      }\n    }\n  }\n  let replacements = 0;\n  for (const length of runs) {\n    replacements += Math.floor(length / 3);\n  }\n  return deletions + Math.max(missing, replacements);\n}",
+  "brute": "function strongPasswordChecker(password) {\n  // Exact DP over edit scripts. State: last written char code (0 = none or a fresh char that\n  // differs from its neighbours), its run length, the mask of kinds present, and the length written.\n  const kindOf = ch => (ch >= 'a' && ch <= 'z') ? 1 : (ch >= 'A' && ch <= 'Z') ? 2 : (ch >= '0' && ch <= '9') ? 4 : 0;\n  const MAXLEN = 20, SIZE = 128 * 3 * 8 * (MAXLEN + 1);\n  const at = (last, run, mask, len) => ((last * 3 + run) * 8 + mask) * (MAXLEN + 1) + len;\n  const close = layer => {\n    // Insert fresh characters of any kind; lengths only grow, so process them in increasing order.\n    for (let len = 0; len < MAXLEN; len++)\n      for (let last = 0; last < 128; last++)\n        for (let run = 0; run < 3; run++)\n          for (let mask = 0; mask < 8; mask++) {\n            const cost = layer[at(last, run, mask, len)];\n            if (cost === Infinity) continue;\n            for (const kind of [1, 2, 4]) {\n              const to = at(0, 1, mask | kind, len + 1);\n              if (cost + 1 < layer[to]) layer[to] = cost + 1;\n            }\n          }\n  };\n  let layer = new Float64Array(SIZE).fill(Infinity);\n  layer[at(0, 0, 0, 0)] = 0;\n  close(layer);\n  for (const ch of password) {\n    const code = ch.charCodeAt(0), kind = kindOf(ch);\n    const next = new Float64Array(SIZE).fill(Infinity);\n    const relax = (i, c) => { if (c < next[i]) next[i] = c; };\n    for (let last = 0; last < 128; last++)\n      for (let run = 0; run < 3; run++)\n        for (let mask = 0; mask < 8; mask++)\n          for (let len = 0; len <= MAXLEN; len++) {\n            const cost = layer[at(last, run, mask, len)];\n            if (cost === Infinity) continue;\n            relax(at(last, run, mask, len), cost + 1); // delete ch\n            if (len === MAXLEN) continue;\n            if (last !== code) relax(at(code, 1, mask | kind, len + 1), cost); // keep ch\n            else if (run < 2) relax(at(code, run + 1, mask | kind, len + 1), cost);\n            for (const k of [1, 2, 4]) relax(at(0, 1, mask | k, len + 1), cost + 1); // replace ch\n          }\n    close(next);\n    layer = next;\n  }\n  let best = Infinity;\n  for (let last = 0; last < 128; last++)\n    for (let run = 0; run < 3; run++)\n      for (let len = 6; len <= MAXLEN; len++) best = Math.min(best, layer[at(last, run, 7, len)]);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pools = ['aA1.!', 'abAB01', 'aaab', 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.!', 'a1'];\n  const pool = pools[Math.floor(rand() * pools.length)];\n  const target = size === 'large' ? 40 + Math.floor(rand() * 11) : 1 + Math.floor(rand() * 32);\n  let password = '';\n  while (password.length < target) {\n    const ch = pool[Math.floor(rand() * pool.length)];\n    const run = rand() < 0.5 ? 1 : 1 + Math.floor(rand() * 9);\n    password += ch.repeat(Math.min(run, target - password.length));\n  }\n  return [password];\n}",
+  "examples": [
+    {"name":"Example 1","input":["a"],"expected":5},
+    {"name":"Example 2","input":["aA1"],"expected":3},
+    {"name":"Example 3","input":["1337C0d3"],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["aaa"]},
+    {"name":"Test 2","input":["aaaaaa"]},
+    {"name":"Test 3","input":["aaB1"]},
+    {"name":"Test 4","input":["1111111111"]},
+    {"name":"Test 5","input":["ABABABABABABABABABAB1"]},
+    {"name":"Test 6","input":["aaaaaaaaaaaaaaaaaaaaa"]},
+    {"name":"Test 7","input":["bbaaaaaaaaaaaaaaacccccc"]},
+    {"name":"Test 8","input":["aaaabbbbccccddeeddeeddeedd"]},
+    {"name":"Test 9","input":["FFFFFFFFFFFFFFF11111111111111111111AAA"]},
+    {"name":"Test 10","input":["A1234567890aaabbbbccccc"]},
+    {"name":"Test 11","input":["..................!!!"]},
+    {"name":"Test 12","input":["abcdefghijklmnopqrstuvwxyzAB1"]},
+    {"name":"Test 13","input":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+    {"name":"Test 14","input":["Aa1Aa1Aa1Aa1Aa1Aa1Aa"]}
+  ],
+  "notes": "## Intuition\n\nThree things can be wrong: the length, the missing character kinds, and runs of three or more equal characters. The trick is that one step can fix several problems at once. Replacing every third character of a run breaks it (a run of length `L` needs `floor(L / 3)` changes), and each changed character can also supply a missing kind. So, apart from length, the cost is `max(missing, replacements)`.\n\n- **Too short** (`n < 6`): inserting characters breaks runs and adds kinds at the same time, so `max(missing, 6 - n)` steps suffice.\n- **Right length**: no insertions or deletions are needed; the answer is `max(missing, replacements)`.\n- **Too long**: `n - 20` deletions are unavoidable. They are best spent inside runs, where they shrink the replacements still needed. That is the greedy part: a run with `L % 3 === 0` saves a replacement with one deletion, `L % 3 === 1` with two, and any other run with three.\n\nTrying all edit sequences (a DP over edits) also works, but is far slower and harder to get right.\n\n## Approach\n\n1. Count `missing` kinds (lowercase, uppercase, digit).\n2. If `n < 6`, return `max(missing, 6 - n)`.\n3. Collect the lengths of all runs of 3 or more equal characters in `runs`.\n4. Set `deletions = max(0, n - 20)` and `left = deletions`.\n5. Spend `left` greedily by `mod`: one deletion on each run with `L % 3 === 0`, then two on each with `L % 3 === 1`, then as many as are left on the rest, down to length 2.\n6. Sum `floor(L / 3)` over the shortened runs into `replacements`, and return `deletions + max(missing, replacements)`.\n\n## Example 1, step by step\n\n`password = \"a\"` has a lowercase letter, so `missing` drops from 3 to 2. Its length `n = 1` is below 6, so the answer is `max(2, 6 - 1) = 5`: five insertions, two of which are an uppercase letter and a digit.\n\n## Complexity\n\n- Time: O(n): one scan for kinds, one for runs, and three passes over the runs.\n- Space: O(n) for the list of run lengths (at most n / 3 entries).\n\n## Pitfalls\n\n- Do not add up the fixes: a single replacement can both break a run and add a missing kind, so take the maximum.\n- When the password is too long, spend deletions on runs with `L % 3 === 0` first, then `L % 3 === 1`; deleting in the wrong runs wastes them.\n- Deletions do nothing for missing kinds; the deleted count is always added on top.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `missing` | how many of lowercase, uppercase, digit are absent |\n| `runs` | lengths of runs of 3 or more equal characters (shortened by deletions) |\n| `start` | index where the current run began |\n| `deletions` | characters that must be removed, `n - 20` or 0 |\n| `left` | deletions not yet assigned to a run |\n| `mod` | which runs this greedy pass serves (`L % 3`) |\n| `cut` | deletions given to one run in this pass |\n| `replacements` | changes still needed to break the remaining runs |",
+  "narration": {
+    "3": "Assume all three kinds are missing, then cross off each kind that appears.",
+    "7": "A short password is fixed by insertions alone.",
+    "8": "Each insertion lengthens it and can add a missing kind or split a run, so the larger need wins.",
+    "10": "Collect the lengths of runs that are 3 or longer.",
+    "12": "Scan one past the end so the last run is closed too.",
+    "13": "The run ends here: either the string ended or the character changed.",
+    "14": "Only runs of 3 or more need fixing.",
+    "15": "The next run starts at this character.",
+    "18": "Anything over 20 characters must be deleted.",
+    "20": "Greedy passes: runs with length % 3 of 0, then 1, then 2.",
+    "22": "Use this run if deletions remain and it is in the current group.",
+    "23": "One deletion for % 3 = 0 and two for % 3 = 1 each save a replacement; in the last pass delete as much as is useful.",
+    "24": "Shorten the run by the deletions it received.",
+    "25": "Those deletions are now used.",
+    "30": "Look at every run after the deletions.",
+    "31": "Each full group of three in a run needs one replacement.",
+    "33": "Deletions are always needed; replacements also cover missing kinds, so take the larger of the two."
+  }
+}

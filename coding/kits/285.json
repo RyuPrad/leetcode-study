@@ -1,0 +1,60 @@
+{
+  "number": 285,
+  "title": "Inorder Successor in BST",
+  "spec": "recalled",
+  "statement": "You are given `root`, the root of a binary search tree (every value in a node's left subtree is smaller than the node's value, every value in its right subtree is larger, and no two nodes share a value), and a node `p` that belongs to the tree. Return the node visited immediately after `p` in an in-order traversal, which is the node whose value is the smallest one strictly greater than `p.val`. When `p` holds the largest value in the tree it has no successor, so return `null`.\n\nEach case is written as `[root, p]`: the tree as a level-order array with `null` for missing children, followed by the value of `p`. Your function is called with the root and the node object `p` itself (not its value), must not change the tree, and must return a node of the tree or `null`; the result is shown as that node's `val`.",
+  "constraints": [
+    "The tree has between 1 and 10^4 nodes",
+    "-10^5 <= Node.val <= 10^5",
+    "All Node.val are unique",
+    "root is a valid binary search tree",
+    "p is a node of the tree"
+  ],
+  "signature": "TreeNode inorderSuccessor(TreeNode root, int p)",
+  "entry": "inorderSuccessor",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "p"
+  ],
+  "validator": "function validate([root, p]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs a root.';\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10^4 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -100000 || v > 100000)) return 'Node values are integers between -10^5 and 10^5.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  if (!values.includes(p)) return 'p must be a value in the tree.';\n  // Link the level-order array into child indexes, then walk it in order: a BST gives rising values.\n  const left = [], right = [], queue = [0];\n  let next = 1;\n  for (let k = 0; k < queue.length && next < root.length; k++) {\n    const at = queue[k];\n    if (next < root.length && root[next] !== null) { left[at] = next; queue.push(next); }\n    next++;\n    if (next < root.length && root[next] !== null) { right[at] = next; queue.push(next); }\n    next++;\n  }\n  const stack = [];\n  let at = 0, previous = -Infinity;\n  while (at !== undefined || stack.length) {\n    while (at !== undefined) { stack.push(at); at = left[at]; }\n    at = stack.pop();\n    if (root[at] <= previous) return 'The tree must be a binary search tree.';\n    previous = root[at];\n    at = right[at];\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, p] = input;\n  const root = kit.toTree(values);\n  // Collect the nodes with an explicit stack so that deep trees need no recursion here.\n  const nodes = [];\n  const stack = [root];\n  while (stack.length) {\n    const node = stack.pop();\n    nodes.push(node);\n    if (node.right) stack.push(node.right);\n    if (node.left) stack.push(node.left);\n  }\n  const links = nodes.map(node => [node.val, node.left, node.right]);\n  const result = solve(root, nodes.find(node => node.val === p));\n  const intact = nodes.every((node, i) => node.val === links[i][0] && node.left === links[i][1] && node.right === links[i][2]);\n  if (!intact) throw new Error('The tree must not be modified.');\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null) return null;\n  if (!new Set(nodes).has(result)) throw new Error('Return a node of the tree or null.');\n  return result.val;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function inorderSuccessor(root, p) {\n  let successor = null;\n  let node = root;\n  while (node !== null) {\n    if (node.val > p.val) {\n      successor = node;\n      node = node.left;\n    } else {\n      node = node.right;\n    }\n  }\n  return successor;\n}",
+  "brute": "function inorderSuccessor(root, p) {\n  // List every node in order with an explicit stack, then take the one after p.\n  const order = [];\n  const stack = [];\n  let node = root;\n  while (node || stack.length) {\n    while (node) { stack.push(node); node = node.left; }\n    node = stack.pop();\n    order.push(node);\n    node = node.right;\n  }\n  const index = order.indexOf(p);\n  return index + 1 < order.length ? order[index + 1] : null;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const n = large ? 900 + pick(90) : 1 + pick(10);\n  const span = large || rand() < 0.3 ? 100000 : 15;\n  const used = new Set();\n  const keys = [];\n  while (keys.length < n) {\n    const v = pick(2 * span + 1) - span;\n    if (!used.has(v)) { used.add(v); keys.push(v); }\n  }\n  // Inserting in random order gives a bushy tree; sorted or reversed order gives a chain.\n  const shape = pick(4);\n  if (shape === 2) keys.sort((a, b) => a - b);\n  if (shape === 3) keys.sort((a, b) => b - a);\n  let root = null;\n  for (const val of keys) {\n    const fresh = { val, left: null, right: null };\n    if (!root) { root = fresh; continue; }\n    let node = root;\n    for (;;) {\n      const side = val < node.val ? 'left' : 'right';\n      if (!node[side]) { node[side] = fresh; break; }\n      node = node[side];\n    }\n  }\n  const level = [];\n  const queue = [root];\n  for (let k = 0; k < queue.length; k++) {\n    level.push(queue[k] ? queue[k].val : null);\n    if (queue[k]) queue.push(queue[k].left, queue[k].right);\n  }\n  while (level[level.length - 1] === null) level.pop();\n  // Sometimes ask about the largest value, whose answer is null.\n  const p = rand() < 0.2 ? Math.max(...keys) : keys[pick(n)];\n  return [level, p];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,1,3],1],"expected":2},
+    {"name":"Example 2","input":[[5,3,6,2,4,null,null,1],6],"expected":null}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[2,1,3],2]},
+    {"name":"Test 3","input":[[2,1,3],3]},
+    {"name":"Test 4","input":[[5,3,6,2,4,null,null,1],4]},
+    {"name":"Test 5","input":[[5,3,6,2,4,null,null,1],1]},
+    {"name":"Test 6","input":[[5,3,6,2,4,null,null,1],3]},
+    {"name":"Test 7","input":[[5,3,6,2,4,null,null,1],5]},
+    {"name":"Test 8","input":[[1,null,2,null,3,null,4],2]},
+    {"name":"Test 9","input":[[4,3,null,2,null,1],3]},
+    {"name":"Test 10","input":[[0,-100000,100000],-100000]},
+    {"name":"Test 11","input":[[8,4,12,2,6,10,14,1,3,5,7,9,11,13,15],7]},
+    {"name":"Test 12","input":[[8,4,12,2,6,10,14,1,3,5,7,9,11,13,15],15]},
+    {"name":"Test 13","input":[[8,4,12,2,6,10,14,1,3,5,7,9,11,13,15],12]},
+    {"name":"Test 14","generate":{"seed":28514,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe plain way is to list the whole tree in order and take the entry after `p`, which costs O(n) time and memory. The search-tree ordering lets us skip most of the tree. The successor is the smallest value above `p.val`, so walk down from the root as if searching for `p.val`. Whenever a node's value is larger than `p.val`, it is a candidate, and anything better must be smaller, so it lies to the left. Whenever the value is at most `p.val`, that node and its whole left subtree are too small, so go right. The last candidate seen is the answer.\n\n## Approach\n\n1. Start with `successor = null` and `node = root`.\n2. While `node` is not `null`:\n   - if `node.val > p.val`, record `node` as `successor` and move to `node.left`;\n   - otherwise move to `node.right`.\n3. Return `successor`, which stays `null` if no value was larger than `p.val`.\n\n## Example 1, step by step\n\nThe tree is `2` with children `1` and `3`, and `p` is the node `1`.\n\n- At `2`: `2 > 1`, so `successor = 2` and the walk goes left to `1`.\n- At `1`: `1 > 1` is false, so it goes right, to `null`.\n- The loop ends and node `2` is returned.\n\nIn Example 2, `p = 6`: `5` is not larger, go right to `6`; `6` is not larger, go right to `null`. No candidate was recorded, so the answer is `null`.\n\n## Complexity\n\n- Time: O(h), where h is the tree's height: one step down per loop (O(n) for a chain, O(log n) when balanced).\n- Space: O(1): only two variables.\n\n## Pitfalls\n\n- Use a strict `>`: when `node.val === p.val` the node is `p` itself, so the search must go right.\n- Do not stop at the first larger node; a smaller candidate may still be in its left subtree.\n- If `p` has a right subtree, the answer is the leftmost node there; if not, it is an ancestor. The single walk covers both cases, so no parent pointers are needed.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `root` | root of the search tree |\n| `p` | the node whose successor is wanted |\n| `node` | the node the walk is currently at |\n| `successor` | the smallest node above `p.val` found so far, or `null` |",
+  "narration": {
+    "2": "No node larger than p has been seen yet.",
+    "3": "Begin the walk at the root.",
+    "4": "Keep walking down until the path runs out.",
+    "5": "Is this node's value above p's? Then it could be the successor.",
+    "6": "It is the smallest larger value so far, because each candidate is smaller than the previous one.",
+    "7": "Anything closer to p.val must be smaller still, so look left.",
+    "9": "This node is p or smaller, so it and its left subtree are too small; look right.",
+    "12": "The last candidate recorded is the in-order successor, or null if there was none."
+  }
+}

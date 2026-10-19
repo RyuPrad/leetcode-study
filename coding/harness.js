@@ -13,6 +13,39 @@ export function installEnvironment() {
   globalThis._Node = globalThis.Node;
 }
 
+// Virtual time for events kits (io.events), serialized into QuickJS: timers fire in time order as the host
+// advances the clock with __studyTick, Date.now() and performance.now() read the virtual clock, and
+// adapters record what happens with kit.trace(text).
+export function installVirtualTime() {
+  let now = 0, order = 0;
+  const timers = new Map();
+  globalThis.__studyTrace = [];
+  const schedule = (callback, delay, args, repeat) => {
+    if (typeof callback !== 'function') throw new TypeError('The timer callback must be a function.');
+    const id = ++order, wait = Math.max(0, Number(delay) || 0);
+    timers.set(id, { callback, args, at: now + wait, every: repeat ? Math.max(1, wait) : 0, order: id });
+    return id;
+  };
+  globalThis.setTimeout = (callback, delay, ...args) => schedule(callback, delay, args, false);
+  globalThis.setInterval = (callback, delay, ...args) => schedule(callback, delay, args, true);
+  globalThis.clearTimeout = globalThis.clearInterval = id => { timers.delete(id); };
+  globalThis.queueMicrotask = callback => { Promise.resolve().then(callback); };
+  Date.now = () => now;
+  globalThis.performance = { now: () => now };
+  globalThis.__studyNow = () => now;
+  // Runs the earliest timer (the first scheduled among equals); false when none is left.
+  globalThis.__studyTick = () => {
+    let next = null;
+    for (const [id, timer] of timers) if (!next || timer.at < next[1].at || timer.at === next[1].at && timer.order < next[1].order) next = [id, timer];
+    if (!next) return false;
+    const [id, timer] = next;
+    now = timer.at;
+    if (timer.every) { timer.at += timer.every; timer.order = ++order; } else timers.delete(id);
+    timer.callback(...timer.args);
+    return true;
+  };
+}
+
 export function executeCase(number, input, entry, deserializeFn, spec) {
   const clone = value => JSON.parse(JSON.stringify(value));
   const original = JSON.stringify(input);
@@ -34,7 +67,8 @@ export function executeCase(number, input, entry, deserializeFn, spec) {
       return value === undefined ? value : clone(value);
     };
     if (spec.seed !== undefined) { let seed = spec.seed; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
-    if (spec.adapter) return globalThis.__studyAdapter(clone(input), entry, { ListNode, TreeNode, Node, clone, listNodes, toList, fromList, toTree, fromTree, findNode });
+    const trace = text => { if (globalThis.__studyTrace && globalThis.__studyTrace.length < 500) globalThis.__studyTrace.push({ t: globalThis.__studyNow ? globalThis.__studyNow() : 0, text: String(text).slice(0, 300) }); };
+    if (spec.adapter) return globalThis.__studyAdapter(clone(input), entry, { ListNode, TreeNode, Node, clone, listNodes, toList, fromList, toTree, fromTree, findNode, trace });
     if (spec.kind === 'design') {
       const [ops, args] = input, obj = new entry(...args[0].map((value, i) => toValue(spec.ctor[i], clone(value)))), result = [null];
       for (let i = 1; i < ops.length; i++) {

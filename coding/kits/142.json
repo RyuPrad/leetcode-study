@@ -1,0 +1,61 @@
+{
+  "number": 142,
+  "title": "Linked List Cycle II",
+  "spec": "leetcode",
+  "statement": "`head` is the first node of a singly linked list, or `null` when the list is empty. Following `next` pointers from `head` may eventually bring you back to a node you already passed, which means the list contains a loop. Return the node where that loop begins, which is the first node reached a second time, or `null` when following `next` ends at `null`. Leave the list unchanged.\n\nEach case is written as `[head, pos]`: the node values in order, and `pos`, the 0-based index of the node that the last node's `next` points to (`-1` means it points to `null`). Your function receives only the head node and never sees `pos`. The result is shown as the index of the node you return, or `-1` for `null`.",
+  "constraints": [
+    "The list has between 0 and 10^4 nodes",
+    "-10^5 <= Node.val <= 10^5",
+    "pos is -1 or the index of a node in the list"
+  ],
+  "signature": "ListNode detectCycle(ListNode head, int pos)",
+  "entry": "detectCycle",
+  "kind": "function",
+  "parameters": [
+    "head",
+    "pos"
+  ],
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, pos] = input;\n  const nodes = kit.listNodes(values);\n  const target = pos >= 0 ? nodes[pos] : null;\n  if (nodes.length > 0) nodes[nodes.length - 1].next = target;\n  // LeetCode passes only the head; pos just describes how the list was built.\n  const result = solve(nodes[0] || null);\n  const intact = nodes.every((node, i) => node.val === values[i] && node.next === (i + 1 < nodes.length ? nodes[i + 1] : target));\n  if (!intact) throw new Error('The linked list must not be modified.');\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null) return -1;\n  const index = nodes.indexOf(result);\n  if (index < 0) throw new Error('Return a node of the input list, or null.');\n  return index;\n}",
+  "validator": "function validate([head, pos]) {\n  if (head.length > 10000) return 'The list has at most 10^4 nodes.';\n  if (head.some(v => v < -100000 || v > 100000)) return 'Node values are between -10^5 and 10^5.';\n  if (pos !== -1 && (pos < 0 || pos >= head.length)) return 'pos is -1 or the index of a node in the list.';\n  return null;\n}",
+  "reference": "function detectCycle(head) {\n  let slow = head;\n  let fast = head;\n  while (fast !== null && fast.next !== null) {\n    slow = slow.next;\n    fast = fast.next.next;\n    if (slow === fast) {\n      let entry = head;\n      while (entry !== slow) {\n        entry = entry.next;\n        slow = slow.next;\n      }\n      return entry;\n    }\n  }\n  return null;\n}",
+  "brute": "function detectCycle(head) {\n  const visited = new Set();\n  for (let node = head; node !== null; node = node.next) {\n    if (visited.has(node)) return node;\n    visited.add(node);\n  }\n  return null;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 2000 : Math.floor(rand() * 9);\n  const span = size === 'large' ? 100000 : 3;\n  const head = Array.from({ length: n }, () => Math.floor(rand() * (2 * span + 1)) - span);\n  const pos = n === 0 || rand() < 0.3 ? -1 : Math.floor(rand() * n);\n  return [head, pos];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,2,0,-4],1],"expected":1},
+    {"name":"Example 2","input":[[1,2],0],"expected":0},
+    {"name":"Example 3","input":[[1],-1],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],-1]},
+    {"name":"Test 2","input":[[5],0]},
+    {"name":"Test 3","input":[[1,2,3,4,5],-1]},
+    {"name":"Test 4","input":[[1,2,3,4,5],4]},
+    {"name":"Test 5","input":[[1,2,3,4,5],0]},
+    {"name":"Test 6","input":[[7,7,7,7,7,7],3]},
+    {"name":"Test 7","input":[[1,2],-1]},
+    {"name":"Test 8","input":[[-100000,100000,0],1]},
+    {"name":"Test 9","input":[[3,1,4,1,5,9,2,6,5,3,5],6]},
+    {"name":"Test 10","input":[[-40,-37,-34,-31,-28,-25,-22,-19,-16,-13,-10,-7,-4,-1,2,5,8,11,14,17,20,23,26,29,32,35,38,41,44,47],28]},
+    {"name":"Test 11","input":[[0,6,1,7,2,8,3,9,4,10,5,0,6,1,7,2,8,3,9,4,10,5,0,6,1,7,2,8,3,9,4,10,5,0,6,1,7,2,8,3],2]},
+    {"name":"Test 12","generate":{"seed":14212,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRemembering every visited node in a set finds the answer directly: the first node met twice is where the loop starts. That needs O(n) extra memory. Floyd's fast and slow pointers need O(1): `fast` moves two nodes per round and `slow` one. Without a loop, `fast` runs off the end. With one, both end up circling it and `fast` gains one node per round, so they must meet.\n\nWhy the meeting point helps: let `a` be the steps from the head to the loop start, `c` the loop length, and say they meet `b` steps into the loop. `slow` walked `a + b` steps and `fast` twice that, so the extra `a + b` is a whole number of laps `k·c`. Hence `a = k·c - b`: walking `a` steps from the meeting point lands on the loop start, exactly where a pointer walking `a` steps from the head arrives.\n\n## Approach\n\n1. Start `slow` and `fast` at `head`.\n2. While `fast` and `fast.next` exist, move `slow` one node and `fast` two.\n3. If they land on the same node, there is a loop: start `entry` at `head`.\n4. Move `entry` and `slow` one node at a time until they are the same node, and return it.\n5. If `fast` reaches the end, return `null`.\n\n## Example 1, step by step\n\nThe list is `3 -> 2 -> 0 -> -4`, and `-4` links back to index 1.\n\n- Round 1: `slow` at index 1, `fast` at index 2.\n- Round 2: `slow` at index 2, `fast` at index 1 (3, then back to 1).\n- Round 3: `slow` at index 3, `fast` at index 3: they meet.\n- `entry` starts at index 0. One step moves `entry` to index 1 and `slow` from index 3 to index 1. They are the same node, so index 1 is returned.\n\n## Complexity\n\n- Time: O(n): `slow` takes at most about n steps before the meeting, and the second phase at most n more.\n- Space: O(1): three pointers.\n\n## Pitfalls\n\n- Check `fast !== null && fast.next !== null` before jumping two nodes, or lists without a loop crash.\n- Compare nodes, not values: values repeat, as in `[7,7,7,7]`.\n- Start both pointers at `head`; starting `fast` one node ahead shifts the meeting point and the second phase misses the start.\n- Do not mark nodes by changing `val` or `next`; the list must stay as it was.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `slow` | pointer that moves one node per round |\n| `fast` | pointer that moves two nodes per round |\n| `entry` | pointer that walks from the head to the loop start |",
+  "narration": {
+    "2": "slow will move one node per round.",
+    "3": "fast starts at the same node and will move two nodes per round.",
+    "4": "Keep going while fast can jump two nodes; if it cannot, the list ends and has no loop.",
+    "5": "Advance slow by one node.",
+    "6": "Advance fast by two nodes.",
+    "7": "The pointers can only land on the same node inside a loop.",
+    "8": "A new pointer starts back at the head.",
+    "9": "Walk entry and slow together until they meet.",
+    "10": "entry moves one node toward the loop start from the head...",
+    "11": "...while slow moves the same distance on from the meeting point.",
+    "13": "They meet exactly at the first node of the loop.",
+    "16": "fast ran off the end of the list, so there is no loop."
+  }
+}
