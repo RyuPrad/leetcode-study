@@ -54,7 +54,7 @@ add('test:typing', node('tests/typing.mjs'));
 add('test:ladders', node('tests/method-ladders.mjs'));
 add('check:kits', tsx('scripts/check-kits.ts'), 'node', 2);
 add('test:kits', node('tests/generated-kits.mjs'));
-for (const [name, f] of [['test:e2e', 'desktop'], ['restore-isolation', 'restore-isolation'], ['test:motion:desktop', 'pointer-motion'], ['test:objects:desktop', 'object-view'], ['test:objects:readability:desktop', 'object-view-readability'], ['test:layout:desktop', 'ui-layout'], ['test:panels:desktop', 'panel-layout'], ['test:coding', 'coding'], ['test:debugger', 'debugger'], ['test:guided:desktop', 'guided']])
+for (const [name, f] of [['test:e2e', 'desktop'], ['restore-isolation', 'restore-isolation'], ['test:motion:desktop', 'pointer-motion'], ['test:objects:desktop', 'object-view'], ['test:objects:readability:desktop', 'object-view-readability'], ['test:layout:desktop', 'ui-layout'], ['test:panels:desktop', 'panel-layout'], ['test:coding', 'coding'], ['test:debugger', 'debugger'], ['test:guided:desktop', 'guided'], ['test:kits:desktop', 'kits']])
   add(name, node(`tests/${f}.e2e.mjs`), 'desktop');
 
 const logs = path.join(ROOT, 'test-results/logs'), timingsFile = path.join(ROOT, 'test-results/timings.json');

@@ -66,6 +66,8 @@ export function kitErrors(record: any, number?: number): string[] {
   if (record.compare === 'checker' && !text(record.checker)) errors.push('Checker mode needs a checker.');
   if (record.compare === 'checker' && record.languages?.some((l: string) => l === 'java' || l === 'c')) errors.push('Checker kits are judged in JavaScript and TypeScript only.');
   if (record.adapter && record.languages?.some((l: string) => l === 'java' || l === 'c')) errors.push('Adapter kits are judged in JavaScript and TypeScript only.');
+  // The Java and C judges return the first argument for in-place changes and have no retained-prefix output.
+  if ((record.io?.prefix || record.io?.mutates) && record.languages?.some((l: string) => l === 'java' || l === 'c')) errors.push('Kits with a retained prefix or a change to a later argument are judged in JavaScript and TypeScript only.');
   for (const key of ['checker', 'validator', 'adapter', 'brute', 'generator']) if (record[key] !== undefined && !text(record[key])) errors.push(`${key} must be source text.`);
   const cases = (list: unknown, name: string, expected: boolean) => {
     if (!Array.isArray(list)) { errors.push(`${name} must be a list.`); return; }

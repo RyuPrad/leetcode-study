@@ -1,6 +1,7 @@
 // Compiles and runs the generated Java and C starter of every problem on its examples with the
 // bundled toolchains. Starters return default values, so the only acceptable failures are the
 // harness's own messages about missing results; anything else is a signature or harness defect.
+// Generated study kits are included in the languages they offer.
 // Usage: npx tsx scripts/check-native.ts [java|c] [problem numbers...]
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,10 +9,13 @@ import path from 'node:path';
 import { starter } from '../coding/languages';
 import { runNative, nativeAvailable, type NativeLanguage } from '../desktop/native-runner';
 import type { CodingProblem } from '../shared/coding';
-import { ROOT } from './content.mjs';
+import { KITS_PATH, ROOT } from './content.mjs';
+import { kitProblem } from '../coding/kits';
 import { workers } from './workers.mjs';
 
-const problems = JSON.parse(fs.readFileSync(path.join(ROOT, 'coding/problems.json'), 'utf8')) as CodingProblem[];
+const kitDir = path.join(ROOT, KITS_PATH);
+const kits = fs.existsSync(kitDir) ? fs.readdirSync(kitDir).filter(f => /^\d+\.json$/.test(f)).map(f => kitProblem(JSON.parse(fs.readFileSync(path.join(kitDir, f), 'utf8')))) : [];
+const problems = [...JSON.parse(fs.readFileSync(path.join(ROOT, 'coding/problems.json'), 'utf8')) as CodingProblem[], ...kits];
 const args = process.argv.slice(2);
 const languages = (args.filter(a => a === 'java' || a === 'c') as NativeLanguage[]);
 const numbers = new Set(args.filter(a => /^\d+$/.test(a)).map(Number));
@@ -26,7 +30,7 @@ let failures = 0;
 const record = (key: string, number: number) => outcomes.set(key, [...(outcomes.get(key) ?? []), number]);
 for (const language of languages.length ? languages : ['java', 'c'] as NativeLanguage[]) {
   if (!nativeAvailable(options, language)) throw new Error(`The ${language} toolchain is missing. Run npm run fetch:toolchains and npm run build.`);
-  const selected = problems.filter(p => !numbers.size || numbers.has(p.number));
+  const selected = problems.filter(p => (!numbers.size || numbers.has(p.number)) && (!p.languages || p.languages.includes(language)));
   let next = 0;
   // A few jobs at once; each is its own process.
   await Promise.all(Array.from({ length: workers({ perWorkerMB: 250 }) }, async () => {
