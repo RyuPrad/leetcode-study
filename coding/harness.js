@@ -13,7 +13,7 @@ export function installEnvironment() {
   globalThis._Node = globalThis.Node;
 }
 
-export function executeCase(number, input, entry, deserializeFn) {
+export function executeCase(number, input, entry, deserializeFn, spec) {
   const clone = value => JSON.parse(JSON.stringify(value));
   const original = JSON.stringify(input);
   const listNodes = values => { const nodes = values.map(v => new ListNode(v)); nodes.forEach((node,i) => node.next = nodes[i+1] || null); return nodes; };
@@ -23,6 +23,38 @@ export function executeCase(number, input, entry, deserializeFn) {
   // shared allows one subtree object to appear more than once (894 builds trees from shared subtrees).
   const fromTree = (root, shared = false) => { const out = [], queue = [root], seen = new Set(); for (let q = 0; q < queue.length; q++) { const node = queue[q]; if (!node) { out.push(null); continue; } if (!shared && seen.has(node) || queue.length > 20000) throw new Error('Output tree contains a cycle, shared node, or is too large.'); seen.add(node); out.push(node.val); queue.push(node.left, node.right); } while (out.at(-1) === null) out.pop(); return out; };
   const findNode = (node, val) => !node ? null : node.val === val ? node : findNode(node.left, val) || findNode(node.right, val);
+  // Generated kits describe their arguments by type (coding/kit-spec.ts) instead of by number.
+  if (spec) {
+    const lists = ['ListNode[]', 'List<ListNode>'], trees = ['TreeNode[]', 'List<TreeNode>'];
+    const toValue = (type, value) => type === 'ListNode' ? toList(value) : type === 'TreeNode' ? toTree(value) : lists.includes(type) ? value.map(toList) : trees.includes(type) ? value.map(toTree) : value;
+    const toJson = (type, value) => {
+      if (type === 'ListNode') return fromList(value);
+      if (type === 'TreeNode') return fromTree(value);
+      if (lists.includes(type) || trees.includes(type)) { if (!Array.isArray(value)) throw new Error(`Return an array of ${lists.includes(type) ? 'list heads' : 'tree roots'}.`); return value.map(item => lists.includes(type) ? fromList(item) : fromTree(item)); }
+      return value === undefined ? value : clone(value);
+    };
+    if (spec.seed !== undefined) { let seed = spec.seed; Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
+    if (spec.adapter) return globalThis.__studyAdapter(clone(input), entry, { ListNode, TreeNode, Node, clone, listNodes, toList, fromList, toTree, fromTree, findNode });
+    if (spec.kind === 'design') {
+      const [ops, args] = input, obj = new entry(...args[0].map((value, i) => toValue(spec.ctor[i], clone(value)))), result = [null];
+      for (let i = 1; i < ops.length; i++) {
+        const method = spec.methods[ops[i]];
+        if (!method || typeof obj[ops[i]] !== 'function') throw new Error(`${ops[i]} is not a method of ${entry.name}.`);
+        const value = obj[ops[i]](...args[i].map((arg, j) => toValue(method.params[j], clone(arg))));
+        result.push(method.returns === 'void' || value === undefined ? null : toJson(method.returns, value));
+      }
+      return result;
+    }
+    const args = clone(input).map((value, i) => toValue(spec.params[i], value)), result = entry(...args);
+    if (spec.mutates !== undefined) {
+      const changed = args[spec.mutates];
+      if (!spec.prefix) return toJson(spec.params[spec.mutates], changed);
+      if (!Number.isInteger(result) || result < 0 || result > changed.length) throw new Error('Return the number of retained elements.');
+      return { length: result, values: changed.slice(0, result) };
+    }
+    if (result === undefined) throw new Error('The solution did not return a value.');
+    return toJson(spec.returns, result);
+  }
   const trees = [94,98,101,102,103,104,110,112,124,129,144,145,199,226,230,235,297,337,437,450,513,538,543,572,606,652,662,669,700,701,783,958,1325,1448];
   const lists = [19,24,25,61,83,86,92,143,147,148,203,206,234,725,876,1721,2130,2807];
   const design = [146,155,173,208,211,225,232,295,303,304,352,355,380,460,622,703,705,706,707,895,901,933,981,1396,1472,1603,1845,1993,2013];

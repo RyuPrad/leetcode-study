@@ -19,6 +19,7 @@ const api: DesktopApi = {
   saveDraft: (id, language, source, cases) => invokeProfile('study:save-draft', id, language, source, cases),
   recordSubmission: (id, language, source, result) => invokeProfile('study:submission', id, language, source, result),
   saveGuidedProgress: (id, progress) => invokeProfile('study:guided-progress', id, progress),
+  loadKit: id => ipcRenderer.invoke('study:kit', id),
   nativeAvailability: () => ipcRenderer.invoke('study:native-available'),
   runNative: request => ipcRenderer.invoke('study:native-run', request),
   cancelNative: jobId => ipcRenderer.invoke('study:native-cancel', jobId),

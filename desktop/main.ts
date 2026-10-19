@@ -9,6 +9,8 @@ import type { CodeDraft, CodingProblem, NativeRunRequest } from '../shared/codin
 import { CODE_LIMIT, isLanguage, isNativeLanguage } from '../shared/coding';
 import codingProblems from '../coding/problems.json';
 import { validateInput } from '../coding/validation';
+import { kitErrors, kitProblem } from '../coding/kits';
+import type { KitRecord } from '../coding/kits';
 import { nativeAvailable, runNative } from './native-runner';
 import { validateDraft } from './coding-data';
 import type { GuidedLessonIdentity } from '../shared/guided';
@@ -36,11 +38,26 @@ const abortNativeJobs = () => { for (const job of nativeJobs.values()) job.abort
 const nativePaths = () => app.isPackaged
   ? { toolchains: path.join(process.resourcesPath, 'toolchains'), native: path.join(process.resourcesPath, 'native') }
   : { toolchains: path.join(app.getAppPath(), 'toolchains'), native: path.join(app.getAppPath(), 'dist', 'native') };
+// Generated study kits are read from the installed content on demand; main never trusts a renderer copy.
+let kitIds = new Set<string>();
+const kitCache = new Map<string, KitRecord>();
+function loadKit(id: unknown): KitRecord {
+  if (typeof id !== 'string' || !kitIds.has(id)) throw new Error('Unknown study kit.');
+  const cached = kitCache.get(id);
+  if (cached) return cached;
+  const number = Number(id.slice('leetcode:'.length)), record = JSON.parse(fs.readFileSync(path.join(root, 'content', 'kits', `${number}.json`), 'utf8'));
+  const errors = kitErrors(record, number);
+  if (errors.length) throw new Error(`Study kit ${number} is invalid: ${errors[0]}`);
+  if (kitCache.size >= 64) kitCache.delete(kitCache.keys().next().value!);
+  kitCache.set(id, record);
+  return record;
+}
 function validateNativeRun(request: unknown): { request: NativeRunRequest; problem: CodingProblem } {
   const r = request as NativeRunRequest;
   if (!r || typeof r !== 'object' || typeof r.jobId !== 'string' || !/^[\w-]{1,100}$/.test(r.jobId) || !isNativeLanguage(r.language) || typeof r.source !== 'string' || r.source.length > CODE_LIMIT || !Array.isArray(r.inputs) || r.inputs.length > 100) throw new Error('Invalid native run.');
-  const problem = (codingProblems as CodingProblem[]).find(p => p.id === r.problemId);
+  const problem = (codingProblems as CodingProblem[]).find(p => p.id === r.problemId) ?? (kitIds.has(r.problemId) ? kitProblem(loadKit(r.problemId)) : undefined);
   if (!problem) throw new Error('Unknown problem.');
+  if (problem.languages && !problem.languages.includes(r.language)) throw new Error(`This problem is not judged in ${r.language === 'java' ? 'Java' : 'C'}.`);
   for (const input of r.inputs) { const invalid = Array.isArray(input) ? validateInput(problem, input) : 'Invalid case.'; if (invalid) throw new Error(invalid); }
   return { request: { jobId: r.jobId, problemId: r.problemId, language: r.language, source: r.source, inputs: r.inputs }, problem };
 }
@@ -68,7 +85,9 @@ else {
     const catalog: Catalog = JSON.parse(fs.readFileSync(path.join(root, 'content/catalog.json'), 'utf8'));
     const guidedLessons = new Map((JSON.parse(fs.readFileSync(path.join(root, 'content/guided-lessons.json'), 'utf8')) as GuidedLessonIdentity[]).map(lesson => [lesson.id, lesson]));
     const problemIds = new Set(catalog.entries.filter(e => e.number).map(e => e.id));
-    const assertProblem = (id: unknown) => { if (typeof id !== 'string' || !problemIds.has(id)) throw new Error('Unknown problem.'); };
+    kitIds = new Set((catalog.index ?? []).filter(e => e.kit).map(e => e.id));
+    // Study kits, hand-built or generated, keep drafts and submissions; Guided lessons stay hand-built only.
+    const assertProblem = (id: unknown) => { if (typeof id !== 'string' || !problemIds.has(id) && !kitIds.has(id)) throw new Error('Unknown problem.'); };
     // Index-only LeetCode problems track progress and study time, but have no drafts, submissions or lessons.
     const trackedIds = new Set([...problemIds, ...(catalog.index ?? []).map(e => e.id)]);
     const assertTracked = (id: unknown) => { if (typeof id !== 'string' || !trackedIds.has(id)) throw new Error('Unknown problem.'); };
@@ -126,6 +145,7 @@ else {
     handleProfile('study:delete-session', id => { tracker.delete(id); sendData(); sendTimer(); return store.snapshot(); });
     handleProfile('study:save-draft', (id,language,source,cases) => { assertProblem(id); if(!isLanguage(language))throw new Error('Unsupported language.'); const previous=pendingDrafts[id]??store.draft(id); pendingDrafts[id]=validateDraft({language,sources:{...previous?.sources,[language]:source},cases,updatedAt:new Date().toISOString()}); clearTimeout(draftTimer); draftTimer=setTimeout(()=>safe(flushDrafts),300); return new Promise<void>((resolve,reject)=>draftWaiters.push({resolve,reject})); });
     handleProfile('study:submission', (id,language,source,result) => { assertProblem(id); flushDrafts(); store.recordSubmission(id,language,source,result); sendData(); return store.snapshot(); });
+    handle('study:kit', id => loadKit(id));
     handle('study:native-available', () => ({ java: nativeAvailable(nativePaths(), 'java'), c: nativeAvailable(nativePaths(), 'c') }));
     handle('study:native-run', async raw => {
       const { request, problem } = validateNativeRun(raw);
@@ -141,7 +161,7 @@ else {
     });
     handle('study:native-cancel', jobId => { nativeJobs.get(String(jobId))?.abort(); nativeJobs.delete(String(jobId)); });
     handleProfile('study:guided-progress', (id, progress) => {
-      assertProblem(id);
+      if (typeof id !== 'string' || !problemIds.has(id)) throw new Error('Unknown problem.');
       const lesson = guidedLessons.get(id);
       if (!lesson) throw new Error('This problem does not have a guided lesson.');
       const clean = validateCurrentGuidedProgress(progress, lesson, store.snapshot().guided[id]);

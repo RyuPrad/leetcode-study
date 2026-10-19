@@ -8,7 +8,8 @@ import type { CodingProblem, JudgeJob, JudgeEvent } from '../../shared/coding';
 const send = (event: JudgeEvent) => self.postMessage(event);
 self.onmessage = async ({data:job}: MessageEvent<JudgeJob>) => {
   try {
-    const problem = (definitions as CodingProblem[]).find(p=>p.id===job.problemId);
+    // Generated kits arrive with the job; hand-built kits are bundled.
+    const problem = job.problem ?? (definitions as CodingProblem[]).find(p=>p.id===job.problemId);
     if(!problem)throw new Error('Unknown problem.');
     if(job.language==='java'||job.language==='c'){
       const vm=await newQuickJSWASMModuleFromVariant(newVariant(RELEASE_SYNC,{wasmLocation:wasmUrl}));

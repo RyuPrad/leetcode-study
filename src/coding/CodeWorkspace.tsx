@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Play, Send, Square, RotateCcw, Check, History, Code2, ChevronRight, X, Lightbulb, Copy } from 'lucide-react';
 import definitions from '../../coding/problems.json';
 import { parseCases } from '../../coding/validation';
@@ -19,10 +21,12 @@ const DebugWorkspace=lazy(()=>import('./DebugWorkspace'));
 const pretty=(value:unknown)=>JSON.stringify(value,null,2);
 // solution.js (JavaScript/TypeScript), solution.c, or the Java class file such as Solution.java.
 const errorLine=/(?:solution\.(?:js|c)|\b[A-Z]\w*\.java):(\d+)/;
-export default function CodeWorkspace({problemId,draft,submissions,active,focusRequest,onRequestFocus}:{problemId:string;draft?:CodeDraft;submissions:Submission[];active:boolean;focusRequest:EditorFocusRequest|null;onRequestFocus:()=>void}) {
-  const problem=(definitions as CodingProblem[]).find(p=>p.id===problemId)!;
+export default function CodeWorkspace({problemId,problem:kit,draft,submissions,active,focusRequest,onRequestFocus}:{problemId:string;problem?:CodingProblem;draft?:CodeDraft;submissions:Submission[];active:boolean;focusRequest:EditorFocusRequest|null;onRequestFocus:()=>void}) {
+  // A generated kit is loaded by the app and passed in; hand-built kits are bundled.
+  const problem=kit??(definitions as CodingProblem[]).find(p=>p.id===problemId)!;
+  const offered=problem.languages??languages,offer=(l:Language|undefined)=>l&&offered.includes(l)?l:undefined;
   const tabOutEnabled=useTabOutEnabled();
-  const [language,setLanguage]=useState<Language>(()=>codeLanguageFor(problemId)??draft?.language??preferredLanguage());
+  const [language,setLanguage]=useState<Language>(()=>offer(codeLanguageFor(problemId))??offer(draft?.language)??offer(preferredLanguage())??'javascript');
   const [sources,setSources]=useState<CodeDraft['sources']>(()=>draft?.sources??{});
   const source=sources[language]??starter(problem,language);
   const [cases,setCases]=useState(draft?.cases??pretty(problem.examples.map(t=>t.input)));
@@ -61,7 +65,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
   };},[]);
   useEffect(()=>{if(confirm)dialog.current?.showModal();},[confirm]);
   useEffect(()=>{if(preview)previewDialog.current?.showModal();},[preview]);
-  useEffect(()=>{if(!revision.current&&draft){setSources(draft.sources);setLanguage(codeLanguageFor(problemId)??draft.language);setCases(draft.cases);}},[draft]);
+  useEffect(()=>{if(!revision.current&&draft){setSources(draft.sources);setLanguage(offer(codeLanguageFor(problemId))??offer(draft.language)??'javascript');setCases(draft.cases);}},[draft]);
   // Main owns the debounce: every edit crosses IPC immediately, so closing/navigation
   // can flush the latest revision without waiting for a renderer timer.
   function persist(nextSource:string,nextCases:string){
@@ -80,14 +84,14 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
   // The Visualizer and Learn tabs show reference code in this language, and their picker changes it.
   const switchLanguage=useRef(changeLanguage);switchLanguage.current=changeLanguage;
   useEffect(()=>{showCodeLanguage(problemId,language);},[language]);
-  useEffect(()=>onCodeLanguage(()=>{const next=codeLanguageFor(problemId);if(next&&next!==current.current.language)switchLanguage.current(next);}),[]);
+  useEffect(()=>onCodeLanguage(()=>{const next=codeLanguageFor(problemId);if(next&&offered.includes(next)&&next!==current.current.language)switchLanguage.current(next);}),[]);
   function replaceSource(target:Language,value:string){if(target!==current.current.language)changeLanguage(target);changeSource(value);}
   function changeCases(value:string){setCases(value);current.current.cases=value;persist(current.current.source,value);}
   function start(mode:'run'|'submit'){
     if(job.current||!active||debugCases)return;setError('');setPreview(null);setLine(null);
     let inputs=problem.examples;
     try{if(mode==='run'&&custom)inputs=parseCases(problem,current.current.cases);}catch(e){setError(String(e).replace(/^Error: /,''));setPanel('cases');return;}
-    const snapshot:JudgeJob={jobId:crypto.randomUUID(),problemId,language:current.current.language,source:current.current.source,mode,cases:inputs};
+    const snapshot:JudgeJob={jobId:crypto.randomUUID(),problemId,language:current.current.language,source:current.current.source,mode,cases:inputs,...(problem.generated?{problem}:{})};
     const total=mode==='submit'?problem.examples.length+problem.tests.length:inputs.length;
     job.current=snapshot;setBusy(mode);setProgress({completed:0,total});setResult(null);setPanel('results');startTime.current=performance.now();
     const fail=(message:string,verdict:JudgeResult['verdict']='Runtime error')=>void finish({verdict,passed:0,total,durationMs:Math.round(performance.now()-startTime.current),cases:[{name:'Runner',input:[],verdict,logs:[],durationMs:0,error:message}]});
@@ -125,7 +129,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
     {debugCases&&<Suspense fallback={<div className="editor-loading">Loading debugger?</div>}><DebugWorkspace problem={problem} language={language} source={source} cases={debugCases} active={active} objectTextSize={objectTextSize} onObjectTextSizeChange={setObjectTextSize} onClose={()=>{setDebugCases(null);onRequestFocus();}}/></Suspense>}
     <section className="code-description" aria-label="Problem description">
       <div className="code-section-label"><Code2 size={15}/>DESCRIPTION<span>{languageNames[language]}</span></div>
-      <div className="description-body"><h2>{problem.number}. {problem.title}</h2><p>{problem.description}</p><div className="contract"><span>{problem.kind==='design'?'Class contract':'Function contract'}</span><code className="contract-signature">{language==='javascript'?(problem.kind==='design'?problem.entry:`${problem.entry}(${problem.parameters.filter(p=>![141,374].includes(problem.number)||!['pos','pick'].includes(p)).join(', ')})`):contractLine(problem,language)}</code></div>
+      <div className="description-body"><h2>{problem.number}. {problem.title}</h2>{problem.generated?<div className="markdown kit-statement"><ReactMarkdown remarkPlugins={[remarkGfm]}>{problem.description}</ReactMarkdown></div>:<p>{problem.description}</p>}<div className="contract"><span>{problem.kind==='design'?'Class contract':'Function contract'}</span><code className="contract-signature">{language==='javascript'?(problem.kind==='design'?problem.entry:`${problem.entry}(${problem.parameters.filter(p=>![141,374].includes(problem.number)||!['pos','pick'].includes(p)).join(', ')})`):contractLine(problem,language)}</code></div>
         {problem.examples.map((t,i)=><div className="problem-example" key={i}><h3>Example {i+1}</h3><label>Arguments</label><pre>{JSON.stringify(t.input)}</pre><label>Expected {problem.kind.includes('codec')?'round trip':'result'}</label><pre>{JSON.stringify(t.expected)}</pre></div>)}
         <h3>Input & execution</h3><ul className="constraints">{problem.constraints.map((c,i)=><li key={i}>{c}</li>)}</ul>
         {isNativeLanguage(language)&&<p className="local-note native-note">{languageNames[language]} runs as a native program on this PC with the bundled {language==='java'?'Java 21 runtime':'Tiny C Compiler'}. Unlike JavaScript and TypeScript it is not sandboxed, so only run code you trust.</p>}
@@ -134,7 +138,7 @@ export default function CodeWorkspace({problemId,draft,submissions,active,focusR
     </section>
     <div className="code-splitter vertical" role="separator" aria-label="Resize description" aria-orientation="vertical" aria-valuenow={Math.round(leftWidth)} tabIndex={0} onPointerDown={e=>drag(e,'x')} onKeyDown={e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();setLeftWidth(v=>Math.max(24,Math.min(60,v+(e.key==='ArrowLeft'?-2:2))));}}}/>
     <section className="code-right" ref={right} aria-label="Coding workspace">
-      <div className="code-toolbar"><label className="language-label"><i/><select aria-label="Language" value={language} disabled={!!busy||!!debugCases} onChange={e=>changeLanguage(e.target.value as Language)}>{languages.map(l=><option key={l} value={l}>{languageNames[l]}</option>)}</select></label><button className="tabout-toggle" aria-label="TabOut" aria-pressed={tabOutEnabled} title="Tab jumps past the next closing bracket or quote on this line. Shift+Tab jumps backward. Toggle to use normal indentation." onClick={()=>setTabOutEnabled(!tabOutEnabled)}>TabOut <span>{tabOutEnabled?'On':'Off'}</span></button><span className={`draft-status ${saveStatus==='Save failed'?'error-text':''}`} aria-live="polite">{saveStatus==='Saved locally'&&<Check size={12}/>} {saveStatus}</span><button className="icon-button" title="Reset code" aria-label="Reset code" disabled={!!busy} onClick={()=>setConfirm('reset')}><RotateCcw size={14}/></button><button className="subtle-button solution-button" title="Show the reference solution" disabled={!!busy} onClick={()=>setSolution('ask')}><Lightbulb size={13}/>Solution</button><div className="run-actions">{busy?<button className="stop-code" onClick={stop}><Square size={12}/>Stop</button>:<><button className="run-code" title="Run examples or custom cases (Ctrl+Enter)" onClick={()=>start('run')}><Play size={13}/>Run</button>{(language==='javascript'||language==='typescript')&&<button className="run-code" title="Debug one case with live breakpoints" onClick={startDebug}>Debug</button>}<button className="submit-code" title="Submit to local tests (Ctrl+Shift+Enter)" onClick={()=>start('submit')}><Send size={13}/>Submit</button></>}</div></div>
+      <div className="code-toolbar"><label className="language-label"><i/><select aria-label="Language" value={language} disabled={!!busy||!!debugCases} onChange={e=>changeLanguage(e.target.value as Language)}>{offered.map(l=><option key={l} value={l}>{languageNames[l]}</option>)}</select></label><button className="tabout-toggle" aria-label="TabOut" aria-pressed={tabOutEnabled} title="Tab jumps past the next closing bracket or quote on this line. Shift+Tab jumps backward. Toggle to use normal indentation." onClick={()=>setTabOutEnabled(!tabOutEnabled)}>TabOut <span>{tabOutEnabled?'On':'Off'}</span></button><span className={`draft-status ${saveStatus==='Save failed'?'error-text':''}`} aria-live="polite">{saveStatus==='Saved locally'&&<Check size={12}/>} {saveStatus}</span><button className="icon-button" title="Reset code" aria-label="Reset code" disabled={!!busy} onClick={()=>setConfirm('reset')}><RotateCcw size={14}/></button><button className="subtle-button solution-button" title="Show the reference solution" disabled={!!busy} onClick={()=>setSolution('ask')}><Lightbulb size={13}/>Solution</button><div className="run-actions">{busy?<button className="stop-code" onClick={stop}><Square size={12}/>Stop</button>:<><button className="run-code" title="Run examples or custom cases (Ctrl+Enter)" onClick={()=>start('run')}><Play size={13}/>Run</button>{(language==='javascript'||language==='typescript')&&<button className="run-code" title="Debug one case with live breakpoints" onClick={startDebug}>Debug</button>}<button className="submit-code" title="Submit to local tests (Ctrl+Shift+Enter)" onClick={()=>start('submit')}><Send size={13}/>Submit</button></>}</div></div>
       <Suspense fallback={<div className="editor-loading">Loading editor…</div>}><CodeEditor source={source} onChange={changeSource} problemId={problemId} language={language} active={active&&!debugCases&&!confirm&&!preview&&!solution} focusRequest={focusRequest} line={line} tabOutEnabled={tabOutEnabled}/></Suspense>
       <div className="code-splitter horizontal" role="separator" aria-label="Resize test results" aria-orientation="horizontal" aria-valuenow={Math.round(bottomHeight)} tabIndex={0} onPointerDown={e=>drag(e,'y')} onKeyDown={e=>{if(['ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();setBottomHeight(v=>Math.max(22,Math.min(70,v+(e.key==='ArrowUp'?2:-2))));}}}/>
       <div className="code-bottom"><div className="code-panel-tabs" role="tablist" aria-label="Code panels">{(['cases','results','submissions'] as const).map(p=><button key={p} role="tab" aria-selected={panel===p} onClick={()=>setPanel(p)}>{p==='cases'?'Test cases':p==='results'?'Local test results':`Submissions (${submissions.length})`}</button>)}</div>

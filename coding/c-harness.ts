@@ -395,7 +395,7 @@ static void study_quad(struct Node* root, int size) {
 };
 
 export function cProgram(problem: CodingProblem, source: string, cases: Json[][]): string {
-  const c = contract(problem.number), n = problem.number;
+  const c = contract(problem), n = problem.number;
   const bodies = cases.map((input, i) => {
     const body = c.kind === 'function' ? functionCase(problem, c.method, input) : c.kind === 'codec' ? codecCase(problem, input) : designCase(problem, c, input);
     return `static void study_case_${i}(void) {\n  ${body.join('\n  ')}\n}`;

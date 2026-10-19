@@ -107,7 +107,7 @@ const cancelled = (): NativeCaseResult => ({ verdict: 'Cancelled', logs: [], dur
 
 async function runJava(problem: CodingProblem, source: string, cases: Json[][], options: NativeRunOptions, dir: string): Promise<NativeRunResult> {
   const paths = toolchainPaths(options), caseTimeout = options.caseTimeout ?? CASE_TIMEOUT, jobTimeout = options.jobTimeout ?? JOB_TIMEOUT;
-  const c = contract(problem.number);
+  const c = contract(problem);
   const job = {
     number: problem.number, kind: c.kind, caseTimeoutMs: caseTimeout, source, cases,
     className: c.kind === 'function' ? 'Solution' : c.name,

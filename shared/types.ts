@@ -1,5 +1,6 @@
 import type { CodeDraft, JudgeResult, Language, NativeLanguage, NativeRunRequest, NativeRunResult, Submission } from './coding';
 import type { GuidedProgress } from './guided';
+import type { KitRecord } from '../coding/kits';
 export type ProblemStatus = 'not-started' | 'in-progress' | 'completed';
 export type Outcome = 'studied' | 'solved' | 'needs-review';
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -17,8 +18,10 @@ export interface Entry {
   slug?: string; acceptance?: number; premium?: boolean; category?: LeetCodeCategory; tags?: string[];
   // Solution-method keys, most central first.
   methods?: string[];
-  // A LeetCode problem without a bundled study kit: no notes, visualizer, lesson or judge.
+  // A LeetCode problem without a hand-built study kit: no visualizer page or Guided lesson.
   indexOnly?: true;
+  // A generated study kit (coding/kits/<n>.json): statement, notes, walkthrough and local judge, loaded on demand.
+  kit?: true;
 }
 // A solution method and its ladder: every problem that uses it, from easiest to hardest.
 export interface SolutionMethod { key: string; name: string; kind: SolutionTechnique['kind']; topic: string; summary: string; ladder: string[]; }
@@ -42,6 +45,7 @@ export interface DesktopApi {
   deleteSession(id: string): Promise<UserData>;
   saveDraft(id: string, language: Language, source: string, cases: string): Promise<void>;
   recordSubmission(problemId: string, language: Language, source: string, result: JudgeResult): Promise<UserData>;
+  loadKit(id: string): Promise<KitRecord>;
   nativeAvailability(): Promise<Record<NativeLanguage, boolean>>;
   runNative(request: NativeRunRequest): Promise<NativeRunResult>;
   cancelNative(jobId: string): Promise<void>;

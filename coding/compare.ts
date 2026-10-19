@@ -10,7 +10,21 @@ function levelTree(values: any[]): any {
   for (let q = 0; q < queue.length && i < values.length; q++) for (const side of ['left', 'right']) { if (i < values.length && values[i] !== null) { queue[q][side] = { val: values[i], left: null, right: null }; queue.push(queue[q][side]); } i++; }
   return i >= values.length ? root : undefined;
 }
+const near = (x: any, y: any): boolean => typeof y === 'number' ? typeof x === 'number' && Number.isFinite(x) && Math.abs(x-y) <= 1e-5 * Math.max(1, Math.abs(y)) : Array.isArray(y) ? Array.isArray(x) && x.length === y.length && y.every((v,i) => near(x[i],v)) : y !== null && typeof y === 'object' ? x !== null && typeof x === 'object' && !Array.isArray(x) && eq(Object.keys(x).sort(), Object.keys(y).sort()) && Object.keys(y).every(k => near(x[k], y[k])) : x === y;
+/** A generated kit's comparison mode (shared/coding.ts). Checker mode is decided in the guest by engine.accepted. */
+function acceptsKit(problem: CodingProblem, actual: any, expected: any): boolean {
+  const mode = problem.compare ?? 'exact';
+  if (mode === 'float') return near(actual, expected);
+  if (mode === 'unordered' || mode === 'unordered-nested') {
+    const inner = (v: unknown) => mode === 'unordered-nested' && Array.isArray(v) ? sorted(v) : v;
+    // A retained prefix ({length, values}) may hold its elements in any order.
+    if (expected && typeof expected === 'object' && !Array.isArray(expected) && 'values' in expected) return !!actual && actual.length === expected.length && Array.isArray(actual.values) && bag(actual.values.map(inner), expected.values.map(inner));
+    return Array.isArray(actual) && Array.isArray(expected) && bag(actual.map(inner), expected.map(inner));
+  }
+  return eq(actual, expected);
+}
 export function accepts(problem: CodingProblem, input: Json[], actual: any, expected: any): boolean {
+  if (problem.generated) return acceptsKit(problem, actual, expected);
   const n = problem.number, a = input as any[];
   if ([4,50,399,295,837,1396,1514].includes(n)) {
     const near = (x: any, y: any): boolean => typeof y === 'number' ? typeof x === 'number' && Number.isFinite(x) && Math.abs(x-y) <= 1e-5 * Math.max(1, Math.abs(y)) : Array.isArray(y) ? Array.isArray(x) && x.length === y.length && y.every((v,i) => near(x[i],v)) : x === y;

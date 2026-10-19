@@ -1,5 +1,6 @@
 import type { CodingProblem, Json, CodeCase } from '../shared/coding';
 import { CASE_LIMIT, INPUT_LIMIT } from '../shared/coding';
+import { contract } from './languages';
 const array = Array.isArray;
 const integer = (x: any) => Number.isSafeInteger(x);
 const sorted = (a: number[], strict = false) => a.every((v,i) => !i || (strict ? v > a[i-1] : v >= a[i-1]));
@@ -8,6 +9,41 @@ const matrix = (a: any) => array(a) && a.length > 0 && a.length <= 100 && a.ever
 const treeIds = new Set([94,98,100,101,102,103,104,105,110,112,116,124,129,144,145,199,226,230,235,297,337,437,450,513,538,543,572,606,617,652,662,669,700,701,783,951,958,1325,1448]);
 function tree(values: any[]): boolean { let slots = 1; for (const value of values) { if (slots-- <= 0) return false; if (value !== null) { if (!integer(value)) return false; slots += 2; } } return true; }
 function bst(values: any[]): boolean { const queue: [number,number][] = [[-Infinity,Infinity]]; let i = 0; for (let q = 0; q < queue.length && i < values.length; q++) { const [lo,hi] = queue[q],v = values[i++]; if (v === null) continue; if (!integer(v) || v <= lo || v >= hi) return false; queue.push([lo,v],[v,hi]); } return i === values.length; }
+/** Whether a JSON value fits a Java-notation type from a generated kit's signature. */
+function typed(value: any, type: string): boolean {
+  const inner = /^(.+)\[\]$/.exec(type)?.[1] ?? /^List<(.+)>$/.exec(type)?.[1];
+  if (inner !== undefined) return array(value) && value.length <= 2000 && value.every(v => typed(v, inner));
+  switch (type) {
+    case 'int': case 'long': case 'Integer': case 'Long': return integer(value);
+    case 'double': case 'Double': return typeof value === 'number' && Number.isFinite(value);
+    case 'boolean': case 'Boolean': return typeof value === 'boolean';
+    case 'char': case 'Character': return typeof value === 'string' && value.length === 1;
+    case 'String': return typeof value === 'string' && value.length <= 10000;
+    case 'ListNode': return array(value) && value.every(integer);
+    case 'TreeNode': return array(value) && tree(value);
+    // Other types (Node and interactive APIs) come with an adapter and a validator.
+    default: return true;
+  }
+}
+/** A generated kit's inputs, checked against its typed signature; its validator adds problem rules. */
+function kitShape(problem: CodingProblem, a: any[]): string | null {
+  const c = contract(problem);
+  if (c.kind === 'design') {
+    const [ops, args] = a;
+    if (!array(ops) || !array(args) || !ops.length || ops.length !== args.length || ops[0] !== problem.entry || ops.length > 500) return `Use matching operations and arguments arrays, starting with "${problem.entry}".`;
+    for (let i = 0; i < ops.length; i++) {
+      const params = i === 0 ? c.constructor : c.methods.find(m => m.name === ops[i])?.params;
+      if (!params) return `${String(ops[i])} is not a public operation.`;
+      if (!array(args[i]) || args[i].length !== params.length) return `${String(ops[i])} takes ${params.length} argument${params.length === 1 ? '' : 's'}.`;
+      const bad = params.findIndex((p, j) => !typed(args[i][j], p.type));
+      if (bad >= 0) return `${String(ops[i])}: ${params[bad].name} must be ${params[bad].type}.`;
+    }
+    return null;
+  }
+  if (c.kind !== 'function') return null;
+  const bad = c.method.params.findIndex((p, i) => !typed(a[i], p.type));
+  return bad >= 0 ? `${c.method.params[bad].name} must be ${c.method.params[bad].type}${c.method.params[bad].type === 'TreeNode' ? ' as a level-order array with null for missing children' : ''}.` : null;
+}
 export function validateInput(problem: CodingProblem, input: unknown): string | null {
   const fail = (message: string): never => { throw new Error(message); };
   try {
@@ -17,6 +53,7 @@ export function validateInput(problem: CodingProblem, input: unknown): string | 
     let cells = 0;
     function bounded(v: any, depth = 0) { if (++cells > 20000 || depth > 12) fail('Input is too large or too deeply nested.'); if (typeof v === 'number' && !Number.isFinite(v)) fail('Numbers must be finite.'); if (typeof v === 'string' && v.length > 10000) fail('Strings are limited to 10,000 characters.'); if (array(v)) { if (v.length > 2000) fail('Arrays are limited to 2,000 items.'); v.forEach(x => bounded(x,depth+1)); } else if (v !== null && !['number','string','boolean'].includes(typeof v)) fail('Use only JSON numbers, strings, booleans, null, and arrays.'); }
     bounded(a);
+    if (problem.generated) { const message = kitShape(problem, a); if (message) fail(message); return null; }
     if (problem.kind === 'design') {
       const [ops,args] = a;
       if (!array(ops) || !array(args) || !ops.length || ops.length !== args.length || ops[0] !== problem.entry || ops.length > 500) fail(`Use matching operations and arguments arrays, starting with ${problem.entry}. Limit: 500 operations.`);

@@ -15,13 +15,13 @@ export function isType(type: string): boolean {
   if (scalar.has(type)) return true;
   if (type.endsWith('[]')) return isType(type.slice(0, -2)) && type !== 'void[]';
   const list = /^List<(.+)>$/.exec(type);
-  return !!list && ['Integer', 'String', 'Boolean', 'TreeNode'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
+  return !!list && ['Integer', 'Long', 'Double', 'Character', 'String', 'Boolean', 'TreeNode', 'ListNode'].includes(list[1]) || !!list && /^List<.+>$/.test(list[1]) && isType(list[1]);
 }
 /** Element type of an array or list, with boxed names unboxed. */
 export function element(type: string): string | undefined {
   if (type.endsWith('[]')) return type.slice(0, -2);
   const inner = /^List<(.+)>$/.exec(type)?.[1];
-  return inner === 'Integer' ? 'int' : inner === 'Boolean' ? 'boolean' : inner;
+  return ({ Integer: 'int', Long: 'long', Double: 'double', Character: 'char', Boolean: 'boolean' } as Record<string, string>)[inner ?? ''] ?? inner;
 }
 
 function splitParams(text: string): string[] {
@@ -46,8 +46,10 @@ export function parseMethod(text: string): Method {
   return { returns: match[1], name: match[2], params: parseParams(match[3]) };
 }
 
-export function contract(number: number): Contract {
-  const raw = (signatures as Record<number, any>)[number];
+/** A problem's typed contract: its own signature for a generated kit, otherwise signatures.mjs by number. */
+export function contract(problem: number | Pick<CodingProblem, 'number' | 'signature'>): Contract {
+  const number = typeof problem === 'number' ? problem : problem.number;
+  const raw = typeof problem === 'object' && problem.signature ? problem.signature : (signatures as Record<number, any>)[number];
   if (!raw) throw new Error(`Problem ${number} has no typed signature.`);
   if (typeof raw === 'string') return { kind: 'function', method: parseMethod(raw), harnessOnly: [] };
   if (raw.kind === 'function') return { kind: 'function', method: parseMethod(raw.signature), harnessOnly: raw.harnessOnly ?? [] };
@@ -182,13 +184,13 @@ function cStarter(problem: CodingProblem, c: Contract): string {
 
 export function starter(problem: CodingProblem, language: Language): string {
   if (language === 'javascript') return problem.starter;
-  const c = contract(problem.number);
+  const c = contract(problem);
   return language === 'typescript' ? typescriptStarter(problem, c) : language === 'java' ? javaStarter(problem, c) : cStarter(problem, c);
 }
 /** One-line contract for the description panel. */
 export function contractLine(problem: CodingProblem, language: Language): string {
   if (language === 'javascript') return problem.kind === 'design' ? problem.entry : `${problem.entry}(${problem.parameters.join(', ')})`;
-  const c = contract(problem.number);
+  const c = contract(problem);
   const methods = c.kind === 'function' ? [c.method] : c.methods;
   if (language === 'java') return methods.map(m => `${m.returns} ${m.name}(${javaParams(m.params)})`).join('\n');
   if (language === 'typescript') return methods.map(m => `${m.name}(${tsParams(m.params)}): ${tsType(m.returns)}`).join('\n');

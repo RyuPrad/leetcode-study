@@ -35,3 +35,15 @@ The Visualizer and Learn tabs can show these solutions instead of the JavaScript
 ## Is Graph Bipartite? (785)
 
 The graph argument is a symmetric zero-based adjacency list with 1–100 vertices, distinct integer neighbors, and no self edges. Isolated vertices and disconnected components are valid. The original reference uses +1/-1 labels and an array queue with a head index. Three visible examples and twelve additional cases cover even/odd cycles, a later failing component, shared neighbors, isolated vertices, and neighbor-order independence. The teaching diagram separately caps input at 16 vertices.
+
+## Generated study kits
+
+Problems without a hand-built kit can have a generated one: `kits/<number>.json`, described by `KitRecord` in `kits.ts`. A record carries an original statement and its rules, study notes, a typed `signature` in the same Java notation as `signatures.mjs`, a JavaScript `reference`, an independent `brute` force, a seeded test `generator(rand, size)`, visible `examples` with LeetCode's stated answers, at least eight `tests`, and optional per-line `narration` for the walkthrough. `spec` is `recalled` for a premium problem described from memory.
+
+These kits are data-driven rather than keyed by number:
+- `kit-spec.ts` derives each case's conversions from the signature (ListNode and TreeNode arguments and results, arrays of them, design classes), and `io` names an argument changed in place, a retained prefix, or a fixed random seed. `harness.js` runs that spec.
+- `compare` is `exact`, `unordered`, `unordered-nested`, `float` or `checker`. A `checker(input, actual, expected)`, a `validator(input)` that returns a message for an invalid input, and an `adapter(input, solve, helpers)` for special harnesses are JavaScript sources that run in their own QuickJS contexts, like the solution itself (`engine.ts` `guestCall`).
+- `validation.ts` checks every argument against its signature type.
+- `languages` lists the languages a kit is judged in. Kits with a checker or an adapter run in JavaScript and TypeScript only; Java and C use the generic native paths for the signature's types.
+
+The app loads a kit over IPC when its problem opens (`desktop/main.ts` `loadKit`), passes the problem to the judge and debug workers, and shows a Walkthrough tab that records every step of the reference with the debugger engine and replays it (`src/coding/WalkthroughWorkspace.tsx`). `npm run check:kits` verifies each kit by running it: the structure and every case against the contract and validator, the reference against every stated answer, the brute force against the reference on every case and on 60 generated inputs, a large generated input, a wrong solution being rejected, the walkthrough recording, and the TypeScript/Java/C starters. `npm run test:kits` drives one kit's Notes, Walkthrough and Code tabs in the built renderer.

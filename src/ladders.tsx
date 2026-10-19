@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { KitRecord } from '../coding/kits';
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ExternalLink, Info, ListOrdered, Lock, SkipForward } from 'lucide-react';
 import type { Difficulty, Entry, Progress, SolutionMethod } from '../shared/types';
 
@@ -76,10 +79,13 @@ function LadderSection({ method, primary, entry, lookup, progress, compact, onNa
   </section>;
 }
 
-// The Overview tab of an index-only problem: what LeetCode says about it, and where it sits on each ladder.
-export function ProblemOverview({ entry, lookup, progress, onNavigate, onOpenLadder, onOpenExternal }: LadderProps & { onOpenExternal: (url: string) => void }) {
+// The Notes tab of a problem without a hand-built kit: what LeetCode says about it, its generated statement and
+// notes when it has a generated kit, and where it sits on each ladder.
+export function ProblemOverview({ entry, lookup, progress, onNavigate, onOpenLadder, onOpenExternal, record, recordError }: LadderProps & { onOpenExternal: (url: string) => void; record?: KitRecord | null; recordError?: string }) {
   return <article className="problem-overview">
-    <div className="note-only"><Info size={16}/>This problem links to LeetCode and has no bundled notes, visualizer or local judge. Solve it on LeetCode, then record your progress, time and reflections here.</div>
+    {entry.kit
+      ? <div className="note-only"><Info size={16}/>{record?.spec === 'recalled' ? 'This premium problem was described from memory, so compare the statement with LeetCode before relying on it. ' : ''}The statement and notes are written for this app. Walk through the reference solution step by step, then solve it in the Code tab against the local tests.</div>
+      : <div className="note-only"><Info size={16}/>This problem links to LeetCode and has no bundled notes, visualizer or local judge. Solve it on LeetCode, then record your progress, time and reflections here.</div>}
     <dl className="overview-facts">
       <div><dt>Difficulty</dt><dd><DifficultyBadge difficulty={entry.difficulty}/></dd></div>
       <div><dt>Acceptance</dt><dd>{entry.acceptance?.toFixed(1)}%</dd></div>
@@ -87,6 +93,12 @@ export function ProblemOverview({ entry, lookup, progress, onNavigate, onOpenLad
       <div><dt>Access</dt><dd>{entry.premium ? <><Lock size={12}/> LeetCode Premium</> : 'Free'}</dd></div>
     </dl>
     <button className="primary-button" onClick={() => onOpenExternal(leetCodeUrl(entry))}><ExternalLink size={15}/>Open on LeetCode</button>
+    {entry.kit && (record ? <div className="markdown kit-notes">
+      <h2>Problem</h2><ReactMarkdown remarkPlugins={[remarkGfm]}>{record.statement}</ReactMarkdown>
+      {record.constraints.length > 0 && <ul>{record.constraints.map((rule, i) => <li key={i}>{rule}</li>)}</ul>}
+      {record.examples.map((example, i) => <div key={i} className="kit-example"><h3>{example.name}</h3><pre>{`Input:    ${JSON.stringify(example.input)}\nExpected: ${JSON.stringify(example.expected)}`}</pre></div>)}
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{record.notes}</ReactMarkdown>
+    </div> : <p className={recordError ? 'error-text' : 'muted'} role={recordError ? 'alert' : 'status'}>{recordError || 'Loading the study notes…'}</p>)}
     {entry.tags?.length ? <><h3>LeetCode tags</h3><ul className="overview-tags">{entry.tags.map(tag => <li key={tag} className="topic-chip">{tag}</li>)}</ul></> : null}
     <h3>Solution methods</h3>
     <MethodLadders entry={entry} lookup={lookup} progress={progress} compact onNavigate={onNavigate} onOpenLadder={onOpenLadder}/>

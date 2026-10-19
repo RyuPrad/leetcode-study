@@ -49,7 +49,7 @@ export default function DebugWorkspace({problem,language='javascript',source,cas
       if(data.type==='finished'){setResult(data);setPaused(false);setStatus(data.error?'Stopped with error':'Finished');instance.terminate();worker.current=null;}
     };
     instance.onerror=error=>{error.preventDefault();setResult({type:'finished',sessionId:id,error:error.message||'Unable to start the debugger.',logs:[],durationMs:0});setStatus('Stopped with error');instance.terminate();worker.current=null;};
-    instance.postMessage({type:'start',sessionId:id,problemId:problem.id,language,source,test:cases[selectedCase],breakpoints:breaks.current} satisfies DebugCommand);
+    instance.postMessage({type:'start',sessionId:id,problemId:problem.id,language,source,test:cases[selectedCase],breakpoints:breaks.current,...(problem.generated?{problem}:{})} satisfies DebugCommand);
     return()=>{session.current='';instance.terminate();worker.current=null;};
   },[selectedCase,restart]);
   useEffect(()=>{setLocation((paused||historical?frame?.location:frame?.operations?.[0]?.location)||frame?.location||null);},[frame,moment,paused,historical]);

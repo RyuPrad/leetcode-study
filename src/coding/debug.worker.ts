@@ -9,9 +9,27 @@ import { evaluate } from '../../coding/engine';
 import { accepts } from '../../coding/compare';
 import type { CodingProblem } from '../../shared/coding';
 import type { DebugCommand, DebugEvent } from '../../shared/debugging';
+import type { VisualizationFrame } from '../../shared/visualization';
 let controller:DebugController|undefined,sessionId='';
 const send=(event:DebugEvent)=>self.postMessage(event);
 self.onmessage=async({data}:MessageEvent<DebugCommand>)=>{
+  if(data.type==='record'){
+    if(sessionId)return;sessionId=data.sessionId;
+    // Step into every statement and keep each frame, so the walkthrough can seek freely.
+    const frames:VisualizationFrame[]=[];let truncated=false,lines:number[]=[],recorder:DebugController;
+    const hooks={started:(executableLines:number[])=>{lines=executableLines;},running:()=>{},frame:(frame:VisualizationFrame,paused:boolean)=>{
+      frames.push(frame);
+      if(frames.length>=data.limit){truncated=true;recorder.stop();return;}
+      if(paused)queueMicrotask(()=>recorder.command('into'));
+    }};
+    recorder=new DebugController(hooks);
+    try{
+      const module=await newQuickJSAsyncWASMModuleFromVariant(newVariant(RELEASE_ASYNC,{wasmLocation:asyncWasm}));
+      const result=await debugEvaluate(module,data.problem,data.source,data.test,recorder,hooks,data.language);
+      send({type:'recorded',sessionId,frames,truncated,actual:result.actual,...(truncated||!result.error?{}:{error:result.error}),logs:result.logs,executableLines:lines});
+    }catch(error){send({type:'recorded',sessionId,frames,truncated,error:String(error).replace(/^Error: /,'').slice(0,8000),logs:[],executableLines:lines});}
+    return;
+  }
   if(data.type!=='start'){
     if(data.sessionId!==sessionId||!controller)return;
     if(data.type==='motion')controller.command(data.motion,data.speed,data.presentation);
@@ -22,7 +40,7 @@ self.onmessage=async({data}:MessageEvent<DebugCommand>)=>{
   }
   if(sessionId)return;sessionId=data.sessionId;
   try{
-    const problem=(definitions as CodingProblem[]).find(p=>p.id===data.problemId);if(!problem)throw new Error('Unknown problem.');
+    const problem=data.problem??(definitions as CodingProblem[]).find(p=>p.id===data.problemId);if(!problem)throw new Error('Unknown problem.');
     const hooks={started:(executableLines:number[])=>send({type:'started',sessionId,executableLines}),frame:(frame:any,paused:boolean,reason:string)=>send({type:'frame',sessionId,frame,paused,reason}),running:()=>send({type:'running',sessionId})};
     controller=new DebugController(hooks,data.breakpoints);
     const module=await newQuickJSAsyncWASMModuleFromVariant(newVariant(RELEASE_ASYNC,{wasmLocation:asyncWasm}));

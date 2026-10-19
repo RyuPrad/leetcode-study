@@ -134,6 +134,8 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
 // Every LeetCode problem without a bundled study kit is an index entry: its metadata, a link to
 // leetcode.com and its solution methods. Each method's ladder runs from easiest to hardest.
 export const INDEX_PATH = 'coding/leetcode-index.json';
+// Generated study kits, one record per problem; scripts/check-kits.ts verifies their behaviour.
+export const KITS_PATH = 'coding/kits';
 export const METHODS_PATH = 'coding/solution-methods.json';
 export const INDEX_TOPICS = ['Strings', 'Advanced Data Structures', 'Design', 'Divide & Conquer', 'Database', 'JavaScript', 'Concurrency', 'Shell'];
 const CATEGORIES = new Set(['algorithms', 'database', 'javascript', 'concurrency', 'shell']);
@@ -141,6 +143,15 @@ export const MAX_METHODS = 3;
 // Easy before Medium before Hard; within a difficulty, a higher acceptance rate comes first.
 export function ladderOrder(a, b) {
   return DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty) || b.acceptance - a.acceptance || a.number - b.number;
+}
+// The structure the catalog relies on; scripts/check-kits.ts checks the rest by running each kit.
+function readKit(root, number, errors) {
+  const file = path.join(root, KITS_PATH, `${number}.json`);
+  if (!fs.existsSync(file)) return null;
+  let kit;
+  try { kit = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { errors.push(`${KITS_PATH}/${number}.json: ${error.message}`); return null; }
+  if (kit?.number !== number || typeof kit.statement !== 'string' || typeof kit.notes !== 'string' || typeof kit.reference !== 'string' || !Array.isArray(kit.examples)) errors.push(`${KITS_PATH}/${number}.json is not a study kit for problem ${number}.`);
+  return kit;
 }
 export function collectIndex(root, entries, errors) {
   const problems = JSON.parse(fs.readFileSync(path.join(root, INDEX_PATH), 'utf8'));
@@ -181,10 +192,10 @@ export function collectIndex(root, entries, errors) {
   for (const problem of problems) {
     const keys = assigned[problem.number], names = keys.map(key => methods.get(key).name);
     const details = { slug: problem.slug, acceptance: problem.acceptance, premium: problem.premium, category: problem.category, tags: problem.tags, methods: keys };
-    const kit = kits.get(problem.number);
-    if (kit) { Object.assign(kit, details); kit.searchText += ` ${names.join(' ')}`.toLowerCase(); continue; }
-    const topic = methods.get(keys[0]).topic;
-    index.push({ id: `leetcode:${problem.number}`, number: problem.number, title: problem.title, topic, difficulty: problem.difficulty, notePath: '', markdown: '', indexOnly: true, ...details,
+    const handBuilt = kits.get(problem.number);
+    if (handBuilt) { Object.assign(handBuilt, details); handBuilt.searchText += ` ${names.join(' ')}`.toLowerCase(); continue; }
+    const topic = methods.get(keys[0]).topic, kit = readKit(root, problem.number, errors);
+    index.push({ id: `leetcode:${problem.number}`, number: problem.number, title: problem.title, topic, difficulty: problem.difficulty, notePath: '', markdown: '', indexOnly: true, ...details, ...(kit ? { kit: true } : {}),
       searchText: `${problem.number} ${problem.title} ${topic} ${problem.tags.join(' ')} ${names.join(' ')}`.toLowerCase() });
   }
   for (const problem of [...problems].sort(ladderOrder)) for (const key of assigned[problem.number]) methods.get(key).ladder.push(`leetcode:${problem.number}`);
@@ -200,6 +211,10 @@ export function buildContent(root = ROOT) {
     fs.copyFileSync(path.join(root, file), path.join(out, file));
   }
   fs.cpSync(path.join(root, 'visualizer-ui'), path.join(out, 'visualizer-ui'), { recursive: true });
+  // The main process reads generated kits on demand (desktop/main.ts loadKit).
+  fs.rmSync(path.join(out, 'kits'), { recursive: true, force: true });
+  fs.mkdirSync(path.join(out, 'kits'), { recursive: true });
+  for (const entry of catalog.index ?? []) if (entry.kit) fs.copyFileSync(path.join(root, KITS_PATH, `${entry.number}.json`), path.join(out, 'kits', `${entry.number}.json`));
   fs.writeFileSync(path.join(out, 'catalog.json'), JSON.stringify(catalog));
   return catalog;
 }

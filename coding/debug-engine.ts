@@ -9,6 +9,7 @@ import { instrument } from './instrument';
 import { installEnvironment, executeCase } from './harness.js';
 import { installDebugEnvironment } from './debug-runtime.js';
 import { validateInput } from './validation';
+import { adapterScript, caseSpec } from './kit-spec';
 
 export interface DebugHooks {
   started(lines:number[]):void;
@@ -86,7 +87,8 @@ export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:Coding
     await evaluate(`(${installEnvironment.toString()})(); (${installDebugEnvironment.toString()})(${JSON.stringify(transformed.sites)}); globalThis.console=Object.fromEntries(['log','info','warn','error','debug'].map(k=>[k,(...args)=>__print(args.map(v=>{try{return typeof v==='string'?v:JSON.stringify(v)}catch{return String(v)}}).join(' ').slice(0,2000))]));`,'environment.js');
     await evaluate(`globalThis[${JSON.stringify(transformed.helperName)}]=__studyDebugger;`,'debug-helper.js');
     await evaluate(transformed.code,'solution.js');
-    const output=await evaluate(`__studyDebugger.enable(); (()=>{const value=(${executeCase.toString()})(${problem.number},${JSON.stringify(test.input)},${problem.entry},${problem.number===297?'deserialize':'undefined'});const text=JSON.stringify(value);if(typeof text!=='string')throw new Error('Return a JSON-compatible value.');if(text.length>262144)throw new Error('Output exceeds 256 KiB.');return text;})()`,'judge.js');
+    if(adapterScript(problem))await evaluate(adapterScript(problem),'adapter.js');
+    const output=await evaluate(`__studyDebugger.enable(); (()=>{const value=(${executeCase.toString()})(${problem.number},${JSON.stringify(test.input)},${problem.entry},${problem.number===297?'deserialize':'undefined'},${JSON.stringify(caseSpec(problem))});const text=JSON.stringify(value);if(typeof text!=='string')throw new Error('Return a JSON-compatible value.');if(text.length>262144)throw new Error('Output exceeds 256 KiB.');return text;})()`,'judge.js');
     if(output!==undefined)actual=JSON.parse(output);
   }catch(e){error=controller.interrupted()?'Debugging exceeded 10 seconds of active execution. Paused time is excluded.':String(e).replace(/^Error: /,'').slice(0,8000);}
   finally{
