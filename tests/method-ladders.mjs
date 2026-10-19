@@ -130,7 +130,7 @@ try {
   report.methods = `the Method ladders view lists all ${catalog.methods.length} methods and opens each ladder`;
 
   // Bookmarks span every LeetCode problem.
-  await page.getByRole('button', {name: `Bookmark ${indexEntry.title}`}).click();
+  await page.getByRole('button', {name: `Bookmark ${indexEntry.title}`, exact: true}).click();
   await page.getByRole('button', {name: /^Bookmarks/}).click();
   assert.deepEqual(await titles(), [indexEntry.title]);
   // A ladder whose topic no problem is filed under still shows as the selected method.
