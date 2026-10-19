@@ -70,6 +70,7 @@ try {
   await page.getByRole('combobox', {name: 'Filter by method'}).selectOption(method.key);
   await page.getByRole('heading', {name: `${method.name} ladder`}).waitFor();
   assert.equal(await page.getByRole('combobox', {name: 'Sort problems'}).inputValue(), 'ladder');
+  assert.equal(await page.getByRole('combobox', {name: 'Filter by method'}).locator('option:not([value="all"])').count(), catalog.methods.length, 'Every method can be chosen');
   const expected = method.ladder.slice(0, 500).map(id => byId.get(id).title);
   assert.deepEqual(await titles(), expected, 'Rows follow the ladder');
   const levels = method.ladder.map(id => byId.get(id).difficulty);
@@ -132,7 +133,17 @@ try {
   await page.getByRole('button', {name: `Bookmark ${indexEntry.title}`}).click();
   await page.getByRole('button', {name: /^Bookmarks/}).click();
   assert.deepEqual(await titles(), [indexEntry.title]);
-  report.bookmarks = 'bookmarks include index-only problems';
+  // A ladder whose topic no problem is filed under still shows as the selected method.
+  const methodOnly = catalog.methods.find(m => ![...catalog.topics, ...catalog.indexTopics].includes(m.topic)) ?? method;
+  await page.getByRole('button', {name: /^Method ladders/}).click();
+  await page.locator('.method-card', {has: page.getByRole('heading', {name: methodOnly.name, exact: true})}).getByRole('button', {name: 'View ladder'}).click();
+  assert.equal(await page.getByRole('combobox', {name: 'Filter by method'}).inputValue(), methodOnly.key);
+  // Leaving a ladder restores number order; Problem library is the study kits again.
+  await page.getByRole('button', {name: /^Problem library/}).click();
+  await page.getByRole('heading', {name: 'Problem library'}).waitFor();
+  assert.equal(await page.getByRole('combobox', {name: 'Sort problems'}).inputValue(), 'number');
+  assert.equal(await page.locator('.problem-table tbody tr').count(), PROBLEM_COUNT);
+  report.bookmarks = 'bookmarks include index-only problems, and Problem library returns to the study kits in number order';
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(ROOT, 'test-results/method-ladders.json'), JSON.stringify({passed: true, ...report}, null, 2));
   for (const line of Object.values(report)) console.log(`PASS ${line}`);

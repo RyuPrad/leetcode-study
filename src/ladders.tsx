@@ -7,6 +7,10 @@ const difficulties: Difficulty[] = ['Easy', 'Medium', 'Hard'];
 const kindLabels: Record<SolutionMethod['kind'], string> = { algorithm: 'Algorithm', technique: 'Technique', 'data-structure': 'Data structure' };
 const categoryLabels: Record<NonNullable<Entry['category']>, string> = { algorithms: 'Algorithms', database: 'Database (SQL)', javascript: 'JavaScript', concurrency: 'Concurrency', shell: 'Shell' };
 export interface Lookup { all: Entry[]; byId: Map<string, Entry>; methods: Map<string, SolutionMethod>; }
+// Method topics in sidebar order, then any topic that only methods use (one that is never a primary method's).
+export function methodTopics(topics: string[], methods: Iterable<SolutionMethod>) {
+  return [...new Set([...topics, ...[...methods].map(method => method.topic)])];
+}
 export function DifficultyBadge({ difficulty }: { difficulty?: Difficulty }) { return difficulty ? <span className={`difficulty ${difficulty.toLowerCase()}`}>{difficulty}</span> : null; }
 export const leetCodeUrl = (entry: Entry) => `https://leetcode.com/problems/${entry.slug}/`;
 // Matches ladderOrder in scripts/content.mjs: difficulty, then higher acceptance, then number.
@@ -94,9 +98,7 @@ export function MethodsView({ lookup, topics, progress, onNavigate, onOpenLadder
   const [query, setQuery] = useState('');
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const methods = [...lookup.methods.values()].filter(method => terms.every(term => `${method.name} ${method.summary} ${method.topic}`.toLowerCase().includes(term)));
-  // A method can belong to a topic that no problem is filed under, e.g. when it is never a primary method.
-  const order = [...new Set([...topics, ...[...lookup.methods.values()].map(method => method.topic)])];
-  const groups = order.map(topic => ({ topic, methods: methods.filter(method => method.topic === topic) })).filter(group => group.methods.length);
+  const groups = methodTopics(topics, lookup.methods.values()).map(topic => ({ topic, methods: methods.filter(method => method.topic === topic) })).filter(group => group.methods.length);
   return <>
     <div className="page-heading"><div><div className="eyebrow">ONE METHOD, EVERY PROBLEM</div><h1>Method ladders</h1><p>Every LeetCode problem grouped by the method its solution uses, ordered from easiest to hardest. Climb a ladder to practise one idea until it sticks.</p></div></div>
     <div className="methods-search search-input"><input type="search" aria-label="Search methods" placeholder="Search methods…" value={query} onChange={event => setQuery(event.target.value)}/></div>

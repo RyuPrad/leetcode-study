@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { collectCatalog, ROOT } from '../scripts/content.mjs';
 import { PROBLEM_COUNT } from '../scripts/library-size.mjs';
 import { assetPath } from '../desktop/protocol';
@@ -68,7 +69,7 @@ test('each method ladder lists its problems once, from easiest to hardest', asyn
 });
 test('the index rejects unknown methods, missing methods and study kits it does not list', async () => {
   const { collectIndex, INDEX_PATH, METHODS_PATH } = await import('../scripts/content.mjs');
-  const root = fs.mkdtempSync(path.join(ROOT, '.test-data', 'index-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'study-index-'));
   try {
     fs.mkdirSync(path.join(root, 'coding'));
     const listed = JSON.parse(fs.readFileSync(path.join(ROOT, INDEX_PATH), 'utf8')).filter((p: { number: number }) => p.number <= 3);
