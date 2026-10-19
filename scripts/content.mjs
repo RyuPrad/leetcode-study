@@ -124,9 +124,72 @@ export function collectCatalog(root = ROOT, { allowAbsolute = false } = {}) {
   if (difficulties) for (const number of Object.keys(difficulties)) if (!entries.some(e => e.number === Number(number))) errors.push(`Difficulty listed for unknown problem ${number}`);
   const linked = new Set(entries.map(e => e.visualizerPath).filter(Boolean));
   for (const file of visualizers) if (!linked.has(file)) errors.push(`Unlinked visualizer: ${file}`);
+  // Historical checkouts predate the full LeetCode index and its method ladders.
+  const indexed = fs.existsSync(path.join(root, INDEX_PATH)) ? collectIndex(root, entries, errors) : null;
   if (errors.length) throw new Error(errors.join('\n'));
   entries.sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || a.title.localeCompare(b.title));
-  return { version: 1, entries, topics: TOPICS, visualizers: visualizers.sort() };
+  return { version: 1, entries, topics: TOPICS, visualizers: visualizers.sort(), ...indexed };
+}
+
+// Every LeetCode problem without a bundled study kit is an index entry: its metadata, a link to
+// leetcode.com and its solution methods. Each method's ladder runs from easiest to hardest.
+export const INDEX_PATH = 'coding/leetcode-index.json';
+export const METHODS_PATH = 'coding/solution-methods.json';
+export const INDEX_TOPICS = ['Strings', 'Advanced Data Structures', 'Design', 'Divide & Conquer', 'Database', 'JavaScript', 'Concurrency', 'Shell'];
+const CATEGORIES = new Set(['algorithms', 'database', 'javascript', 'concurrency', 'shell']);
+export const MAX_METHODS = 3;
+// Easy before Medium before Hard; within a difficulty, a higher acceptance rate comes first.
+export function ladderOrder(a, b) {
+  return DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty) || b.acceptance - a.acceptance || a.number - b.number;
+}
+export function collectIndex(root, entries, errors) {
+  const problems = JSON.parse(fs.readFileSync(path.join(root, INDEX_PATH), 'utf8'));
+  const { methods: definitions, problems: assigned } = JSON.parse(fs.readFileSync(path.join(root, METHODS_PATH), 'utf8'));
+  const methods = new Map(), byNumber = new Map();
+  for (const method of definitions) {
+    const location = `${METHODS_PATH} method ${method.key}`;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(method.key ?? '')) errors.push(`Invalid key in ${location}`);
+    if (methods.has(method.key)) errors.push(`Duplicate method ${method.key}`);
+    if (!TECHNIQUE_KINDS.has(method.kind)) errors.push(`Invalid kind in ${location}`);
+    if (![...TOPICS, ...INDEX_TOPICS].includes(method.topic)) errors.push(`Unknown topic in ${location}: ${method.topic}`);
+    if (!method.name?.trim() || !method.summary?.trim()) errors.push(`Missing name or summary in ${location}`);
+    methods.set(method.key, { key: method.key, name: method.name, kind: method.kind, topic: method.topic, summary: method.summary, ladder: [] });
+  }
+  for (const problem of problems) {
+    const location = `${INDEX_PATH} problem ${problem.number}`;
+    if (!Number.isInteger(problem.number) || problem.number < 1) { errors.push(`Invalid number in ${location}`); continue; }
+    if (byNumber.has(problem.number)) errors.push(`Duplicate problem ${problem.number} in ${INDEX_PATH}`);
+    if (!problem.title?.trim() || !/^[a-z0-9-]+$/.test(problem.slug ?? '')) errors.push(`Invalid title or slug in ${location}`);
+    if (!DIFFICULTIES.includes(problem.difficulty)) errors.push(`Invalid difficulty in ${location}`);
+    if (!(problem.acceptance >= 0 && problem.acceptance <= 100)) errors.push(`Invalid acceptance in ${location}`);
+    if (typeof problem.premium !== 'boolean' || !CATEGORIES.has(problem.category) || !Array.isArray(problem.tags)) errors.push(`Invalid premium, category or tags in ${location}`);
+    const keys = assigned[problem.number];
+    if (!Array.isArray(keys) || keys.length < 1 || keys.length > MAX_METHODS) errors.push(`Problem ${problem.number} needs 1 to ${MAX_METHODS} solution methods`);
+    else for (const key of keys) if (!methods.has(key)) errors.push(`Unknown solution method ${key} for problem ${problem.number}`);
+    if (Array.isArray(keys) && new Set(keys).size !== keys.length) errors.push(`Duplicate solution method for problem ${problem.number}`);
+    byNumber.set(problem.number, problem);
+  }
+  for (const number of Object.keys(assigned)) if (!byNumber.has(Number(number))) errors.push(`Solution methods listed for unknown problem ${number}`);
+  const kits = new Map(entries.filter(entry => entry.number).map(entry => [entry.number, entry]));
+  for (const [number, entry] of kits) {
+    const problem = byNumber.get(number);
+    if (!problem) errors.push(`Study kit ${number} is missing from ${INDEX_PATH}`);
+    else if (entry.difficulty && entry.difficulty !== problem.difficulty) errors.push(`Difficulty of ${number} differs from ${INDEX_PATH}`);
+  }
+  if (errors.length) return null;
+  const index = [];
+  for (const problem of problems) {
+    const keys = assigned[problem.number], names = keys.map(key => methods.get(key).name);
+    const details = { slug: problem.slug, acceptance: problem.acceptance, premium: problem.premium, category: problem.category, tags: problem.tags, methods: keys };
+    const kit = kits.get(problem.number);
+    if (kit) { Object.assign(kit, details); kit.searchText += ` ${names.join(' ')}`.toLowerCase(); continue; }
+    const topic = methods.get(keys[0]).topic;
+    index.push({ id: `leetcode:${problem.number}`, number: problem.number, title: problem.title, topic, difficulty: problem.difficulty, notePath: '', markdown: '', indexOnly: true, ...details,
+      searchText: `${problem.number} ${problem.title} ${topic} ${problem.tags.join(' ')} ${names.join(' ')}`.toLowerCase() });
+  }
+  for (const problem of [...problems].sort(ladderOrder)) for (const key of assigned[problem.number]) methods.get(key).ladder.push(`leetcode:${problem.number}`);
+  const used = new Set([...TOPICS, ...index.map(entry => entry.topic)]);
+  return { index, indexTopics: INDEX_TOPICS.filter(topic => used.has(topic)), methods: [...methods.values()].filter(method => method.ladder.length) };
 }
 export function buildContent(root = ROOT) {
   const catalog = collectCatalog(root);
@@ -143,4 +206,5 @@ export function buildContent(root = ROOT) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const catalog = collectCatalog();
   console.log(`Validated ${catalog.entries.filter(e => e.number).length} problems, ${catalog.visualizers.length} visualizers, ${catalog.topics.length} topics and 2 reference guides.`);
+  if (catalog.index) console.log(`Indexed ${catalog.index.length} more LeetCode problems and ${catalog.methods.length} solution-method ladders.`);
 }

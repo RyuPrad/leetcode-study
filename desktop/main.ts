@@ -69,6 +69,9 @@ else {
     const guidedLessons = new Map((JSON.parse(fs.readFileSync(path.join(root, 'content/guided-lessons.json'), 'utf8')) as GuidedLessonIdentity[]).map(lesson => [lesson.id, lesson]));
     const problemIds = new Set(catalog.entries.filter(e => e.number).map(e => e.id));
     const assertProblem = (id: unknown) => { if (typeof id !== 'string' || !problemIds.has(id)) throw new Error('Unknown problem.'); };
+    // Index-only LeetCode problems track progress and study time, but have no drafts, submissions or lessons.
+    const trackedIds = new Set([...problemIds, ...(catalog.index ?? []).map(e => e.id)]);
+    const assertTracked = (id: unknown) => { if (typeof id !== 'string' || !trackedIds.has(id)) throw new Error('Unknown problem.'); };
     store = new StudyStore(app.getPath('userData'));
     tracker = new StudyTracker(store);
     protocol.handle('study', request => {
@@ -116,8 +119,8 @@ else {
       handle(channel, (epoch, ...args) => { assertProfile(epoch); return fn(...args); });
     }
     handle('study:bootstrap', () => ({ catalog, data: store.snapshot(), notice: store.notice, version: app.getVersion(), profileEpoch }));
-    handleProfile('study:progress', (id, patch) => { assertProblem(id); store.updateProgress(id, patch); sendData(); return store.snapshot(); });
-    handleProfile('study:select', id => { if (id !== null) assertProblem(id); flushDrafts(); const state = tracker.select(id); sendData(); sendTimer(); return state; });
+    handleProfile('study:progress', (id, patch) => { assertTracked(id); store.updateProgress(id, patch); sendData(); return store.snapshot(); });
+    handleProfile('study:select', id => { if (id !== null) assertTracked(id); flushDrafts(); const state = tracker.select(id); sendData(); sendTimer(); return state; });
     ipcMain.on('study:activity', (event, epoch) => { if (epoch === profileEpoch && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && trusted(event.senderFrame.url)) safe(() => tracker.activity()); });
     handleProfile('study:edit-session', (id, patch) => { tracker.edit(id, patch); sendData(); sendTimer(); return store.snapshot(); });
     handleProfile('study:delete-session', id => { tracker.delete(id); sendData(); sendTimer(); return store.snapshot(); });

@@ -8,12 +8,24 @@ export interface SolutionTechnique {
   kind: 'algorithm' | 'technique' | 'data-structure';
   role: string;
 }
+export type LeetCodeCategory = 'algorithms' | 'database' | 'javascript' | 'concurrency' | 'shell';
 export interface Entry {
   id: string; number?: number; title: string; topic: string; difficulty?: Difficulty;
   notePath: string; markdown: string; searchText: string; visualizerPath?: string;
   solutionTechniques?: SolutionTechnique[];
+  // From the full LeetCode index (coding/leetcode-index.json); absent in historical catalogs.
+  slug?: string; acceptance?: number; premium?: boolean; category?: LeetCodeCategory; tags?: string[];
+  // Solution-method keys, most central first.
+  methods?: string[];
+  // A LeetCode problem without a bundled study kit: no notes, visualizer, lesson or judge.
+  indexOnly?: true;
 }
-export interface Catalog { version: 1; entries: Entry[]; topics: string[]; visualizers: string[]; }
+// A solution method and its ladder: every problem that uses it, from easiest to hardest.
+export interface SolutionMethod { key: string; name: string; kind: SolutionTechnique['kind']; topic: string; summary: string; ladder: string[]; }
+export interface Catalog {
+  version: 1; entries: Entry[]; topics: string[]; visualizers: string[];
+  index?: Entry[]; indexTopics?: string[]; methods?: SolutionMethod[];
+}
 export interface Progress { status: ProblemStatus; bookmarked: boolean; needsReview: boolean; updatedAt: string; }
 export interface StudySession {
   id: string; problemId: string; startedAt: string; endedAt: string | null;

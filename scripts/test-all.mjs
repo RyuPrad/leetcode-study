@@ -51,6 +51,7 @@ add('test:playback', node('tests/playback.mjs'));
 add('editor/tabout', node('tests/tabout.mjs'));
 add('editor/focus', node('tests/editor-focus.mjs'));
 add('test:typing', node('tests/typing.mjs'));
+add('test:ladders', node('tests/method-ladders.mjs'));
 for (const [name, f] of [['test:e2e', 'desktop'], ['restore-isolation', 'restore-isolation'], ['test:motion:desktop', 'pointer-motion'], ['test:objects:desktop', 'object-view'], ['test:objects:readability:desktop', 'object-view-readability'], ['test:layout:desktop', 'ui-layout'], ['test:panels:desktop', 'panel-layout'], ['test:coding', 'coding'], ['test:debugger', 'debugger'], ['test:guided:desktop', 'guided']])
   add(name, node(`tests/${f}.e2e.mjs`), 'desktop');
 
