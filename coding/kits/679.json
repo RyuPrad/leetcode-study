@@ -1,0 +1,63 @@
+{
+  "number": 679,
+  "title": "24 Game",
+  "spec": "leetcode",
+  "statement": "`cards` holds four numbers. Decide whether some arithmetic expression that uses each of the four numbers exactly once, combined with `+`, `-`, `*`, `/` and any parentheses, has the value 24. Return `true` if one exists and `false` otherwise.\n\n- Division is exact real division, so fractions are allowed along the way (for example `4 / (1 - 2 / 3)` is 12).\n- Every operator takes two operands; `-` cannot be used to negate a single number.\n- Numbers cannot be glued into longer ones: `1` and `2` never become `12`.\n- The numbers may be used in any order.",
+  "constraints": [
+    "cards.length == 4",
+    "1 <= cards[i] <= 9"
+  ],
+  "signature": "boolean judgePoint24(int[] cards)",
+  "entry": "judgePoint24",
+  "kind": "function",
+  "parameters": [
+    "cards"
+  ],
+  "validator": "function validate([cards]) {\n  if (!Array.isArray(cards) || cards.length !== 4) return 'cards must hold exactly 4 numbers.';\n  if (cards.some(v => !Number.isInteger(v) || v < 1 || v > 9)) return 'Each card is a whole number from 1 to 9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function judgePoint24(cards) {\n  const EPSILON = 1e-6;\n\n  function solve(numbers) {\n    if (numbers.length === 1) {\n      return Math.abs(numbers[0] - 24) < EPSILON;\n    }\n    for (let i = 0; i < numbers.length; i++) {\n      for (let j = i + 1; j < numbers.length; j++) {\n        const rest = numbers.filter((_, k) => k !== i && k !== j);\n        const a = numbers[i];\n        const b = numbers[j];\n        const options = [a * b, a + b, a - b, b - a];\n        if (Math.abs(b) > EPSILON) {\n          options.push(a / b);\n        }\n        if (Math.abs(a) > EPSILON) {\n          options.push(b / a);\n        }\n        for (const value of options) {\n          if (solve([value, ...rest])) {\n            return true;\n          }\n        }\n      }\n    }\n    return false;\n  }\n\n  return solve(cards);\n}",
+  "brute": "function judgePoint24(cards) {\n  // Exact fractions: for every subset of cards, list every value its cards can make, then look for 24 in the full set.\n  const gcd = (x, y) => (y === 0 ? Math.abs(x) : gcd(y, x % y));\n  const make = (n, d) => {\n    if (d < 0) { n = -n; d = -d; }\n    const g = gcd(n, d) || 1;\n    return [n / g, d / g];\n  };\n  const values = new Map();\n  for (let mask = 1; mask < 16; mask++) {\n    const found = new Map();\n    const bits = [0, 1, 2, 3].filter(b => mask & (1 << b));\n    if (bits.length === 1) found.set(cards[bits[0]] + '/1', [cards[bits[0]], 1]);\n    for (let part = (mask - 1) & mask; part > 0; part = (part - 1) & mask) {\n      for (const [n1, d1] of values.get(part).values()) {\n        for (const [n2, d2] of values.get(mask ^ part).values()) {\n          const results = [make(n1 * d2 + n2 * d1, d1 * d2), make(n1 * d2 - n2 * d1, d1 * d2), make(n1 * n2, d1 * d2)];\n          if (n2 !== 0) results.push(make(n1 * d2, d1 * n2));\n          for (const [n, d] of results) found.set(n + '/' + d, [n, d]);\n        }\n      }\n    }\n    values.set(mask, found);\n  }\n  return values.get(15).has('24/1');\n}",
+  "generator": "function generate(rand, size) {\n  // Every input has exactly four cards; small inputs lean on repeated cards, which are often unsolvable.\n  const top = size === 'small' && rand() < 0.4 ? 3 : 9;\n  return [Array.from({ length: 4 }, () => 1 + Math.floor(rand() * top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[4,1,8,7]],"expected":true},
+    {"name":"Example 2","input":[[1,2,1,2]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,1,1,1]]},
+    {"name":"Test 2","input":[[3,3,8,8]]},
+    {"name":"Test 3","input":[[1,5,5,5]]},
+    {"name":"Test 4","input":[[1,3,4,6]]},
+    {"name":"Test 5","input":[[1,1,1,8]]},
+    {"name":"Test 6","input":[[6,6,6,6]]},
+    {"name":"Test 7","input":[[9,9,9,9]]},
+    {"name":"Test 8","input":[[1,1,7,7]]},
+    {"name":"Test 9","input":[[3,3,7,7]]},
+    {"name":"Test 10","input":[[1,2,7,7]]},
+    {"name":"Test 11","input":[[8,1,1,1]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAny expression on four numbers is built by repeatedly taking two of the values still available and replacing them with one result. So instead of enumerating expressions and parentheses, search over those merges: pick a pair, apply an operator, and continue with one fewer number. After three merges a single value remains, and the answer is `true` if any branch ends at 24. Failing branches are simply abandoned and the next choice is tried.\n\n## Approach\n\n1. `solve(numbers)` returns whether the list can be merged down to 24.\n2. With one number left, compare it with 24 using a small tolerance `EPSILON`, because divisions produce floating-point fractions.\n3. Otherwise try every pair of positions `i < j`, and keep the other numbers in `rest`.\n4. Collect the results `a * b`, `a + b`, `a - b`, `b - a` in `options`, plus `a / b` and `b / a` when the divisor is not zero. Both directions of `-` and `/` are needed because each pair is visited once.\n5. Recurse on `[value, ...rest]` for each `value`; return `true` at the first success, and `false` when every choice fails. The order of the options only changes how soon an answer is found.\n\n## Example 1, step by step\n\n`cards = [4, 1, 8, 7]`.\n- The first pair is `a = 4`, `b = 1`, and the first option `4 * 1 = 4` gives `[4, 8, 7]`.\n- In `[4, 8, 7]`, the pair `(4, 8)` leads to `[32, 7]`, `[12, 7]`, `[-4, 7]`, `[4, 7]`, `[0.5, 7]` and `[2, 7]`; none of them reaches 24.\n- The pair `(4, 7)` then tries `[28, 8]`, `[11, 8]` and `[-3, 8]`, which fail, and `7 - 4 = 3` gives `[3, 8]`.\n- In `[3, 8]` the first option `3 * 8 = 24` leaves `[24]`, so `true` travels back up. The expression found is `(7 - 4 * 1) * 8`; LeetCode's `(8 - 4) * (7 - 1)` is another.\n\n## Complexity\n\n- Time: O(1) for four cards: at most 6·6 × 3·6 × 1·6 = 3,888 final values are checked.\n- Space: O(1): the recursion is at most four calls deep with lists of at most four numbers.\n\n## Pitfalls\n\n- Never test `=== 24`: `8 / (3 - 8 / 3)` evaluates to 23.99999999999999 in floating point.\n- Integer division loses answers such as `[3, 3, 8, 8]` and `[1, 5, 5, 5]`, which need fractions in the middle.\n- With `j > i` only, forgetting `b - a` or `b / a` misses cases like `8 / (3 - 8 / 3)`.\n- Combining only neighbours, or evaluating left to right, misses groupings such as `(8 - 4) * (7 - 1)`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `EPSILON` | tolerance for comparing floating-point values |\n| `numbers` | values still available at this level |\n| `i`, `j` | positions of the two values being merged |\n| `a`, `b` | the two values being merged |\n| `rest` | the other values, which stay for the next level |\n| `options` | every result of combining `a` and `b` |\n| `value` | the merged result currently being tried |",
+  "narration": {
+    "2": "Division creates fractions, so final values are compared with a small tolerance.",
+    "4": "solve reports whether this list of numbers can be merged down to 24.",
+    "5": "One number left: the expression is complete.",
+    "6": "It succeeds when that number is 24, up to rounding error.",
+    "8": "Choose the first operand a by position i...",
+    "9": "...and the second operand b at a later position j, so each pair is visited once.",
+    "10": "Keep every other number for the next level.",
+    "13": "Product, sum and both differences are always possible.",
+    "14": "Dividing by b is allowed only when b is not zero.",
+    "17": "Likewise, b / a needs a to be non-zero.",
+    "20": "Try each result of merging a and b.",
+    "21": "Replace the pair by its result and recurse with one number fewer.",
+    "22": "That branch reached 24, so the whole search succeeds.",
+    "27": "No pair and operator led to 24 from this list, so this branch is abandoned.",
+    "30": "Start the search with all four cards."
+  }
+}

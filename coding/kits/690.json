@@ -1,0 +1,64 @@
+{
+  "number": 690,
+  "title": "Employee Importance",
+  "spec": "leetcode",
+  "statement": "A company's staff is given as the array `employees`. Each element is an `Employee` object with three fields: `id` (a unique integer), `importance` (an integer score, possibly negative) and `subordinates` (an array holding the ids of the people who report to that employee directly). Every employee has at most one direct manager, the reporting lines never loop, and every id listed in `subordinates` belongs to someone in `employees`.\n\nFor the employee whose id equals `id`, add up the importance of that employee, of everyone reporting to them directly, of everyone reporting to those people, and so on down every level, and return the total. The array is in no particular order, and `id` is always the id of one of the employees.\n\nEach case is written as `[employees, id]` with every employee as `[id, importance, subordinates]`. Your function receives the array of `Employee` objects (read `employee.id`, `employee.importance` and `employee.subordinates`) and the number `id`.",
+  "constraints": [
+    "1 <= employees.length <= 2000",
+    "1 <= employees[i].id <= 2000",
+    "All employees[i].id are unique",
+    "-100 <= employees[i].importance <= 100",
+    "Each employee has at most one direct manager and any number of direct subordinates",
+    "Every id in employees[i].subordinates is the id of an employee",
+    "id is the id of an employee"
+  ],
+  "signature": "int getImportance(List<Object> employees, int id)",
+  "entry": "getImportance",
+  "kind": "function",
+  "parameters": [
+    "employees",
+    "id"
+  ],
+  "validator": "function validate([employees, id]) {\n  if (!Array.isArray(employees) || employees.length < 1 || employees.length > 2000) return 'employees needs 1 to 2000 entries.';\n  const manager = new Map();\n  const ids = new Set();\n  for (const entry of employees) {\n    if (!Array.isArray(entry) || entry.length !== 3 || !Array.isArray(entry[2])) return 'Write each employee as [id, importance, subordinates].';\n    const [own, importance] = entry;\n    if (!Number.isInteger(own) || own < 1 || own > 2000) return 'Employee ids are whole numbers from 1 to 2000.';\n    if (ids.has(own)) return 'Employee ids must be unique.';\n    ids.add(own);\n    if (!Number.isInteger(importance) || importance < -100 || importance > 100) return 'Importance values are whole numbers from -100 to 100.';\n  }\n  for (const [own, , subordinates] of employees) {\n    for (const sub of subordinates) {\n      if (!ids.has(sub)) return 'Every subordinate id must belong to an employee.';\n      if (manager.has(sub)) return 'An employee can have at most one direct manager.';\n      manager.set(sub, own);\n    }\n  }\n  // With one manager each, the lines are loop-free exactly when walking down from the top people reaches everyone.\n  const byId = new Map(employees.map(entry => [entry[0], entry[2]]));\n  const stack = [...ids].filter(own => !manager.has(own));\n  let reached = 0;\n  while (stack.length > 0) {\n    reached++;\n    for (const sub of byId.get(stack.pop())) stack.push(sub);\n  }\n  if (reached !== employees.length) return 'The reporting lines must not form a loop.';\n  if (!ids.has(id)) return 'id must be the id of one of the employees.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [list, id] = input;\n  class Employee {\n    constructor(id, importance, subordinates) { this.id = id; this.importance = importance; this.subordinates = subordinates; }\n  }\n  const employees = list.map(([own, importance, subordinates]) => new Employee(own, importance, [...subordinates]));\n  const result = solve(employees, id);\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  return result;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function getImportance(employees, id) {\n  const byId = new Map();\n  for (const employee of employees) {\n    byId.set(employee.id, employee);\n  }\n\n  let total = 0;\n  const stack = [id];\n  while (stack.length > 0) {\n    const employee = byId.get(stack.pop());\n    total += employee.importance;\n    for (const subordinate of employee.subordinates) {\n      stack.push(subordinate);\n    }\n  }\n  return total;\n}",
+  "brute": "function getImportance(employees, id) {\n  // Walk up from every employee through their managers and count those whose chain passes through id.\n  const managerOf = {};\n  for (const person of employees) {\n    for (const sub of person.subordinates) managerOf[sub] = person.id;\n  }\n  let sum = 0;\n  for (const person of employees) {\n    let current = person.id;\n    while (current !== undefined && current !== id) current = managerOf[current];\n    if (current === id) sum += person.importance;\n  }\n  return sum;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const shuffle = (list) => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  const n = size === 'large' ? int(1800, 2000) : int(1, 9);\n  const idPool = size === 'large' || rand() < 0.3 ? 2000 : 20;\n  const ids = shuffle(Array.from({ length: idPool }, (_, i) => i + 1)).slice(0, n);\n  const span = size === 'small' && rand() < 0.5 ? 5 : 100;\n  const shape = rand();\n  const subordinates = ids.map(() => []);\n  for (let i = 1; i < n; i++) {\n    // Shapes: a long chain, a wide star, or a random forest where some people have no manager.\n    if (shape < 0.2) subordinates[i - 1].push(ids[i]);\n    else if (shape < 0.35) subordinates[0].push(ids[i]);\n    else if (rand() < 0.9) subordinates[int(0, i - 1)].push(ids[i]);\n  }\n  const employees = shuffle(ids.map((own, i) => [own, int(-span, span), shuffle(subordinates[i])]));\n  // Large cases usually ask about the top of a big tree; small ones ask about anyone.\n  const id = size === 'large' && rand() < 0.7 ? ids[0] : ids[int(0, n - 1)];\n  return [employees, id];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,5,[2,3]],[2,3,[]],[3,3,[]]],1],"expected":11},
+    {"name":"Example 2","input":[[[1,2,[5]],[5,-3,[]]],5],"expected":-3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,7,[]]],1]},
+    {"name":"Test 2","input":[[[1,-100,[]]],1]},
+    {"name":"Test 3","input":[[[1,1,[2]],[2,2,[3]],[3,3,[4]],[4,4,[]]],2]},
+    {"name":"Test 4","input":[[[1,5,[2,3]],[2,3,[4]],[3,3,[]],[4,-2,[]]],4]},
+    {"name":"Test 5","input":[[[1,10,[2]],[2,5,[]],[3,100,[4]],[4,1,[]]],1]},
+    {"name":"Test 6","input":[[[4,1,[]],[2,-3,[4,5]],[5,6,[]],[1,2,[2,3]],[3,0,[]]],1]},
+    {"name":"Test 7","input":[[[10,5,[20]],[20,-5,[]]],10]},
+    {"name":"Test 8","input":[[[2000,100,[1999,1]],[1999,-100,[]],[1,50,[]]],2000]},
+    {"name":"Test 9","input":[[[1,1,[2,3,4,5,6]],[2,1,[]],[3,1,[]],[4,1,[]],[5,1,[]],[6,1,[]]],1]},
+    {"name":"Test 10","input":[[[8,4,[3,9]],[3,-6,[11,2]],[9,7,[]],[11,10,[5]],[2,-1,[]],[5,20,[]]],3]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe people below one employee form a tree: the employee at the top, their direct reports as children, and so on. The answer is the sum of `importance` over that subtree. Two things make it fast: a hash map from id to employee, because the array is not indexed by id, and a depth-first walk that visits each person in the subtree exactly once. A slower check would walk up from every employee through their managers and keep those whose chain reaches `id`.\n\n## Approach\n\n1. Build `byId`, a map from each employee's id to the employee object.\n2. Put `id` on a `stack` and set `total = 0`.\n3. While the stack is not empty, pop an id and look up its `employee` in `byId`.\n4. Add `employee.importance` to `total`, then push every id in `employee.subordinates` so that their teams are visited too.\n5. When the stack is empty, everyone under `id` has been counted; return `total`.\n\n## Example 1, step by step\n\n`byId` maps 1, 2 and 3 to their employees and `stack = [1]`. Pop 1: `total = 5`, push 2 and 3. Pop 3: `total = 8`, no reports. Pop 2: `total = 11`, no reports. The stack is empty, so the answer is `11`.\n\n## Complexity\n\n- Time: O(n): building the map touches every employee once, and the walk visits each person in the subtree once.\n- Space: O(n) for the map and the stack.\n\n## Pitfalls\n\n- `employees[id]` is not the employee with that id: the array is unordered and ids start at 1, so look people up through `byId`.\n- Direct reports are not enough; their own reports, at every depth, also count.\n- Do not sum the whole array: the company can have several separate trees, and only the one under `id` matters.\n- Scanning the array to find each subordinate works but costs O(n²); the map keeps it linear.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `byId` | map from an employee id to the `Employee` object |\n| `total` | importance added up so far |\n| `stack` | ids still waiting to be visited |\n| `employee` | the person being counted right now |\n| `subordinate` | the id of one of that person's direct reports |",
+  "narration": {
+    "2": "The array is not indexed by id, so build a map from id to employee for constant-time lookups.",
+    "3": "Visit every employee once...",
+    "4": "...and file them under their id.",
+    "7": "The running sum of importance starts at zero.",
+    "8": "Start the depth-first walk from the requested employee.",
+    "9": "Keep going while someone in the subtree is still waiting to be counted.",
+    "10": "Take the most recently pushed id and look up that employee.",
+    "11": "Count this person's importance.",
+    "12": "Every direct report heads their own smaller team...",
+    "13": "...so push their id to be visited later.",
+    "16": "Everyone under id has been counted exactly once; return the sum."
+  }
+}

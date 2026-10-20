@@ -1,0 +1,68 @@
+{
+  "number": 708,
+  "title": "Insert into a Sorted Circular Linked List",
+  "spec": "recalled",
+  "statement": "You get `head`, some node of a circular singly linked list (the last node's `next` leads back to the first), and an integer `insertVal`. Read around the circle from the right starting node, the values are in non-decreasing order, but `head` can be any node, not necessarily the one holding the smallest value. Add one new node holding `insertVal` so that the circle is still sorted in the same sense; when several spots work, any of them is accepted. Keep every existing node and its order.\n\n- If `head` is `null` (the list is empty), make a circle of one new node that points to itself and return that node.\n- Otherwise return `head`, the node you were given.\n\nNodes are `ListNode` objects with `val` and `next`; create the new one with `new ListNode(insertVal)`. Each case is written as `[head, insertVal]`, where `head` lists the values met when walking once around the circle starting at the given node (`[]` when empty). The result is shown the same way, starting at the node you return.",
+  "constraints": [
+    "The list has between 0 and 5 * 10^4 nodes",
+    "-10^6 <= Node.val, insertVal <= 10^6",
+    "Walking around the circle from some node gives non-decreasing values"
+  ],
+  "signature": "ListNode insert(ListNode head, int insertVal)",
+  "entry": "insert",
+  "kind": "function",
+  "parameters": [
+    "head",
+    "insertVal"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [values, insertVal] = input;\n  if (!Array.isArray(actual) || actual.length !== values.length + 1) return false;\n  // Removing the inserted value at its first difference from the original must give the original back.\n  let i = 0;\n  while (i < values.length && actual[i] === values[i]) i++;\n  if (values.length > 0 && i === 0) return false;\n  if (actual[i] !== insertVal) return false;\n  for (let j = i; j < values.length; j++) {\n    if (actual[j + 1] !== values[j]) return false;\n  }\n  // A circle is sorted when it drops from a bigger to a smaller value at most once.\n  let drops = 0;\n  for (let j = 0; j < actual.length; j++) {\n    if (actual[j] > actual[(j + 1) % actual.length]) drops++;\n  }\n  return drops <= 1;\n}",
+  "validator": "function validate([head, insertVal]) {\n  if (!Array.isArray(head) || head.length > 50000) return 'head lists at most 5 * 10^4 values.';\n  if (head.some(v => !Number.isInteger(v) || v < -1000000 || v > 1000000)) return 'Node values are whole numbers from -10^6 to 10^6.';\n  if (!Number.isInteger(insertVal) || insertVal < -1000000 || insertVal > 1000000) return 'insertVal is a whole number from -10^6 to 10^6.';\n  let drops = 0;\n  for (let i = 0; i < head.length; i++) {\n    if (head[i] > head[(i + 1) % head.length]) drops++;\n  }\n  if (drops > 1) return 'Going around the circle, the values must be sorted from some starting node.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, insertVal] = input;\n  const nodes = kit.listNodes(values);\n  if (nodes.length > 0) nodes[nodes.length - 1].next = nodes[0];\n  const head = nodes.length > 0 ? nodes[0] : null;\n  const result = solve(head, insertVal);\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (head !== null && result !== head) throw new Error('Return the node you were given.');\n  if (result === null || typeof result !== 'object') throw new Error('For an empty list, return the new node.');\n  if (!nodes.every((node, i) => node.val === values[i])) throw new Error('Do not change the values of existing nodes.');\n  // Walk once around the circle: the original nodes must appear in order, plus exactly one new node.\n  const original = new Set(nodes);\n  const out = [];\n  let seen = 0;\n  let added = 0;\n  let node = result;\n  do {\n    if (node === null || typeof node !== 'object') throw new Error('The list must stay circular.');\n    if (out.length > nodes.length) throw new Error('The circle must hold the original nodes plus one new node.');\n    if (original.has(node)) {\n      if (node !== nodes[seen]) throw new Error('Keep the existing nodes in their original order.');\n      seen++;\n    } else {\n      added++;\n      if (node.val !== insertVal) throw new Error('The new node must hold insertVal.');\n    }\n    out.push(node.val);\n    node = node.next;\n  } while (node !== result);\n  if (seen !== nodes.length || added !== 1) throw new Error('The circle must hold the original nodes plus one new node.');\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function insert(head, insertVal) {\n  const node = new ListNode(insertVal);\n  if (head === null) {\n    node.next = node;\n    return node;\n  }\n\n  let prev = head;\n  let curr = head.next;\n  do {\n    if (prev.val <= insertVal && insertVal <= curr.val) {\n      break;\n    }\n    if (prev.val > curr.val && (insertVal >= prev.val || insertVal <= curr.val)) {\n      break;\n    }\n    prev = curr;\n    curr = curr.next;\n  } while (prev !== head);\n\n  prev.next = node;\n  node.next = curr;\n  return head;\n}",
+  "brute": "function insert(head, insertVal) {\n  const fresh = new ListNode(insertVal);\n  if (!head) {\n    fresh.next = fresh;\n    return fresh;\n  }\n  const ring = [head];\n  for (let p = head.next; p !== head; p = p.next) ring.push(p);\n  const sortedCircle = (vals) => vals.filter((v, i) => v > vals[(i + 1) % vals.length]).length <= 1;\n  // Try every gap in turn and keep the first one that leaves the circle sorted.\n  for (let j = 0; j < ring.length; j++) {\n    const vals = ring.map(p => p.val);\n    vals.splice(j + 1, 0, insertVal);\n    if (sortedCircle(vals)) {\n      fresh.next = ring[j].next;\n      ring[j].next = fresh;\n      return head;\n    }\n  }\n  return head;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const span = large ? 1000000 : 5;\n  const pick = () => Math.floor(rand() * (2 * span + 1)) - span;\n  const n = large ? 1500 + Math.floor(rand() * 501) : rand() < 0.1 ? 0 : 1 + Math.floor(rand() * 6);\n  const same = rand() < 0.15 ? pick() : null;\n  const sorted = Array.from({ length: n }, () => same === null ? pick() : same).sort((x, y) => x - y);\n  const shift = n > 0 ? Math.floor(rand() * n) : 0;\n  const head = sorted.slice(shift).concat(sorted.slice(0, shift));\n  const insertVal = n > 0 && rand() < 0.3 ? sorted[Math.floor(rand() * n)] : pick();\n  return [head, insertVal];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,4,1],2],"expected":[3,4,1,2]},
+    {"name":"Example 2","input":[[],1],"expected":[1]},
+    {"name":"Example 3","input":[[1],0],"expected":[1,0]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],-5]},
+    {"name":"Test 2","input":[[1],1]},
+    {"name":"Test 3","input":[[1],2]},
+    {"name":"Test 4","input":[[3,3,3],3]},
+    {"name":"Test 5","input":[[3,3,3],0]},
+    {"name":"Test 6","input":[[1,3,5],4]},
+    {"name":"Test 7","input":[[1,3,5],6]},
+    {"name":"Test 8","input":[[1,3,5],0]},
+    {"name":"Test 9","input":[[5,1,3],6]},
+    {"name":"Test 10","input":[[5,1,3],2]},
+    {"name":"Test 11","input":[[1000000,-1000000],1000000]},
+    {"name":"Test 12","input":[[2,2,3,1,1],2]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA sorted circle has at most one place where the values drop, from the largest value back to the smallest. The new value fits either between two neighbours that bracket it (`prev.val <= insertVal <= curr.val`), or at that drop when it is a new maximum or a new minimum. Walking once around the circle from `head` with a pair of pointers finds such a spot. If a whole lap finds none, every value is equal, and any spot works.\n\n## Approach\n\n1. Make the new node. If `head` is `null`, point it at itself and return it.\n2. Start `prev = head` and `curr = head.next`.\n3. Stop when `insertVal` lies between `prev.val` and `curr.val`.\n4. Also stop at the drop (`prev.val > curr.val`) when `insertVal` is at least the maximum or at most the minimum.\n5. Otherwise step both pointers forward; quit after one full lap.\n6. Link `prev -> node -> curr` and return `head`.\n\n## Example 1, step by step\n\nThe circle is `3 -> 4 -> 1 -> 3` and `insertVal = 2`.\n\n- `prev = 3`, `curr = 4`: 2 is not between them and this is not the drop.\n- `prev = 4`, `curr = 1`: this is the drop, but 2 is neither `>= 4` nor `<= 1`.\n- `prev = 1`, `curr = 3`: `1 <= 2 <= 3`, so stop.\n\nLinking gives `3 -> 4 -> 1 -> 2 -> 3`, read from `head` as `[3, 4, 1, 2]`.\n\n## Complexity\n\n- Time: O(n): at most one lap around the circle.\n- Space: O(1): two pointers and the new node.\n\n## Pitfalls\n\n- Use a `do ... while` (or a step count) so a one-node circle, where `curr === prev`, still runs the checks once and the loop ends.\n- When all values are equal and `insertVal` differs, neither condition ever holds; after one lap, insert anywhere instead of looping forever.\n- At the drop, accept both a new maximum (`>= prev.val`) and a new minimum (`<= curr.val`).\n- Return the original `head`, not the new node, unless the list was empty.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `node` | the new node holding `insertVal` |\n| `prev` | the node the new one may follow |\n| `curr` | `prev.next`, the node the new one may precede |",
+  "narration": {
+    "2": "Create the node to insert up front.",
+    "3": "An empty list has nowhere to walk.",
+    "4": "A single node forms a circle by pointing at itself.",
+    "5": "Return the new node as the head of the new circle.",
+    "8": "Walk with prev starting at the given node...",
+    "9": "...and curr just after it, so the new node may go between them.",
+    "10": "A do-while runs at least once, even when the circle has one node.",
+    "11": "insertVal fits between two neighbours that bracket it.",
+    "14": "At the drop from the largest to the smallest value, a new maximum or a new minimum fits here.",
+    "17": "No fit yet: move prev forward.",
+    "18": "Move curr forward too, keeping it right after prev.",
+    "19": "Stop after one full lap; then every value is equal and any spot works.",
+    "21": "Link prev to the new node.",
+    "22": "Link the new node to curr, closing the circle again.",
+    "23": "Return the node that was given."
+  }
+}

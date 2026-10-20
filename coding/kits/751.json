@@ -1,0 +1,65 @@
+{
+  "number": 751,
+  "title": "IP to CIDR",
+  "spec": "recalled",
+  "statement": "An IPv4 address is a 32-bit unsigned integer written as four decimal numbers from 0 to 255, one per byte with the most significant byte first, separated by dots (such as `\"15.136.255.107\"`). A CIDR block is written as a base address, a slash and a prefix length `k` from 0 to 32, for example `\"123.45.64.0/20\"`. It stands for every address whose highest `k` bits equal the highest `k` bits of the base, which is 2^(32 - k) consecutive addresses.\n\nYou are given a starting address `ip` and a count `n`. Choose CIDR blocks that together cover exactly the `n` consecutive addresses `ip`, `ip + 1`, ..., `ip + n - 1`: every one of them must lie in some block, and no block may contain an address outside that range. Use as few blocks as possible and return them as a list of strings in any order. Write each block's base as the lowest address the block covers, in dotted form without leading zeros.",
+  "constraints": [
+    "7 <= ip.length <= 15",
+    "ip has the form \"a.b.c.d\" where a, b, c and d are integers from 0 to 255 without leading zeros",
+    "1 <= n <= 1000",
+    "Every address ip + x with 0 <= x < n is a valid IPv4 address (the range ends at or before 255.255.255.255)"
+  ],
+  "signature": "List<String> ipToCIDR(String ip, int n)",
+  "entry": "ipToCIDR",
+  "kind": "function",
+  "parameters": [
+    "ip",
+    "n"
+  ],
+  "compare": "unordered",
+  "validator": "function validate([ip, n]) {\n  if (typeof ip !== 'string' || ip.length < 7 || ip.length > 15) return 'ip has 7 to 15 characters.';\n  const parts = ip.split('.');\n  if (parts.length !== 4 || !parts.every(part => /^(0|[1-9][0-9]{0,2})$/.test(part) && Number(part) <= 255)) return 'ip must look like \"a.b.c.d\" with numbers from 0 to 255 and no leading zeros.';\n  if (!Number.isInteger(n) || n < 1 || n > 1000) return 'n is between 1 and 1000.';\n  const start = parts.reduce((value, part) => value * 256 + Number(part), 0);\n  if (start + n - 1 > 4294967295) return 'The range must end at or before 255.255.255.255.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function ipToCIDR(ip, n) {\n  let start = 0;\n  for (const part of ip.split('.')) {\n    start = start * 256 + Number(part);\n  }\n  const blocks = [];\n  while (n > 0) {\n    let size = 1;\n    let prefix = 32;\n    while (size * 2 <= n && (start & size) === 0) {\n      size *= 2;\n      prefix--;\n    }\n    const address = [24, 16, 8, 0].map(shift => (start >>> shift) & 255).join('.');\n    blocks.push(address + '/' + prefix);\n    start += size;\n    n -= size;\n  }\n  return blocks;\n}",
+  "brute": "function ipToCIDR(ip, n) {\n  // Split the whole address space like a binary tree and keep every largest node that lies inside the range.\n  const [a, b, c, d] = ip.split('.').map(Number);\n  const first = ((a * 256 + b) * 256 + c) * 256 + d;\n  const last = first + n - 1;\n  const format = value => [Math.floor(value / 16777216) % 256, Math.floor(value / 65536) % 256, Math.floor(value / 256) % 256, value % 256].join('.');\n  const blocks = [];\n  const visit = (low, size, prefix) => {\n    const high = low + size - 1;\n    if (high < first || low > last) return;\n    if (low >= first && high <= last) {\n      blocks.push(format(low) + '/' + prefix);\n      return;\n    }\n    visit(low, size / 2, prefix + 1);\n    visit(low + size / 2, size / 2, prefix + 1);\n  };\n  visit(0, 2 ** 32, 0);\n  return blocks;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const top = 2 ** 32;\n  const n = size === 'large' ? 900 + pick(101) : 1 + pick(40);\n  const mode = pick(4);\n  let start;\n  if (mode === 0) start = pick(top - n + 1);\n  else if (mode === 1) {\n    // Just before (or at) an aligned boundary, so blocks of many sizes appear.\n    const boundary = 2 ** (4 + pick(28));\n    start = boundary * (1 + pick(top / boundary - 1)) - pick(n + 1);\n  } else if (mode === 2) start = top - n - pick(3);\n  else start = pick(20);\n  start = Math.max(0, Math.min(start, top - n));\n  const ip = [Math.floor(start / 16777216) % 256, Math.floor(start / 65536) % 256, Math.floor(start / 256) % 256, start % 256].join('.');\n  return [ip, n];\n}",
+  "examples": [
+    {"name":"Example 1","input":["255.0.0.7",10],"expected":["255.0.0.7/32","255.0.0.8/29","255.0.0.16/32"]},
+    {"name":"Example 2","input":["117.145.102.62",8],"expected":["117.145.102.62/31","117.145.102.64/30","117.145.102.68/31"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["0.0.0.0",1000]},
+    {"name":"Test 2","input":["255.255.255.255",1]},
+    {"name":"Test 3","input":["255.255.255.0",256]},
+    {"name":"Test 4","input":["128.0.0.0",512]},
+    {"name":"Test 5","input":["1.2.3.4",1]},
+    {"name":"Test 6","input":["10.0.0.255",2]},
+    {"name":"Test 7","input":["0.0.0.1",1000]},
+    {"name":"Test 8","input":["127.255.255.250",12]},
+    {"name":"Test 9","input":["192.168.1.0",1000]},
+    {"name":"Test 10","input":["255.255.252.24",1000]},
+    {"name":"Test 11","input":["63.255.255.255",3]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe address at the front of the remaining range must be covered, and the block covering it cannot start earlier, so a block starts exactly there. A block of `size = 2^s` addresses is legal only when its base ends in `s` zero bits (it is aligned) and when it does not run past the range. Taking the largest legal block is always best: a smaller one only splits that same aligned chunk into more pieces. So the greedy rule is to grow the block while both conditions still hold, emit it, and continue after it. A slower check is to split the whole address space like a binary tree and keep the largest nodes inside the range.\n\n## Approach\n\n1. Parse `ip` into the integer `start` by reading its four numbers in base 256.\n2. While addresses remain (`n > 0`), begin with `size = 1` and `prefix = 32`.\n3. Double `size` (and decrease `prefix`) while the doubled block still fits in `n` and bit `size` of `start` is 0, which means `start` is a multiple of `2 * size`.\n4. Turn `start` back into dotted form by shifting right by 24, 16, 8 and 0 bits and masking with 255, then add `address/prefix` to `blocks`.\n5. Move `start` forward by `size` and take `size` off `n`.\n\n## Example 1, step by step\n\n`ip = \"255.0.0.7\"`, `n = 10`; only the last byte changes, so we track it.\n- Last byte `7` is `111` in binary: bit 1 is set, so `size` stays 1. Emit `255.0.0.7/32`; now the byte is 8 and `n = 9`.\n- `8` is `1000`: bits 1, 2 and 4 are 0, so `size` grows to 2, 4, 8 and stops because 16 > 9. Emit `255.0.0.8/29`; now the byte is 16 and `n = 1`.\n- A block of 2 would exceed `n`, so emit `255.0.0.16/32` and `n = 0`.\n\nThe answer is `[\"255.0.0.7/32\", \"255.0.0.8/29\", \"255.0.0.16/32\"]`.\n\n## Complexity\n\n- Time: O(log² n): there are O(log n) blocks, and each grows its size in O(log n) steps.\n- Space: O(log n) for the returned blocks.\n\n## Pitfalls\n\n- JavaScript bit operators work on signed 32-bit integers, while `start` can reach 2^32 - 1. Build it with `* 256` and read bytes with `>>>`, not `>>`.\n- Alignment matters: `255.0.0.7` can only begin a `/32` block even though 10 addresses are needed.\n- Check that the doubled block fits before doubling, or the last block covers addresses beyond the range.\n- The base must be the block's first address, and `prefix` is `32 - log2(size)`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `start` | the first address not covered yet, as an integer |\n| `n` | how many addresses are still uncovered |\n| `size` | number of addresses in the block being built |\n| `prefix` | that block's prefix length, `32 - log2(size)` |\n| `address` | `start` written in dotted form |\n| `blocks` | the CIDR strings found so far |",
+  "narration": {
+    "3": "Read the four numbers of the address one at a time.",
+    "4": "Treat them as base-256 digits to get the address as one integer.",
+    "7": "Keep emitting blocks until every address in the range is covered.",
+    "8": "Every block can at least cover the single address at start.",
+    "9": "A single address is a /32 block.",
+    "10": "Double the block while it still fits in the range and start's next bit is 0, so the base stays aligned.",
+    "11": "The block now covers twice as many addresses...",
+    "12": "...so one fewer bit of the prefix is fixed.",
+    "14": "Turn start back into four bytes by shifting and masking with 255.",
+    "15": "Record the block as base address, slash, prefix length.",
+    "16": "The next block starts right after this one.",
+    "17": "Those addresses are covered, so fewer remain.",
+    "19": "The blocks cover exactly the requested range."
+  }
+}

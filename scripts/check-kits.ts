@@ -66,10 +66,8 @@ async function check(number: number): Promise<string[]> {
       else if (!accepted(sync, problem, test.input, brute.actual, run.actual)) errors.push(`Brute force ${show(brute.actual)} and reference ${show(run.actual)} disagree on ${test.name} ${show(test.input)}.`);
     }
   }
-  // Varied answers catch solutions that return a constant; a yes/no problem has only two.
-  const variety = outputs.every(o => typeof o === 'boolean') ? 2 : 3;
-  if (new Set(outputs.map(o => JSON.stringify(o))).size < Math.min(variety, outputs.length)) errors.push(`The cases produce fewer than ${variety} distinct answers; vary the tests.`);
   // Random small inputs compare the reference with the brute force, and must pass validation.
+  const fuzzed = new Set<string>();
   if (record.generator) {
     for (let seed = 1; seed <= FUZZ && errors.length < 12; seed++) {
       let input: Json[];
@@ -78,6 +76,7 @@ async function check(number: number): Promise<string[]> {
       if (invalid) { errors.push(`Generated input (seed ${seed}) is invalid: ${invalid} ${show(input)}`); continue; }
       const run = evaluate(sync, problem, problem.reference, input);
       if (run.verdict !== 'Accepted') { errors.push(`The reference fails generated input ${show(input)}: ${run.verdict} ${run.error ?? ''}`); continue; }
+      fuzzed.add(JSON.stringify(run.actual));
       if (!record.brute) continue;
       const brute = evaluate(sync, problem, record.brute, input, 10000);
       if (brute.verdict !== 'Accepted') { if (brute.verdict !== 'Time limit exceeded') errors.push(`The brute force fails generated input ${show(input)}: ${brute.verdict} ${brute.error ?? ''}`); continue; }
@@ -91,6 +90,11 @@ async function check(number: number): Promise<string[]> {
     } catch (error) { errors.push(String(error)); }
   } else errors.push('A kit needs a generator.');
   if (!record.brute) errors.push('A kit needs an independent brute force.');
+  // Varied answers catch solutions that return a constant. A problem whose answer takes only two values (yes/no,
+  // 0 or 1) on every case and generated input needs only those two.
+  const answers = new Set(outputs.map(o => JSON.stringify(o)));
+  const variety = new Set([...answers, ...fuzzed]).size <= 2 ? 2 : 3;
+  if (answers.size < Math.min(variety, outputs.length)) errors.push(`The cases produce fewer than ${variety} distinct answers; vary the tests.`);
   // A plainly wrong solution must not be accepted.
   const wrong = problem.kind === 'design' ? `class ${problem.entry} { constructor() {} ${Object.keys(problem.methods ?? {}).filter(m => m !== 'constructor').map(m => `${m}() { return -12345; }`).join(' ')} }` : `function ${problem.entry}() { return -12345; }`;
   const verdict = await judge(sync, problem, wrong, cases);

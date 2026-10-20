@@ -1,0 +1,70 @@
+{
+  "number": 711,
+  "title": "Number of Distinct Islands II",
+  "spec": "recalled",
+  "statement": "`grid` is a matrix of `0`s (water) and `1`s (land). An island is a maximal group of land cells joined through shared edges (up, down, left, right); cells touching only at a corner are not joined.\n\nTwo islands have the same shape when one can be laid exactly on top of the other by sliding it, possibly after rotating it by 90, 180 or 270 degrees and/or mirroring it (left-to-right or top-to-bottom). Return the number of different island shapes in `grid`. A grid with no land has `0` shapes.",
+  "constraints": [
+    "m == grid.length",
+    "n == grid[i].length",
+    "1 <= m, n <= 50",
+    "grid[i][j] is 0 or 1"
+  ],
+  "signature": "int numDistinctIslands2(int[][] grid)",
+  "entry": "numDistinctIslands2",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 50) return 'grid needs 1 to 50 rows.';\n  const cols = Array.isArray(grid[0]) ? grid[0].length : 0;\n  if (cols < 1 || cols > 50) return 'Each row needs 1 to 50 cells.';\n  for (const row of grid) {\n    if (!Array.isArray(row) || row.length !== cols) return 'All rows must have the same length.';\n    if (row.some(v => v !== 0 && v !== 1)) return 'Each cell is 0 or 1.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numDistinctIslands2(grid) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const seen = grid.map(row => row.map(() => false));\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  const transforms = [\n    ([r, c]) => [r, c], ([r, c]) => [r, -c], ([r, c]) => [-r, c], ([r, c]) => [-r, -c],\n    ([r, c]) => [c, r], ([r, c]) => [c, -r], ([r, c]) => [-c, r], ([r, c]) => [-c, -r]\n  ];\n\n  const canonical = cells => {\n    let smallest = null;\n    for (const transform of transforms) {\n      const moved = cells.map(transform);\n      moved.sort((a, b) => a[0] - b[0] || a[1] - b[1]);\n      const [baseRow, baseCol] = moved[0];\n      const key = moved.map(([r, c]) => `${r - baseRow},${c - baseCol}`).join(';');\n      if (smallest === null || key < smallest) {\n        smallest = key;\n      }\n    }\n    return smallest;\n  };\n\n  const shapes = new Set();\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (grid[r][c] === 0 || seen[r][c]) {\n        continue;\n      }\n      const cells = [];\n      const stack = [[r, c]];\n      seen[r][c] = true;\n      while (stack.length > 0) {\n        const [y, x] = stack.pop();\n        cells.push([y, x]);\n        for (const [dy, dx] of directions) {\n          const ny = y + dy;\n          const nx = x + dx;\n          if (ny >= 0 && ny < rows && nx >= 0 && nx < cols && grid[ny][nx] === 1 && !seen[ny][nx]) {\n            seen[ny][nx] = true;\n            stack.push([ny, nx]);\n          }\n        }\n      }\n      shapes.add(canonical(cells));\n    }\n  }\n  return shapes.size;\n}",
+  "brute": "function numDistinctIslands2(grid) {\n  // Collect islands with BFS, then compare each one against the shapes kept so far under all 8 symmetries.\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const owner = grid.map(row => row.map(() => -1));\n  const islands = [];\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (grid[r][c] !== 1 || owner[r][c] !== -1) continue;\n      const id = islands.length;\n      const queue = [[r, c]];\n      owner[r][c] = id;\n      for (let head = 0; head < queue.length; head++) {\n        const [y, x] = queue[head];\n        for (const [ny, nx] of [[y - 1, x], [y + 1, x], [y, x - 1], [y, x + 1]]) {\n          if (ny < 0 || nx < 0 || ny >= rows || nx >= cols || grid[ny][nx] !== 1 || owner[ny][nx] !== -1) continue;\n          owner[ny][nx] = id;\n          queue.push([ny, nx]);\n        }\n      }\n      islands.push(queue);\n    }\n  }\n  const normalize = cells => {\n    const minR = Math.min(...cells.map(p => p[0]));\n    const minC = Math.min(...cells.map(p => p[1]));\n    return new Set(cells.map(([a, b]) => (a - minR) * 1000 + (b - minC)));\n  };\n  const sameSet = (a, b) => a.size === b.size && [...a].every(v => b.has(v));\n  const variants = cells => {\n    const out = [];\n    let current = cells;\n    for (let turn = 0; turn < 4; turn++) {\n      out.push(normalize(current));\n      out.push(normalize(current.map(([a, b]) => [a, -b])));\n      current = current.map(([a, b]) => [b, -a]);\n    }\n    return out;\n  };\n  const kept = [];\n  for (const island of islands) {\n    const all = variants(island);\n    if (!kept.some(shape => all.some(v => sameSet(v, shape)))) kept.push(normalize(island));\n  }\n  return kept.length;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const rows = large ? 40 + Math.floor(rand() * 11) : 1 + Math.floor(rand() * 7);\n  const cols = large ? 40 + Math.floor(rand() * 11) : 1 + Math.floor(rand() * 7);\n  const grid = Array.from({ length: rows }, () => new Array(cols).fill(0));\n  if (rand() < 0.5) {\n    const density = 0.2 + rand() * 0.5;\n    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) grid[r][c] = rand() < density ? 1 : 0;\n    return [grid];\n  }\n  // Stamp rotated and mirrored copies of a few random shapes, keeping the copies apart.\n  const shapes = [];\n  const kinds = large ? 6 : 2;\n  for (let s = 0; s < kinds; s++) {\n    const cells = [[0, 0]];\n    const target = 1 + Math.floor(rand() * (large ? 8 : 4));\n    while (cells.length < target) {\n      const [r, c] = cells[Math.floor(rand() * cells.length)];\n      const [dr, dc] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(rand() * 4)];\n      if (!cells.some(([a, b]) => a === r + dr && b === c + dc)) cells.push([r + dr, c + dc]);\n    }\n    shapes.push(cells);\n  }\n  const attempts = large ? 400 : 12;\n  for (let t = 0; t < attempts; t++) {\n    const flip = rand() < 0.5 ? -1 : 1;\n    let cells = shapes[Math.floor(rand() * shapes.length)].map(([r, c]) => [r, c * flip]);\n    const turns = Math.floor(rand() * 4);\n    for (let q = 0; q < turns; q++) cells = cells.map(([r, c]) => [c, -r]);\n    const minR = Math.min(...cells.map(p => p[0]));\n    const minC = Math.min(...cells.map(p => p[1]));\n    const offR = Math.floor(rand() * rows);\n    const offC = Math.floor(rand() * cols);\n    const placed = cells.map(([r, c]) => [r - minR + offR, c - minC + offC]);\n    const free = placed.every(([r, c]) => r < rows && c < cols && [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([dr, dc]) => {\n      const y = r + dr, x = c + dc;\n      return y < 0 || y >= rows || x < 0 || x >= cols || grid[y][x] === 0;\n    }));\n    if (free) for (const [r, c] of placed) grid[r][c] = 1;\n  }\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,1,0,0,0],[1,0,0,0,0],[0,0,0,0,1],[0,0,0,1,1]]],"expected":1},
+    {"name":"Example 2","input":[[[1,1,0,0,0],[1,1,0,0,0],[0,0,0,1,1],[0,0,0,1,1]]],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0]]]},
+    {"name":"Test 2","input":[[[1]]]},
+    {"name":"Test 3","input":[[[1,1,1,1,1]]]},
+    {"name":"Test 4","input":[[[1,0,1,0,1],[0,1,0,1,0],[1,0,1,0,1]]]},
+    {"name":"Test 5","input":[[[1,0,0,0,1,1,1],[1,0,0,0,1,0,0],[1,1,0,0,0,0,0],[0,0,0,0,0,0,0],[0,1,1,0,0,0,1],[0,0,1,0,1,1,1],[0,0,1,0,0,0,0]]]},
+    {"name":"Test 6","input":[[[1,1,0,0,0,1,1],[0,1,1,0,1,1,0],[0,0,0,0,0,0,0],[1,1,1,0,0,0,0],[0,1,0,0,0,0,0]]]},
+    {"name":"Test 7","input":[[[1,1,1,1,0,1],[0,0,0,0,0,1],[1,1,0,1,0,1],[1,1,0,1,0,1],[0,0,0,1,0,0]]]},
+    {"name":"Test 8","input":[[[1,1,1,1,1,1],[1,1,1,1,1,1],[1,1,1,1,1,1],[1,1,1,1,1,1]]]},
+    {"name":"Test 9","input":[[[1,1,0,0,0,0,1,1],[0,1,1,0,0,1,1,0],[0,0,1,0,0,1,0,0]]]},
+    {"name":"Test 10","input":[[[1],[1],[0],[1],[0],[1],[1]]]},
+    {"name":"Test 11","input":[[[1,1,0,0,1,1,0,1],[1,1,0,0,1,1,0,1],[1,0,0,0,0,1,0,1],[0,0,0,0,0,0,0,0],[1,1,0,1,0,0,0,0],[1,0,0,1,1,0,0,0]]]},
+    {"name":"Test 12","input":[[[1,1,0,0],[0,0,1,1],[1,1,0,0],[0,0,1,0]]]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFinding the islands is an ordinary flood fill; the hard part is deciding when two islands match. The eight ways to rotate and mirror a shape all come from swapping and negating coordinates: `(r, c)` can become `(±r, ±c)` or `(±c, ±r)`. If every island is turned into one **canonical key** that is the same for all eight orientations and every position, matching shapes collapse into one entry of a hash set. Comparing each pair of islands under all eight symmetries also works, but costs far more.\n\n## Approach\n\n1. Scan the grid. At each unvisited land cell, run a DFS with an explicit `stack`, marking `seen` and gathering the island's `cells`.\n2. For each of the 8 `transforms`, map every cell, sort the result by row then column, and subtract the first cell (`baseRow`, `baseCol`) so the shape no longer depends on where it sits.\n3. Turn that list into a string `key` and keep the `smallest` of the eight keys as the island's canonical form.\n4. Add the canonical form to `shapes`; the answer is `shapes.size`.\n\n## Example 1, step by step\n\nThe first island is `(0,0), (0,1), (1,0)`; with no transformation its key is `\"0,0;0,1;1,0\"`, already the smallest of its eight. The second island is `(2,4), (3,3), (3,4)`. Rotating it by 180 degrees with `(r, c) → (-r, -c)` gives `(-2,-4), (-3,-3), (-3,-4)`; sorted and shifted by `(-3, -4)` it becomes `(0,0), (0,1), (1,0)`, the same smallest key. The set holds one key, so the answer is `1`.\n\n## Complexity\n\n- Time: O(m · n · log(m · n)): every land cell is visited once, and each island's cells are transformed and sorted 8 times.\n- Space: O(m · n) for `seen`, the stack and the stored keys.\n\n## Pitfalls\n\n- Translation must be removed **after** sorting each transformed copy; the first cell changes with the orientation.\n- Any fixed rule for choosing among the eight keys works, as long as every island uses the same rule.\n- Mirroring is allowed, so an S tetromino and a Z tetromino count as one shape.\n- A recursive flood fill can recurse 2,500 levels on a full 50 by 50 grid; an explicit stack avoids that.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `seen` | land cells already assigned to an island |\n| `directions` | the four edge neighbours' offsets |\n| `transforms` | the 8 rotations and reflections of a coordinate |\n| `cells` | the current island's cells |\n| `stack` | DFS frontier |\n| `moved`, `baseRow`, `baseCol` | a transformed copy and its first cell |\n| `key`, `smallest` | one orientation's text form and the canonical one |\n| `shapes` | canonical keys of the shapes found |",
+  "narration": {
+    "4": "seen marks land cells that already belong to an island.",
+    "6": "The eight symmetries of a square: keep or swap the coordinates, and keep or negate each one.",
+    "11": "canonical turns an island into a key that is the same for every rotation, reflection and position.",
+    "13": "Try all eight orientations of the island.",
+    "14": "Apply this rotation or reflection to every cell.",
+    "15": "Sort by row, then column, so the list order no longer depends on how the cells were found.",
+    "16": "The first sorted cell is the anchor used to remove the position.",
+    "17": "Write the cells relative to the anchor as one string.",
+    "18": "Keep the smallest of the eight strings, a fixed rule every island follows.",
+    "22": "Islands with the same shape all end up with this same key.",
+    "25": "The set keeps one key per distinct shape.",
+    "28": "Skip water and land already counted in an earlier island.",
+    "32": "Start a depth-first search from this new land cell.",
+    "34": "Keep exploring until the island has no unvisited cells left.",
+    "36": "Record the cell as part of this island.",
+    "40": "Step to an edge neighbour only if it is inside the grid, land, and not yet visited.",
+    "41": "Mark it right away so it is never pushed twice.",
+    "46": "Reduce the finished island to its canonical key and store it.",
+    "49": "The number of different keys is the number of distinct shapes."
+  }
+}

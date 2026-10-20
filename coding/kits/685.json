@@ -1,0 +1,69 @@
+{
+  "number": 685,
+  "title": "Redundant Connection II",
+  "spec": "leetcode",
+  "statement": "Here a **rooted tree** is a directed graph with one special node, the root, that has no incoming edge, while every other node has exactly one incoming edge (from its parent) and can be reached by following edges out of the root.\n\nSomeone took a rooted tree on the nodes `1` to `n` and added one more directed edge between two different nodes; that edge was not already part of the tree. You receive the resulting `n` edges as `edges`, where `[u, v]` is an edge pointing from the parent `u` to the child `v`.\n\nReturn an edge whose removal leaves a rooted tree containing all `n` nodes. When several edges would work, return the one that appears latest in `edges`.",
+  "constraints": [
+    "n == edges.length",
+    "3 <= n <= 1000",
+    "edges[i].length == 2",
+    "1 <= u_i, v_i <= n",
+    "u_i != v_i",
+    "edges is a rooted tree on nodes 1..n plus one extra edge that was not already present"
+  ],
+  "signature": "int[] findRedundantDirectedConnection(int[][] edges)",
+  "entry": "findRedundantDirectedConnection",
+  "kind": "function",
+  "parameters": [
+    "edges"
+  ],
+  "validator": "function validate([edges]) {\n  if (!Array.isArray(edges)) return 'edges must be a list of [u, v] pairs.';\n  const n = edges.length;\n  if (n < 3 || n > 1000) return 'edges needs 3 to 1000 pairs.';\n  const seen = new Set();\n  const inDegree = new Array(n + 1).fill(0);\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2 || !edge.every(x => Number.isInteger(x) && x >= 1 && x <= n)) return 'Each edge is [u, v] with both nodes between 1 and n.';\n    if (edge[0] === edge[1]) return 'An edge cannot point from a node to itself.';\n    const key = edge[0] * 4096 + edge[1];\n    if (seen.has(key)) return 'The same edge appears twice.';\n    seen.add(key);\n    inDegree[edge[1]]++;\n  }\n  // Weakly connected after leaving out edge number skip (or none)?\n  const connectedWithout = skip => {\n    const leader = Array.from({ length: n + 1 }, (_, i) => i);\n    const find = x => { while (leader[x] !== x) { leader[x] = leader[leader[x]]; x = leader[x]; } return x; };\n    let parts = n;\n    edges.forEach(([u, v], i) => { if (i === skip) return; const a = find(u), b = find(v); if (a !== b) { leader[b] = a; parts--; } });\n    return parts === 1;\n  };\n  const bad = 'The edges must form a rooted tree plus one extra edge.';\n  const doubled = [];\n  for (let x = 1; x <= n; x++) if (inDegree[x] > 2) return bad; else if (inDegree[x] === 2) doubled.push(x);\n  if (doubled.length > 1) return bad;\n  if (doubled.length === 0) return connectedWithout(-1) ? null : bad;\n  const into = [];\n  edges.forEach(([, v], i) => { if (v === doubled[0]) into.push(i); });\n  return into.some(i => connectedWithout(i)) ? null : bad;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findRedundantDirectedConnection(edges) {\n  const n = edges.length;\n  const incoming = new Array(n + 1).fill(-1);\n  let first = -1;\n  let second = -1;\n  for (let i = 0; i < n; i++) {\n    const child = edges[i][1];\n    if (incoming[child] === -1) {\n      incoming[child] = i;\n    } else {\n      first = incoming[child];\n      second = i;\n    }\n  }\n\n  const leader = Array.from({ length: n + 1 }, (_, node) => node);\n  const find = (node) => {\n    while (leader[node] !== node) {\n      leader[node] = leader[leader[node]];\n      node = leader[node];\n    }\n    return node;\n  };\n\n  for (let i = 0; i < n; i++) {\n    if (i === second) continue;\n    const [u, v] = edges[i];\n    const rootU = find(u);\n    const rootV = find(v);\n    if (rootU === rootV) {\n      return first !== -1 ? edges[first] : edges[i];\n    }\n    leader[rootV] = rootU;\n  }\n  return edges[second];\n}",
+  "brute": "function findRedundantDirectedConnection(edges) {\n  // Try removing each edge, latest first, and test whether a rooted tree remains.\n  const n = edges.length;\n  for (let skip = n - 1; skip >= 0; skip--) {\n    const children = Array.from({ length: n + 1 }, () => []);\n    const parents = new Array(n + 1).fill(0);\n    edges.forEach(([u, v], i) => {\n      if (i !== skip) {\n        children[u].push(v);\n        parents[v]++;\n      }\n    });\n    if (parents.some(c => c > 1)) continue;\n    const roots = [];\n    for (let x = 1; x <= n; x++) if (parents[x] === 0) roots.push(x);\n    if (roots.length !== 1) continue;\n    const reached = new Set([roots[0]]);\n    const stack = [roots[0]];\n    while (stack.length) {\n      const x = stack.pop();\n      for (const y of children[x]) if (!reached.has(y)) { reached.add(y); stack.push(y); }\n    }\n    if (reached.size === n) return edges[skip];\n  }\n  return null;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 900 + pick(101) : 3 + pick(6);\n  const labels = Array.from({ length: n }, (_, i) => i + 1);\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [labels[i], labels[j]] = [labels[j], labels[i]]; }\n  // A random tree: chain-like, star-like or fully random, depending on the roll.\n  const shape = rand();\n  const edges = [];\n  const present = new Set();\n  for (let i = 1; i < n; i++) {\n    const p = shape < 0.25 ? i - 1 : shape < 0.4 ? 0 : shape < 0.6 ? Math.max(0, i - 1 - pick(3)) : pick(i);\n    edges.push([labels[p], labels[i]]);\n    present.add(labels[p] * 4096 + labels[i]);\n  }\n  // The extra edge: sometimes into the root (a cycle without a two-parent node), otherwise anywhere new.\n  for (;;) {\n    const u = 1 + pick(n);\n    const v = rand() < 0.3 ? labels[0] : 1 + pick(n);\n    if (u === v || present.has(u * 4096 + v)) continue;\n    edges.push([u, v]);\n    break;\n  }\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  return [edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2],[1,3],[2,3]]],"expected":[2,3]},
+    {"name":"Example 2","input":[[[1,2],[2,3],[3,4],[4,1],[1,5]]],"expected":[4,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,2],[2,3],[3,1]]]},
+    {"name":"Test 2","input":[[[2,1],[3,1],[4,2],[1,4]]]},
+    {"name":"Test 3","input":[[[1,2],[2,3],[3,4],[4,2]]]},
+    {"name":"Test 4","input":[[[4,2],[1,5],[5,2],[5,3],[2,4]]]},
+    {"name":"Test 5","input":[[[2,3],[3,1],[3,4],[1,2]]]},
+    {"name":"Test 6","input":[[[5,1],[1,2],[1,3],[3,4],[4,5]]]},
+    {"name":"Test 7","input":[[[2,3],[1,2],[1,3]]]},
+    {"name":"Test 8","input":[[[1,3],[2,3],[1,2]]]},
+    {"name":"Test 9","input":[[[3,4],[4,1],[1,2],[2,3],[5,4],[6,5]]]},
+    {"name":"Test 10","input":[[[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,3]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRemoving each edge in turn and checking whether a rooted tree remains works, but costs O(n²). Instead, look at what the extra edge can break. Either some node now has **two parents**, or the extra edge points at the root, so every node has one parent and there is a **cycle**. With two parents, one of the two edges into that node must go; leave out the later one and use union-find to see whether a cycle is still there. If it is, the earlier edge was the culprit. Without a two-parent node, the edge that closes the cycle in union-find is the latest edge of the cycle, which is what we must return.\n\n## Approach\n\n1. Scan `edges`, recording in `incoming` which edge enters each node. If a node is entered twice, `first` and `second` keep the indices of its two incoming edges.\n2. Set up union-find with `leader` and `find` (path halving).\n3. Add the edges in order, skipping `second`. If an edge joins two nodes that already share a leader, it closes a cycle: return `edges[first]` when there is a two-parent node, otherwise this edge.\n4. If no cycle appears, removing `second` leaves a valid tree: return `edges[second]`.\n\n## Example 1, step by step\n\n`edges = [[1,2],[1,3],[2,3]]`. The scan sets `incoming[2] = 0` and `incoming[3] = 1`; edge 2 also enters node 3, so `first = 1` and `second = 2`. Union-find adds `[1,2]` and `[1,3]` without finding a cycle and skips `[2,3]`. No cycle remains, so the answer is `edges[2] = [2,3]`.\n\n## Complexity\n\n- Time: O(n·α(n)): one scan plus one union-find pass.\n- Space: O(n) for `incoming` and `leader`.\n\n## Pitfalls\n\n- Undirected union-find alone (problem 684) fails here: in `[[2,1],[3,1],[4,2],[1,4]]` the answer is `[2,1]`, an edge into the two-parent node that also lies on the cycle.\n- When a two-parent node and a cycle both exist, the answer is the earlier edge into that node, even though it is not the latest edge overall.\n- If the extra edge points at the root, no node has two parents: `second` stays -1, nothing is skipped, and the edge that closes the cycle is the answer (Example 2).\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `incoming` | for each node, the index of the first edge entering it, or -1 |\n| `first`, `second` | indices of the two edges into the two-parent node, or -1 |\n| `leader` | union-find parent pointers |\n| `find` | returns a node's set representative |\n| `rootU`, `rootV` | representatives of the current edge's ends |",
+  "narration": {
+    "3": "For every node, remember which edge first entered it.",
+    "6": "First pass: look for a node with two incoming edges.",
+    "8": "No edge has entered this child yet...",
+    "9": "...so record this edge as its parent edge.",
+    "11": "A second parent: remember the earlier edge as first...",
+    "12": "...and this later one as second.",
+    "16": "Every node starts as its own union-find leader.",
+    "17": "find walks up to a node's representative.",
+    "19": "Halve the path as we go so later finds are faster.",
+    "25": "Second pass: union the edges in order.",
+    "26": "Leave out the later edge into the two-parent node.",
+    "28": "Representative of the edge's parent end.",
+    "29": "Representative of the edge's child end.",
+    "30": "Both ends already connected: this edge closes a cycle.",
+    "31": "With a two-parent node the earlier edge is to blame; otherwise this edge closes the cycle last.",
+    "33": "Join the two sets.",
+    "35": "No cycle without second, so removing second leaves a rooted tree."
+  }
+}

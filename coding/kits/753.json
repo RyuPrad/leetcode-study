@@ -1,0 +1,63 @@
+{
+  "number": 753,
+  "title": "Cracking the Safe",
+  "spec": "leetcode",
+  "statement": "A safe is locked with a password of exactly `n` digits, where every digit lies between `0` and `k - 1`. As you type, the safe looks at the latest `n` digits entered after every keystroke (or at everything typed so far, while that is shorter than `n`) and opens as soon as they equal the password.\n\nYou do not know the password. Return a string of digits that is certain to open the safe whatever the password is, meaning each of the `k^n` possible passwords shows up somewhere in it as `n` consecutive digits, and that is as short as such a string can be. Any shortest valid string is accepted.",
+  "constraints": [
+    "1 <= n <= 4",
+    "1 <= k <= 10",
+    "1 <= k^n <= 4096"
+  ],
+  "signature": "String crackSafe(int n, int k)",
+  "entry": "crackSafe",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "k"
+  ],
+  "compare": "checker",
+  "checker": "function check([n, k], actual, expected) {\n  if (typeof actual !== 'string' || actual.length !== expected.length) return false;\n  for (let i = 0; i < actual.length; i++) {\n    const digit = actual.charCodeAt(i) - 48;\n    if (digit < 0 || digit >= k) return false;\n  }\n  const windows = new Set();\n  for (let i = 0; i + n <= actual.length; i++) windows.add(actual.slice(i, i + n));\n  return windows.size === k ** n;\n}",
+  "validator": "function validate([n, k]) {\n  if (!Number.isInteger(n) || n < 1 || n > 4) return 'n is between 1 and 4.';\n  if (!Number.isInteger(k) || k < 1 || k > 10) return 'k is between 1 and 10.';\n  if (k ** n > 4096) return 'k^n can be at most 4096.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function crackSafe(n, k) {\n  const start = '0'.repeat(n - 1);\n  const used = new Map();\n  const stack = [[start, '']];\n  const digits = [];\n\n  while (stack.length > 0) {\n    const [node, digit] = stack[stack.length - 1];\n    const next = used.get(node) ?? 0;\n    if (next < k) {\n      used.set(node, next + 1);\n      stack.push([(node + next).slice(1), String(next)]);\n    } else {\n      stack.pop();\n      digits.push(digit);\n    }\n  }\n  return start + digits.reverse().join('');\n}",
+  "brute": "function crackSafe(n, k) {\n  // Backtracking: extend the string one digit at a time, never repeating an n-digit window.\n  const total = k ** n;\n  const seen = new Set();\n  const text = Array(n).fill('0');\n  seen.add(text.join(''));\n  const extend = () => {\n    if (seen.size === total) return true;\n    for (let d = k - 1; d >= 0; d--) {\n      const window = text.slice(text.length - n + 1).join('') + d;\n      if (seen.has(window)) continue;\n      seen.add(window);\n      text.push(String(d));\n      if (extend()) return true;\n      text.pop();\n      seen.delete(window);\n    }\n    return false;\n  };\n  extend();\n  return text.join('');\n}",
+  "generator": "function generate(rand, size) {\n  const pairs = [];\n  for (let n = 1; n <= 4; n++) for (let k = 1; k <= 10; k++) {\n    const count = k ** n;\n    if (size === 'large' ? count >= 1000 && count <= 4096 : count <= 64) pairs.push([n, k]);\n  }\n  return pairs[Math.floor(rand() * pairs.length)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,2],"expected":"10"},
+    {"name":"Example 2","input":[2,2],"expected":"01100"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[4,1]},
+    {"name":"Test 3","input":[1,10]},
+    {"name":"Test 4","input":[2,3]},
+    {"name":"Test 5","input":[3,2]},
+    {"name":"Test 6","input":[4,2]},
+    {"name":"Test 7","input":[2,10]},
+    {"name":"Test 8","input":[3,4]},
+    {"name":"Test 9","input":[4,3]},
+    {"name":"Test 10","input":[2,7]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThere are `k^n` passwords and each must start at a different position of the answer, so no string shorter than `k^n + n - 1` can work. Reaching that bound means every new digit must create a brand-new password.\n\nTurn it into a graph: each node is a string of `n - 1` digits, and each password is an edge from its first `n - 1` digits to its last `n - 1` digits. Typing one digit walks one edge. Every node has exactly `k` edges in and `k` edges out, and the graph is connected, so an Euler circuit (a walk using every edge once) exists. Writing down the start node and then one digit per edge of that circuit gives a shortest answer. Trying digit by digit with backtracking also works, but needs a search.\n\n## Approach\n\n1. Start at the node of `n - 1` zeros. `used` counts how many outgoing digits of each node have been taken.\n2. Run Hierholzer's algorithm with an explicit `stack` of `[node, digit]` pairs, where `digit` is the edge that led to `node`.\n3. If the top node still has an untaken digit `next`, take it and push the node it leads to: drop the first character of `node + next`.\n4. If the top node has no edges left, pop it and append its `digit` to `digits`.\n5. `digits` holds the circuit backwards; reverse it and prefix `start`.\n\n## Example 1, step by step\n\n`n = 1, k = 2`: `start` is the empty string, the graph's only node. It takes digit `0` (back to itself), then `1`; the node is now exhausted, so the pops record `1`, `0` and the empty start digit. Reversed, that is `\"01\"`, which contains both passwords. LeetCode prints `\"10\"`; either is accepted.\n\n## Complexity\n\n- Time: O(n · k^n): each of the `k^n` edges is pushed and popped once, and building a node string costs O(n).\n- Space: O(n · k^n) for the stack, the `used` map and the answer.\n\n## Pitfalls\n\n- Recording a digit when it is pushed (pre-order) can strand unused edges; record it when it is popped.\n- The answer must be exactly `k^n + n - 1` characters; a longer string that covers every password is still wrong.\n- `n = 1` gives an empty node name, and `k = 1` gives a single self-loop; both must still work.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `start` | the node of `n - 1` zeros where the circuit begins |\n| `used` | for each node, how many of its outgoing digits are taken |\n| `stack` | the current walk as `[node, digit]` pairs |\n| `node`, `digit` | the top node and the digit typed to reach it |\n| `next` | the next untaken digit of `node` |\n| `digits` | edge digits in the order they were finished |",
+  "narration": {
+    "2": "The circuit starts at the node made of n - 1 zeros; it will also be the answer's first digits.",
+    "3": "used remembers, per node, how many of its k outgoing digits have already been walked.",
+    "4": "The walk begins at start; no digit was typed to get there, so its digit is empty.",
+    "5": "digits collects edge digits as their part of the circuit is finished.",
+    "7": "Keep going until the whole walk has been unwound.",
+    "8": "Look at the node on top of the stack and the digit that led to it.",
+    "9": "The next untaken digit for this node is how many it has used so far.",
+    "10": "Does this node still have an unused outgoing edge?",
+    "11": "Mark that digit as taken for this node.",
+    "12": "Typing the digit moves to the node formed by the last n - 1 digits of node + next.",
+    "14": "Every edge out of this node is used, so it is finished: pop it.",
+    "15": "Record the digit that reached it; Hierholzer's algorithm produces the circuit in reverse.",
+    "18": "Reverse the finished digits and put the start node in front to get a shortest string."
+  }
+}

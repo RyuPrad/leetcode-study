@@ -1,0 +1,71 @@
+{
+  "number": 803,
+  "title": "Bricks Falling When Hit",
+  "spec": "leetcode",
+  "statement": "`grid` has `m` rows and `n` columns; a `1` is a brick and a `0` is an empty cell. A brick is **stable** if it lies in the top row (row 0), or if at least one of its four side neighbours (up, down, left, right) is a stable brick.\n\n`hits` is a sequence of cells to strike, applied one after another; `hits[i] = [row, col]`. When a cell is struck:\n\n- if it holds a brick, that brick is removed; if it is empty, nothing happens;\n- every brick that was stable just before the strike but is not stable any more then falls and vanishes from the grid at once (falling bricks never come to rest on other bricks).\n\nReturn an array whose `i`-th value is how many bricks fall because of the `i`-th strike, not counting the struck brick itself. Bricks that are already unstable in the starting grid never count as falling.",
+  "constraints": [
+    "m == grid.length",
+    "n == grid[i].length",
+    "1 <= m, n <= 200",
+    "grid[i][j] is 0 or 1",
+    "1 <= hits.length <= 4 * 10^4",
+    "hits[i].length == 2",
+    "0 <= hits[i][0] <= m - 1",
+    "0 <= hits[i][1] <= n - 1",
+    "All cells in hits are distinct"
+  ],
+  "signature": "int[] hitBricks(int[][] grid, int[][] hits)",
+  "entry": "hitBricks",
+  "kind": "function",
+  "parameters": [
+    "grid",
+    "hits"
+  ],
+  "validator": "function validate([grid, hits]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 200) return 'grid needs 1 to 200 rows.';\n  const n = grid[0].length;\n  if (n < 1 || n > 200) return 'Each row needs 1 to 200 cells.';\n  for (const row of grid) {\n    if (!Array.isArray(row) || row.length !== n) return 'All rows must have the same length.';\n    if (row.some((v) => v !== 0 && v !== 1)) return 'grid cells are 0 or 1.';\n  }\n  if (!Array.isArray(hits) || hits.length < 1 || hits.length > 40000) return 'hits needs 1 to 40000 cells.';\n  const seen = new Set();\n  for (const hit of hits) {\n    if (!Array.isArray(hit) || hit.length !== 2) return 'Each hit is a [row, col] pair.';\n    const [r, c] = hit;\n    if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || r >= grid.length || c < 0 || c >= n) return 'Each hit must be a cell inside the grid.';\n    const key = r * n + c;\n    if (seen.has(key)) return 'Each cell may be hit at most once.';\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function hitBricks(grid, hits) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const roof = rows * cols;\n  const parent = Array.from({ length: roof + 1 }, (_, i) => i);\n  const size = new Array(roof + 1).fill(1);\n  const find = (x) => {\n    while (parent[x] !== x) {\n      parent[x] = parent[parent[x]];\n      x = parent[x];\n    }\n    return x;\n  };\n  const union = (a, b) => {\n    let rootA = find(a);\n    let rootB = find(b);\n    if (rootA === rootB) return;\n    if (size[rootA] > size[rootB]) [rootA, rootB] = [rootB, rootA];\n    parent[rootA] = rootB;\n    size[rootB] += size[rootA];\n  };\n  const board = grid.map((row) => row.slice());\n  for (const [r, c] of hits) {\n    board[r][c] = 0;\n  }\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  const attach = (r, c) => {\n    const id = r * cols + c;\n    if (r === 0) union(id, roof);\n    for (const [dr, dc] of directions) {\n      const nr = r + dr;\n      const nc = c + dc;\n      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr][nc] === 1) {\n        union(id, nr * cols + nc);\n      }\n    }\n  };\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (board[r][c] === 1) attach(r, c);\n    }\n  }\n  const result = new Array(hits.length).fill(0);\n  for (let i = hits.length - 1; i >= 0; i--) {\n    const [r, c] = hits[i];\n    if (grid[r][c] === 0) continue;\n    const before = size[find(roof)];\n    board[r][c] = 1;\n    attach(r, c);\n    const after = size[find(roof)];\n    result[i] = Math.max(0, after - before - 1);\n  }\n  return result;\n}",
+  "brute": "function hitBricks(grid, hits) {\n  // Simulate forwards: after every strike, flood-fill from the top row and drop whatever is not reached.\n  const m = grid.length;\n  const n = grid[0].length;\n  const cells = grid.map((row) => row.slice());\n  const dropUnstable = () => {\n    const stable = cells.map((row) => row.map(() => false));\n    const stack = [];\n    for (let c = 0; c < n; c++) {\n      if (cells[0][c] === 1) { stable[0][c] = true; stack.push([0, c]); }\n    }\n    while (stack.length) {\n      const [r, c] = stack.pop();\n      for (const [nr, nc] of [[r + 1, c], [r - 1, c], [r, c + 1], [r, c - 1]]) {\n        if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;\n        if (cells[nr][nc] !== 1 || stable[nr][nc]) continue;\n        stable[nr][nc] = true;\n        stack.push([nr, nc]);\n      }\n    }\n    let dropped = 0;\n    for (let r = 0; r < m; r++) {\n      for (let c = 0; c < n; c++) {\n        if (cells[r][c] === 1 && !stable[r][c]) { cells[r][c] = 0; dropped++; }\n      }\n    }\n    return dropped;\n  };\n  dropUnstable(); // bricks that start unstable are never counted\n  return hits.map(([r, c]) => {\n    if (cells[r][c] === 0) return 0;\n    cells[r][c] = 0;\n    return dropUnstable();\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const m = large ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 5);\n  const n = large ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 5);\n  const density = large ? 0.75 + rand() * 0.2 : 0.4 + rand() * 0.55;\n  const grid = Array.from({ length: m }, () => Array.from({ length: n }, () => (rand() < density ? 1 : 0)));\n  const total = m * n;\n  const count = large ? Math.min(2000, total) : 1 + Math.floor(rand() * Math.min(total, 8));\n  const order = Array.from({ length: total }, (_, i) => i);\n  // Partial Fisher-Yates shuffle picks distinct cells to strike.\n  for (let i = 0; i < count; i++) {\n    const j = i + Math.floor(rand() * (total - i));\n    [order[i], order[j]] = [order[j], order[i]];\n  }\n  const hits = order.slice(0, count).map((id) => [Math.floor(id / n), id % n]);\n  return [grid, hits];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,0,0,0],[1,1,1,0]],[[1,0]]],"expected":[2]},
+    {"name":"Example 2","input":[[[1,0,0,0],[1,1,0,0]],[[1,1],[1,0]]],"expected":[0,0]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1]],[[0,0]]]},
+    {"name":"Test 2","input":[[[0]],[[0,0]]]},
+    {"name":"Test 3","input":[[[1],[1],[1],[1]],[[1,0]]]},
+    {"name":"Test 4","input":[[[1,1,1],[0,1,0],[0,1,0],[1,1,1]],[[0,1],[2,1]]]},
+    {"name":"Test 5","input":[[[1,0,1],[1,1,1],[0,1,0]],[[0,0],[0,2]]]},
+    {"name":"Test 6","input":[[[1,1,1],[1,1,1],[1,1,1]],[[0,0],[0,1],[0,2]]]},
+    {"name":"Test 7","input":[[[0,1,0],[0,0,0],[1,1,1]],[[2,1],[0,1]]]},
+    {"name":"Test 8","input":[[[1,1,1,1,1],[1,0,0,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,1,1,1,1]],[[0,4],[1,0],[2,2],[0,0],[4,4],[1,4]]]},
+    {"name":"Test 9","input":[[[1,1,1,1,1,1],[0,0,1,0,0,1],[1,1,1,1,0,1],[1,0,0,1,1,1],[1,1,0,0,0,1],[0,1,1,1,1,1]],[[3,5],[0,2],[1,2],[5,1],[0,5],[2,0],[3,3]]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSimulating each strike forwards means a fresh flood fill from the top row every time, O(hits · m · n). Removing bricks is awkward for union-find, which can only merge sets, but adding bricks is easy. So play the strikes **backwards**: start from the grid with every struck brick already removed, then put the bricks back one by one in reverse order. When a brick returns, every brick that newly joins the top-row group is exactly a brick that fell when that brick was struck in forward time.\n\n## Approach\n\n1. Make one union-find node per cell plus an extra node `roof`; `size` tracks how many nodes each set holds.\n2. Copy `grid` into `board` and clear every struck cell.\n3. `attach(r, c)` joins a brick to `roof` if it is in row 0, and to every neighbouring brick on `board`. Call it for every brick left on `board`.\n4. Walk `hits` from last to first. Skip cells that never held a brick. Otherwise record `before`, the size of the roof's set, put the brick back and `attach` it, then read `after`.\n5. The bricks that came back to the roof are `after - before - 1` (minus one for the restored brick itself); clamp at 0 for a brick that reconnects nothing.\n\n## Example 1, step by step\n\n`grid = [[1,0,0,0],[1,1,1,0]]`, `hits = [[1,0]]`. After clearing the hit, `board = [[1,0,0,0],[0,1,1,0]]`. Brick (0,0) joins `roof`, so that set has size 2; bricks (1,1) and (1,2) form a separate set of size 2. Going back over hit 0: `before = 2`. Restoring (1,0) links it to (0,0) and to (1,1), so the roof's set grows to `after = 5`. The answer is `5 - 2 - 1 = 2`, giving `[2]`.\n\n## Complexity\n\n- Time: O((m · n + hits) · α(m · n)): each cell and each restored brick does a constant number of unions.\n- Space: O(m · n) for `parent`, `size` and `board`.\n\n## Pitfalls\n\n- A strike on an empty cell must give 0 and must not be restored, so check the original `grid`, not `board`.\n- Do not count the restored brick itself: subtract 1, and clamp with `Math.max(0, ...)` when it is not attached to the roof.\n- Bricks floating from the start are never in the roof's set, so they are never counted.\n- A brick that already fell may be struck later; in reverse it simply rejoins without reaching the roof, giving 0.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `roof` | extra node that every top-row brick joins |\n| `parent`, `size` | union-find forest and set sizes |\n| `board` | the grid as it stands at the current point of the reverse walk |\n| `attach` | links a brick to the roof and its neighbouring bricks |\n| `before`, `after` | size of the roof's set before and after restoring a brick |\n| `result` | bricks that fell for each strike |",
+  "narration": {
+    "4": "An extra node stands for the top of the grid; every top-row brick joins it.",
+    "5": "Each cell starts as its own one-element set.",
+    "9": "Path halving: point x at its grandparent while walking up to the root.",
+    "14": "Merge the sets of a and b, smaller under larger.",
+    "20": "The larger set absorbs the smaller one's count.",
+    "22": "Copy the grid so the original still tells us which hits struck a brick.",
+    "24": "Remove every struck brick up front: this is the grid after all hits.",
+    "29": "Top-row bricks hang from the roof.",
+    "33": "Link to each neighbour that is currently a brick.",
+    "40": "Build the sets for the final grid, brick by brick.",
+    "44": "Undo the hits from last to first.",
+    "46": "A hit on an empty cell changes nothing, so its answer stays 0.",
+    "47": "Measure the roof's set before this brick returns.",
+    "48": "Put the brick back on the board...",
+    "49": "...and connect it to the roof and its neighbours.",
+    "51": "Newly roof-connected bricks, minus the restored brick itself, are the ones that fell."
+  }
+}
