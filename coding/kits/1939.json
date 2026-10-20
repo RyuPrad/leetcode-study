@@ -1,0 +1,56 @@
+{
+  "number": 1939,
+  "title": "Users That Actively Request Confirmation Messages",
+  "spec": "recalled",
+  "statement": "A service sends confirmation messages to the users who sign up:\n\n- `Signups(user_id, time_stamp)`: one row per user with the datetime they signed up; `user_id` is unique.\n- `Confirmations(user_id, time_stamp, action)`: one row per confirmation message a user requested, at datetime `time_stamp`. `(user_id, time_stamp)` is unique, every `user_id` appears in `Signups`, and `action` is `'confirmed'` or `'timeout'`.\n\nFind the users who requested two confirmation messages **at most 24 hours apart**. Two requests exactly 24 hours apart count; 24 hours and one second apart do not. Only the request times matter, not the `action`. Return one column, `user_id`, listing each such user once. Rows may come in any order.",
+  "constraints": [
+    "user_id is unique in Signups",
+    "(user_id, time_stamp) is unique in Confirmations",
+    "every Confirmations.user_id appears in Signups",
+    "action is 'confirmed' or 'timeout'",
+    "time_stamp values are datetimes"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Signups": [["user_id","INT"],["time_stamp","DATETIME"]],
+    "Confirmations": [["user_id","INT"],["time_stamp","DATETIME"],["action","ENUM('confirmed', 'timeout')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Signups = [], Confirmations = [] }] = input;\n  const stamp = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;\n  const users = new Set(), requests = new Set();\n  for (const [user, time] of Signups) {\n    if (user === null) return 'Every signup needs a user_id.';\n    if (users.has(user)) return `user_id ${user} signs up twice.`;\n    if (!stamp.test(String(time))) return `User ${user} has a malformed signup time.`;\n    users.add(user);\n  }\n  for (const [user, time, action] of Confirmations) {\n    if (!users.has(user)) return `Confirmation for user ${user}, who never signed up.`;\n    if (!stamp.test(String(time))) return `User ${user} has a malformed confirmation time.`;\n    if (action !== 'confirmed' && action !== 'timeout') return `Unknown action ${action}.`;\n    const key = `${user}|${time}`;\n    if (requests.has(key)) return `User ${user} has two confirmations at ${time}.`;\n    requests.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT earlier.user_id\nFROM Confirmations AS earlier\nJOIN Confirmations AS later\n  ON later.user_id = earlier.user_id\n AND later.time_stamp > earlier.time_stamp\nWHERE TIMESTAMPDIFF(SECOND, earlier.time_stamp, later.time_stamp) <= 24 * 60 * 60;",
+  "brute": "SELECT s.user_id\nFROM Signups AS s\nWHERE EXISTS (\n  SELECT 1\n  FROM Confirmations AS a\n  WHERE a.user_id = s.user_id\n    AND EXISTS (\n      SELECT 1\n      FROM Confirmations AS b\n      WHERE b.user_id = a.user_id\n        AND b.time_stamp > a.time_stamp\n        AND b.time_stamp <= DATE_ADD(a.time_stamp, INTERVAL 1 DAY)\n    )\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const text = seconds => new Date(seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');\n  // Gaps between consecutive requests sit on and around the 24-hour boundary.\n  const gaps = [86400, 86401, 86399, 419, 3600, 88200, 90000, 172800, 50000, 1];\n  const start = Date.UTC(2020, 11, 20) / 1000;\n  const userCount = small ? Math.floor(rand() * 6) : 600;\n  const cap = small ? 8 : 2000;\n  const ids = [];\n  for (let id = 1; id <= (small ? 9 : 900); id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Signups = [], Confirmations = [];\n  for (const user of ids.slice(0, userCount)) {\n    let time = start + Math.floor(rand() * 40) * 86400 + Math.floor(rand() * 86400);\n    Signups.push([user, text(time - 86400 * (1 + Math.floor(rand() * 30)) - Math.floor(rand() * 86400))]);\n    const messages = Math.floor(rand() * (small ? 3 : 5));\n    for (let m = 0; m < messages && Confirmations.length < cap; m++) {\n      Confirmations.push([user, text(time), rand() < 0.5 ? 'confirmed' : 'timeout']);\n      time += pick(gaps);\n    }\n  }\n  // Shuffle so the rows of one user are not adjacent or sorted.\n  for (let i = Confirmations.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Confirmations[i], Confirmations[j]] = [Confirmations[j], Confirmations[i]]; }\n  return [{ Signups, Confirmations }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Signups":[[3,"2020-03-21 10:16:13"],[7,"2020-01-04 13:57:59"],[2,"2020-07-29 23:09:44"],[6,"2020-12-09 10:39:37"]],"Confirmations":[[3,"2021-01-06 03:30:46","timeout"],[3,"2021-01-06 03:37:45","timeout"],[7,"2021-06-12 11:57:29","confirmed"],[7,"2021-06-13 11:57:30","confirmed"],[2,"2021-01-22 00:00:00","confirmed"],[2,"2021-01-23 00:00:00","timeout"],[6,"2021-10-23 14:14:14","confirmed"],[6,"2021-10-24 14:14:13","timeout"]]}],"expected":{"columns":["user_id"],"rows":[[2],[3],[6]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Signups":[[1,"2021-01-01 00:00:00"],[2,"2021-01-02 00:00:00"]],"Confirmations":[]}]},
+    {"name":"Test 2","input":[{"Signups":[[1,"2021-01-01 00:00:00"]],"Confirmations":[[1,"2021-01-05 10:00:00","timeout"]]}]},
+    {"name":"Test 3","input":[{"Signups":[[4,"2021-01-01 00:00:00"]],"Confirmations":[[4,"2021-02-01 08:00:00","confirmed"],[4,"2021-02-02 08:00:00","timeout"]]}]},
+    {"name":"Test 4","input":[{"Signups":[[4,"2021-01-01 00:00:00"]],"Confirmations":[[4,"2021-02-01 08:00:00","confirmed"],[4,"2021-02-02 08:00:01","timeout"]]}]},
+    {"name":"Test 5","input":[{"Signups":[[5,"2021-01-01 00:00:00"]],"Confirmations":[[5,"2021-03-01 09:00:00","timeout"],[5,"2021-03-02 09:30:00","timeout"]]}]},
+    {"name":"Test 6","input":[{"Signups":[[6,"2020-12-01 00:00:00"]],"Confirmations":[[6,"2020-12-31 23:00:00","timeout"],[6,"2021-01-01 22:59:59","confirmed"]]}]},
+    {"name":"Test 7","input":[{"Signups":[[7,"2021-01-01 00:00:00"]],"Confirmations":[[7,"2021-04-01 00:00:00","timeout"],[7,"2021-04-02 23:00:00","timeout"]]}]},
+    {"name":"Test 8","input":[{"Signups":[[8,"2021-01-01 00:00:00"]],"Confirmations":[[8,"2021-05-03 12:00:00","confirmed"],[8,"2021-05-01 12:00:00","timeout"],[8,"2021-05-02 18:00:00","timeout"]]}]},
+    {"name":"Test 9","input":[{"Signups":[[9,"2021-01-01 00:00:00"],[10,"2021-01-01 00:00:00"]],"Confirmations":[[9,"2021-06-01 10:00:00","timeout"],[9,"2021-06-01 10:05:00","timeout"],[9,"2021-06-01 10:10:00","confirmed"],[9,"2021-06-01 10:15:00","timeout"],[10,"2021-06-01 10:00:00","timeout"]]}]},
+    {"name":"Test 10","input":[{"Signups":[[1,"2021-01-01 00:00:00"],[2,"2021-01-01 00:00:00"],[3,"2021-01-01 00:00:00"]],"Confirmations":[[1,"2021-07-01 10:00:00","timeout"],[2,"2021-07-01 20:00:00","timeout"],[3,"2021-07-02 06:00:00","confirmed"],[1,"2021-07-03 10:00:00","confirmed"]]}]},
+    {"name":"Test 11","input":[{"Signups":[[3,"2020-03-21 10:16:13"],[7,"2020-01-04 13:57:59"],[11,"2020-02-02 02:02:02"]],"Confirmations":[[3,"2021-01-06 03:30:46","timeout"],[7,"2021-06-12 11:57:29","confirmed"],[7,"2021-06-13 11:57:29","confirmed"],[11,"2021-08-10 00:00:00","confirmed"],[11,"2021-08-12 00:00:00","confirmed"],[11,"2021-08-13 00:00:00","timeout"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Two requests at most 24 hours apart\" is a statement about **pairs** of rows of the same user. Joining `Confirmations` to itself on `user_id` lists every pair; keeping only pairs where the second request is later avoids pairing a row with itself and counts each pair once. A pair qualifies when the gap between its two timestamps is at most 86,400 seconds, and a user qualifies when any of their pairs does.\n\n## Approach\n\n1. Take each request `earlier` and join it to every request `later` of the same user with a strictly later `time_stamp`.\n2. Measure the gap with `TIMESTAMPDIFF(SECOND, earlier.time_stamp, later.time_stamp)` and keep pairs at most `24 * 60 * 60` seconds apart (inclusive, so exactly one day counts).\n3. `SELECT DISTINCT earlier.user_id`, because a user can have several qualifying pairs.\n\n## Example 1, step by step\n\n| user | earlier | later | gap (s) | kept |\n| --- | --- | --- | --- | --- |\n| 3 | 2021-01-06 03:30:46 | 2021-01-06 03:37:45 | 419 | yes |\n| 7 | 2021-06-12 11:57:29 | 2021-06-13 11:57:30 | 86401 | no |\n| 2 | 2021-01-22 00:00:00 | 2021-01-23 00:00:00 | 86400 | yes |\n| 6 | 2021-10-23 14:14:14 | 2021-10-24 14:14:13 | 86399 | yes |\n\nDistinct users: 2, 3 and 6.\n\n## Complexity\n\n- Time: the self-join compares each request with the other requests of the same user, O(C + Σ kᵤ²) for C rows where user u has kᵤ requests; with an index on `(user_id, time_stamp)` this is close to O(C).\n- Space: O(U) for the distinct users in the result.\n\n## Pitfalls\n\n- `TIMESTAMPDIFF(HOUR, ...) <= 24` truncates: a gap of 24 hours 30 minutes reads as 24 hours and wrongly qualifies. Compare seconds.\n- `< 86400` excludes the pair exactly one day apart, which must count.\n- `DATEDIFF(...) <= 1` compares calendar days, so a request at 00:00 and another at 23:00 the next day (47 hours apart) would pass.\n- Without `DISTINCT` a user with several close pairs appears several times.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `earlier` | one request of a user |\n| `later` | another request of the same user with a later timestamp |\n| `TIMESTAMPDIFF(SECOND, ...)` | the gap between the two requests in seconds |\n| `DISTINCT` | reports each qualifying user once |",
+  "narration": {
+    "1": "Report each user who owns at least one qualifying pair, once.",
+    "2": "Every confirmation request is a candidate first request of a pair.",
+    "3": "Join the table to itself so each request meets the other requests.",
+    "4": "Pairs are formed only within one user.",
+    "5": "Only later requests are paired, so no row pairs with itself and each pair appears once.",
+    "6": "Keep the pairs whose gap is at most 86,400 seconds; exactly one day still counts."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 2175,
+  "title": "The Change in Global Rankings",
+  "spec": "recalled",
+  "statement": "Two tables describe national teams in a global ranking and an update to their points:\n\n- `TeamPoints(team_id, name, points)`: one row per team; `team_id` is unique and no two teams share a `name`.\n- `PointsChange(team_id, points_change)`: one row per team; `team_id` is unique and every team in `TeamPoints` has exactly one row here. `points_change` is added to the team's points and may be positive, zero or negative.\n\nA ranking orders the teams by points from highest to lowest; teams with equal points are ordered by `name` alphabetically. Positions are numbered 1, 2, 3, ... with no shared positions.\n\nRank the teams once with their current points and once after adding `points_change`. For every team report `team_id`, `name` and `rank_diff`, where `rank_diff` is the position before the update minus the position after it (positive when the team moved up, negative when it moved down, 0 when it stayed). Rows may come in any order.",
+  "constraints": [
+    "team_id is unique in TeamPoints, and names are unique",
+    "team_id is unique in PointsChange",
+    "PointsChange has a row for every team in TeamPoints and no other team",
+    "points_change may be negative, zero or positive"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "TeamPoints": [["team_id","INT"],["name","VARCHAR(100)"],["points","INT"]],
+    "PointsChange": [["team_id","INT"],["points_change","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ TeamPoints = [], PointsChange = [] }] = input;\n  const teams = new Set(), names = new Set(), changed = new Set();\n  for (const [id, name, points] of TeamPoints) {\n    if (id === null || name === null || points === null) return 'TeamPoints rows need a team_id, a name and points.';\n    if (teams.has(id)) return `team_id ${id} appears twice in TeamPoints.`;\n    const key = String(name).toLowerCase();\n    if (names.has(key)) return `The name ${name} appears twice.`;\n    teams.add(id); names.add(key);\n  }\n  for (const [id, change] of PointsChange) {\n    if (id === null || change === null) return 'PointsChange rows need a team_id and a points_change.';\n    if (changed.has(id)) return `team_id ${id} appears twice in PointsChange.`;\n    if (!teams.has(id)) return `PointsChange names team ${id}, which is not in TeamPoints.`;\n    changed.add(id);\n  }\n  if (changed.size !== teams.size) return 'Every team needs a row in PointsChange.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH old_ranks AS (\n  SELECT t.team_id,\n         t.name,\n         ROW_NUMBER() OVER (ORDER BY t.points DESC, t.name) AS old_rank\n  FROM TeamPoints AS t\n),\nnew_ranks AS (\n  SELECT t.team_id,\n         ROW_NUMBER() OVER (ORDER BY t.points + c.points_change DESC, t.name) AS new_rank\n  FROM TeamPoints AS t\n  JOIN PointsChange AS c\n    ON c.team_id = t.team_id\n)\nSELECT o.team_id,\n       o.name,\n       CAST(o.old_rank AS SIGNED) - CAST(n.new_rank AS SIGNED) AS rank_diff\nFROM old_ranks AS o\nJOIN new_ranks AS n\n  ON n.team_id = o.team_id;",
+  "brute": "WITH scores AS (\n  SELECT t.team_id, t.name, t.points AS before_points, t.points + c.points_change AS after_points\n  FROM TeamPoints AS t, PointsChange AS c\n  WHERE c.team_id = t.team_id\n)\nSELECT s.team_id,\n       s.name,\n       (SELECT COUNT(*) FROM scores AS x\n        WHERE x.before_points > s.before_points\n           OR (x.before_points = s.before_points AND x.name < s.name))\n     - (SELECT COUNT(*) FROM scores AS y\n        WHERE y.after_points > s.after_points\n           OR (y.after_points = s.after_points AND y.name < s.name)) AS rank_diff\nFROM scores AS s",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };\n  const TeamPoints = [], PointsChange = [];\n  if (size === 'small') {\n    const countries = shuffle(['Algeria', 'Senegal', 'New Zealand', 'Croatia', 'Brazil', 'Japan', 'Morocco', 'Peru', 'Ghana', 'Spain']);\n    const ids = shuffle(Array.from({ length: 12 }, (_, i) => i + 1));\n    const count = Math.floor(rand() * 9);\n    // A narrow points pool and small changes make old and new ties common.\n    for (let i = 0; i < count; i++) TeamPoints.push([ids[i], countries[i], pick([1400, 1410, 1420, 1430, 1430, 1450])]);\n    for (const [id] of shuffle(TeamPoints.slice())) PointsChange.push([id, pick([-30, -20, -10, 0, 0, 10, 20, 30])]);\n  } else {\n    const count = 1500;\n    const ids = shuffle(Array.from({ length: count }, (_, i) => i + 1));\n    const codes = shuffle(Array.from({ length: count }, (_, i) => `Team ${String.fromCharCode(65 + (i % 26))}${String(i).padStart(4, '0')}`));\n    for (let i = 0; i < count; i++) TeamPoints.push([ids[i], codes[i], 1000 + Math.floor(rand() * 120)]);\n    for (const [id] of shuffle(TeamPoints.slice())) PointsChange.push([id, Math.floor(rand() * 41) - 20]);\n  }\n  return [{ TeamPoints, PointsChange }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"TeamPoints":[[3,"Algeria",1431],[1,"Senegal",2132],[2,"New Zealand",1402],[4,"Croatia",1817]],"PointsChange":[[3,399],[2,0],[4,13],[1,-22]]}],"expected":{"columns":["team_id","name","rank_diff"],"rows":[[1,"Senegal",0],[4,"Croatia",-1],[3,"Algeria",1],[2,"New Zealand",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"TeamPoints":[],"PointsChange":[]}]},
+    {"name":"Test 2","input":[{"TeamPoints":[[7,"Brazil",1500]],"PointsChange":[[7,-300]]}]},
+    {"name":"Test 3","input":[{"TeamPoints":[[1,"Japan",1600],[2,"Peru",1500],[3,"Ghana",1400]],"PointsChange":[[1,0],[2,0],[3,0]]}]},
+    {"name":"Test 4","input":[{"TeamPoints":[[1,"Japan",1600],[2,"Peru",1500],[3,"Ghana",1400]],"PointsChange":[[3,250],[1,-250],[2,0]]}]},
+    {"name":"Test 5","input":[{"TeamPoints":[[10,"Spain",1500],[20,"Morocco",1500],[30,"Brazil",1500]],"PointsChange":[[10,0],[20,0],[30,0]]}]},
+    {"name":"Test 6","input":[{"TeamPoints":[[1,"Spain",1510],[2,"Brazil",1500]],"PointsChange":[[1,-10],[2,0]]}]},
+    {"name":"Test 7","input":[{"TeamPoints":[[1,"Brazil",1500],[2,"Spain",1500],[3,"Morocco",1490]],"PointsChange":[[1,-10],[2,0],[3,20]]}]},
+    {"name":"Test 8","input":[{"TeamPoints":[[4,"Ghana",1300],[3,"Croatia",1400],[2,"Algeria",1500],[1,"Peru",1600]],"PointsChange":[[1,50],[2,50],[3,50],[4,50]]}]},
+    {"name":"Test 9","input":[{"TeamPoints":[[1,"Senegal",2000],[2,"Japan",1700],[3,"Croatia",1650],[4,"Peru",1600],[5,"Ghana",1550]],"PointsChange":[[1,-500],[2,0],[3,0],[4,0],[5,0]]}]},
+    {"name":"Test 10","input":[{"TeamPoints":[[1,"Morocco",1420],[2,"Algeria",1400],[3,"Japan",1410],[4,"Croatia",1400]],"PointsChange":[[1,-20],[2,20],[3,0],[4,30]]}]},
+    {"name":"Test 11","input":[{"TeamPoints":[[5,"Peru",-10],[6,"Spain",0],[8,"Ghana",5]],"PointsChange":[[5,15],[6,-5],[8,-5]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA team's position is just its row number when the teams are sorted by points (descending) with the name as the tie-breaker. Because names are unique, that sort has no real ties, so `ROW_NUMBER()` gives every team a distinct position. Compute the position twice, once on the old points and once on the updated points, and subtract.\n\n## Approach\n\n1. `old_ranks`: number the teams with `ROW_NUMBER() OVER (ORDER BY points DESC, name)`.\n2. `new_ranks`: join `PointsChange` to get `points + points_change` and number the teams again with the same ordering on the new total.\n3. Join the two CTEs on `team_id` and report `old_rank - new_rank` as `rank_diff`. Both ranks are cast to `SIGNED` first, because MySQL returns `ROW_NUMBER()` as an unsigned integer and a negative difference of unsigned values is an error.\n\n## Example 1, step by step\n\n- Old points: Senegal 2132, Croatia 1817, Algeria 1431, New Zealand 1402, giving positions 1, 2, 3, 4.\n- New points: Senegal 2110, Croatia 1830, Algeria 1830, New Zealand 1402. Croatia and Algeria tie, and Algeria comes first by name, so the positions are Senegal 1, Algeria 2, Croatia 3, New Zealand 4.\n- Differences: Senegal 1 - 1 = 0, Croatia 2 - 3 = -1, Algeria 3 - 2 = 1, New Zealand 4 - 4 = 0.\n\n## Complexity\n\n- Time: O(T log T) for the two sorts over T teams, plus the joins on `team_id`.\n- Space: O(T) for the two numbered CTEs.\n\n## Pitfalls\n\n- `RANK()` or `DENSE_RANK()` give tied teams the same position; the problem breaks ties by name, so each team needs its own position.\n- Forgetting `name` in the window's `ORDER BY` makes the order of tied teams arbitrary.\n- Subtracting in the wrong direction (`new_rank - old_rank`) flips every sign: moving up must be positive.\n- In MySQL, `old_rank - new_rank` on raw `ROW_NUMBER()` values fails with an out-of-range error when the result is negative; cast to `SIGNED`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `old_ranks` | each team's position with its current points |\n| `new_ranks` | each team's position after adding `points_change` |\n| `t` | `TeamPoints` |\n| `c` | `PointsChange`, joined on `team_id` |\n| `o`, `n` | one team's old and new position, joined on `team_id` |\n| `rank_diff` | old position minus new position |",
+  "narration": {
+    "1": "The first stage numbers the teams by their current points.",
+    "4": "ROW_NUMBER over points descending, then name, gives every team its own position.",
+    "7": "The second stage ranks the teams again after the update.",
+    "9": "The same ordering is applied to the updated total, points plus points_change.",
+    "11": "PointsChange is joined so each team gets its own change.",
+    "16": "Both positions are cast to signed integers before subtracting, so a drop gives a negative number instead of an error.",
+    "18": "The old and new positions of the same team are paired on team_id."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "number": 2020,
+  "title": "Number of Accounts That Did Not Stream",
+  "spec": "recalled",
+  "statement": "A streaming service keeps its subscriptions and its viewing sessions:\n\n- `Subscriptions(account_id, start_date, end_date)`: one row per account; `account_id` is unique. The account is subscribed from `start_date` through `end_date` (both included), and `start_date <= end_date`.\n- `Streams(session_id, account_id, stream_date)`: one row per streaming session; `session_id` is unique and `account_id` always names an account in `Subscriptions`. An account may have any number of sessions, including none.\n\nCount the accounts whose subscription was active on at least one day of the year **2021** but that have **no** streaming session dated in 2021 (sessions in other years do not matter). Return a single row with a single column `accounts_count`.",
+  "constraints": [
+    "account_id is unique in Subscriptions",
+    "start_date <= end_date in every subscription",
+    "session_id is unique in Streams",
+    "Every Streams.account_id appears in Subscriptions"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Subscriptions": [["account_id","INT"],["start_date","DATE"],["end_date","DATE"]],
+    "Streams": [["session_id","INT"],["account_id","INT"],["stream_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Subscriptions = [], Streams = [] }] = input;\n  const isDate = value => typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value);\n  const accounts = new Set(), sessions = new Set();\n  for (const [account, start, end] of Subscriptions) {\n    if (account === null) return 'Every subscription needs an account_id.';\n    if (accounts.has(account)) return `account_id ${account} appears twice in Subscriptions.`;\n    accounts.add(account);\n    if (!isDate(start) || !isDate(end)) return `Account ${account} needs YYYY-MM-DD start and end dates.`;\n    if (start > end) return `Account ${account} ends before it starts.`;\n  }\n  for (const [session, account, date] of Streams) {\n    if (session === null) return 'Every stream needs a session_id.';\n    if (sessions.has(session)) return `session_id ${session} appears twice in Streams.`;\n    sessions.add(session);\n    if (!accounts.has(account)) return `Session ${session} names unknown account ${account}.`;\n    if (!isDate(date)) return `Session ${session} needs a YYYY-MM-DD stream_date.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT COUNT(sub.account_id) AS accounts_count\nFROM Subscriptions AS sub\nLEFT JOIN Streams AS st\n  ON st.account_id = sub.account_id\n  AND YEAR(st.stream_date) = 2021\nWHERE YEAR(sub.start_date) <= 2021\n  AND YEAR(sub.end_date) >= 2021\n  AND st.session_id IS NULL;",
+  "brute": "SELECT COUNT(*) AS accounts_count\nFROM Subscriptions AS s\nWHERE s.start_date < '2022-01-01'\n  AND s.end_date >= '2021-01-01'\n  AND s.account_id NOT IN (\n    SELECT t.account_id\n    FROM Streams AS t\n    WHERE t.stream_date BETWEEN '2021-01-01' AND '2021-12-31'\n  )",
+  "generator": "function generate(rand, size) {\n  const day = offset => new Date(Date.UTC(2019, 0, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const Subscriptions = [], Streams = [];\n  if (size === 'small') {\n    // Dates cluster on the year boundaries so that \"active in 2021\" and \"streamed in 2021\" are tested at their edges.\n    const dates = ['2019-11-30', '2020-05-16', '2020-12-31', '2021-01-01', '2021-03-15', '2021-08-08', '2021-12-31', '2022-01-01', '2022-04-10'];\n    const pick = () => dates[Math.floor(rand() * dates.length)];\n    const accounts = Math.floor(rand() * 7);\n    for (let id = 1; id <= accounts; id++) {\n      const [a, b] = [pick(), pick()].sort();\n      Subscriptions.push([id + 2, a, b]);\n    }\n    const sessions = accounts ? Math.floor(rand() * 9) : 0;\n    for (let s = 1; s <= sessions; s++) Streams.push([s + 10, Subscriptions[Math.floor(rand() * accounts)][0], pick()]);\n    return [{ Subscriptions, Streams }];\n  }\n  // Large: four years of dates, 2,000 accounts and 2,000 sessions.\n  for (let id = 1; id <= 2000; id++) {\n    const start = Math.floor(rand() * 1300);\n    Subscriptions.push([id, day(start), day(start + Math.floor(rand() * 500))]);\n  }\n  for (let s = 1; s <= 2000; s++) Streams.push([s, 1 + Math.floor(rand() * 2000), day(Math.floor(rand() * 1460))]);\n  return [{ Subscriptions, Streams }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Subscriptions":[[9,"2020-02-18","2021-10-30"],[3,"2021-09-21","2021-11-13"],[11,"2020-02-28","2020-08-18"],[13,"2021-04-20","2021-09-22"],[4,"2020-10-26","2021-05-08"],[5,"2020-09-11","2021-01-17"]],"Streams":[[14,9,"2020-05-16"],[16,3,"2021-10-27"],[18,11,"2020-04-29"],[17,13,"2021-08-08"],[19,4,"2020-12-31"],[13,5,"2021-01-05"]]}],"expected":{"columns":["accounts_count"],"rows":[[2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Subscriptions":[],"Streams":[]}]},
+    {"name":"Test 2","input":[{"Subscriptions":[[1,"2021-02-01","2021-03-01"]],"Streams":[]}]},
+    {"name":"Test 3","input":[{"Subscriptions":[[1,"2020-01-01","2020-12-31"],[2,"2022-01-01","2022-05-01"],[3,"2020-06-01","2021-01-01"]],"Streams":[]}]},
+    {"name":"Test 4","input":[{"Subscriptions":[[1,"2021-01-01","2022-03-01"],[2,"2021-05-01","2022-03-01"]],"Streams":[[1,1,"2021-12-31"],[2,2,"2022-01-01"]]}]},
+    {"name":"Test 5","input":[{"Subscriptions":[[7,"2020-03-01","2022-02-01"],[8,"2021-01-01","2021-06-30"]],"Streams":[[1,7,"2020-04-01"],[2,7,"2022-01-15"],[3,7,"2020-09-09"],[4,8,"2020-12-31"],[5,8,"2021-02-02"]]}]},
+    {"name":"Test 6","input":[{"Subscriptions":[[1,"2021-03-01","2021-04-01"],[2,"2019-05-01","2021-01-10"]],"Streams":[[10,1,"2021-03-02"],[11,1,"2021-03-05"],[12,2,"2021-01-01"]]}]},
+    {"name":"Test 7","input":[{"Subscriptions":[[1,"2020-01-01","2021-02-01"],[2,"2021-07-01","2021-07-01"]],"Streams":[[1,1,"2021-06-01"],[2,2,"2020-07-01"]]}]},
+    {"name":"Test 8","input":[{"Subscriptions":[[1,"2019-01-01","2023-01-01"],[2,"2021-12-31","2022-06-30"],[3,"2020-12-01","2021-01-01"],[4,"2021-04-04","2021-05-05"],[5,"2019-02-02","2020-02-02"]],"Streams":[[1,5,"2021-03-03"],[2,1,"2022-02-02"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo conditions must hold for an account: its subscription touches 2021, and it has no 2021 session. The second one is an **anti-join**: left join each subscription to its 2021 sessions only, and keep the subscriptions where nothing matched. Putting the year test in the `ON` clause is what makes this work: sessions from other years simply fail to match, and an account whose only sessions are from 2020 still comes out with a null session.\n\n## Approach\n\n1. Start from `Subscriptions` (alias `sub`), one row per account.\n2. `LEFT JOIN Streams` (alias `st`) on the same `account_id` **and** `YEAR(st.stream_date) = 2021`.\n3. `WHERE` keeps subscriptions active during 2021, `YEAR(start_date) <= 2021` and `YEAR(end_date) >= 2021`, whose join found no session (`st.session_id IS NULL`).\n4. `COUNT` the remaining accounts. Each kept account produced exactly one null-padded row, so nothing is counted twice.\n\n## Example 1, step by step\n\n- Account 11 (2020-02-28 to 2020-08-18) ended before 2021, so it is dropped. Accounts 9, 3, 13, 4 and 5 all touch 2021.\n- 2021 sessions exist for account 3 (2021-10-27), 13 (2021-08-08) and 5 (2021-01-05); they match and are dropped by `IS NULL`.\n- Account 9 streamed on 2020-05-16 and account 4 on 2020-12-31; neither date is in 2021, so both join to nothing and survive.\n\n`accounts_count = 2`.\n\n## Complexity\n\n- Time: O(A + S) for A accounts and S sessions with a hash or index on `Streams.account_id`.\n- Space: O(A) for the joined rows.\n\n## Pitfalls\n\n- Filtering `YEAR(stream_date) <> 2021` in `WHERE` keeps an account that streamed both in 2020 and in 2021, and counts an account once per old session.\n- An inner join loses accounts that never streamed at all, which do qualify.\n- \"Active in 2021\" is an overlap test: a subscription from 2020-06-01 to 2021-01-01 counts, while one ending on 2020-12-31 does not.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `sub` | `Subscriptions`, one row per account |\n| `st` | that account's 2021 sessions, or nulls when there are none |\n| `accounts_count` | the number of accounts left after the filters |",
+  "narration": {
+    "1": "Count the accounts that survive the filters and name the column accounts_count.",
+    "3": "Left join the sessions so accounts without a matching session are kept with nulls.",
+    "5": "Only 2021 sessions may match; a session from another year leaves the account unmatched.",
+    "6": "The subscription must start no later than 2021 ...",
+    "7": "... and end no earlier than 2021, so it is active on some day of that year.",
+    "8": "A null session means the account had no 2021 session at all: the anti-join."
+  }
+}

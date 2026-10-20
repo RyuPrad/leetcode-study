@@ -1,0 +1,54 @@
+{
+  "number": 1949,
+  "title": "Strong Friendship",
+  "spec": "recalled",
+  "statement": "One table lists friendships:\n\n- `Friendship(user1_id, user2_id)`: one row per pair of friends; the pair `(user1_id, user2_id)` is unique and always `user1_id < user2_id`. Friendship goes both ways: the row `(1, 2)` makes 1 a friend of 2 and 2 a friend of 1.\n\nA **common friend** of users x and y is a third user who is friends with both of them. The friendship between x and y is **strong** when x and y are friends and have at least three common friends.\n\nReport every strong friendship once, as it appears in `Friendship`, with the columns `user1_id`, `user2_id` and `common_friend` (how many common friends the two users have). Rows may come in any order.",
+  "constraints": [
+    "(user1_id, user2_id) is unique in Friendship",
+    "user1_id < user2_id in every row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Friendship": [["user1_id","INT"],["user2_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Friendship = [] }] = input;\n  const pairs = new Set();\n  for (const [a, b] of Friendship) {\n    if (a === null || b === null) return 'Every friendship needs both user ids.';\n    if (a >= b) return `Row (${a}, ${b}) must have user1_id < user2_id.`;\n    const key = `${a}|${b}`;\n    if (pairs.has(key)) return `Friendship (${a}, ${b}) appears twice.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH links AS (\n  SELECT user1_id AS user_id, user2_id AS friend_id FROM Friendship\n  UNION ALL\n  SELECT user2_id, user1_id FROM Friendship\n)\nSELECT f.user1_id, f.user2_id, COUNT(*) AS common_friend\nFROM Friendship AS f\nJOIN links AS n1\n  ON n1.user_id = f.user1_id\nJOIN links AS n2\n  ON n2.user_id = f.user2_id\n AND n2.friend_id = n1.friend_id\nGROUP BY f.user1_id, f.user2_id\nHAVING COUNT(*) >= 3;",
+  "brute": "WITH triangles AS (\n  SELECT ab.user1_id AS a, ab.user2_id AS b, ac.user2_id AS c\n  FROM Friendship AS ab\n  JOIN Friendship AS ac ON ac.user1_id = ab.user1_id AND ac.user2_id > ab.user2_id\n  JOIN Friendship AS bc ON bc.user1_id = ab.user2_id AND bc.user2_id = ac.user2_id\n)\nSELECT user1_id, user2_id, COUNT(*) AS common_friend\nFROM (\n  SELECT a AS user1_id, b AS user2_id FROM triangles\n  UNION ALL\n  SELECT a, c FROM triangles\n  UNION ALL\n  SELECT b, c FROM triangles\n) AS sides\nGROUP BY user1_id, user2_id\nHAVING COUNT(*) >= 3",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Friendship = [], seen = new Set();\n  const add = (x, y) => {\n    if (x === y) return;\n    const a = Math.min(x, y), b = Math.max(x, y);\n    if (seen.has(`${a}|${b}`)) return;\n    seen.add(`${a}|${b}`);\n    Friendship.push([a, b]);\n  };\n  if (size === 'small') {\n    const limit = pick(9);\n    // Often plant a pair with 2 or 3 common friends (sometimes without the pair's own friendship), then fill randomly.\n    if (rand() < 0.5) {\n      const ids = [1, 2, 3, 4, 5, 6, 7];\n      for (let i = ids.length - 1; i > 0; i--) { const j = pick(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n      if (rand() < 0.8) add(ids[0], ids[1]);\n      const commons = 2 + pick(2);\n      for (let k = 2; k < 2 + commons; k++) { add(ids[0], ids[k]); add(ids[1], ids[k]); }\n    }\n    for (let tries = 0; tries < 40 && Friendship.length < limit; tries++) add(1 + pick(7), 1 + pick(7));\n    return [{ Friendship }];\n  }\n  // Large: 30 groups of 8 users; low-numbered groups get many more edges, so density (and strength) varies.\n  for (let tries = 0; tries < 8000 && Friendship.length < 2000; tries++) {\n    if (rand() < 0.6) {\n      const group = Math.floor(30 * rand() * rand());\n      add(group * 8 + 1 + pick(8), group * 8 + 1 + pick(8));\n    } else add(1 + pick(240), 1 + pick(240));\n  }\n  return [{ Friendship }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Friendship":[[1,2],[1,3],[2,3],[1,4],[2,4],[1,5],[2,5],[1,7],[3,7],[1,6],[3,6],[2,6]]}],"expected":{"columns":["user1_id","user2_id","common_friend"],"rows":[[1,2,4],[1,3,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Friendship":[]}]},
+    {"name":"Test 2","input":[{"Friendship":[[1,2]]}]},
+    {"name":"Test 3","input":[{"Friendship":[[1,2],[1,3],[2,3],[1,4],[2,4],[1,5],[2,5]]}]},
+    {"name":"Test 4","input":[{"Friendship":[[1,2],[1,3],[2,3],[1,4],[2,4],[1,5],[3,5]]}]},
+    {"name":"Test 5","input":[{"Friendship":[[1,3],[2,3],[1,4],[2,4],[1,5],[2,5]]}]},
+    {"name":"Test 6","input":[{"Friendship":[[1,2],[1,3],[1,4],[1,5],[2,3],[2,4],[2,5],[3,4],[3,5],[4,5]]}]},
+    {"name":"Test 7","input":[{"Friendship":[[1,5],[1,9],[2,5],[2,9],[3,5],[3,9],[5,9]]}]},
+    {"name":"Test 8","input":[{"Friendship":[[1,2],[1,8],[2,5],[5,8],[2,10],[8,10],[2,8],[5,10]]}]},
+    {"name":"Test 9","input":[{"Friendship":[[1,2],[1,3],[1,4],[1,5],[1,6],[2,3],[2,4],[2,5],[2,6],[3,4],[3,5],[3,6],[4,5],[4,6],[5,6]]}]},
+    {"name":"Test 10","input":[{"Friendship":[[10,20],[10,30],[20,30],[10,40],[20,40],[10,50],[20,50],[60,70],[60,80],[70,80],[60,90],[70,90],[30,40]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row stores a friendship once, with the smaller id first, but friendship goes both ways. Listing every friendship in **both directions** gives each user a plain neighbor list (`links`). The common friends of a pair `(x, y)` are the users that appear in both neighbor lists, so joining `x`'s list to `y`'s list on the friend's id produces one row per common friend, and `COUNT(*)` per pair is the number we want.\n\n## Approach\n\n1. `links`: `UNION ALL` of each row as `(user1_id → user2_id)` and `(user2_id → user1_id)`.\n2. Start from `Friendship` (alias `f`), so only pairs that are actually friends are considered, each once.\n3. Join `n1`, the neighbors of `f.user1_id`, and `n2`, the neighbors of `f.user2_id`, requiring the same `friend_id`.\n4. `GROUP BY` the pair and keep groups with `COUNT(*) >= 3`; that count is `common_friend`.\n\n## Example 1, step by step\n\n`links` holds 24 rows; for instance user 1's neighbors are 2, 3, 4, 5, 6, 7 and user 3's are 1, 2, 6, 7.\n\n| f | neighbors of user1 | neighbors of user2 | shared | count |\n| --- | --- | --- | --- | --- |\n| (1, 2) | 2, 3, 4, 5, 6, 7 | 1, 3, 4, 5, 6 | 3, 4, 5, 6 | 4 |\n| (1, 3) | 2, 3, 4, 5, 6, 7 | 1, 2, 6, 7 | 2, 6, 7 | 3 |\n| (2, 3) | 1, 3, 4, 5, 6 | 1, 2, 6, 7 | 1, 6 | 2 |\n| (1, 6) | 2, 3, 4, 5, 6, 7 | 1, 2, 3 | 2, 3 | 2 |\n\nEvery other pair shares at most 2 friends, so the `HAVING` keeps `(1, 2, 4)` and `(1, 3, 3)`.\n\n## Complexity\n\n- Time: O(F · d) for F friendship rows with hashed joins, where d is the most friends any user has: each pair scans the first user's neighbors and looks each one up among the second user's.\n- Space: O(F) for `links`.\n\n## Pitfalls\n\n- Using only one direction of the rows: user 3 would lose friend 1, stored as `(1, 3)`; every friend with a smaller id than the user disappears.\n- Counting pairs that share three friends but are not friends themselves; the query must start from `Friendship` rows.\n- Using `> 3` instead of `>= 3`, which drops pairs with exactly three common friends.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `links` | every friendship in both directions: `(user_id, friend_id)` |\n| `f` | the friendship being judged; supplies `user1_id` and `user2_id` |\n| `n1` | one row per friend of `f.user1_id` |\n| `n2` | the same friend seen from `f.user2_id`, so each matched row is a common friend |\n| `common_friend` | `COUNT(*)` of matches per pair |",
+  "narration": {
+    "1": "The links CTE turns each stored friendship into neighbor rows, so friendship can be read in either direction.",
+    "2": "The first half reads each row as user1 befriending user2.",
+    "4": "The second half reads the same row backwards, from user2 to user1.",
+    "6": "For every friendship pair, the output carries both ids and the number of joined rows, which is the common-friend count.",
+    "7": "Starting from Friendship keeps only pairs that really are friends, each in its stored orientation.",
+    "8": "n1 lists every friend of the pair's first user.",
+    "10": "n2 lists the friends of the pair's second user.",
+    "12": "n2 must name the same friend as n1, so each surviving row is one common friend.",
+    "13": "Group by the pair so COUNT(*) counts its common friends.",
+    "14": "Only friendships with at least three common friends are strong."
+  }
+}

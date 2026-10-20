@@ -1,0 +1,58 @@
+{
+  "number": 1843,
+  "title": "Suspicious Bank Accounts",
+  "spec": "recalled",
+  "statement": "Two tables describe bank accounts and their money movements:\n\n- `Accounts(account_id, max_income)`: one row per account; `account_id` is unique. `max_income` is the most the account is expected to receive in one month.\n- `Transactions(transaction_id, account_id, type, amount, day)`: one row per transaction; `transaction_id` is unique. `type` is `'Creditor'` (money paid into the account) or `'Debtor'` (money taken out), `amount` is positive, and `day` is a datetime such as `'2021-06-02 11:38:14'`. Every `account_id` here is in `Accounts`.\n\nAn account's **income** in a calendar month is the total `amount` of its `'Creditor'` transactions dated in that month; `'Debtor'` transactions do not count. An account is suspicious when its income is strictly greater than its `max_income` in two or more consecutive calendar months (December of one year and January of the next are consecutive). Report one column, `account_id`, listing each suspicious account once. Rows may come in any order.",
+  "constraints": [
+    "account_id is unique in Accounts",
+    "transaction_id is unique in Transactions",
+    "type is 'Creditor' or 'Debtor'",
+    "Every Transactions.account_id appears in Accounts",
+    "amount is positive"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Accounts": [["account_id","INT"],["max_income","INT"]],
+    "Transactions": [["transaction_id","INT"],["account_id","INT"],["type","ENUM('Creditor', 'Debtor')"],["amount","INT"],["day","DATETIME"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Accounts = [], Transactions = [] }] = input;\n  const accounts = new Set(), ids = new Set();\n  for (const [id, limit] of Accounts) {\n    if (id === null || limit === null) return 'Every account needs an id and a max_income.';\n    if (accounts.has(id)) return `account_id ${id} appears twice in Accounts.`;\n    accounts.add(id);\n  }\n  for (const [id, account, type, amount, day] of Transactions) {\n    if (id === null) return 'Every transaction needs an id.';\n    if (ids.has(id)) return `transaction_id ${id} appears twice.`;\n    ids.add(id);\n    if (!accounts.has(account)) return `Account ${account} is not in Accounts.`;\n    if (type !== 'Creditor' && type !== 'Debtor') return `Unknown type ${type}.`;\n    if (amount === null || amount <= 0) return `Transaction ${id} needs a positive amount.`;\n    if (day === null || !/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(day)) return `day ${day} must look like 2021-06-02 11:38:14.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH over_limit AS (\n  SELECT t.account_id, YEAR(t.day) * 12 + MONTH(t.day) AS month_index\n  FROM Transactions AS t\n  JOIN Accounts AS a\n    ON a.account_id = t.account_id\n  WHERE t.type = 'Creditor'\n  GROUP BY t.account_id, month_index, a.max_income\n  HAVING SUM(t.amount) > a.max_income\n)\nSELECT DISTINCT cur.account_id\nFROM over_limit AS cur\nJOIN over_limit AS nxt\n  ON nxt.account_id = cur.account_id\n  AND nxt.month_index = cur.month_index + 1;",
+  "brute": "SELECT a.account_id\nFROM Accounts AS a\nWHERE EXISTS (\n  SELECT 1\n  FROM Transactions AS t\n  WHERE t.account_id = a.account_id\n    AND t.type = 'Creditor'\n    AND (SELECT SUM(x.amount) FROM Transactions AS x\n         WHERE x.account_id = a.account_id AND x.type = 'Creditor'\n           AND DATE_FORMAT(x.day, '%Y-%m') = DATE_FORMAT(t.day, '%Y-%m')) > a.max_income\n    AND (SELECT SUM(y.amount) FROM Transactions AS y\n         WHERE y.account_id = a.account_id AND y.type = 'Creditor'\n           AND DATE_FORMAT(y.day, '%Y-%m') = DATE_FORMAT(DATE_ADD(t.day, INTERVAL 1 MONTH), '%Y-%m')) > a.max_income\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const pad = n => String(n).padStart(2, '0');\n  const accountCount = small ? Math.floor(rand() * 4) : 200;\n  const Accounts = [];\n  for (let id = 1; id <= accountCount; id++) Accounts.push([id, small ? pick([100, 200, 300]) : 500 + 100 * Math.floor(rand() * 20)]);\n  const Transactions = [];\n  if (Accounts.length) {\n    // Small cases stay inside a few months around a year boundary, on month edges, so sums tie limits and months touch.\n    const months = small ? [[2020, 11], [2020, 12], [2021, 1], [2021, 2], [2021, 4]] : [];\n    if (!small) for (let y = 2019; y <= 2021; y++) for (let m = 1; m <= 12; m++) months.push([y, m]);\n    const count = small ? Math.floor(rand() * 9) : 2000;\n    for (let i = 1; i <= count; i++) {\n      const [y, m] = pick(months);\n      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();\n      const d = small ? pick([1, 15, last]) : 1 + Math.floor(rand() * last);\n      const time = `${pad(Math.floor(rand() * 24))}:${pad(Math.floor(rand() * 60))}:${pad(Math.floor(rand() * 60))}`;\n      Transactions.push([\n        i,\n        pick(Accounts)[0],\n        rand() < 0.75 ? 'Creditor' : 'Debtor',\n        small ? pick([50, 100, 150, 200, 250]) : 50 + Math.floor(rand() * 1500),\n        `${y}-${pad(m)}-${pad(d)} ${time}`,\n      ]);\n    }\n  }\n  return [{ Accounts, Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Accounts":[[3,21000],[4,10400]],"Transactions":[[2,3,"Creditor",107100,"2021-06-02 11:38:14"],[4,4,"Creditor",10400,"2021-06-20 12:39:18"],[11,4,"Debtor",58800,"2021-07-23 12:41:55"],[1,4,"Creditor",49300,"2021-05-03 16:11:04"],[15,3,"Debtor",75500,"2021-05-23 14:40:20"],[10,3,"Creditor",102100,"2021-06-15 10:37:16"],[14,4,"Creditor",56300,"2021-07-21 12:12:25"],[19,4,"Debtor",101100,"2021-05-09 15:21:49"],[8,3,"Creditor",64900,"2021-07-26 15:09:56"],[7,3,"Creditor",90900,"2021-06-14 11:23:07"]]}],"expected":{"columns":["account_id"],"rows":[[3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Accounts":[[1,100],[2,200]],"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Accounts":[[1,100]],"Transactions":[[1,1,"Creditor",150,"2021-03-10 10:00:00"],[2,1,"Creditor",120,"2021-04-05 09:00:00"]]}]},
+    {"name":"Test 3","input":[{"Accounts":[[1,100]],"Transactions":[[1,1,"Creditor",150,"2021-01-10 10:00:00"],[2,1,"Creditor",150,"2021-03-10 10:00:00"]]}]},
+    {"name":"Test 4","input":[{"Accounts":[[5,100]],"Transactions":[[1,5,"Creditor",101,"2020-12-31 23:59:59"],[2,5,"Creditor",101,"2021-01-01 00:00:00"]]}]},
+    {"name":"Test 5","input":[{"Accounts":[[1,100]],"Transactions":[[1,1,"Creditor",100,"2021-05-01 08:00:00"],[2,1,"Creditor",300,"2021-06-01 08:00:00"]]}]},
+    {"name":"Test 6","input":[{"Accounts":[[1,100]],"Transactions":[[1,1,"Debtor",500,"2021-05-01 08:00:00"],[2,1,"Debtor",500,"2021-06-01 08:00:00"],[3,1,"Creditor",50,"2021-05-02 08:00:00"],[4,1,"Creditor",50,"2021-06-02 08:00:00"]]}]},
+    {"name":"Test 7","input":[{"Accounts":[[1,100]],"Transactions":[[1,1,"Creditor",60,"2021-08-01 08:00:00"],[2,1,"Creditor",60,"2021-08-20 08:00:00"],[3,1,"Creditor",40,"2021-09-03 08:00:00"],[4,1,"Creditor",70,"2021-09-30 08:00:00"]]}]},
+    {"name":"Test 8","input":[{"Accounts":[[2,100]],"Transactions":[[1,2,"Creditor",500,"2020-06-15 08:00:00"],[2,2,"Creditor",500,"2021-07-15 08:00:00"]]}]},
+    {"name":"Test 9","input":[{"Accounts":[[1,100],[2,100]],"Transactions":[[1,1,"Creditor",200,"2021-02-10 08:00:00"],[2,1,"Creditor",200,"2021-03-10 08:00:00"],[3,1,"Creditor",200,"2021-04-10 08:00:00"],[4,2,"Creditor",200,"2021-03-11 08:00:00"]]}]},
+    {"name":"Test 10","input":[{"Accounts":[[1,100],[2,300],[3,50]],"Transactions":[[1,1,"Creditor",150,"2021-01-31 18:00:00"],[2,1,"Creditor",150,"2021-02-01 06:00:00"],[3,2,"Creditor",250,"2021-01-15 08:00:00"],[4,2,"Creditor",400,"2021-02-15 08:00:00"],[5,3,"Creditor",60,"2021-11-30 08:00:00"],[6,3,"Creditor",60,"2021-12-01 08:00:00"]]}]},
+    {"name":"Test 11","input":[{"Accounts":[[1,100],[2,100]],"Transactions":[[1,1,"Creditor",150,"2021-05-05 08:00:00"],[2,2,"Creditor",150,"2021-06-05 08:00:00"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rule has two layers. First, decide for every (account, month) pair whether the month's deposits exceed the account's limit: that is a filtered `GROUP BY` with a `HAVING` test. Second, look for two such months that sit next to each other. Comparing months is easy once each month is a single integer: `YEAR * 12 + MONTH` numbers months consecutively, so December 2020 and January 2021 differ by exactly 1. A self-join of the over-the-limit months on \"same account, next month index\" then finds the suspicious accounts.\n\n## Approach\n\n1. CTE `over_limit`: join `Transactions` (alias `t`) to `Accounts` (alias `a`), keep `'Creditor'` rows, group by account and `month_index = YEAR(day) * 12 + MONTH(day)`, and keep the groups whose `SUM(amount)` is greater than `max_income`.\n2. Self-join `over_limit` as `cur` and `nxt` on the same account with `nxt.month_index = cur.month_index + 1`.\n3. `SELECT DISTINCT cur.account_id`, since a run of three or more months produces several matching pairs.\n\n## Example 1, step by step\n\n- Account 3 (limit 21000): May has only a debit, so no income; June income is 107100 + 102100 + 90900 = 300100; July income is 64900. June and July are over the limit.\n- Account 4 (limit 10400): May income 49300, June 10400 (equal, not greater), July 56300. May and July are over the limit.\n- `over_limit` holds (3, June), (3, July), (4, May), (4, July). Only account 3 has a month followed by the next month, so the output is `3`.\n\n## Complexity\n\n- Time: O(n) to group n transactions (hash grouping), plus a self-join of the over-limit months, at most O(n) rows.\n- Space: O(n) for `over_limit`.\n\n## Pitfalls\n\n- Grouping by `MONTH(day)` alone merges the same month of different years and treats June 2020 and July 2021 as neighbours.\n- `>=` instead of `>` wrongly flags a month whose income equals the limit (account 4 in June).\n- Forgetting `type = 'Creditor'` counts withdrawals as income.\n- Without `DISTINCT`, an account over the limit for three straight months is listed twice.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `over_limit` | (account, month) pairs whose deposits exceed `max_income` |\n| `month_index` | `YEAR * 12 + MONTH`, consecutive months differ by 1 |\n| `t`, `a` | `Transactions` and `Accounts` inside the CTE |\n| `cur`, `nxt` | an over-limit month and the over-limit month right after it |",
+  "narration": {
+    "1": "The over_limit CTE finds every month in which an account received more than it should.",
+    "2": "month_index turns a year and month into one number, so the next month is always month_index + 1, even across a new year.",
+    "4": "Join Accounts to know each account's max_income.",
+    "6": "Only deposits count as income.",
+    "7": "One group per account and calendar month.",
+    "8": "Keep the months whose total deposits are strictly above the limit.",
+    "10": "DISTINCT lists an account once even if it has several pairs of neighbouring months.",
+    "12": "Pair each over-limit month with another over-limit month of the same account...",
+    "14": "...that comes exactly one month later."
+  }
+}

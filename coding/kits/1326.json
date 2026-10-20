@@ -1,0 +1,66 @@
+{
+  "number": 1326,
+  "title": "Minimum Number of Taps to Open to Water a Garden",
+  "spec": "leetcode",
+  "statement": "A straight garden runs along the number line from point `0` to point `n`, and there is one tap at every whole point `0, 1, ..., n`. You get `n` and an array `ranges` of length `n + 1`: when tap `i` is turned on it waters the closed segment `[i - ranges[i], i + ranges[i]]` (a tap with range `0` waters only its own point).\n\nReturn the smallest number of taps you must turn on so that every point of the segment `[0, n]` is watered, or `-1` if that is impossible even with all taps on. Watered segments that only touch at a single point still join up, and watering beyond `0` or `n` is harmless.",
+  "constraints": [
+    "1 <= n <= 10^4",
+    "ranges.length == n + 1",
+    "0 <= ranges[i] <= 100"
+  ],
+  "signature": "int minTaps(int n, int[] ranges)",
+  "entry": "minTaps",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "ranges"
+  ],
+  "validator": "function validate([n, ranges]) {\n  if (!Number.isInteger(n) || n < 1 || n > 10000) return 'n is a whole number from 1 to 10000.';\n  if (ranges.length !== n + 1) return 'ranges needs exactly n + 1 values.';\n  if (ranges.some(r => !Number.isInteger(r) || r < 0 || r > 100)) return 'Each range is a whole number from 0 to 100.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minTaps(n, ranges) {\n  const reach = new Array(n + 1).fill(0);\n  for (let i = 0; i <= n; i++) {\n    const left = Math.max(0, i - ranges[i]);\n    const right = Math.min(n, i + ranges[i]);\n    reach[left] = Math.max(reach[left], right);\n  }\n\n  let taps = 0;\n  let covered = 0;\n  let farthest = 0;\n  for (let x = 0; x < n; x++) {\n    farthest = Math.max(farthest, reach[x]);\n    if (x === covered) {\n      if (farthest <= x) {\n        return -1;\n      }\n      taps++;\n      covered = farthest;\n    }\n  }\n  return taps;\n}",
+  "brute": "function minTaps(n, ranges) {\n  // best[x] = fewest taps whose segments together cover [0, x].\n  const best = new Array(n + 1).fill(Infinity);\n  best[0] = 0;\n  for (let x = 1; x <= n; x++) {\n    for (let i = 0; i <= n; i++) {\n      const lo = Math.max(0, i - ranges[i]), hi = i + ranges[i];\n      if (lo < x && x <= hi && best[lo] + 1 < best[x]) best[x] = best[lo] + 1;\n    }\n  }\n  return best[n] === Infinity ? -1 : best[n];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 499) : 1 + Math.floor(rand() * 12);\n  const cap = size === 'large' ? 100 : 1 + Math.floor(rand() * 5);\n  // Each input picks how often a tap has any range, so some gardens have gaps and some do not.\n  const density = size === 'large' ? 0.03 + rand() * 0.2 : 0.2 + rand() * 0.8;\n  const ranges = Array.from({ length: n + 1 }, () => rand() < density ? Math.floor(rand() * (cap + 1)) : 0);\n  return [n, ranges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[5,[3,4,1,1,0,0]],"expected":1},
+    {"name":"Example 2","input":[3,[0,0,0,0]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[0,0]]},
+    {"name":"Test 2","input":[1,[1,0]]},
+    {"name":"Test 3","input":[1,[0,1]]},
+    {"name":"Test 4","input":[7,[1,2,1,0,2,1,0,1]]},
+    {"name":"Test 5","input":[8,[4,0,0,0,0,0,0,0,4]]},
+    {"name":"Test 6","input":[4,[2,0,0,0,2]]},
+    {"name":"Test 7","input":[6,[1,0,0,0,0,0,1]]},
+    {"name":"Test 8","input":[9,[0,5,0,3,3,3,1,4,0,4]]},
+    {"name":"Test 9","input":[5,[0,0,0,0,0,5]]},
+    {"name":"Test 10","input":[35,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 11","input":[10,[0,2,0,0,0,0,0,0,0,3,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach tap is just a segment `[i - ranges[i], i + ranges[i]]`, so the task is \"cover `[0, n]` with as few segments as possible\". A dynamic program over every point and every tap works but costs O(n²). The greedy idea from *Jump Game II* is faster: once everything up to some point is watered, the next tap to open is the one that starts no later than that point and reaches the farthest to the right. Any other choice reaches less far and can never save a tap later.\n\n## Approach\n\n1. For every tap, clamp its segment to `[0, n]` and record in `reach[left]` the farthest `right` of any segment starting at `left`.\n2. Walk `x` from `0` to `n - 1`, keeping `farthest`, the best right end among segments that start at or before `x`.\n3. `covered` is the right edge of the watered part so far. When `x` reaches `covered`, a new tap is needed.\n4. If `farthest` does not pass `x`, nothing can water the ground just right of `x`: return `-1`.\n5. Otherwise open that tap (`taps++`) and move `covered` to `farthest`. After the loop `taps` is the answer.\n\n## Example 1, step by step\n\n`n = 5`, `ranges = [3,4,1,1,0,0]`. The clamped segments are `[0,3]`, `[0,5]`, `[1,3]`, `[2,4]`, `[4,4]`, `[5,5]`, so `reach = [5,3,4,0,4,5]`. At `x = 0`, `farthest = 5` and `x === covered`, so one tap is opened and `covered` becomes `5`. For `x = 1..4` the edge is never reached again, so the answer is `1`.\n\n## Complexity\n\n- Time: O(n): one pass builds `reach`, one pass jumps across it.\n- Space: O(n) for `reach`.\n\n## Pitfalls\n\n- Clamp the left end to `0`; a tap near the start may reach far into negative points and must still count as starting at `0`.\n- Segments that only touch (`[0,2]` and `[2,4]`) do join up, so a segment starting exactly at `covered` is usable.\n- Stop the walk at `n - 1`: once `covered` is `n` no more taps are needed, and `n` itself must not trigger another one.\n- A tap with range `0` waters a single point and never helps; the `farthest <= x` check catches gardens that are left with gaps.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `reach` | for each start point, the farthest right end of a segment starting there |\n| `left`, `right` | one tap's segment, clamped to `[0, n]` |\n| `taps` | taps opened so far |\n| `covered` | everything in `[0, covered]` is already watered |\n| `farthest` | best right end among segments starting at or before `x` |\n| `x` | the point being scanned |",
+  "narration": {
+    "2": "reach[p] will hold the farthest right end of any tap segment that starts at point p.",
+    "3": "Turn every tap into its watered segment.",
+    "4": "Clamp the left end at 0; watering below 0 does not matter.",
+    "5": "Clamp the right end at n for the same reason.",
+    "6": "Keep only the longest segment for each start point.",
+    "9": "No taps are open yet.",
+    "10": "Nothing is watered beyond point 0 so far.",
+    "12": "Scan the points of the garden, stopping before n.",
+    "13": "Track the best right end among all segments that start at or before x.",
+    "14": "We reached the end of the watered part, so another tap must be opened.",
+    "15": "If no segment gets past x, the ground just right of x stays dry.",
+    "16": "So the garden cannot be watered.",
+    "18": "Open the tap that reaches farthest.",
+    "19": "Everything up to farthest is now watered.",
+    "22": "Every point was covered; return the number of taps opened."
+  }
+}

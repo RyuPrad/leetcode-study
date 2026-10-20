@@ -1,0 +1,49 @@
+{
+  "number": 1831,
+  "title": "Maximum Transaction Each Day",
+  "spec": "recalled",
+  "statement": "One table logs transactions:\n\n- `Transactions(transaction_id, day, amount)`: one row per transaction; `transaction_id` is unique. `day` is the moment the transaction happened, a datetime such as `'2021-04-03 15:57:28'`, and `amount` is its amount.\n\nGroup the transactions by calendar date (the date part of `day`, ignoring the time). Within each date, find the largest `amount`, and report every transaction whose amount equals the largest one of its date; when several transactions share that largest amount, report all of them. The output has one column, `transaction_id`, sorted in ascending order.",
+  "constraints": [
+    "transaction_id is unique in Transactions",
+    "day is a datetime 'YYYY-MM-DD HH:MM:SS'",
+    "Several transactions of one date may share the largest amount"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Transactions": [["transaction_id","INT"],["day","DATETIME"],["amount","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Transactions = [] }] = input;\n  const ids = new Set();\n  for (const [id, day, amount] of Transactions) {\n    if (id === null || day === null || amount === null) return 'Every transaction needs an id, a day and an amount.';\n    if (ids.has(id)) return `transaction_id ${id} appears twice.`;\n    ids.add(id);\n    if (!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(day)) return `day ${day} must look like 2021-04-03 15:57:28.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT transaction_id,\n    RANK() OVER (PARTITION BY DATE(day) ORDER BY amount DESC) AS amount_rank\n  FROM Transactions\n)\nSELECT transaction_id\nFROM ranked\nWHERE amount_rank = 1\nORDER BY transaction_id;",
+  "brute": "SELECT t.transaction_id\nFROM Transactions AS t\nJOIN (\n  SELECT DATE(day) AS tx_date, MAX(amount) AS top_amount\n  FROM Transactions\n  GROUP BY DATE(day)\n) AS best\n  ON best.tx_date = DATE(t.day) AND best.top_amount = t.amount\nORDER BY t.transaction_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pad = n => String(n).padStart(2, '0');\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const dates = small ? ['2021-04-03', '2021-04-04', '2021-04-28'] : [];\n  if (!small) for (let m = 1; m <= 12; m++) for (let d = 1; d <= 28; d += 2) dates.push(`2021-${pad(m)}-${pad(d)}`);\n  const amounts = [0, 10, 21, 40, 57, 58, 58];\n  const clock = () => {\n    const edge = rand();\n    if (edge < 0.15) return '00:00:00';\n    if (edge < 0.3) return '23:59:59';\n    return `${pad(Math.floor(rand() * 24))}:${pad(Math.floor(rand() * 60))}:${pad(Math.floor(rand() * 60))}`;\n  };\n  // Distinct ids in shuffled order, with gaps.\n  const ids = [];\n  for (let i = 0, id = 0; i < count; i++) { id += 1 + Math.floor(rand() * 3); ids.push(id); }\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Transactions = ids.map(id => [\n    id,\n    `${dates[Math.floor(rand() * dates.length)]} ${clock()}`,\n    small ? amounts[Math.floor(rand() * amounts.length)] : Math.floor(rand() * 60),\n  ]);\n  return [{ Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Transactions":[[8,"2021-04-03 15:57:28",57],[9,"2021-04-28 08:47:25",21],[1,"2021-04-29 13:28:30",58],[5,"2021-04-28 16:39:59",40],[6,"2021-04-29 23:39:28",58]]}],"expected":{"columns":["transaction_id"],"rows":[[1],[5],[6],[8]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Transactions":[[4,"2021-01-01 12:00:00",99]]}]},
+    {"name":"Test 3","input":[{"Transactions":[[3,"2021-05-05 08:00:00",70],[1,"2021-05-05 09:30:00",70],[2,"2021-05-05 21:15:00",70]]}]},
+    {"name":"Test 4","input":[{"Transactions":[[1,"2021-04-03 23:59:59",50],[2,"2021-04-04 00:00:00",40],[3,"2021-04-03 00:00:00",60]]}]},
+    {"name":"Test 5","input":[{"Transactions":[[12,"2021-06-01 10:00:00",15],[7,"2021-06-02 10:00:00",25],[3,"2021-06-01 11:00:00",35],[9,"2021-06-02 12:00:00",5]]}]},
+    {"name":"Test 6","input":[{"Transactions":[[1,"2021-07-01 08:00:00",30],[2,"2021-07-01 09:00:00",80],[3,"2021-07-01 10:00:00",80],[4,"2021-07-02 08:00:00",90],[5,"2021-07-02 09:00:00",10]]}]},
+    {"name":"Test 7","input":[{"Transactions":[[10,"2021-03-10 06:00:00",0],[11,"2021-03-10 07:00:00",0],[12,"2021-03-11 06:00:00",0]]}]},
+    {"name":"Test 8","input":[{"Transactions":[[5,"2020-02-29 13:00:00",44],[6,"2021-02-28 13:00:00",33],[7,"2021-03-01 13:00:00",22],[8,"2020-02-29 14:00:00",11]]}]},
+    {"name":"Test 9","input":[{"Transactions":[[1,"2021-08-08 08:00:00",5],[2,"2021-08-08 08:00:01",6],[3,"2021-08-08 08:00:02",7],[4,"2021-08-08 08:00:03",8],[20,"2021-08-08 08:00:04",9]]}]},
+    {"name":"Test 10","input":[{"Transactions":[[8,"2021-04-03 15:57:28",57],[9,"2021-04-28 08:47:25",21],[1,"2021-04-29 13:28:30",58],[5,"2021-04-28 16:39:59",40],[6,"2021-04-29 23:39:28",58],[2,"2021-04-03 01:00:00",57],[3,"2021-04-28 23:59:59",40]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The largest transaction of each day\" is a per-group maximum, but the answer is the **rows** that reach it, not the maximum itself. A window function ranks every row inside its group without collapsing the group, so each transaction can see how it compares with the rest of its date. `RANK()` gives every row tied for first place rank 1, which is exactly the \"report all of them\" rule. The group key is the calendar date, `DATE(day)`, not the full datetime.\n\n## Approach\n\n1. CTE `ranked`: for each transaction compute `amount_rank = RANK() OVER (PARTITION BY DATE(day) ORDER BY amount DESC)`. The largest amount of each date gets rank 1, and equal amounts share it.\n2. Keep the rows with `amount_rank = 1`.\n3. Select `transaction_id` and `ORDER BY transaction_id`.\n\n## Example 1, step by step\n\n- Dates: 2021-04-03 has transaction 8 (57); 2021-04-28 has 9 (21) and 5 (40); 2021-04-29 has 1 (58) and 6 (58).\n- `ranked`: 8 → 1; 5 → 1, 9 → 2; 1 → 1, 6 → 1 (tied amounts share rank 1).\n- Rank-1 rows: 8, 5, 1, 6. Sorted, the output is 1, 5, 6, 8.\n\n## Complexity\n\n- Time: O(n log n) for n transactions, to sort each date's rows by amount.\n- Space: O(n) for `ranked`.\n\n## Pitfalls\n\n- Partitioning by `day` itself groups by the exact second, so almost every transaction becomes its own maximum. Use `DATE(day)`.\n- `ROW_NUMBER()` picks one arbitrary winner per date and loses the ties (transaction 6 or 1 in the example).\n- `GROUP BY DATE(day)` with `MAX(amount)` alone gives the amounts, not the ids; you must join it back or rank instead.\n- The output must be sorted by `transaction_id`, not by date.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every transaction with its `amount_rank` within its date |\n| `DATE(day)` | the calendar date a transaction belongs to |\n| `amount_rank` | 1 for the largest amount of the date, shared by ties |",
+  "narration": {
+    "1": "The ranked CTE scores each transaction against the others of the same date.",
+    "3": "RANK restarts for every calendar date and gives rank 1 to every row tied for the largest amount.",
+    "8": "Only the transactions that reach their date's maximum survive.",
+    "9": "The ids come out in ascending order, as required."
+  }
+}

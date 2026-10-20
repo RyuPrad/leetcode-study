@@ -1,0 +1,53 @@
+{
+  "number": 2205,
+  "title": "The Number of Users That Are Eligible for Discount",
+  "spec": "recalled",
+  "statement": "One table records purchases, and a second one-row table carries the arguments:\n\n- `Purchases(user_id, time_stamp, amount)`: one row per purchase; the pair `(user_id, time_stamp)` is unique. `time_stamp` is a datetime such as `2022-03-18 12:03:09` and `amount` is what the user paid.\n- `Params(startDate, endDate, minAmount)`: exactly one row. On LeetCode this problem is a MySQL function `getUserIDs(startDate, endDate, minAmount)` that returns a number; here its arguments are stored in `Params` instead, so you write an ordinary query. Each date stands for the very start of its day, so it is stored as a datetime at midnight (`2022-03-08 00:00:00`), and `startDate <= endDate`.\n\nA user is eligible for a discount when at least one of their purchases happened inside the closed interval from `startDate` to `endDate` (both ends included, so a purchase at exactly `endDate` midnight counts but one later that day does not) **and** that same purchase has `amount >= minAmount`.\n\nReturn exactly one row with one column `user_cnt`: the number of eligible users (0 when there are none).",
+  "constraints": [
+    "(user_id, time_stamp) is unique in Purchases",
+    "Params has exactly one row",
+    "startDate and endDate are datetimes at 00:00:00, and startDate <= endDate",
+    "The result always has exactly one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Purchases": [["user_id","INT"],["time_stamp","DATETIME"],["amount","INT"]],
+    "Params": [["startDate","DATETIME"],["endDate","DATETIME"],["minAmount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Purchases = [], Params = [] }] = input;\n  if (Params.length !== 1) return 'Params must have exactly one row.';\n  const [startDate, endDate, minAmount] = Params[0];\n  if (startDate === null || endDate === null || minAmount === null) return 'Params needs startDate, endDate and minAmount.';\n  if (!/ 00:00:00$/.test(startDate) || !/ 00:00:00$/.test(endDate)) return 'startDate and endDate must be at 00:00:00.';\n  if (startDate > endDate) return 'startDate must not be after endDate.';\n  const seen = new Set();\n  for (const [user, time, amount] of Purchases) {\n    if (user === null || time === null || amount === null) return 'Purchases rows need a user_id, a time_stamp and an amount.';\n    const key = `${user}|${time}`;\n    if (seen.has(key)) return `User ${user} has two purchases at ${time}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT COUNT(DISTINCT pu.user_id) AS user_cnt\nFROM Purchases AS pu\nCROSS JOIN Params AS p\nWHERE pu.time_stamp BETWEEN p.startDate AND p.endDate\n  AND pu.amount >= p.minAmount;",
+  "brute": "SELECT COUNT(*) AS user_cnt\nFROM (SELECT DISTINCT user_id FROM Purchases) AS u\nWHERE EXISTS (\n  SELECT 1\n  FROM Purchases AS x, Params AS p\n  WHERE x.user_id = u.user_id\n    AND x.time_stamp >= p.startDate\n    AND x.time_stamp <= p.endDate\n    AND x.amount >= p.minAmount\n)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const day = offset => new Date(Date.UTC(2022, 2, 1 + offset)).toISOString().slice(0, 10);\n  const two = n => String(n).padStart(2, '0');\n  const clock = () => (rand() < 0.3 ? '00:00:00' : `${two(Math.floor(rand() * 24))}:${two(Math.floor(rand() * 60))}:${two(Math.floor(rand() * 60))}`);\n  const small = size === 'small';\n  const start = Math.floor(rand() * (small ? 6 : 200));\n  const end = start + Math.floor(rand() * (small ? 4 : 120));\n  const minAmount = small ? pick([500, 1000, 1000]) : 100 + Math.floor(rand() * 900);\n  const Params = [[`${day(start)} 00:00:00`, `${day(end)} 00:00:00`, minAmount]];\n  const rows = small ? Math.floor(rand() * 9) : 2000, users = small ? 5 : 400;\n  const Purchases = [], seen = new Set();\n  for (let tries = 0; Purchases.length < rows && tries < rows * 5; tries++) {\n    // Days cluster around the window's edges so boundary instants come up often.\n    const offset = small ? pick([start - 1, start, start + 1, end - 1, end, end + 1]) : Math.floor(rand() * 365);\n    const time = `${day(Math.max(0, offset))} ${clock()}`;\n    const user = 1 + Math.floor(rand() * users);\n    if (seen.has(`${user}|${time}`)) continue;\n    seen.add(`${user}|${time}`);\n    const amount = small ? pick([minAmount - 1, minAmount, minAmount + 1, 300, 4500]) : 1 + Math.floor(rand() * 2000);\n    Purchases.push([user, time, amount]);\n  }\n  return [{ Purchases, Params }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Purchases":[[1,"2022-04-20 09:03:00",4416],[2,"2022-03-19 19:24:02",678],[3,"2022-03-18 12:03:09",4523],[3,"2022-03-30 09:43:42",626]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}],"expected":{"columns":["user_cnt"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Purchases":[],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 2","input":[{"Purchases":[[4,"2022-03-08 00:00:00",1000]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 3","input":[{"Purchases":[[1,"2022-03-20 00:00:00",2000],[2,"2022-03-20 00:00:01",2000],[3,"2022-03-20 18:30:00",5000]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 4","input":[{"Purchases":[[1,"2022-03-07 23:59:59",3000],[2,"2022-03-21 00:00:00",3000]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 5","input":[{"Purchases":[[7,"2022-03-10 10:00:00",1500],[7,"2022-03-11 10:00:00",2500],[7,"2022-03-12 10:00:00",3500],[8,"2022-03-12 11:00:00",1200]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 6","input":[{"Purchases":[[1,"2022-03-10 08:00:00",999],[2,"2022-03-15 08:00:00",1000]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 7","input":[{"Purchases":[[5,"2022-03-10 08:00:00",200],[5,"2022-04-02 08:00:00",9000],[6,"2022-03-01 12:00:00",8000],[6,"2022-03-12 12:00:00",400]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 8","input":[{"Purchases":[[1,"2022-01-05 09:00:00",50],[2,"2022-01-06 09:00:00",60],[3,"2022-01-07 09:00:00",70],[1,"2022-01-07 10:00:00",80]],"Params":[["2022-01-01 00:00:00","2022-01-31 00:00:00",10]]}]},
+    {"name":"Test 9","input":[{"Purchases":[[1,"2022-05-05 00:00:00",700],[2,"2022-05-05 00:00:30",700],[3,"2022-05-04 23:59:59",700]],"Params":[["2022-05-05 00:00:00","2022-05-05 00:00:00",700]]}]},
+    {"name":"Test 10","input":[{"Purchases":[[1,"2022-04-20 09:03:00",4416],[2,"2022-03-19 19:24:02",678],[3,"2022-03-18 12:03:09",4523],[3,"2022-03-30 09:43:42",626],[4,"2022-03-09 15:00:00",1300],[2,"2022-03-08 00:00:00",1000]],"Params":[["2022-03-08 00:00:00","2022-03-20 00:00:00",1000]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEligibility is decided purchase by purchase: one purchase must be both inside the time window and large enough. So filter the purchases with both conditions at once, then count how many **different** users are left. A user with several qualifying purchases is still one user.\n\n## Approach\n\n1. Read `Purchases` (alias `pu`) and attach the single `Params` row (alias `p`) with a `CROSS JOIN`, so every purchase can see the arguments.\n2. Keep purchases whose `time_stamp` is `BETWEEN p.startDate AND p.endDate`; `BETWEEN` includes both ends.\n3. Also require `pu.amount >= p.minAmount` on that same row.\n4. `COUNT(DISTINCT pu.user_id)` counts eligible users. With no rows left it returns 0, and an aggregate without `GROUP BY` always yields exactly one row.\n\n## Example 1, step by step\n\nThe window runs from `2022-03-08 00:00:00` to `2022-03-20 00:00:00` and the minimum is 1000.\n\n- User 1, `2022-04-20 09:03:00`, 4416: outside the window, dropped.\n- User 2, `2022-03-19 19:24:02`, 678: inside the window but below 1000, dropped.\n- User 3, `2022-03-18 12:03:09`, 4523: inside and large enough, kept.\n- User 3, `2022-03-30 09:43:42`, 626: outside, dropped.\n\nOne purchase remains, from one user, so `user_cnt = 1`.\n\n## Complexity\n\n- Time: O(P) for a single scan of P purchases plus the distinct count.\n- Space: O(U) for the distinct users among the kept purchases.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(user_id)` counts purchases, so a user with two qualifying purchases is counted twice.\n- `DATE(time_stamp) BETWEEN ...` lets in every purchase made later on the end day; the end is midnight, not the whole day.\n- Checking the two conditions on different purchases (for example, any purchase in the window and `MAX(amount)` over all of them) wrongly admits a user whose big purchase happened outside the window.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pu` | `Purchases`, one row per purchase |\n| `p` | `Params`, the single row of arguments |\n| `CROSS JOIN` | pairs every purchase with the arguments |\n| `user_cnt` | number of different users with a qualifying purchase |",
+  "narration": {
+    "1": "Count each eligible user once, however many qualifying purchases they made.",
+    "2": "Start from the purchases, because eligibility is decided by a single purchase.",
+    "3": "Params has one row, so the cross join just attaches the arguments to every purchase.",
+    "4": "BETWEEN includes both ends, so purchases at exactly midnight of startDate or endDate count.",
+    "5": "The same purchase must also be at least minAmount."
+  }
+}

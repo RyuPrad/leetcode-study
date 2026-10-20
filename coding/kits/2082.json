@@ -1,0 +1,47 @@
+{
+  "number": 2082,
+  "title": "The Number of Rich Customers",
+  "spec": "recalled",
+  "statement": "One table lists a store's bills:\n\n- `Store(bill_id, customer_id, amount)`: one row per bill; `bill_id` is unique. A customer may have any number of bills.\n\nCall a customer **rich** when at least one of their bills has an `amount` strictly greater than 500. Report how many distinct customers are rich, as a single row with one column named `rich_count`. A customer with several bills above 500 is still counted once, and a bill of exactly 500 does not make anyone rich. When nobody is rich (or `Store` is empty) the answer is one row with `0`.",
+  "constraints": [
+    "bill_id is unique in Store",
+    "amount >= 0; no column is null",
+    "A customer_id may appear on many bills"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Store": [["bill_id","INT"],["customer_id","INT"],["amount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Store = [] }] = input;\n  const bills = new Set();\n  for (const [bill, customer, amount] of Store) {\n    if (bill === null || customer === null || amount === null) return 'Store rows may not contain null.';\n    if (bills.has(bill)) return `bill_id ${bill} appears twice in Store.`;\n    if (amount < 0) return `Bill ${bill} has a negative amount.`;\n    bills.add(bill);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT COUNT(DISTINCT customer_id) AS rich_count\nFROM Store\nWHERE amount > 500;",
+  "brute": "SELECT COUNT(*) AS rich_count\nFROM (\n  SELECT customer_id\n  FROM Store\n  GROUP BY customer_id\n  HAVING MAX(amount) > 500\n) AS rich",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const amounts = [100, 257, 394, 499, 500, 501, 549, 834];\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const customers = small ? 4 : 600;\n  const Store = [];\n  for (let i = 0; i < rows; i++) {\n    const amount = small ? amounts[Math.floor(rand() * amounts.length)] : Math.floor(rand() * 1001);\n    // Bill ids are unique but not in insertion order.\n    Store.push([small ? 3 * i + 1 + Math.floor(rand() * 3) : i + 1, 1 + Math.floor(rand() * customers), amount]);\n  }\n  return [{ Store }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Store":[[6,1,549],[8,1,834],[4,2,394],[11,3,657],[13,3,257]]}],"expected":{"columns":["rich_count"],"rows":[[2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Store":[]}]},
+    {"name":"Test 2","input":[{"Store":[[1,7,501]]}]},
+    {"name":"Test 3","input":[{"Store":[[1,7,500],[2,8,499],[3,9,0]]}]},
+    {"name":"Test 4","input":[{"Store":[[1,1,900],[2,1,800],[3,1,700],[4,2,100]]}]},
+    {"name":"Test 5","input":[{"Store":[[10,1,501],[11,2,600],[12,3,1000],[13,4,750]]}]},
+    {"name":"Test 6","input":[{"Store":[[1,5,500],[2,5,501],[3,6,500],[4,6,500]]}]},
+    {"name":"Test 7","input":[{"Store":[[1,1,100],[2,1,200],[3,1,300],[4,1,400]]}]},
+    {"name":"Test 8","input":[{"Store":[[5,2,549],[3,2,120],[9,4,120],[7,4,834],[1,6,833],[2,6,834],[4,8,499]]}]},
+    {"name":"Test 9","input":[{"Store":[[1,3,0],[2,3,1200],[3,4,1200],[4,5,500]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about customers, but the condition is about bills: a customer qualifies as soon as **one** of their bills is above 500. So keep only the bills above 500; every customer still present after that filter is rich. Counting them is an aggregate over the surviving bills, and `DISTINCT` makes a customer with several big bills count once.\n\n## Approach\n\n1. Read every bill from `Store`.\n2. `WHERE amount > 500` keeps only the bills that make their customer rich; the comparison is strict, so 500 itself is dropped.\n3. `COUNT(DISTINCT customer_id)` counts the different customers among those bills and names the result `rich_count`. With no rows left it still returns one row holding 0.\n\n## Example 1, step by step\n\n- Bills above 500: bill 6 (customer 1, 549), bill 8 (customer 1, 834) and bill 11 (customer 3, 657). Bills 4 (394) and 13 (257) are dropped.\n- The surviving `customer_id` values are 1, 1, 3; the distinct ones are 1 and 3.\n- `rich_count` is 2.\n\n## Complexity\n\n- Time: one scan of the B bills, plus hashing the surviving customer ids for `DISTINCT`: O(B).\n- Space: O(C) for the C distinct rich customers.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(customer_id)` counts bills, not customers: customer 1 in Example 1 would be counted twice, giving 3.\n- `amount >= 500` treats a bill of exactly 500 as rich; the rule is strictly greater.\n- `GROUP BY customer_id` with `COUNT(*)` returns one row per customer instead of a single total.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `WHERE amount > 500` | the bills that make their customer rich |\n| `COUNT(DISTINCT customer_id)` | the number of different customers among those bills |\n| `rich_count` | the single output column |",
+  "narration": {
+    "1": "Count each customer that survives the filter once, however many big bills they have, and name the column rich_count.",
+    "2": "Every bill in Store is a candidate.",
+    "3": "Only bills strictly above 500 make a customer rich, so all other bills are dropped before counting."
+  }
+}

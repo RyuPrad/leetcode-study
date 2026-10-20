@@ -1,0 +1,53 @@
+{
+  "number": 2112,
+  "title": "The Airport With the Most Traffic",
+  "spec": "recalled",
+  "statement": "One table counts the flights between pairs of airports:\n\n- `Flights(departure_airport, arrival_airport, flights_count)`: `(departure_airport, arrival_airport)` is the primary key. A row says that `flights_count` flights flew from `departure_airport` to `arrival_airport`. The two airports of a row always differ, and the route in the opposite direction, if any, is a separate row.\n\nThe **traffic** of an airport is the total number of flights that departed from it plus the total that arrived at it, summed over every row that names it. Report the airport with the largest traffic in one column named `airport_id`. When several airports share the largest traffic, report each of them. An empty table gives no rows. Rows may come in any order.",
+  "constraints": [
+    "(departure_airport, arrival_airport) is unique in Flights",
+    "departure_airport <> arrival_airport",
+    "flights_count >= 1; no column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Flights": [["departure_airport","INT"],["arrival_airport","INT"],["flights_count","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Flights = [] }] = input;\n  const routes = new Set();\n  for (const [from, to, count] of Flights) {\n    if (from === null || to === null || count === null) return 'Flights rows may not contain null.';\n    if (from === to) return `Airport ${from} cannot have a route to itself.`;\n    const key = `${from}>${to}`;\n    if (routes.has(key)) return `The route ${from} -> ${to} appears twice.`;\n    if (count < 1) return 'flights_count must be at least 1.';\n    routes.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH traffic AS (\n  SELECT departure_airport AS airport_id, flights_count\n  FROM Flights\n  UNION ALL\n  SELECT arrival_airport AS airport_id, flights_count\n  FROM Flights\n),\ntotals AS (\n  SELECT airport_id, SUM(flights_count) AS total_flights\n  FROM traffic\n  GROUP BY airport_id\n)\nSELECT airport_id\nFROM totals\nWHERE total_flights = (SELECT MAX(total_flights) FROM totals);",
+  "brute": "SELECT airport_id\nFROM (\n  SELECT ids.airport_id,\n         RANK() OVER (\n           ORDER BY (\n             SELECT SUM(f.flights_count)\n             FROM Flights AS f\n             WHERE f.departure_airport = ids.airport_id OR f.arrival_airport = ids.airport_id\n           ) DESC\n         ) AS traffic_rank\n  FROM (\n    SELECT departure_airport AS airport_id FROM Flights\n    UNION\n    SELECT arrival_airport FROM Flights\n  ) AS ids\n) AS ranked\nWHERE traffic_rank = 1",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const airports = small ? 5 : 200;\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const seen = new Set(), Flights = [];\n  for (let tries = 0; Flights.length < rows && tries < rows * 20; tries++) {\n    const from = 1 + Math.floor(rand() * airports), to = 1 + Math.floor(rand() * airports);\n    if (from === to || seen.has(`${from}>${to}`)) continue;\n    seen.add(`${from}>${to}`);\n    // Small counts make equal totals, and so ties, common.\n    Flights.push([from, to, 1 + Math.floor(rand() * (small ? 6 : 100))]);\n  }\n  return [{ Flights }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Flights":[[1,2,4],[2,1,5],[2,4,5]]}],"expected":{"columns":["airport_id"],"rows":[[2]]}},
+    {"name":"Example 2","input":[{"Flights":[[1,2,4],[2,1,5],[3,4,5],[4,3,4],[5,6,7]]}],"expected":{"columns":["airport_id"],"rows":[[1],[2],[3],[4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Flights":[]}]},
+    {"name":"Test 2","input":[{"Flights":[[1,2,5]]}]},
+    {"name":"Test 3","input":[{"Flights":[[1,9,3],[2,9,3],[3,9,3],[1,2,4]]}]},
+    {"name":"Test 4","input":[{"Flights":[[7,1,4],[7,2,4],[3,4,5]]}]},
+    {"name":"Test 5","input":[{"Flights":[[1,2,10],[3,4,1],[3,5,1],[3,6,1],[6,3,1]]}]},
+    {"name":"Test 6","input":[{"Flights":[[1,2,3],[2,1,3],[3,1,1]]}]},
+    {"name":"Test 7","input":[{"Flights":[[5,1,6],[2,5,6],[3,4,8]]}]},
+    {"name":"Test 8","input":[{"Flights":[[1,2,2],[2,3,2],[3,1,2]]}]},
+    {"name":"Test 9","input":[{"Flights":[[10,20,1],[20,30,100],[30,10,1],[40,30,50],[30,40,49]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row adds traffic to **two** airports: its departure airport and its arrival airport. Once the table is unfolded into one row per (airport, flights) contribution, traffic is a plain `SUM` per airport, and the busiest airports are those whose sum equals the maximum sum. Comparing with the maximum, instead of sorting and taking one row, keeps every tied airport.\n\n## Approach\n\n1. `traffic`: `UNION ALL` of two projections of `Flights`, one naming the departure airport and one naming the arrival airport, each with the row's `flights_count`. `UNION ALL` keeps equal contributions that `UNION` would merge.\n2. `totals`: group `traffic` by `airport_id` and sum `flights_count` into `total_flights`.\n3. Keep the airports whose `total_flights` equals `(SELECT MAX(total_flights) FROM totals)`.\n\n## Example 1, step by step\n\n- `traffic`: departures give (1, 4), (2, 5), (2, 5); arrivals give (2, 4), (1, 5), (4, 5).\n- `totals`: airport 1 → 4 + 5 = 9, airport 2 → 5 + 5 + 4 = 14, airport 4 → 5.\n- The maximum is 14, reached only by airport 2, so the result is `2`.\n\nIn Example 2 airports 1, 2, 3 and 4 all reach 9 while 5 and 6 reach 7, so four rows are reported.\n\n## Complexity\n\n- Time: O(F) for F routes: `traffic` has 2F rows and grouping hashes them once.\n- Space: O(A) for the A airports in `totals`.\n\n## Pitfalls\n\n- `UNION` instead of `UNION ALL` drops repeated (airport, count) pairs: in Example 1 airport 2 departs on two routes of 5 flights, and `UNION` would keep only one of them.\n- Summing only departures (or only arrivals) misses airports that mostly receive flights.\n- `COUNT(*)` counts routes, not flights; one route with 10 flights outweighs three routes with 1.\n- `ORDER BY ... LIMIT 1` reports a single airport even when several tie.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `traffic` | one row per (airport, flights) contribution, two per route |\n| `totals` | one row per airport with its `total_flights` |\n| `total_flights` | departures plus arrivals for that airport |\n| `(SELECT MAX(total_flights) FROM totals)` | the largest traffic of any airport |",
+  "narration": {
+    "1": "The first stage turns each route into contributions to the airports it touches.",
+    "2": "Every route counts its flights toward its departure airport.",
+    "4": "UNION ALL keeps every contribution, even when two of them look identical.",
+    "5": "The same route counts its flights toward its arrival airport as well.",
+    "8": "The second stage collapses the contributions into one total per airport.",
+    "9": "SUM(flights_count) adds up all contributions of one airport into total_flights.",
+    "11": "Grouping by airport_id puts departures and arrivals of the same airport together.",
+    "15": "Keep every airport whose total equals the largest one, so tied airports are all reported."
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "number": 1230,
+  "title": "Toss Strange Coins",
+  "spec": "recalled",
+  "statement": "You hold a set of biased coins: coin `i` comes up heads with probability `prob[i]`, independently of the others. Every coin is tossed exactly once. Return the probability that the number of coins showing heads is exactly `target`.\n\nAn answer within `10^-5` of the true probability is accepted.",
+  "constraints": [
+    "1 <= prob.length <= 1000",
+    "0 <= prob[i] <= 1",
+    "0 <= target <= prob.length",
+    "Answers within 10^-5 of the correct value are accepted"
+  ],
+  "signature": "double probabilityOfHeads(double[] prob, int target)",
+  "entry": "probabilityOfHeads",
+  "kind": "function",
+  "parameters": [
+    "prob",
+    "target"
+  ],
+  "compare": "float",
+  "validator": "function validate([prob, target]) {\n  if (prob.length < 1 || prob.length > 1000) return 'prob needs 1 to 1000 coins.';\n  if (prob.some(p => typeof p !== 'number' || !(p >= 0 && p <= 1))) return 'Each probability is between 0 and 1.';\n  if (!Number.isInteger(target) || target < 0 || target > prob.length) return 'target is a whole number from 0 to prob.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function probabilityOfHeads(prob, target) {\n  const dp = new Array(target + 1).fill(0);\n  dp[0] = 1;\n\n  for (const p of prob) {\n    for (let heads = target; heads >= 1; heads--) {\n      dp[heads] = dp[heads] * (1 - p) + dp[heads - 1] * p;\n    }\n    dp[0] = dp[0] * (1 - p);\n  }\n\n  return dp[target];\n}",
+  "brute": "function probabilityOfHeads(prob, target) {\n  // Build the full distribution of head counts, one coin at a time, pushing each count forward.\n  let dist = [1];\n  for (let i = 0; i < prob.length; i++) {\n    const grown = new Array(dist.length + 1).fill(0);\n    for (let count = 0; count < dist.length; count++) {\n      grown[count] += dist[count] * (1 - prob[i]);\n      grown[count + 1] += dist[count] * prob[i];\n    }\n    dist = grown;\n  }\n  return dist[target] ?? 0;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const coin = () => {\n    const r = rand();\n    if (r < 0.1) return 0;\n    if (r < 0.2) return 1;\n    if (r < 0.3) return 0.5;\n    return Math.round(rand() * 100) / 100;\n  };\n  if (size === 'small') {\n    const n = int(1, 8);\n    const prob = Array.from({ length: n }, coin);\n    return [prob, int(0, n)];\n  }\n  const n = int(800, 1000);\n  const bias = rand();\n  const prob = Array.from({ length: n }, () => Math.round(Math.min(1, Math.max(0, bias + (rand() - 0.5) * 0.6)) * 1000) / 1000);\n  const mean = prob.reduce((sum, p) => sum + p, 0);\n  const target = Math.min(n, Math.max(0, Math.round(mean) + int(-10, 10)));\n  return [prob, target];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[0.4],1],"expected":0.4},
+    {"name":"Example 2","input":[[0.5,0.5,0.5,0.5,0.5],0],"expected":0.03125}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[0],0]},
+    {"name":"Test 3","input":[[0],1]},
+    {"name":"Test 4","input":[[1,1,1],2]},
+    {"name":"Test 5","input":[[0.5,0.5],1]},
+    {"name":"Test 6","input":[[0.1,0.2,0.3,0.4],2]},
+    {"name":"Test 7","input":[[0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1],9]},
+    {"name":"Test 8","input":[[0.25,0.75,1,0],2]},
+    {"name":"Test 9","input":[[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3],3]},
+    {"name":"Test 10","input":[[0.6,0.35,0.9,0.05,0.5,0.72],4]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nListing all `2^n` head/tail outcomes and adding up their probabilities is correct but hopeless for 1000 coins. Instead, ask how the distribution of head counts changes when one more coin is tossed: a count of `heads` after the new coin came either from `heads` before it plus a tail, or from `heads - 1` before it plus a head. That is a 0/1 knapsack where each coin is an item that adds 0 or 1 to the count, weighted by its probability.\n\n## Approach\n\n1. Let `dp[heads]` be the probability of exactly `heads` heads among the coins seen so far, for `heads` from `0` to `target` (larger counts can never come back down, so they are not needed). Start with `dp[0] = 1`.\n2. For each coin `p`, update `heads` from `target` down to `1`: `dp[heads] = dp[heads] * (1 - p) + dp[heads - 1] * p`. Going downward means `dp[heads - 1]` still holds the value from before this coin.\n3. Update `dp[0]` last: zero heads stays zero only on a tail.\n4. Return `dp[target]`.\n\n## Example 1, step by step\n\n`prob = [0.4]`, `target = 1`, so `dp = [1, 0]`. For the coin `p = 0.4`: `dp[1] = 0 * 0.6 + 1 * 0.4 = 0.4`, then `dp[0] = 1 * 0.6 = 0.6`. The answer is `dp[1] = 0.4`.\n\n## Complexity\n\n- Time: O(n · target): each coin updates at most `target + 1` entries.\n- Space: O(target) for the single row.\n\n## Pitfalls\n\n- Looping `heads` upward reuses a value already updated for this coin, as if the coin could land heads twice.\n- `dp[0]` has no `heads - 1` term; handle it separately instead of reading `dp[-1]`.\n- Coins with `p = 0` or `p = 1` are legal; the formula handles them without special cases.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[heads]` | probability of exactly `heads` heads among the coins processed so far |\n| `p` | heads probability of the current coin |\n| `heads` | the head count being updated |",
+  "narration": {
+    "2": "dp[heads] will hold the probability of exactly heads heads; only counts up to target matter.",
+    "3": "Before any coin is tossed, zero heads is certain.",
+    "5": "Add the coins one at a time, like items in a 0/1 knapsack.",
+    "6": "Go from target down to 1 so dp[heads - 1] still describes the coins before this one.",
+    "7": "Either the count was already heads and this coin shows tails, or it was heads - 1 and this coin shows heads.",
+    "9": "Zero heads survives only if this coin shows tails.",
+    "12": "After every coin, dp[target] is the probability of exactly target heads."
+  }
+}

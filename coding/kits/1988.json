@@ -1,0 +1,53 @@
+{
+  "number": 1988,
+  "title": "Find Cutoff Score for Each School",
+  "spec": "recalled",
+  "statement": "Schools choose a minimum exam score for admission:\n\n- `Schools(school_id, capacity)`: one row per school; `school_id` is unique and `capacity` is how many students the school can take.\n- `Exam(score, student_count)`: `score` is unique, and `student_count` is the number of students who scored **at least** `score`. A higher score never has a larger `student_count`.\n\nA school picks its minimum score from the `score` values in `Exam`. With minimum score `x`, every student who scored at least `x` applies, so the school receives the `student_count` of `x` applications. Each school picks the score that:\n\n1. keeps the number of applications at most its `capacity`;\n2. among those, receives the most applications;\n3. among those still tied, is the smallest score.\n\nReturn the columns `school_id` and `score` for every school, where `score` is `-1` when no score in `Exam` keeps the applications within capacity. Rows may come in any order.",
+  "constraints": [
+    "school_id is unique in Schools",
+    "score is unique in Exam",
+    "if one score is higher than another, its student_count is not larger",
+    "capacity and student_count are non-negative"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Schools": [["school_id","INT"],["capacity","INT"]],
+    "Exam": [["score","INT"],["student_count","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Schools = [], Exam = [] }] = input;\n  const schools = new Set(), scores = new Set();\n  for (const [id, capacity] of Schools) {\n    if (id === null || capacity === null) return 'Every school needs a school_id and a capacity.';\n    if (schools.has(id)) return `school_id ${id} appears twice.`;\n    if (capacity < 0) return `School ${id} has a negative capacity.`;\n    schools.add(id);\n  }\n  for (const [score, count] of Exam) {\n    if (score === null || count === null) return 'Every exam row needs a score and a student_count.';\n    if (scores.has(score)) return `score ${score} appears twice.`;\n    if (count < 0) return `score ${score} has a negative student_count.`;\n    scores.add(score);\n  }\n  const sorted = [...Exam].sort((a, b) => b[0] - a[0]);\n  for (let i = 1; i < sorted.length; i++) {\n    if (sorted[i][1] < sorted[i - 1][1]) return `score ${sorted[i][0]} has fewer students than the higher score ${sorted[i - 1][0]}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.school_id, IFNULL(MIN(e.score), -1) AS score\nFROM Schools AS s\nLEFT JOIN Exam AS e\n  ON e.student_count <= s.capacity\nGROUP BY s.school_id;",
+  "brute": "SELECT s.school_id,\n       COALESCE((\n         SELECT e.score\n         FROM Exam AS e\n         WHERE e.student_count <= s.capacity\n         ORDER BY e.student_count DESC, e.score ASC\n         LIMIT 1\n       ), -1) AS score\nFROM Schools AS s",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const examRows = small ? Math.floor(rand() * 7) : 600;\n  const schoolRows = small ? Math.floor(rand() * 7) : 800;\n  // Distinct scores, highest first; counts never shrink as the score drops, and often repeat.\n  const pool = [];\n  for (let s = small ? 500 : 0; s <= 1000; s += small ? 25 : 1) pool.push(s);\n  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const chosen = pool.slice(0, examRows).sort((a, b) => b - a);\n  const steps = small ? [0, 0, 5, 12, 30] : [0, 0, 1, 3, 8, 20];\n  const Exam = [], counts = [];\n  let count = 1 + Math.floor(rand() * (small ? 15 : 5));\n  for (const score of chosen) {\n    Exam.push([score, count]);\n    counts.push(count);\n    count += steps[Math.floor(rand() * steps.length)];\n  }\n  // Capacities land on, just below and just above existing counts, and outside their range.\n  const top = counts.length ? counts[counts.length - 1] : 20;\n  const Schools = [];\n  const ids = [];\n  for (let id = 1; id <= (small ? 12 : 1200); id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  for (const id of ids.slice(0, schoolRows)) {\n    const r = rand();\n    let capacity;\n    if (counts.length && r < 0.6) capacity = counts[Math.floor(rand() * counts.length)] + [-1, 0, 0, 1][Math.floor(rand() * 4)];\n    else capacity = Math.floor(rand() * (top + 10));\n    Schools.push([id, Math.max(0, capacity)]);\n  }\n  return [{ Schools, Exam }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Schools":[[11,151],[5,48],[9,9],[10,99]],"Exam":[[975,10],[966,60],[844,76],[749,76],[744,100]]}],"expected":{"columns":["school_id","score"],"rows":[[5,975],[9,-1],[10,749],[11,744]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Schools":[[1,10],[2,0]],"Exam":[]}]},
+    {"name":"Test 2","input":[{"Schools":[],"Exam":[[900,5],[800,20]]}]},
+    {"name":"Test 3","input":[{"Schools":[[1,20]],"Exam":[[900,5],[800,20],[700,40]]}]},
+    {"name":"Test 4","input":[{"Schools":[[1,4],[2,19]],"Exam":[[900,5],[800,20],[700,40]]}]},
+    {"name":"Test 5","input":[{"Schools":[[3,50]],"Exam":[[950,10],[900,30],[850,30],[820,30],[800,70]]}]},
+    {"name":"Test 6","input":[{"Schools":[[4,1000]],"Exam":[[600,300],[990,2],[750,80]]}]},
+    {"name":"Test 7","input":[{"Schools":[[7,25],[8,25],[9,25]],"Exam":[[880,12],[860,25],[840,26]]}]},
+    {"name":"Test 8","input":[{"Schools":[[1,15],[2,16],[3,14],[4,9]],"Exam":[[700,10],[650,15],[600,15],[550,16]]}]},
+    {"name":"Test 9","input":[{"Schools":[[21,5],[22,6],[23,100]],"Exam":[[999,6],[998,6],[997,6],[996,6]]}]},
+    {"name":"Test 10","input":[{"Schools":[[11,151],[5,48],[9,10],[10,99],[12,76]],"Exam":[[744,100],[749,76],[966,60],[975,10],[844,76]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nLowering the minimum score can only let more students in, because a lower score never has a smaller `student_count`. So among the scores whose `student_count` fits within a school's capacity, the **smallest** one has the largest count, and when several scores tie on that count it is also the smallest of them. All three rules collapse into one: take the minimum score whose count fits. A left join keeps schools for which nothing fits, and `IFNULL` turns their missing minimum into `-1`.\n\n## Approach\n\n1. Start from `Schools` (alias `s`) so every school produces a row.\n2. `LEFT JOIN Exam` (alias `e`) on `e.student_count <= s.capacity`: each school meets every score it could use; a school with none gets one row of nulls.\n3. `GROUP BY s.school_id` and take `MIN(e.score)`; `IFNULL(..., -1)` handles the all-null group.\n\n## Example 1, step by step\n\n| school_id | capacity | scores that fit (count) | MIN(score) | score |\n| --- | --- | --- | --- | --- |\n| 11 | 151 | 975 (10), 966 (60), 844 (76), 749 (76), 744 (100) | 744 | 744 |\n| 5 | 48 | 975 (10) | 975 | 975 |\n| 9 | 9 | none | null | -1 |\n| 10 | 99 | 975 (10), 966 (60), 844 (76), 749 (76) | 749 | 749 |\n\nSchool 10's best count, 76, is shared by 844 and 749; the smaller score, 749, wins.\n\n## Complexity\n\n- Time: the inequality join compares every school with every score, O(S · E), then groups the matches.\n- Space: O(S · E) for the joined rows in the worst case, O(S) for the result.\n\n## Pitfalls\n\n- An inner join drops schools that no score fits, which must appear with `-1`.\n- `<` instead of `<=` rejects a score whose count exactly equals the capacity.\n- `MAX(e.score)` picks the strictest cutoff, which receives the fewest applications.\n- Picking by `MAX(student_count)` alone and returning any score with it breaks ties wrongly; the smallest tied score is required.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Schools`, one output row each |\n| `e` | an `Exam` score whose `student_count` fits within `s.capacity` |\n| `MIN(e.score)` | the lowest fitting score: most applications, smallest on ties |\n| `IFNULL(..., -1)` | `-1` for a school with no fitting score |",
+  "narration": {
+    "1": "Report each school with its lowest fitting score, or -1 when there is none.",
+    "2": "Schools is the left table, so every school appears in the result.",
+    "3": "A left join keeps schools that no score fits, with nulls in place of the exam columns.",
+    "4": "A score fits when the students who reach it do not exceed the capacity.",
+    "5": "One group per school, so MIN picks among that school's fitting scores."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 1972,
+  "title": "First and Last Call On the Same Day",
+  "spec": "recalled",
+  "statement": "A phone company logs calls between its users:\n\n- `Calls(caller_id, recipient_id, call_time)`: one row per call from `caller_id` to `recipient_id` at datetime `call_time`. `caller_id` and `recipient_id` always differ, and `(caller_id, recipient_id, call_time)` is unique. You may assume no user takes part in two calls at the same moment.\n\nA call involves both of its users: it counts for the caller and for the recipient alike. For one user on one calendar day, look at all the calls that involve them that day, ordered by `call_time`. The user **qualifies** when, on at least one day, their first and their last call of that day are with the same other person. A day with a single call qualifies, since that call is both the first and the last. Return one column, `user_id`, listing each qualifying user once. Rows may come in any order.",
+  "constraints": [
+    "caller_id <> recipient_id in every row",
+    "(caller_id, recipient_id, call_time) is unique in Calls",
+    "no user takes part in two calls with the same call_time",
+    "call_time values are datetimes; days are calendar dates"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Calls": [["caller_id","INT"],["recipient_id","INT"],["call_time","DATETIME"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Calls = [] }] = input;\n  const stamp = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;\n  const busy = new Set();\n  for (const [caller, recipient, time] of Calls) {\n    if (caller === null || recipient === null) return 'Every call needs a caller_id and a recipient_id.';\n    if (caller === recipient) return `User ${caller} calls themself.`;\n    if (!stamp.test(String(time))) return `A call of user ${caller} has a malformed call_time.`;\n    for (const user of [caller, recipient]) {\n      if (busy.has(`${user}|${time}`)) return `User ${user} is in two calls at ${time}.`;\n      busy.add(`${user}|${time}`);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH both_sides AS (\n  SELECT caller_id AS user_id, recipient_id AS other_id, call_time\n  FROM Calls\n  UNION ALL\n  SELECT recipient_id AS user_id, caller_id AS other_id, call_time\n  FROM Calls\n),\nday_ends AS (\n  SELECT user_id,\n         DATE(call_time) AS call_day,\n         FIRST_VALUE(other_id) OVER (PARTITION BY user_id, DATE(call_time) ORDER BY call_time) AS first_other,\n         FIRST_VALUE(other_id) OVER (PARTITION BY user_id, DATE(call_time) ORDER BY call_time DESC) AS last_other\n  FROM both_sides\n)\nSELECT DISTINCT user_id\nFROM day_ends\nWHERE first_other = last_other;",
+  "brute": "WITH sides AS (\n  SELECT caller_id AS user_id, recipient_id AS other_id, call_time FROM Calls\n  UNION ALL\n  SELECT recipient_id, caller_id, call_time FROM Calls\n),\ndays AS (\n  SELECT user_id, MIN(call_time) AS first_time, MAX(call_time) AS last_time\n  FROM sides\n  GROUP BY user_id, DATE(call_time)\n)\nSELECT DISTINCT d.user_id\nFROM days AS d\nWHERE (SELECT f.other_id FROM sides AS f WHERE f.user_id = d.user_id AND f.call_time = d.first_time)\n    = (SELECT l.other_id FROM sides AS l WHERE l.user_id = d.user_id AND l.call_time = d.last_time)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pad = n => String(n).padStart(2, '0');\n  const users = small ? 5 : 150, calls = small ? Math.floor(rand() * 9) : 2000, days = small ? 2 : 20;\n  // Small cases use a coarse grid with the edges of the day, so calls straddle midnight.\n  const clocks = ['00:00:00', '06:30:00', '12:00:00', '18:15:00', '23:59:59'];\n  const busy = new Set(), Calls = [];\n  for (let attempt = 0; Calls.length < calls && attempt < calls * 20; attempt++) {\n    const caller = 1 + Math.floor(rand() * users);\n    let recipient = 1 + Math.floor(rand() * (users - 1));\n    if (recipient >= caller) recipient++;\n    const day = `2021-08-${pad(10 + Math.floor(rand() * days))}`;\n    const clock = small ? clocks[Math.floor(rand() * clocks.length)]\n      : `${pad(Math.floor(rand() * 24))}:${pad(Math.floor(rand() * 60))}:${pad(Math.floor(rand() * 60))}`;\n    const time = `${day} ${clock}`;\n    if (busy.has(`${caller}|${time}`) || busy.has(`${recipient}|${time}`)) continue;\n    busy.add(`${caller}|${time}`);\n    busy.add(`${recipient}|${time}`);\n    Calls.push([caller, recipient, time]);\n  }\n  return [{ Calls }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Calls":[[8,4,"2021-08-24 17:46:07"],[4,8,"2021-08-24 19:57:13"],[5,1,"2021-08-11 05:28:44"],[8,3,"2021-08-17 04:04:15"],[11,3,"2021-08-17 13:07:00"],[8,11,"2021-08-17 22:22:22"]]}],"expected":{"columns":["user_id"],"rows":[[1],[4],[5],[8]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Calls":[]}]},
+    {"name":"Test 2","input":[{"Calls":[[1,2,"2021-08-01 10:00:00"]]}]},
+    {"name":"Test 3","input":[{"Calls":[[1,2,"2021-08-01 09:00:00"],[1,3,"2021-08-01 17:00:00"]]}]},
+    {"name":"Test 4","input":[{"Calls":[[1,2,"2021-08-01 10:00:00"],[1,3,"2021-08-01 20:00:00"],[3,1,"2021-08-02 10:00:00"],[2,1,"2021-08-02 20:00:00"]]}]},
+    {"name":"Test 5","input":[{"Calls":[[4,5,"2021-08-03 09:00:00"],[6,4,"2021-08-03 18:00:00"]]}]},
+    {"name":"Test 6","input":[{"Calls":[[8,7,"2021-08-04 08:00:00"],[7,9,"2021-08-04 12:00:00"],[8,7,"2021-08-04 21:00:00"],[9,10,"2021-08-04 22:00:00"]]}]},
+    {"name":"Test 7","input":[{"Calls":[[10,11,"2021-08-01 23:59:59"],[12,10,"2021-08-02 00:00:00"],[13,14,"2021-08-03 08:00:00"],[13,15,"2021-08-03 23:59:59"]]}]},
+    {"name":"Test 8","input":[{"Calls":[[1,2,"2021-08-05 08:00:00"],[2,1,"2021-08-05 09:00:00"],[1,2,"2021-08-05 10:00:00"],[3,4,"2021-08-05 08:00:00"],[4,1,"2021-08-05 11:00:00"],[3,2,"2021-08-05 12:00:00"]]}]},
+    {"name":"Test 9","input":[{"Calls":[[5,6,"2021-08-09 18:00:00"],[5,7,"2021-08-09 07:00:00"],[6,5,"2021-08-10 07:00:00"],[7,6,"2021-08-10 12:00:00"],[5,6,"2021-08-10 20:00:00"],[7,5,"2021-08-09 12:00:00"]]}]},
+    {"name":"Test 10","input":[{"Calls":[[1,2,"2021-08-01 08:00:00"],[3,1,"2021-08-01 12:00:00"],[1,3,"2021-08-02 08:00:00"],[3,1,"2021-08-02 23:00:00"],[2,3,"2021-08-01 07:00:00"],[3,2,"2021-08-02 07:00:00"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach call matters to two people, so the first step is to see every call from both sides: one row for the caller with the recipient as the other person, and one for the recipient with the caller as the other person. Then, for each user and calendar day, a window ordered by time can read off the other person of the day's first call and of its last call. The user qualifies when those two people agree on some day.\n\n## Approach\n\n1. `both_sides`: `UNION ALL` of the calls as seen by the caller and as seen by the recipient, as `(user_id, other_id, call_time)`.\n2. `day_ends`: partition by `user_id` and `DATE(call_time)`; `FIRST_VALUE(other_id)` ordered by `call_time` gives the first call's partner (`first_other`), and the same ordered by `call_time DESC` gives the last call's partner (`last_other`).\n3. Keep rows with `first_other = last_other` and `SELECT DISTINCT user_id`, since a user can qualify on several days and every row of a day carries the same pair.\n\n## Example 1, step by step\n\n`both_sides` has 12 rows; `day_ends` repeats the same pair on every row of a user's day, so here is one line per user and day:\n\n| user_id | call_day | first_other | last_other | qualifies |\n| --- | --- | --- | --- | --- |\n| 8 | 2021-08-17 | 3 | 11 | no |\n| 3 | 2021-08-17 | 8 | 11 | no |\n| 11 | 2021-08-17 | 3 | 8 | no |\n| 8 | 2021-08-24 | 4 | 4 | yes |\n| 4 | 2021-08-24 | 8 | 8 | yes |\n| 5 | 2021-08-11 | 1 | 1 | yes |\n| 1 | 2021-08-11 | 5 | 5 | yes |\n\nUser 8 fails on 08-17 but qualifies on 08-24, so the answer is 1, 4, 5 and 8.\n\n## Complexity\n\n- Time: O(C log C) for C calls, to sort the 2C side rows within each user and day.\n- Space: O(C) for `both_sides` and `day_ends`.\n\n## Pitfalls\n\n- Looking only at `caller_id` misses received calls: a user who calls 5 and is later called by 6 must not qualify.\n- Partitioning by user alone mixes days; the first and last calls are taken per calendar day.\n- A rolling 24-hour window is not a day: calls at 23:59:59 and 00:00:00 fall on different dates.\n- Requiring every call of the day to be with one person is too strict; only the first and the last matter.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `both_sides` | each call twice, once from each participant's side |\n| `other_id` | the person on the other end of that call |\n| `day_ends` | each side row with the partners of its user's first and last call that day |\n| `first_other`, `last_other` | the partners of the day's first and last call |",
+  "narration": {
+    "1": "The first stage lists every call from both participants' points of view.",
+    "2": "The caller's view: the other person is the recipient.",
+    "4": "UNION ALL adds the recipient's view of the same calls.",
+    "8": "The second stage finds, for each user and day, the partners of the first and last call.",
+    "10": "Calendar days come from DATE(call_time), so midnight separates days.",
+    "11": "FIRST_VALUE over calls ordered by time gives the partner of the day's first call.",
+    "12": "Ordering the same window by time descending gives the partner of the day's last call.",
+    "15": "DISTINCT reports each user once, however many rows and days qualify.",
+    "17": "Keep the rows whose first and last partner agree, which happens on a qualifying day."
+  }
+}

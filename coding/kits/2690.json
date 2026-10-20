@@ -1,0 +1,62 @@
+{
+  "number": 2690,
+  "title": "Infinite Method Object",
+  "spec": "recalled",
+  "statement": "Write `createInfiniteObject()`, which returns an object that behaves as if it had **every** method. Whatever name you look up on it, you get a function back, and calling that function with no arguments returns the name that was looked up, as a string: `obj.abc123()` returns `\"abc123\"`, and `obj[\"x y\"]()` returns `\"x y\"`.\n\nThis must hold for any string name: the empty string, names full of punctuation or spaces, names that look like numbers, and names that ordinary objects already have, such as `toString` or `constructor`.\n\nEach case gives one name, `method`. The judge calls `createInfiniteObject()`, then calls `obj[method]()`, and the answer is the string that call returns.",
+  "constraints": [
+    "method is a string",
+    "0 <= method.length <= 1000"
+  ],
+  "signature": "String createInfiniteObject(String method)",
+  "entry": "createInfiniteObject",
+  "kind": "function",
+  "parameters": [
+    "method"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [method] = input;\n  if (typeof method !== 'string') return 'method must be a string.';\n  if (method.length > 1000) return 'method can have at most 1000 characters.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [method] = input;\n  const name = JSON.stringify(method.length > 40 ? `${method.slice(0, 40)}…` : method);\n  const obj = solve();\n  if (obj === null || (typeof obj !== 'object' && typeof obj !== 'function')) throw new Error('createInfiniteObject must return an object.');\n  kit.trace('createInfiniteObject() returns obj');\n  const member = obj[method];\n  if (typeof member !== 'function') throw new Error(`obj[${name}] must be a function.`);\n  kit.trace(`obj[${name}] is looked up and gives a function`);\n  const result = member.call(obj);\n  kit.trace(`obj[${name}]() returns ${typeof result === 'string' && result.length > 40 ? JSON.stringify(`${result.slice(0, 40)}…`) : JSON.stringify(result)}`);\n  return result;\n}",
+  "starters": {
+    "javascript": "/**\n * @return {Object} an object on which every name is a method returning that name\n */\nfunction createInfiniteObject() {\n  // Write your code here.\n}\n",
+    "typescript": "function createInfiniteObject(): Record<string, () => string> {\n  // Write your code here.\n  return {};\n}\n"
+  },
+  "api": "createInfiniteObject(): Record<string, () => string>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function createInfiniteObject() {\n  const target = {};\n  const handler = {\n    get(_, name) {\n      const method = () => String(name);\n      return method;\n    },\n  };\n  return new Proxy(target, handler);\n}",
+  "brute": "function createInfiniteObject() {\n  // A different trap: build each method once, keep it in a Map, and hand back the same function on later lookups.\n  const made = new Map();\n  return new Proxy(Object.create(null), {\n    get(target, key) {\n      if (!made.has(key)) {\n        made.set(key, function () {\n          return typeof key === 'symbol' ? key.toString() : `${key}`;\n        });\n      }\n      return made.get(key);\n    },\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-_|^$#@!?()[]{}<>,;:\"\\'\\\\/~`+=*&%';\n  if (size === 'small' && rand() < 0.3) {\n    return [pick(['', 'toString', 'valueOf', 'constructor', '__proto__', 'hasOwnProperty', 'then', 'length', 'prototype', '0', '42', '-1', 'NaN', 'undefined', 'null'])];\n  }\n  const length = size === 'small' ? Math.floor(rand() * 9) : 900 + Math.floor(rand() * 101);\n  let method = '';\n  for (let i = 0; i < length; i++) method += alphabet[Math.floor(rand() * alphabet.length)];\n  return [method];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abc123"],"expected":"abc123"},
+    {"name":"Example 2","input":[".-qw73n|^2It"],"expected":".-qw73n|^2It"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":[""]},
+    {"name":"Test 3","input":["toString"]},
+    {"name":"Test 4","input":["constructor"]},
+    {"name":"Test 5","input":["__proto__"]},
+    {"name":"Test 6","input":["hasOwnProperty"]},
+    {"name":"Test 7","input":["0"]},
+    {"name":"Test 8","input":["then"]},
+    {"name":"Test 9","input":["hello world!"]},
+    {"name":"Test 10","input":["${x} \"quoted\" \\ back\\slash"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nAn ordinary object only answers the names it was given, and nobody can list every possible string in advance. So the object has to **compute** its methods at the moment a name is looked up. That is exactly what a `Proxy` does: it wraps a target object, and a `get` trap in its handler runs on every property lookup, receiving the name being looked up. The trap can return a fresh function that remembers that name in a closure. Because the trap sees every lookup, even names that a plain object inherits, such as `toString` or `__proto__`, come back as our function. (The brute force uses the same idea with a `Map` that builds each method only once.)\n\n## Approach\n\n1. Create an empty `target`; the proxy never actually stores anything in it.\n2. Write a `handler` with a `get(_, name)` trap. The first argument is the target, which is not needed.\n3. In the trap, build `method = () => String(name)` and return it.\n4. Return `new Proxy(target, handler)`.\n\n## Example 1, step by step\n\n`method = \"abc123\"`:\n\n- `createInfiniteObject()` returns the proxy `obj`.\n- The judge looks up `obj[\"abc123\"]`. The `get` trap runs with `name = \"abc123\"` and returns a new arrow function that closes over `name`.\n- Calling it returns `String(\"abc123\")`, which is `\"abc123\"`, the answer.\n\n## Complexity\n\n- Time: O(1) per lookup and per call, apart from producing the returned string.\n- Space: O(1) for the proxy; each lookup makes one small function.\n\n## Pitfalls\n\n- Returning the name itself from `get` (`return name`) gives a string, not a function, so `obj[method]()` throws.\n- A plain object with a few hand-written methods cannot answer unknown names, and `toString` or `constructor` would return the inherited built-ins.\n- Using `this` inside a regular `function` method is unnecessary: the closure already knows `name`.\n- The live debugger cannot run a `Proxy`; use Run or Submit, and the timeline walkthrough, to follow it.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `target` | the empty object the proxy wraps |\n| `handler` | the traps object; only `get` is defined |\n| `name` | the property name being looked up |\n| `method` | the function returned for that name, which returns `name` |",
+  "narration": {
+    "1": "createInfiniteObject takes no arguments and returns the proxy.",
+    "2": "target is an empty object; the proxy wraps it but never stores methods in it.",
+    "3": "handler holds the traps that decide how the proxy behaves.",
+    "4": "The get trap runs on every property lookup and receives the name being looked up.",
+    "5": "Build a function that closes over name and returns it as a string.",
+    "6": "Every lookup, whatever the name, yields such a function.",
+    "9": "Wrap target with the handler; this proxy is the infinite-method object."
+  }
+}

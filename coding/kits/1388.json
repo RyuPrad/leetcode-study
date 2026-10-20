@@ -1,0 +1,61 @@
+{
+  "number": 1388,
+  "title": "Pizza With 3n Slices",
+  "spec": "leetcode",
+  "statement": "A round pizza is cut into `3n` slices, and `slices` lists their sizes going clockwise around the pizza (so the last slice sits next to the first). Three people share it in rounds until nothing is left:\n\n- You take any one of the slices still on the pizza.\n- Alice then takes the remaining slice right next to yours going anti-clockwise.\n- Bob then takes the remaining slice right next to yours going clockwise.\n\nAfter a round the leftover slices close up into a smaller circle. Return the largest possible total size of the slices you take.",
+  "constraints": [
+    "slices.length == 3 * n",
+    "1 <= slices.length <= 500",
+    "1 <= slices[i] <= 1000"
+  ],
+  "signature": "int maxSizeSlices(int[] slices)",
+  "entry": "maxSizeSlices",
+  "kind": "function",
+  "parameters": [
+    "slices"
+  ],
+  "validator": "function validate([slices]) {\n  if (!Array.isArray(slices) || slices.length < 1 || slices.length > 500) return 'slices needs 1 to 500 values.';\n  if (slices.length % 3 !== 0) return 'The number of slices must be a multiple of 3.';\n  if (slices.some(v => !Number.isInteger(v) || v < 1 || v > 1000)) return 'Each slice size is a whole number from 1 to 1000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxSizeSlices(slices) {\n  const picks = slices.length / 3;\n\n  // Best total of up to `picks` slices from slices[from..to], no two side by side.\n  function bestOnLine(from, to) {\n    const length = to - from + 1;\n    // dp[i][j]: best total using the first i slices of this line and taking at most j of them.\n    const dp = Array.from({ length: length + 1 }, () => new Array(picks + 1).fill(0));\n    for (let i = 1; i <= length; i++) {\n      const size = slices[from + i - 1];\n      for (let j = 1; j <= picks; j++) {\n        const skip = dp[i - 1][j];\n        const take = (i >= 2 ? dp[i - 2][j - 1] : 0) + size;\n        dp[i][j] = Math.max(skip, take);\n      }\n    }\n    return dp[length][picks];\n  }\n\n  // The first and last slices touch, so at least one of them is left out.\n  const withoutLast = bestOnLine(0, slices.length - 2);\n  const withoutFirst = bestOnLine(1, slices.length - 1);\n  return Math.max(withoutLast, withoutFirst);\n}",
+  "brute": "function maxSizeSlices(slices) {\n  // Play the game itself: try every slice you could take, remove it and both neighbours, recurse.\n  const memo = new Map();\n  function play(circle) {\n    if (circle.length === 0) return 0;\n    const key = circle.join(',');\n    if (memo.has(key)) return memo.get(key);\n    let best = 0;\n    const k = circle.length;\n    for (let i = 0; i < k; i++) {\n      const gone = new Set([i, (i + 1) % k, (i - 1 + k) % k]);\n      const rest = circle.filter((_, idx) => !gone.has(idx));\n      best = Math.max(best, slices[circle[i]] + play(rest));\n    }\n    memo.set(key, best);\n    return best;\n  }\n  return play(slices.map((_, i) => i));\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 150 + pick(17) : 1 + pick(4);\n  const top = size === 'large' || rand() < 0.4 ? 1000 : 1 + pick(9);\n  const slices = Array.from({ length: 3 * n }, () => 1 + pick(top));\n  if (size === 'small' && rand() < 0.25) {\n    // Big values at both ends test the circular wrap-around.\n    slices[0] = 1000;\n    slices[slices.length - 1] = 1000;\n  }\n  return [slices];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4,5,6]],"expected":10},
+    {"name":"Example 2","input":[[8,9,8,6,1,1]],"expected":16}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5,1,1]]},
+    {"name":"Test 2","input":[[1,1,1]]},
+    {"name":"Test 3","input":[[1000,1000,1000,1000,1000,1000]]},
+    {"name":"Test 4","input":[[10,1,1,1,1,10]]},
+    {"name":"Test 5","input":[[9,1,1,9,1,1]]},
+    {"name":"Test 6","input":[[4,1,2,5,8,3,1,9,7]]},
+    {"name":"Test 7","input":[[3,1,2,3,1,2,3,1,2,3,1,2]]},
+    {"name":"Test 8","input":[[15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]]},
+    {"name":"Test 9","input":[[6,7,6,7,6,7,6,7,6,7,6,7]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSimulating the game tries every pick in every round, which explodes quickly. Look instead at which slices end up yours. Each round removes your slice together with its two current neighbours, so no two of your slices are ever side by side on the original circle. The reverse also holds: any `n` slices with no two neighbouring each other (counting the first and last as neighbours) can be collected in some order. So the task becomes: choose `n = slices.length / 3` non-adjacent slices on a circle with the largest total.\n\nA circle is awkward for DP, but the first and last slice cannot both be chosen. Solve two straight lines, one without the last slice and one without the first, and keep the better result.\n\n## Approach\n\n1. Set `picks` to `slices.length / 3`.\n2. `bestOnLine(from, to)` runs a DP over `slices[from..to]`. `dp[i][j]` is the best total from the first `i` slices of that line while taking at most `j` of them.\n3. For slice `i` (size `size`): `skip` keeps `dp[i - 1][j]`; `take` adds `size` to `dp[i - 2][j - 1]`, because the slice just before it must stay free. Store the larger.\n4. Return `dp[length][picks]`. Sizes are positive and a line of `3n - 1` slices always has room for `n` separated picks, so \"at most\" ends up as exactly `picks`.\n5. Return the larger of `withoutLast` and `withoutFirst`.\n\n## Example 1, step by step\n\n`slices = [1,2,3,4,5,6]`, so `picks = 2`. `withoutLast` works on `[1,2,3,4,5]`; its best pair with a gap is 3 + 5 = 8. `withoutFirst` works on `[2,3,4,5,6]`; its best pair is 4 + 6 = 10. The answer is `max(8, 10) = 10`, matching taking slice 4 first and slice 6 next.\n\n## Complexity\n\n- Time: O(n²): each line has about `3n` slices and `picks = n` counts.\n- Space: O(n²) for `dp` (two rows would be enough).\n\n## Pitfalls\n\n- Forgetting the wrap-around: `[10,1,1,1,1,10]` gives 20 on a straight line but only 11 on the circle.\n- You take exactly `n` slices, not as many as a line allows; capping `j` at `picks` matters.\n- Taking slice `i` must look back two rows (`dp[i - 2]`), not one.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `picks` | how many slices you get, `n` |\n| `from`, `to` | the ends of the straight line being solved |\n| `length` | number of slices on that line |\n| `dp` | `dp[i][j]`: best total from the first `i` slices taking at most `j` |\n| `size` | size of the `i`-th slice of the line |\n| `skip`, `take` | totals when slice `i` is left or taken |\n| `withoutLast`, `withoutFirst` | best totals of the two lines |",
+  "narration": {
+    "2": "You end up with one third of the slices.",
+    "5": "Solve the problem on a straight line of slices, where the ends do not touch.",
+    "8": "Build the table; with no slices or no picks allowed the best total is 0.",
+    "9": "Fill the table one slice of the line at a time.",
+    "10": "The size of the i-th slice of this line.",
+    "11": "Consider every number of picks up to n.",
+    "12": "Option 1: leave this slice and keep the best answer without it.",
+    "13": "Option 2: take it; the previous slice must then stay free, so look two slices back with one fewer pick.",
+    "14": "Keep whichever option gives more.",
+    "17": "The best total for this line with n picks.",
+    "21": "Line one drops the last slice, so the first may be taken.",
+    "22": "Line two drops the first slice, so the last may be taken.",
+    "23": "The circle's answer is the better of the two lines."
+  }
+}

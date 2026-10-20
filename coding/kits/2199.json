@@ -1,0 +1,54 @@
+{
+  "number": 2199,
+  "title": "Finding the Topic of Each Post",
+  "spec": "recalled",
+  "statement": "A site wants to tag its posts with topics:\n\n- `Keywords(topic_id, word)`: each row says that `word` expresses topic `topic_id`. `(topic_id, word)` is unique. A topic can have several words, and the same word can belong to several topics.\n- `Posts(post_id, content)`: one row per post; `post_id` is unique. `content` is words of English letters separated by single spaces.\n\nA post has a topic when one of that topic's keywords appears in its content as a **whole word**, ignoring letter case (`WAR` matches `war`, but `war` does not match `warning`).\n\nFor every post report `post_id` and `topic`: the post's topic ids in ascending numeric order, each once, joined with commas and no spaces (for example `1,3`), or the text `Ambiguous!` when the post has no topic. Rows may come in any order.",
+  "constraints": [
+    "(topic_id, word) is unique in Keywords, ignoring case",
+    "word is one word of English letters",
+    "post_id is unique in Posts",
+    "content is words of English letters separated by single spaces",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Keywords": [["topic_id","INT"],["word","VARCHAR(25)"]],
+    "Posts": [["post_id","INT"],["content","VARCHAR(100)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Keywords = [], Posts = [] }] = input;\n  const pairs = new Set(), posts = new Set();\n  for (const [topic, word] of Keywords) {\n    if (topic === null || word === null) return 'Keywords rows may not contain null.';\n    if (!/^[A-Za-z]+$/.test(word)) return `Keyword \"${word}\" must be one word of English letters.`;\n    const key = `${topic}|${word.toLowerCase()}`;\n    if (pairs.has(key)) return `Topic ${topic} lists the word ${word} twice.`;\n    pairs.add(key);\n  }\n  for (const [id, content] of Posts) {\n    if (id === null || content === null) return 'Posts rows may not contain null.';\n    if (posts.has(id)) return `post_id ${id} appears twice in Posts.`;\n    if (!/^[A-Za-z]+( [A-Za-z]+)*$/.test(content)) return `Post ${id} must be words of English letters separated by single spaces.`;\n    posts.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH matches AS (\n  SELECT DISTINCT p.post_id, k.topic_id\n  FROM Posts AS p\n  JOIN Keywords AS k\n    ON CONCAT(' ', LOWER(p.content), ' ') LIKE CONCAT('% ', LOWER(k.word), ' %')\n)\nSELECT p.post_id,\n       IFNULL(GROUP_CONCAT(m.topic_id ORDER BY m.topic_id), 'Ambiguous!') AS topic\nFROM Posts AS p\nLEFT JOIN matches AS m\n  ON m.post_id = p.post_id\nGROUP BY p.post_id;",
+  "brute": "SELECT p.post_id,\n       IFNULL(\n         (SELECT GROUP_CONCAT(DISTINCT k.topic_id ORDER BY k.topic_id SEPARATOR ',')\n          FROM Keywords AS k\n          WHERE p.content REGEXP CONCAT('(^| )', k.word, '( |$)')),\n         'Ambiguous!'\n       ) AS topic\nFROM Posts AS p",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const keywords = ['war', 'ball', 'football', 'handball', 'vaccine', 'peace', 'goal', 'virus', 'game', 'sun'];\n  // Near misses share letters with keywords but are different words; fillers never match.\n  const others = ['warning', 'wars', 'balls', 'footballer', 'vaccinated', 'goals', 'we', 'play', 'the', 'love', 'sunny', 'and'];\n  const vocabulary = [...keywords, ...keywords, ...others];\n  const caseOf = w => { const r = rand(); return r < 0.15 ? w.toUpperCase() : r < 0.3 ? w[0].toUpperCase() + w.slice(1) : w; };\n  const topics = small ? 4 : 30, keywordRows = small ? Math.floor(rand() * 7) : 60, postRows = small ? Math.floor(rand() * 6) : 1500;\n  const Keywords = [], seen = new Set();\n  for (let i = 0; i < keywordRows * 2 && Keywords.length < keywordRows; i++) {\n    const topic = 1 + Math.floor(rand() * topics), word = keywords[Math.floor(rand() * keywords.length)];\n    if (seen.has(`${topic}|${word}`)) continue;\n    seen.add(`${topic}|${word}`);\n    Keywords.push([topic, caseOf(word)]);\n  }\n  const Posts = [];\n  for (let id = 1; id <= postRows; id++) {\n    const words = [];\n    for (let n = 1 + Math.floor(rand() * (small ? 4 : 8)); n > 0; n--) words.push(caseOf(vocabulary[Math.floor(rand() * vocabulary.length)]));\n    Posts.push([id, words.join(' ')]);\n  }\n  return [{ Keywords, Posts }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Keywords":[[1,"handball"],[1,"football"],[3,"WAR"],[2,"Vaccine"]],"Posts":[[1,"We call it soccer They call it football hahaha"],[2,"Americans prefer basketball while Europeans love handball and football"],[3,"stop the war and play handball"],[4,"warning I planted some flowers this morning and then got vaccinated"]]}],"expected":{"columns":["post_id","topic"],"rows":[[1,"1"],[2,"1"],[3,"1,3"],[4,"Ambiguous!"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Keywords":[[1,"war"]],"Posts":[]}]},
+    {"name":"Test 2","input":[{"Keywords":[],"Posts":[[1,"war and peace"],[2,"football"]]}]},
+    {"name":"Test 3","input":[{"Keywords":[[1,"war"],[2,"ball"]],"Posts":[[1,"warning about wars"],[2,"football and handball"],[3,"a reward"]]}]},
+    {"name":"Test 4","input":[{"Keywords":[[1,"war"],[2,"peace"]],"Posts":[[1,"war"],[2,"war is over"],[3,"make peace"],[4,"the war ended in peace"]]}]},
+    {"name":"Test 5","input":[{"Keywords":[[10,"goal"],[2,"goal"],[7,"goal"]],"Posts":[[1,"what a goal"],[2,"no goals today"]]}]},
+    {"name":"Test 6","input":[{"Keywords":[[3,"WAR"],[1,"Vaccine"]],"Posts":[[5,"War Never Changes"],[6,"get the VACCINE"],[7,"vaccines and warfare"]]}]},
+    {"name":"Test 7","input":[{"Keywords":[[1,"football"],[1,"handball"],[1,"soccer"]],"Posts":[[1,"soccer is football"],[2,"handball handball handball"]]}]},
+    {"name":"Test 8","input":[{"Keywords":[[3,"sun"],[1,"sun"],[2,"moon"],[4,"star"],[2,"star"]],"Posts":[[1,"sun moon and star"],[2,"sunny day"],[3,"star"],[4,"moon sun"]]}]},
+    {"name":"Test 9","input":[{"Keywords":[[1,"handball"],[1,"football"],[3,"WAR"],[2,"Vaccine"],[2,"virus"]],"Posts":[[1,"stop the war and play handball"],[2,"warning I got vaccinated"],[3,"the virus and the war"],[4,"FOOTBALL"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA keyword counts only as a whole word, and letter case does not matter. Lower-case both sides and pad the content with a space at each end: then every word of the post, including the first and the last, sits between two spaces, so `' war '` occurs in `' stop the war and play handball '` but not in `' warning i planted ... '`. One `LIKE` per (post, keyword) pair decides the match. After that it is grouping: collect each post's distinct topic ids in order, and fall back to `Ambiguous!` when there are none.\n\n## Approach\n\n1. `matches`: join `Posts` (`p`) to `Keywords` (`k`) on `' ' + content + ' '` containing `' ' + word + ' '`, both lower-cased, and keep `DISTINCT` (post, topic) pairs, since two keywords of one topic may both appear.\n2. Start again from `Posts` and `LEFT JOIN matches` (`m`), so posts without any topic survive with a null `topic_id`.\n3. Group by post and build `GROUP_CONCAT(m.topic_id ORDER BY m.topic_id)`; its default separator is a comma.\n4. `IFNULL(..., 'Ambiguous!')`: a post whose only row has a null topic concatenates to null.\n\n## Example 1, step by step\n\n- Post 1 contains `' football '`, so `matches` holds (1, 1).\n- Post 2 contains `' handball '` and `' football '`, both topic 1; `DISTINCT` keeps one (2, 1).\n- Post 3 contains `' war '` (keyword `WAR`, topic 3) and `' handball '` (topic 1): (3, 1) and (3, 3), joined as `1,3`.\n- Post 4 has `warning` and `vaccinated` but neither `' war '` nor `' vaccine '`, so it has no match and becomes `Ambiguous!`.\n\n## Complexity\n\n- Time: O(P · K · L) for P posts, K keywords and content length L, because every pair is tested with `LIKE`; grouping adds O(P + matches).\n- Space: O(P · T) for `matches` with T topics.\n\n## Pitfalls\n\n- `LIKE CONCAT('%', word, '%')` without spaces matches inside longer words, so `war` would tag `warning`.\n- Padding only one side misses a keyword at the start or end of the content.\n- Without `DISTINCT` a topic matched by two keywords appears twice, as in `1,1`.\n- An inner join drops posts with no topic instead of reporting `Ambiguous!`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | a post |\n| `k` | a keyword whose padded word occurs in the padded content |\n| `matches` | distinct (post_id, topic_id) pairs found |\n| `m` | a post's matches; null for a post with none |\n| `topic` | sorted topic ids joined by commas, or `Ambiguous!` |",
+  "narration": {
+    "1": "The first stage finds which topics each post mentions.",
+    "2": "DISTINCT keeps one row per post and topic even when several keywords of that topic appear.",
+    "4": "Every post is tested against every keyword.",
+    "5": "Padding the lower-cased content and keyword with spaces makes LIKE match whole words only, wherever they sit.",
+    "8": "Topic ids are joined in ascending order with commas; a post with no match concatenates to null and becomes Ambiguous!.",
+    "10": "A left join keeps posts that matched no keyword.",
+    "12": "One output row per post."
+  }
+}

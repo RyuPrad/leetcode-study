@@ -1,0 +1,52 @@
+{
+  "number": 2118,
+  "title": "Build the Equation",
+  "spec": "recalled",
+  "statement": "One table holds the terms of a polynomial in `X`:\n\n- `Terms(power, factor)`: one row per term `factor · X^power`; `power` is unique, between `0` and `100`. `factor` is between `-100` and `100` and never `0`. The table has at least one row.\n\nWrite the equation as one string `<terms>=0`, with the terms ordered by `power` from highest to lowest and written back to back. Each term is:\n\n- a sign, `+` for a positive factor and `-` for a negative one (the first term gets its sign too),\n- the absolute value of the factor (written even when it is `1`),\n- then `X^<power>` when the power is 2 or more, just `X` when the power is 1, and nothing when the power is 0.\n\nReturn one row with one column, `equation`. For terms `(2, 1)`, `(1, -4)`, `(0, 2)` it is `+1X^2-4X+2=0`.",
+  "constraints": [
+    "power is unique in Terms",
+    "0 <= power <= 100",
+    "-100 <= factor <= 100 and factor != 0",
+    "Terms has at least one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Terms": [["power","INT"],["factor","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Terms = [] }] = input;\n  if (!Terms.length) return 'Terms needs at least one row.';\n  const powers = new Set();\n  for (const [power, factor] of Terms) {\n    if (power === null || power < 0 || power > 100) return 'Every power must be between 0 and 100.';\n    if (powers.has(power)) return `power ${power} appears twice in Terms.`;\n    if (factor === null || factor === 0 || factor < -100 || factor > 100) return `The factor of power ${power} must be a nonzero number between -100 and 100.`;\n    powers.add(power);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH formatted AS (\n  SELECT\n    power,\n    CONCAT(\n      IF(factor > 0, '+', '-'),\n      ABS(factor),\n      CASE power\n        WHEN 0 THEN ''\n        WHEN 1 THEN 'X'\n        ELSE CONCAT('X^', power)\n      END\n    ) AS term\n  FROM Terms\n)\nSELECT CONCAT(GROUP_CONCAT(term ORDER BY power DESC SEPARATOR ''), '=0') AS equation\nFROM formatted;",
+  "brute": "WITH RECURSIVE ranked AS (\n  SELECT\n    ROW_NUMBER() OVER (ORDER BY power DESC) AS pos,\n    CONCAT(\n      CASE WHEN factor < 0 THEN '-' ELSE '+' END,\n      CAST(ABS(factor) AS CHAR),\n      IF(power = 0, '', 'X'),\n      IF(power > 1, CONCAT('^', power), '')\n    ) AS piece\n  FROM Terms\n),\nchain AS (\n  SELECT pos, CAST(piece AS CHAR(2000)) AS lhs\n  FROM ranked\n  WHERE pos = 1\n  UNION ALL\n  SELECT r.pos, CONCAT(c.lhs, r.piece)\n  FROM chain AS c\n  JOIN ranked AS r ON r.pos = c.pos + 1\n)\nSELECT CONCAT(lhs, '=0') AS equation\nFROM chain\nWHERE pos = (SELECT COUNT(*) FROM ranked)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const factors = [-100, -12, -3, -1, 1, 2, 7, 10, 100];\n  const pool = small\n    ? (rand() < 0.5 ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 9, 10, 11, 99, 100])\n    : Array.from({ length: 101 }, (_, i) => i);\n  const chosen = pool.filter(() => rand() < (small ? 0.6 : 0.9));\n  if (!chosen.length) chosen.push(pool[Math.floor(rand() * pool.length)]);\n  while (small && chosen.length > 8) chosen.splice(Math.floor(rand() * chosen.length), 1);\n  // Rows arrive in a shuffled order, so the query must sort by power itself.\n  for (let i = chosen.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [chosen[i], chosen[j]] = [chosen[j], chosen[i]];\n  }\n  const Terms = chosen.map(power => [power, small ? factors[Math.floor(rand() * factors.length)] : (rand() < 0.5 ? -1 : 1) * (1 + Math.floor(rand() * 100))]);\n  return [{ Terms }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Terms":[[2,1],[1,-4],[0,2]]}],"expected":{"columns":["equation"],"rows":[["+1X^2-4X+2=0"]]}},
+    {"name":"Example 2","input":[{"Terms":[[4,-4],[2,1],[1,-1]]}],"expected":{"columns":["equation"],"rows":[["-4X^4+1X^2-1X=0"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Terms":[[0,5]]}]},
+    {"name":"Test 2","input":[{"Terms":[[1,-1]]}]},
+    {"name":"Test 3","input":[{"Terms":[[0,2],[1,-4],[2,1]]}]},
+    {"name":"Test 4","input":[{"Terms":[[9,3],[10,-2],[100,1],[2,-100]]}]},
+    {"name":"Test 5","input":[{"Terms":[[1,100],[0,-100]]}]},
+    {"name":"Test 6","input":[{"Terms":[[1,1]]}]},
+    {"name":"Test 7","input":[{"Terms":[[5,-1],[3,7],[50,-8],[0,-1],[1,2],[4,1]]}]},
+    {"name":"Test 8","input":[{"Terms":[[2,-3]]}]},
+    {"name":"Test 9","input":[{"Terms":[[100,-100],[0,100]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is string building, not arithmetic. Each row can be turned into its own piece of text (`-4X`, `+1X^2`, `+2`) without looking at any other row. Then one aggregate glues the pieces together in descending power order, and `=0` goes on the end.\n\n## Approach\n\n1. CTE `formatted` turns every row into `term` with `CONCAT` of three parts: the sign from `IF(factor > 0, '+', '-')`, the digits from `ABS(factor)`, and the variable part from a `CASE` on `power` (`''` for 0, `'X'` for 1, `CONCAT('X^', power)` otherwise). It keeps `power` for sorting.\n2. The final `SELECT` aggregates all rows with `GROUP_CONCAT(term ORDER BY power DESC SEPARATOR '')`: highest power first, no separator between terms.\n3. `CONCAT(..., '=0')` appends the right-hand side and names the column `equation`.\n\n## Example 1, step by step\n\n`formatted` holds:\n\n- power 2, factor 1 → `+1X^2`\n- power 1, factor -4 → `-4X`\n- power 0, factor 2 → `+2`\n\nSorted by power descending and joined with no separator: `+1X^2-4X+2`. Appending `=0` gives `+1X^2-4X+2=0`.\n\n## Complexity\n\n- Time: O(T log T) for T terms, for the sort inside `GROUP_CONCAT`; T is at most 101.\n- Space: O(T) for the formatted terms and the final string.\n\n## Pitfalls\n\n- `GROUP_CONCAT` separates with a comma by default; `SEPARATOR ''` is required.\n- Without `ORDER BY power DESC` inside `GROUP_CONCAT` the terms come in whatever order the table is read.\n- Printing the factor directly gives `-4` but `1` without a plus sign; take the sign and the absolute value separately.\n- Powers 0 and 1 are special: `+2X^0` and `-4X^1` are wrong.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `formatted` | one row per term: its `power` and its text `term` |\n| `term` | sign, absolute factor and variable part of one term |\n| `GROUP_CONCAT(... ORDER BY power DESC SEPARATOR '')` | all terms joined, highest power first |\n| `equation` | the joined terms followed by `=0` |",
+  "narration": {
+    "1": "The CTE formatted turns each row into the text of one term, keeping power for sorting.",
+    "5": "The sign comes first and is always written: plus for a positive factor, minus for a negative one.",
+    "6": "ABS prints the factor without its sign, so -4 becomes 4 and the minus is not doubled.",
+    "7": "The variable part depends on the power: nothing for 0, a bare X for 1, and X^power otherwise.",
+    "15": "GROUP_CONCAT joins every term with no separator, highest power first, and =0 is appended as the right-hand side."
+  }
+}

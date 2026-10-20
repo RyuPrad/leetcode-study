@@ -1,0 +1,55 @@
+{
+  "number": 2010,
+  "title": "The Number of Seniors and Juniors to Join the Company II",
+  "spec": "recalled",
+  "statement": "One table lists job candidates:\n\n- `Candidates(employee_id, experience, salary)`: one row per candidate; `employee_id` is unique. `experience` is `'Senior'` or `'Junior'`, and `salary` is the candidate's positive yearly salary. Two candidates with the same experience never ask for the same salary.\n\nA company has a total salary budget of **70000** and hires in this order:\n\n1. Seniors first, cheapest first: keep hiring the lowest-paid remaining senior while that salary still fits in the budget; stop at the first senior who does not fit.\n2. Then, with whatever budget the hired seniors left over, hire juniors the same way: cheapest first, stopping at the first junior who does not fit.\n\nA salary fits when it is at most the remaining budget, so the budget may be spent exactly.\n\nReport the `employee_id` of every hired candidate, seniors and juniors together, in one column named `employee_id`. Rows may come in any order.",
+  "constraints": [
+    "employee_id is unique in Candidates",
+    "experience is 'Senior' or 'Junior'",
+    "salary is a positive integer",
+    "No two candidates with the same experience have the same salary",
+    "The budget is 70000"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Candidates": [["employee_id","INT"],["experience","ENUM('Senior', 'Junior')"],["salary","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Candidates = [] }] = input;\n  const ids = new Set(), salaries = new Set();\n  for (const [id, experience, salary] of Candidates) {\n    if (id === null || experience === null || salary === null) return 'Every column is required.';\n    if (ids.has(id)) return `employee_id ${id} appears twice.`;\n    ids.add(id);\n    if (experience !== 'Senior' && experience !== 'Junior') return `Unknown experience ${experience}.`;\n    if (salary <= 0) return 'salary must be positive.';\n    const key = `${experience}|${salary}`;\n    if (salaries.has(key)) return `Two ${experience} candidates ask for ${salary}.`;\n    salaries.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH running AS (\n  SELECT\n    employee_id,\n    experience,\n    SUM(salary) OVER (PARTITION BY experience ORDER BY salary) AS spent\n  FROM Candidates\n),\nseniors AS (\n  SELECT employee_id, spent\n  FROM running\n  WHERE experience = 'Senior'\n    AND spent <= 70000\n)\nSELECT employee_id\nFROM seniors\nUNION ALL\nSELECT employee_id\nFROM running\nWHERE experience = 'Junior'\n  AND spent <= 70000 - (SELECT IFNULL(MAX(spent), 0) FROM seniors);",
+  "brute": "WITH senior_hired AS (\n  SELECT a.employee_id, a.salary\n  FROM Candidates AS a\n  JOIN Candidates AS b\n    ON b.experience = a.experience AND b.salary <= a.salary\n  WHERE a.experience = 'Senior'\n  GROUP BY a.employee_id, a.salary\n  HAVING SUM(b.salary) <= 70000\n),\njunior_hired AS (\n  SELECT a.employee_id\n  FROM Candidates AS a\n  JOIN Candidates AS b\n    ON b.experience = a.experience AND b.salary <= a.salary\n  WHERE a.experience = 'Junior'\n  GROUP BY a.employee_id\n  HAVING SUM(b.salary) <= 70000 - (SELECT COALESCE(SUM(salary), 0) FROM senior_hired)\n)\nSELECT employee_id FROM senior_hired\nUNION ALL\nSELECT employee_id FROM junior_hired",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  // Small salaries are round numbers so running totals often land exactly on the budget.\n  const pool = [5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 50000, 60000, 70000, 80000];\n  const used = new Set(), Candidates = [];\n  const ids = Array.from({ length: small ? 15 : 3000 }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  for (let i = 0; i < rows; i++) {\n    const experience = rand() < 0.5 ? 'Senior' : 'Junior';\n    const draw = () => (small ? pool[Math.floor(rand() * pool.length)] : 100 + Math.floor(rand() * 100000));\n    let salary = draw();\n    // Large sets redraw a repeated salary; small sets simply skip the candidate.\n    while (!small && used.has(`${experience}|${salary}`)) salary = draw();\n    if (used.has(`${experience}|${salary}`)) continue;\n    used.add(`${experience}|${salary}`);\n    Candidates.push([ids[i], experience, salary]);\n  }\n  return [{ Candidates }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Candidates":[[1,"Junior",10000],[9,"Junior",15000],[2,"Senior",20000],[11,"Senior",16000],[13,"Senior",50000],[4,"Junior",40000]]}],"expected":{"columns":["employee_id"],"rows":[[11],[2],[1],[9]]}},
+    {"name":"Example 2","input":[{"Candidates":[[1,"Junior",25000],[9,"Junior",10000],[2,"Senior",85000],[11,"Senior",80000],[13,"Senior",90000],[4,"Junior",30000]]}],"expected":{"columns":["employee_id"],"rows":[[9],[1],[4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Candidates":[]}]},
+    {"name":"Test 2","input":[{"Candidates":[[7,"Senior",70000]]}]},
+    {"name":"Test 3","input":[{"Candidates":[[1,"Junior",30000],[2,"Junior",40000],[3,"Junior",1000]]}]},
+    {"name":"Test 4","input":[{"Candidates":[[1,"Senior",30000],[2,"Senior",40000],[3,"Junior",1]]}]},
+    {"name":"Test 5","input":[{"Candidates":[[1,"Senior",70001],[2,"Junior",30000],[3,"Junior",40000]]}]},
+    {"name":"Test 6","input":[{"Candidates":[[1,"Senior",20000],[2,"Senior",60000],[3,"Junior",10000],[4,"Junior",30000],[5,"Junior",5000],[6,"Junior",8000]]}]},
+    {"name":"Test 7","input":[{"Candidates":[[10,"Senior",25000],[11,"Senior",25001],[12,"Senior",25002],[13,"Junior",20000],[14,"Junior",19998]]}]},
+    {"name":"Test 8","input":[{"Candidates":[[1,"Senior",10000],[2,"Junior",10000],[3,"Senior",50000],[4,"Junior",5000],[5,"Senior",15000],[6,"Junior",6000]]}]},
+    {"name":"Test 9","input":[{"Candidates":[[1,"Junior",80000],[2,"Senior",90000],[3,"Junior",75000]]}]},
+    {"name":"Test 10","input":[{"Candidates":[[1,"Senior",40000],[2,"Senior",35000],[3,"Junior",25000],[4,"Junior",40000],[5,"Junior",4000]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nHiring the cheapest candidate first and stopping at the first one who does not fit means the hired seniors are exactly a **prefix** of the seniors sorted by salary: the ones whose running total of salaries is at most 70000. A window `SUM(salary) OVER (PARTITION BY experience ORDER BY salary)` computes that running total for every candidate at once. Juniors follow the same rule with a smaller budget: 70000 minus what the hired seniors cost, which is the largest running total among them.\n\n## Approach\n\n1. `running`: for each candidate, `spent` is the total salary of everyone with the same experience up to and including them, in salary order.\n2. `seniors`: the seniors with `spent <= 70000`; these are hired.\n3. Output those seniors, then `UNION ALL` the juniors whose `spent` fits in `70000` minus the seniors' cost. `IFNULL(MAX(spent), 0)` is that cost, and `0` when no senior was hired.\n\n## Example 1, step by step\n\n- Seniors by salary: 11 (16000), 2 (20000), 13 (50000). Running totals 16000, 36000, 86000, so `seniors` holds 11 and 2 with `MAX(spent) = 36000`.\n- The juniors' budget is 70000 - 36000 = 34000.\n- Juniors by salary: 1 (10000), 9 (15000), 4 (40000). Running totals 10000, 25000, 65000; the first two fit in 34000.\n- The result is 11, 2, 1, 9.\n\n## Complexity\n\n- Time: O(n log n) for n candidates, to sort each experience by salary for the window.\n- Space: O(n) for the running totals.\n\n## Pitfalls\n\n- With no senior hired, `MAX(spent)` is `null` and `70000 - null` is `null`, which would hire no juniors; `IFNULL` turns it into 0.\n- Subtracting the cost of **all** seniors instead of the hired ones shrinks the juniors' budget too much.\n- A running total without `PARTITION BY experience` mixes seniors and juniors in one sum.\n- Comparing with `<` instead of `<=` refuses a candidate who uses the budget exactly.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `running` | every candidate with `spent`, the running salary total within their experience |\n| `spent` | cost of hiring this candidate and every cheaper one of the same experience |\n| `seniors` | the hired seniors: `spent` at most 70000 |\n| `IFNULL(MAX(spent), 0)` | what the hired seniors cost in total |",
+  "narration": {
+    "1": "The running CTE gives every candidate the cost of hiring them together with all cheaper candidates of the same experience.",
+    "5": "The window sums salaries in salary order, separately for seniors and juniors.",
+    "8": "The seniors CTE keeps the hired seniors.",
+    "12": "A senior is hired when the running total up to them still fits in the 70000 budget.",
+    "14": "Report the hired seniors first.",
+    "16": "UNION ALL appends the hired juniors to the same employee_id column.",
+    "20": "A junior is hired when their running total fits in what the seniors left; IFNULL makes that 70000 when no senior was hired."
+  }
+}

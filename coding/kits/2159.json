@@ -1,0 +1,50 @@
+{
+  "number": 2159,
+  "title": "Order Two Columns Independently",
+  "spec": "recalled",
+  "statement": "One table holds pairs of numbers:\n\n- `Data(first_col, second_col)`: the table has no primary key, so values and even whole rows may repeat.\n\nSort the two columns **independently**: `first_col` in ascending order and `second_col` in descending order, each on its own, ignoring which values shared a row. Then pair them up by position: the k-th output row holds the k-th smallest `first_col` and the k-th largest `second_col`. Repeated values keep all their copies, so the output has as many rows as `Data`.\n\nReport the columns `first_col` and `second_col`, with the rows in that position order (so `first_col` ascends from the first row to the last).",
+  "constraints": [
+    "Data has no primary key; duplicate rows are allowed",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Data": [["first_col","INT"],["second_col","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Data = [] }] = input;\n  for (const [first, second] of Data) if (first === null || second === null) return 'Data rows may not contain null.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH firsts AS (\n  SELECT first_col, ROW_NUMBER() OVER (ORDER BY first_col) AS row_num\n  FROM Data\n),\nseconds AS (\n  SELECT second_col, ROW_NUMBER() OVER (ORDER BY second_col DESC) AS row_num\n  FROM Data\n)\nSELECT f.first_col, s.second_col\nFROM firsts AS f\nJOIN seconds AS s\n  ON s.row_num = f.row_num\nORDER BY f.row_num;",
+  "brute": "WITH digits AS (\n  SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4\n  UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9\n),\npositions AS (\n  SELECT 1 + ones.d + 10 * tens.d + 100 * hundreds.d + 1000 * thousands.d AS k\n  FROM digits AS ones, digits AS tens, digits AS hundreds, digits AS thousands\n),\nfirsts AS (\n  SELECT v.first_col, SUM(d.first_col < v.first_col) AS lo, SUM(d.first_col <= v.first_col) AS hi\n  FROM (SELECT DISTINCT first_col FROM Data) AS v\n  CROSS JOIN Data AS d\n  GROUP BY v.first_col\n),\nseconds AS (\n  SELECT v.second_col, SUM(d.second_col > v.second_col) AS lo, SUM(d.second_col >= v.second_col) AS hi\n  FROM (SELECT DISTINCT second_col FROM Data) AS v\n  CROSS JOIN Data AS d\n  GROUP BY v.second_col\n)\nSELECT f.first_col, s.second_col\nFROM positions AS p\nJOIN firsts AS f ON p.k > f.lo AND p.k <= f.hi\nJOIN seconds AS s ON p.k > s.lo AND p.k <= s.hi\nORDER BY p.k",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const high = small ? 6 : 400;\n  const Data = [];\n  for (let i = 0; i < rows; i++) {\n    // Small tables sometimes repeat a whole row, which the table allows.\n    if (small && Data.length && rand() < 0.15) { Data.push(Data[Data.length - 1].slice()); continue; }\n    Data.push([1 + Math.floor(rand() * high), 1 + Math.floor(rand() * high)]);\n  }\n  return [{ Data }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Data":[[4,2],[2,3],[3,1],[1,4]]}],"expected":{"columns":["first_col","second_col"],"rows":[[1,4],[2,3],[3,2],[4,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Data":[]}]},
+    {"name":"Test 2","input":[{"Data":[[5,7]]}]},
+    {"name":"Test 3","input":[{"Data":[[1,4],[2,3],[3,2],[4,1]]}]},
+    {"name":"Test 4","input":[{"Data":[[2,1],[2,5],[1,3]]}]},
+    {"name":"Test 5","input":[{"Data":[[3,3],[3,3],[1,9]]}]},
+    {"name":"Test 6","input":[{"Data":[[-1,0],[0,-5],[10,10]]}]},
+    {"name":"Test 7","input":[{"Data":[[1,1],[2,2],[3,3]]}]},
+    {"name":"Test 8","input":[{"Data":[[7,7],[7,7],[7,7]]}]},
+    {"name":"Test 9","input":[{"Data":[[9,2],[4,8],[4,1],[6,8],[1,5],[9,3],[2,2]]}]},
+    {"name":"Test 10","input":[{"Data":[[1,10],[2,20],[3,30],[4,40],[5,50]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe two output columns have nothing to do with each other: the first is `first_col` sorted up, the second is `second_col` sorted down, glued together side by side. A sorted column is a list of (position, value) pairs, and `ROW_NUMBER()` is exactly the tool that hands out positions 1, 2, 3, ... in a chosen order. Number each column separately, then join the two numbered lists on equal positions.\n\n## Approach\n\n1. `firsts`: every `first_col` with `ROW_NUMBER() OVER (ORDER BY first_col)` as `row_num`.\n2. `seconds`: every `second_col` with `ROW_NUMBER() OVER (ORDER BY second_col DESC)` as `row_num`.\n3. Join `firsts` (`f`) and `seconds` (`s`) on `s.row_num = f.row_num`. Both lists have one entry per row of `Data`, so every position matches exactly once.\n4. `ORDER BY f.row_num` puts the pairs in position order.\n\n## Example 1, step by step\n\n- `firsts`: values 4, 2, 3, 1 sorted up give positions 1 → 1, 2 → 2, 3 → 3, 4 → 4.\n- `seconds`: values 2, 3, 1, 4 sorted down give positions 1 → 4, 2 → 3, 3 → 2, 4 → 1.\n- Joining on position gives (1, 4), (2, 3), (3, 2), (4, 1).\n\n## Complexity\n\n- Time: two sorts of the N rows, O(N log N), and a join on `row_num`, O(N) with hashing.\n- Space: O(N) for the two numbered lists.\n\n## Pitfalls\n\n- `ORDER BY first_col, second_col DESC` on `Data` keeps the original pairs; it only breaks ties within `first_col`. With rows (2, 1), (2, 5), (1, 3) it gives (1, 3) first instead of (1, 5).\n- `RANK()` or `DENSE_RANK()` give equal numbers to equal values, so duplicates collide in the join and multiply rows; `ROW_NUMBER()` gives each copy its own position.\n- `DISTINCT` or `UNION` would drop repeated values, but each copy must keep its own row.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `firsts` | each `first_col` value with its position in ascending order |\n| `seconds` | each `second_col` value with its position in descending order |\n| `row_num` | position 1..N handed out by `ROW_NUMBER()` |\n| `f`, `s` | the two numbered lists, matched on equal `row_num` |",
+  "narration": {
+    "1": "The first stage numbers the first column on its own.",
+    "2": "ROW_NUMBER over first_col ascending gives the smallest value position 1, and each duplicate its own position.",
+    "5": "The second stage numbers the second column on its own.",
+    "6": "Here the order is descending, so the largest second_col gets position 1.",
+    "11": "Joining the two lists on equal positions pairs the k-th smallest first value with the k-th largest second value.",
+    "13": "Output rows follow the shared position, which keeps first_col ascending."
+  }
+}

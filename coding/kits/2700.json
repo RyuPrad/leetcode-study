@@ -1,0 +1,67 @@
+{
+  "number": 2700,
+  "title": "Differences Between Two Objects",
+  "spec": "recalled",
+  "statement": "Write `objDiff(obj1, obj2)`. Both arguments come from `JSON.parse` and are either two objects or two arrays, possibly nested. Return an object that records where they differ.\n\nWalk the keys that `obj1` and `obj2` **both** have (for arrays, the keys are the indexes, which become string keys in the result). A key found in only one of them is ignored. For a shared key with values `a` (from `obj1`) and `b` (from `obj2`):\n\n- If `a` and `b` are both objects, or both arrays, compare them the same way, one level down. When that inner comparison finds something, the key maps to its result (always an object); when it finds nothing, the key is left out.\n- Otherwise (two primitives, or values of different kinds such as an object and an array, or `null` and a number) the key is left out when `a === b`, and maps to the pair `[a, b]` when they differ.\n\nSo every leaf of the result is a pair `[value in obj1, value in obj2]`, and `{}` means no difference. The keys of the result may come in any order.",
+  "constraints": [
+    "obj1 and obj2 are both JSON objects or both JSON arrays",
+    "2 <= JSON.stringify(obj1).length <= 10^4",
+    "2 <= JSON.stringify(obj2).length <= 10^4",
+    "obj1 and obj2 are nested at most 10 levels deep",
+    "No key is \"__proto__\""
+  ],
+  "signature": "Object objDiff(Object obj1, Object obj2)",
+  "entry": "objDiff",
+  "kind": "function",
+  "parameters": [
+    "obj1",
+    "obj2"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  // Deep equality in which the order of object keys does not matter.\n  const same = (x, y) => {\n    if (Array.isArray(y)) return Array.isArray(x) && x.length === y.length && y.every((value, i) => same(x[i], value));\n    if (y !== null && typeof y === 'object') {\n      if (x === null || typeof x !== 'object' || Array.isArray(x)) return false;\n      const keys = Object.keys(y);\n      return Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key) && same(x[key], y[key]));\n    }\n    return x === y;\n  };\n  return same(actual, expected);\n}",
+  "validator": "function validate(input) {\n  const [obj1, obj2] = input;\n  for (const value of [obj1, obj2]) {\n    if (value === null || typeof value !== 'object') return 'obj1 and obj2 must be JSON objects or arrays.';\n    if (JSON.stringify(value).length > 10000) return 'Keep each value under 10,000 characters of JSON.';\n    const stack = [[value, 1]];\n    while (stack.length) {\n      const [item, depth] = stack.pop();\n      if (item === null || typeof item !== 'object') continue;\n      if (depth > 10) return 'Keep obj1 and obj2 at most 10 levels deep.';\n      if (!Array.isArray(item) && Object.hasOwn(item, '__proto__')) return 'Keys named \"__proto__\" are not allowed.';\n      for (const key of Object.keys(item)) stack.push([item[key], depth + 1]);\n    }\n  }\n  if (Array.isArray(obj1) !== Array.isArray(obj2)) return 'obj1 and obj2 must both be objects or both be arrays.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function objDiff(obj1, obj2) {\n  const diff = {};\n  for (const key of Object.keys(obj1)) {\n    if (!Object.hasOwn(obj2, key)) {\n      continue;\n    }\n    const a = obj1[key];\n    const b = obj2[key];\n    const sameKind = a !== null && b !== null && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b);\n    if (sameKind) {\n      const inner = objDiff(a, b);\n      if (Object.keys(inner).length > 0) {\n        diff[key] = inner;\n      }\n    } else if (a !== b) {\n      diff[key] = [a, b];\n    }\n  }\n  return diff;\n}",
+  "brute": "function objDiff(obj1, obj2) {\n  // Walk obj2's keys instead; walk returns null for \"no difference\".\n  const kind = value => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);\n  const walk = (a, b) => {\n    if (kind(a) !== kind(b)) return [a, b];\n    if (kind(a) !== 'array' && kind(a) !== 'object') return a === b ? null : [a, b];\n    const out = {};\n    let found = false;\n    for (const key in b) {\n      if (!Object.prototype.hasOwnProperty.call(a, key)) continue;\n      const inner = walk(a[key], b[key]);\n      if (inner !== null) {\n        out[key] = inner;\n        found = true;\n      }\n    }\n    return found ? out : null;\n  };\n  return walk(obj1, obj2) || {};\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['a', 'b', 'c', 'v', 'x', 'z'];\n  let budget = small ? 12 : 900;\n  const primitive = () => {\n    const roll = rand();\n    if (roll < 0.45) return Math.floor(rand() * 7) - 2;\n    if (roll < 0.7) return pick(['', 'a', 'b', '1']);\n    if (roll < 0.85) return rand() < 0.5;\n    return null;\n  };\n  const value = (depth, container) => {\n    budget--;\n    if (!container && (depth >= (small ? 3 : 7) || budget <= 0 || rand() < 0.45)) return primitive();\n    const length = depth === 0 && !small ? 60 : Math.floor(rand() * (small ? 4 : 6));\n    if (rand() < 0.5) return Array.from({ length }, () => value(depth + 1, false));\n    const object = {};\n    for (let i = 0; i < length; i++) object[pick(names) + (small ? '' : i)] = value(depth + 1, false);\n    return object;\n  };\n  // A changed copy: values are kept, replaced or dropped, arrays grow or shrink, and nested kinds may change.\n  const mutate = (item, depth) => {\n    if (item === null || typeof item !== 'object') {\n      const roll = rand();\n      if (roll < 0.6) return item;\n      if (roll < 0.88) return primitive();\n      return rand() < 0.5 ? [] : { a: primitive() };\n    }\n    if (depth > 0 && rand() < 0.08) return Array.isArray(item) ? Object.assign({}, item) : Object.values(item);\n    if (Array.isArray(item)) {\n      const out = item.map(child => mutate(child, depth + 1));\n      const roll = rand();\n      if (roll < 0.25) out.length = Math.floor(rand() * (out.length + 1));\n      else if (roll < 0.5) out.push(primitive());\n      return out;\n    }\n    const out = {};\n    for (const key of Object.keys(item)) if (rand() < 0.9) out[key] = mutate(item[key], depth + 1);\n    if (rand() < 0.3) out[pick(names) + 'new'] = primitive();\n    return out;\n  };\n  const obj1 = value(0, true);\n  const obj2 = rand() < 0.15 ? JSON.parse(JSON.stringify(obj1)) : mutate(obj1, 0);\n  return rand() < 0.5 ? [obj1, obj2] : [obj2, obj1];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{},{"a":1,"b":2}],"expected":{}},
+    {"name":"Example 2","input":[{"a":1,"v":3,"x":[],"z":{"a":null}},{"a":2,"v":4,"x":[],"z":{"a":2}}],"expected":{"a":[1,2],"v":[3,4],"z":{"a":[null,2]}}},
+    {"name":"Example 3","input":[{"a":5,"v":6,"z":[1,2,4,[2,5,7]]},{"a":5,"v":7,"z":[1,2,3,[1]]}],"expected":{"v":[6,7],"z":{"2":[4,3],"3":{"0":[2,1]}}}},
+    {"name":"Example 4","input":[{"a":{"b":1}},{"a":[5]}],"expected":{"a":[{"b":1},[5]]}},
+    {"name":"Example 5","input":[{"a":[1,2,{}],"b":false},{"b":false,"a":[1,2,{}]}],"expected":{}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2,3],[1,2,3]]},
+    {"name":"Test 2","input":[[1,2,3],[1,5,3,4]]},
+    {"name":"Test 3","input":[{"a":1},{"b":1}]},
+    {"name":"Test 4","input":[{"a":null},{"a":{}}]},
+    {"name":"Test 5","input":[{"a":{"b":{"c":1}}},{"a":{"b":{"c":"1"}}}]},
+    {"name":"Test 6","input":[{"a":[]},{"a":{}}]},
+    {"name":"Test 7","input":[{"a":true,"b":0},{"a":false,"b":false}]},
+    {"name":"Test 8","input":[[{"x":1},{"x":2}],[{"x":1},{"x":3}]]},
+    {"name":"Test 9","input":[{"a":{"x":1},"b":2},{"a":{"x":1,"y":2},"b":2}]},
+    {"name":"Test 10","input":[{"s":"","t":"a"},{"s":"","t":"b"}]},
+    {"name":"Test 11","input":[{"a":[1,[2,[3]]]},{"a":[1,[2,[4]]]}]},
+    {"name":"Test 12","input":[{"a":1,"b":{"c":2}},{"b":{"c":3},"a":1}]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBoth inputs are trees, and the answer follows the shape of the parts they share. At each shared key there are only two situations. If both values are containers of the same kind (two objects or two arrays), the question repeats one level down, so the function calls itself and keeps the result only if it is not empty. In every other situation the two values are compared as wholes: equal primitives produce nothing, anything else becomes the pair `[a, b]`. Keys present on one side only never appear. (The brute force walks `obj2`'s keys instead and uses `null` for \"no difference\" rather than an empty object.)\n\n## Approach\n\n1. Start an empty `diff`.\n2. For each `key` of `obj1`, skip it unless `obj2` also has it as its own key.\n3. Let `a` and `b` be the two values. `sameKind` is true when both are non-null objects and both or neither are arrays.\n4. If `sameKind`, compute `inner = objDiff(a, b)` and store it under `key` only when it has at least one key.\n5. Otherwise, if `a !== b`, store `[a, b]`.\n6. Return `diff`.\n\n## Example 1, step by step\n\n`obj1 = {}` and `obj2 = {\"a\": 1, \"b\": 2}`.\n\n- `diff` starts as `{}`.\n- `Object.keys(obj1)` is empty, so the loop body never runs: `a` and `b` exist only in `obj2`, and keys from one side are ignored.\n- The answer is `{}`.\n\nIn Example 3 the same steps give `v → [6, 7]`, and for `z` (two arrays) the recursive call returns `{\"2\": [4, 3], \"3\": {\"0\": [2, 1]}}`, which is kept because it is not empty.\n\n## Complexity\n\n- Time: O(n), where n is the number of values in `obj1`: each shared key is handled once at its level.\n- Space: O(d + r): recursion depth d plus the size r of the result.\n\n## Pitfalls\n\n- `typeof null` is `\"object\"`, so test for `null` before recursing; `{\"a\": null}` against `{\"a\": 2}` must give `[null, 2]`.\n- An object and an array are different kinds even though both have `typeof \"object\"`: Example 4 reports the whole values, not a merged comparison.\n- Do not store an empty inner result; Example 5 and equal empty arrays (`x` in Example 2) must vanish.\n- `key in obj2` also finds inherited names such as `\"toString\"`; `Object.hasOwn` looks only at the object's own keys.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `diff` | the differences found at this level |\n| `key` | a key (or array index) of `obj1` |\n| `a`, `b` | the values under `key` in `obj1` and `obj2` |\n| `sameKind` | both are objects, or both are arrays, so they are compared key by key |\n| `inner` | the differences found one level down |",
+  "narration": {
+    "2": "diff collects the differences found at this level.",
+    "3": "Go through the keys of obj1; for an array these are its indexes.",
+    "4": "A key that obj2 does not have is ignored.",
+    "7": "a is the value in obj1 under this key.",
+    "8": "b is the value in obj2 under the same key.",
+    "9": "Two objects, or two arrays, are compared key by key; null and mixed kinds are not.",
+    "11": "Compare the two containers one level down.",
+    "12": "Keep the inner result only if it found at least one difference.",
+    "15": "Primitives or different kinds: any inequality is recorded as the pair [a, b].",
+    "16": "The pair holds the value from obj1 first and the value from obj2 second.",
+    "19": "Every shared key has been compared; return the differences."
+  }
+}

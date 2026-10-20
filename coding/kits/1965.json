@@ -1,0 +1,53 @@
+{
+  "number": 1965,
+  "title": "Employees With Missing Information",
+  "spec": "leetcode",
+  "statement": "An employee's details are split over two tables:\n\n- `Employees(employee_id, name)`: an employee's name; `employee_id` is unique.\n- `Salaries(employee_id, salary)`: an employee's salary; `employee_id` is unique.\n\nAn employee's information is **missing** when their id has a row in one table but not in the other: no `Employees` row means the name is missing, no `Salaries` row means the salary is missing.\n\nReturn one column, `employee_id`, listing every employee with missing information, ordered by `employee_id` ascending.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "employee_id is unique in Salaries",
+    "An id may appear in only one of the two tables"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["name","VARCHAR(30)"]],
+    "Salaries": [["employee_id","INT"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [], Salaries = [] }] = input;\n  const named = new Set(), paid = new Set();\n  for (const [id, name] of Employees) {\n    if (id === null) return 'Every Employees row needs an employee_id.';\n    if (named.has(id)) return `employee_id ${id} appears twice in Employees.`;\n    if (name === null) return `Employee ${id} needs a name.`;\n    named.add(id);\n  }\n  for (const [id, salary] of Salaries) {\n    if (id === null) return 'Every Salaries row needs an employee_id.';\n    if (paid.has(id)) return `employee_id ${id} appears twice in Salaries.`;\n    if (salary === null) return `Employee ${id} needs a salary value.`;\n    paid.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT employee_id\nFROM Employees\nWHERE employee_id NOT IN (SELECT employee_id FROM Salaries)\nUNION\nSELECT employee_id\nFROM Salaries\nWHERE employee_id NOT IN (SELECT employee_id FROM Employees)\nORDER BY employee_id;",
+  "brute": "SELECT employee_id\nFROM (\n  SELECT employee_id FROM Employees\n  UNION ALL\n  SELECT employee_id FROM Salaries\n) AS ids\nGROUP BY employee_id\nHAVING COUNT(*) = 1\nORDER BY employee_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const names = ['Crew', 'Haven', 'Kristian', 'Ana', 'Bob', 'Lee', 'Mia', 'Omar'];\n  const pool = small ? 10 : 2600, cap = small ? pick(9) : 2000;\n  const Employees = [], Salaries = [];\n  for (let id = 1; id <= pool; id++) {\n    // Each id is in both tables, only one of them, or neither.\n    const r = rand();\n    const inEmployees = r < 0.65, inSalaries = r < 0.5 || r >= 0.8;\n    if (inEmployees && Employees.length < cap) Employees.push([id, names[pick(names.length)]]);\n    if (inSalaries && Salaries.length < cap) Salaries.push([id, 1000 * (20 + pick(80)) + pick(1000)]);\n  }\n  const shuffle = rows => { for (let i = rows.length - 1; i > 0; i--) { const j = pick(i + 1); [rows[i], rows[j]] = [rows[j], rows[i]]; } return rows; };\n  return [{ Employees: shuffle(Employees), Salaries: shuffle(Salaries) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[2,"Crew"],[4,"Haven"],[5,"Kristian"]],"Salaries":[[5,76071],[1,22517],[4,63539]]}],"expected":{"columns":["employee_id"],"rows":[[1],[2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[],"Salaries":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[3,"Ana"],[1,"Bob"]],"Salaries":[]}]},
+    {"name":"Test 3","input":[{"Employees":[],"Salaries":[[8,50000],[6,42000]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,"Ana"],[2,"Bob"],[3,"Lee"]],"Salaries":[[3,30000],[1,40000],[2,50000]]}]},
+    {"name":"Test 5","input":[{"Employees":[[9,"Mia"],[3,"Omar"],[7,"Lee"]],"Salaries":[[7,61000],[1,23000],[12,45000]]}]},
+    {"name":"Test 6","input":[{"Employees":[[100,"Ana"],[2,"Bob"]],"Salaries":[[10,30000],[5,20000],[5000,10000]]}]},
+    {"name":"Test 7","input":[{"Employees":[[4,"Haven"]],"Salaries":[]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,"Ana"],[3,"Bob"]],"Salaries":[[2,30000],[4,40000]]}]},
+    {"name":"Test 9","input":[{"Employees":[[1,"Crew"],[2,"Crew"],[5,"Haven"],[8,"Mia"],[11,"Omar"]],"Salaries":[[2,76071],[5,22517],[6,63539],[11,99000],[13,41000],[14,41000]]}]},
+    {"name":"Test 10","input":[{"Employees":[[6,"Lee"]],"Salaries":[[6,55000]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA missing name and a missing salary are mirror images: an id that is in `Salaries` but not `Employees`, or in `Employees` but not `Salaries`. MySQL has no `FULL OUTER JOIN`, so the natural route is to answer each half with a `NOT IN` subquery and glue the halves together with `UNION`.\n\n## Approach\n\n1. First branch: ids from `Employees` whose `employee_id` is `NOT IN` the ids of `Salaries` (salary missing).\n2. Second branch: ids from `Salaries` that are `NOT IN` the ids of `Employees` (name missing).\n3. `UNION` the two branches; an id can only be in one of them, and `UNION` also removes duplicates.\n4. `ORDER BY employee_id` sorts the combined result.\n\n## Example 1, step by step\n\n- `Employees` ids are 2, 4, 5; `Salaries` ids are 5, 1, 4.\n- First branch: 2 is not among 5, 1, 4, so it is kept; 4 and 5 are dropped. Result: 2.\n- Second branch: 1 is not among 2, 4, 5, so it is kept; 5 and 4 are dropped. Result: 1.\n- `UNION` gives {2, 1}, and the `ORDER BY` returns 1, 2.\n\n## Complexity\n\n- Time: O(E + S) with hashed `NOT IN` lookups for E employees and S salary rows, plus O(k log k) to sort the k missing ids.\n- Space: O(E + S) for the lookup sets.\n\n## Pitfalls\n\n- A single `LEFT JOIN` from `Employees` finds missing salaries but never sees ids that only exist in `Salaries`.\n- `NOT IN` returns nothing at all if its subquery yields a `null`; it is safe here only because `employee_id` is a key that is never null.\n- The `ORDER BY` must come after the last branch and applies to the whole `UNION`, not just the second `SELECT`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| first `SELECT ... FROM Employees` | employees with a name but no salary row |\n| first `NOT IN` subquery | every id that has a salary |\n| second `SELECT ... FROM Salaries` | employees with a salary but no name row |\n| second `NOT IN` subquery | every id that has a name |\n| `UNION` | combines both lists into one `employee_id` column |",
+  "narration": {
+    "1": "The output is one column of employee ids.",
+    "2": "The first branch looks at employees who have a name.",
+    "3": "Keep those whose id never appears in Salaries: their salary is missing.",
+    "4": "UNION appends the second branch and drops any duplicate ids.",
+    "6": "The second branch looks at employees who have a salary.",
+    "7": "Keep those whose id never appears in Employees: their name is missing.",
+    "8": "Sort the combined list by employee_id, as the problem asks."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "number": 2066,
+  "title": "Account Balance",
+  "spec": "recalled",
+  "statement": "A bank logs the transactions on its accounts:\n\n- `Transactions(account_id, day, type, amount)`: one row per transaction; `(account_id, day)` is unique, so an account has at most one transaction per day. `type` is `'Deposit'` (adds `amount` to the balance) or `'Withdraw'` (subtracts it).\n\nEvery account starts at a balance of 0, and its balance never drops below 0 at any point. For every transaction, report the account's balance right after it, with the columns `account_id`, `day` and `balance`. Order the rows by `account_id` ascending, then by `day` ascending.",
+  "constraints": [
+    "(account_id, day) is unique in Transactions",
+    "type is 'Deposit' or 'Withdraw'",
+    "amount is a non-negative integer",
+    "Every balance starts at 0 and never goes below 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Transactions": [["account_id","INT"],["day","DATE"],["type","ENUM('Deposit', 'Withdraw')"],["amount","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Transactions = [] }] = input;\n  const keys = new Set(), byAccount = new Map();\n  for (const row of Transactions) {\n    const [account, day, type, amount] = row;\n    if (account === null) return 'Every transaction needs an account_id.';\n    if (typeof day !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(day)) return `Account ${account} needs a YYYY-MM-DD day.`;\n    const key = `${account}/${day}`;\n    if (keys.has(key)) return `Account ${account} has two transactions on ${day}.`;\n    keys.add(key);\n    if (type !== 'Deposit' && type !== 'Withdraw') return `type must be 'Deposit' or 'Withdraw', not ${type}.`;\n    if (amount === null || amount < 0) return `Account ${account} on ${day} needs a non-negative amount.`;\n    if (!byAccount.has(account)) byAccount.set(account, []);\n    byAccount.get(account).push(row);\n  }\n  for (const [account, rows] of byAccount) {\n    let balance = 0;\n    for (const [, day, type, amount] of rows.sort((a, b) => (a[1] < b[1] ? -1 : 1))) {\n      balance += type === 'Deposit' ? amount : -amount;\n      if (balance < 0) return `Account ${account} goes below 0 on ${day}.`;\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH signed AS (\n  SELECT account_id, day,\n    IF(type = 'Deposit', amount, -amount) AS delta\n  FROM Transactions\n)\nSELECT account_id, day,\n  SUM(delta) OVER (PARTITION BY account_id ORDER BY day) AS balance\nFROM signed\nORDER BY account_id, day;",
+  "brute": "SELECT t.account_id, t.day, SUM(CASE WHEN p.type = 'Deposit' THEN p.amount ELSE -p.amount END) AS balance\nFROM Transactions AS t\nJOIN Transactions AS p\n  ON p.account_id = t.account_id\n  AND p.day <= t.day\nGROUP BY t.account_id, t.day\nORDER BY t.account_id, t.day",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = offset => new Date(Date.UTC(2021, 10, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const Transactions = [];\n  const accounts = small ? 1 + Math.floor(rand() * 3) : 40;\n  const perAccount = small ? 3 : 50;\n  const amounts = [500, 1000, 2000, 3000, 7000];\n  for (let a = 0; a < accounts; a++) {\n    const account = small ? [1, 2, 3, 7][a] : a + 1;\n    // Distinct days per account, in increasing order; the rows are shuffled afterwards.\n    let offset = Math.floor(rand() * 5), balance = 0;\n    const n = small ? Math.floor(rand() * (perAccount + 1)) : perAccount;\n    for (let i = 0; i < n; i++) {\n      let type = rand() < 0.45 && balance > 0 ? 'Withdraw' : 'Deposit';\n      let amount = small ? amounts[Math.floor(rand() * amounts.length)] : 100 * (1 + Math.floor(rand() * 100));\n      if (type === 'Withdraw') {\n        // Withdraw at most the current balance; sometimes exactly all of it.\n        amount = rand() < 0.3 ? balance : Math.min(amount, balance);\n        balance -= amount;\n      } else balance += amount;\n      Transactions.push([account, day(offset), type, amount]);\n      offset += 1 + Math.floor(rand() * 6);\n    }\n  }\n  for (let i = Transactions.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Transactions[i], Transactions[j]] = [Transactions[j], Transactions[i]]; }\n  return [{ Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Transactions":[[1,"2021-11-07","Deposit",2000],[1,"2021-11-09","Withdraw",1000],[1,"2021-11-11","Deposit",3000],[2,"2021-12-07","Deposit",7000],[2,"2021-12-12","Withdraw",7000]]}],"expected":{"columns":["account_id","day","balance"],"rows":[[1,"2021-11-07",2000],[1,"2021-11-09",1000],[1,"2021-11-11",4000],[2,"2021-12-07",7000],[2,"2021-12-12",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Transactions":[[5,"2021-01-01","Deposit",300]]}]},
+    {"name":"Test 3","input":[{"Transactions":[[1,"2021-03-05","Withdraw",500],[1,"2021-03-01","Deposit",800],[1,"2021-03-09","Deposit",100]]}]},
+    {"name":"Test 4","input":[{"Transactions":[[2,"2021-12-01","Deposit",100],[1,"2021-12-01","Deposit",50],[2,"2021-12-02","Withdraw",100],[1,"2021-12-03","Withdraw",20]]}]},
+    {"name":"Test 5","input":[{"Transactions":[[3,"2021-12-31","Deposit",1000],[3,"2022-01-01","Withdraw",1000],[3,"2022-01-02","Deposit",0],[3,"2022-01-10","Deposit",250]]}]},
+    {"name":"Test 6","input":[{"Transactions":[[10,"2021-05-20","Deposit",4000],[10,"2021-05-03","Deposit",1000],[10,"2021-05-11","Withdraw",1000],[9,"2021-05-15","Deposit",700]]}]},
+    {"name":"Test 7","input":[{"Transactions":[[4,"2021-07-01","Deposit",2000],[4,"2021-07-02","Deposit",2000],[4,"2021-07-03","Deposit",2000],[4,"2021-07-04","Withdraw",6000],[4,"2021-07-05","Deposit",1]]}]},
+    {"name":"Test 8","input":[{"Transactions":[[1,"2021-11-09","Deposit",1000],[2,"2021-11-09","Deposit",1000],[3,"2021-11-09","Deposit",1000],[2,"2021-11-10","Withdraw",400],[3,"2021-11-08","Deposit",5]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe balance after a transaction is the sum of everything that happened to that account up to and including that day, with deposits counted as positive and withdrawals as negative. That is a **running total per account**, which a window function computes in one pass: `SUM(...) OVER (PARTITION BY account_id ORDER BY day)`.\n\n## Approach\n\n1. `signed`: turn each transaction into a signed change `delta`, `+amount` for a deposit and `-amount` for a withdrawal, using `IF`.\n2. In the final query, `SUM(delta) OVER (PARTITION BY account_id ORDER BY day)` adds up the changes of the same account from its first day through the current row's day. Since an account has at most one transaction per day, each row's frame ends exactly at that row.\n3. `ORDER BY account_id, day` returns the rows in the required order.\n\n## Example 1, step by step\n\n- `signed` for account 1: 2021-11-07 → +2000, 2021-11-09 → −1000, 2021-11-11 → +3000. Running totals: 2000, 1000, 4000.\n- `signed` for account 2: 2021-12-07 → +7000, 2021-12-12 → −7000. Running totals: 7000, 0.\n\nThe five rows, in account then day order, are the expected output.\n\n## Complexity\n\n- Time: O(n log n) for n transactions, for sorting each account's rows by day.\n- Space: O(n) for `signed` and the result.\n\n## Pitfalls\n\n- Summing `amount` without a sign treats withdrawals as deposits.\n- Without `PARTITION BY account_id` the running total leaks from one account into the next.\n- The window's `ORDER BY day` decides what is summed; the final `ORDER BY` only decides how rows are listed, and both are needed.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `signed` | each transaction with its signed change `delta` |\n| `delta` | `amount` for a deposit, `-amount` for a withdrawal |\n| `balance` | running sum of `delta` within the account, ordered by day |",
+  "narration": {
+    "1": "The first stage rewrites every transaction as a signed change to the balance.",
+    "3": "Deposits keep their amount and withdrawals become negative, so a plain sum gives the balance.",
+    "6": "The final query lists each transaction with the balance right after it.",
+    "7": "Add up the signed changes of the same account from its first day through this row's day.",
+    "9": "List rows by account, then by day, as required."
+  }
+}

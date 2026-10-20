@@ -1,0 +1,72 @@
+{
+  "number": 2721,
+  "title": "Execute Asynchronous Functions in Parallel",
+  "spec": "leetcode",
+  "statement": "Write `promiseAll(functions)`. Each entry of `functions` takes no arguments and, when called, gives back a promise. Start **all** of them at once (none may wait for another) and return a single promise that combines their outcomes:\n\n- If every promise resolves, yours resolves with the list of their values, placed in the same order as `functions` (not in the order they finished). It resolves at the moment the slowest one resolves.\n- If any promise rejects, yours rejects right away with the reason of the earliest rejection.\n\nBuild this yourself: calling the built-in `Promise.all` is not allowed.\n\nEach case describes `functions` as JSON. An entry `{ t, resolve }` is a function whose promise resolves with the value `resolve` after `t` ms; `{ t, reject }` rejects with the string `reject` after `t` ms. When `t` is `0` the promise is already settled when the function returns. Timing starts when the function is called. The answer is `{ t, resolved }` or `{ t, rejected }`: how your promise settled and when, in ms after `promiseAll` was called.",
+  "constraints": [
+    "1 <= functions.length <= 10",
+    "Each function is { t, resolve } or { t, reject }",
+    "0 <= t <= 1000",
+    "resolve is an integer from -1000 to 1000",
+    "reject is a string of 1 to 20 characters"
+  ],
+  "signature": "Object promiseAll(List<Object> functions)",
+  "entry": "promiseAll",
+  "kind": "function",
+  "parameters": [
+    "functions"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [functions] = input;\n  if (!Array.isArray(functions) || functions.length < 1 || functions.length > 10) return 'Give 1 to 10 functions.';\n  for (const spec of functions) {\n    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return 'Each function must be an object such as { \"t\": 100, \"resolve\": 5 }.';\n    if (!Number.isInteger(spec.t) || spec.t < 0 || spec.t > 1000) return 'Each function needs a time t from 0 to 1000.';\n    const keys = Object.keys(spec).sort().join(',');\n    if (keys === 'resolve,t') {\n      if (!Number.isInteger(spec.resolve) || spec.resolve < -1000 || spec.resolve > 1000) return 'resolve must be an integer from -1000 to 1000.';\n    } else if (keys === 'reject,t') {\n      if (typeof spec.reject !== 'string' || spec.reject.length < 1 || spec.reject.length > 20) return 'reject must be a string of 1 to 20 characters.';\n    } else return 'Each function needs t and exactly one of resolve or reject.';\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [specs] = input;\n  const functions = specs.map((spec, index) => () => {\n    kit.trace(`functions[${index}] is called`);\n    const failing = spec.reject !== undefined;\n    const outcome = failing ? spec.reject : spec.resolve;\n    const settle = () => kit.trace(`The promise of functions[${index}] ${failing ? 'rejects' : 'resolves'} with ${JSON.stringify(outcome)}`);\n    if (spec.t === 0) {\n      settle();\n      return failing ? Promise.reject(outcome) : Promise.resolve(outcome);\n    }\n    return new Promise((resolve, reject) => setTimeout(() => {\n      settle();\n      if (failing) reject(outcome);\n      else resolve(outcome);\n    }, spec.t));\n  });\n  const start = Date.now();\n  kit.trace(`promiseAll is called with ${specs.length} function${specs.length === 1 ? '' : 's'}`);\n  // The exercise asks for a solution without the built-in Promise.all.\n  const builtin = Promise.all;\n  Promise.all = () => { throw new Error('Solve this without the built-in Promise.all.'); };\n  let promise;\n  try { promise = solve(functions); } finally { Promise.all = builtin; }\n  if (!promise || typeof promise.then !== 'function') throw new Error('promiseAll must return a promise.');\n  return promise.then((values) => {\n    kit.trace(`The returned promise resolves with ${JSON.stringify(values)}`);\n    return { t: Date.now() - start, resolved: values };\n  }, (reason) => {\n    const rejected = reason instanceof Error ? String(reason) : reason;\n    kit.trace(`The returned promise rejects with ${JSON.stringify(rejected)}`);\n    return { t: Date.now() - start, rejected };\n  });\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Array<() => Promise<any>>} functions\n * @return {Promise<any[]>}\n */\nfunction promiseAll(functions) {\n  // Write your code here.\n  return new Promise((resolve, reject) => {\n  });\n}\n",
+    "typescript": "function promiseAll<T>(functions: Array<() => Promise<T>>): Promise<T[]> {\n  // Write your code here.\n  return new Promise((resolve, reject) => {\n  });\n}\n"
+  },
+  "api": "promiseAll<T>(functions: Array<() => Promise<T>>): Promise<T[]>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function promiseAll(functions) {\n  return new Promise((resolve, reject) => {\n    const results = new Array(functions.length);\n    let pending = functions.length;\n    functions.forEach((fn, index) => {\n      const promise = fn();\n      promise.then((value) => {\n        results[index] = value;\n        pending -= 1;\n        if (pending === 0) {\n          resolve(results);\n        }\n      }, (reason) => {\n        reject(reason);\n      });\n    });\n  });\n}",
+  "brute": "async function promiseAll(functions) {\n  const tagged = functions.map((fn, index) => fn().then((value) => ({ index, value })));\n  const values = [];\n  const done = new Set();\n  while (done.size < functions.length) {\n    const open = tagged.filter((_, index) => !done.has(index));\n    const first = await Promise.race(open);\n    done.add(first.index);\n    values[first.index] = first.value;\n  }\n  return values;\n}",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? 1 + Math.floor(rand() * 4) : 6 + Math.floor(rand() * 5);\n  const maxTime = size === 'small' ? 120 : 1000;\n  const failing = rand() < 0.5;\n  const functions = [];\n  for (let i = 0; i < count; i++) {\n    const roll = rand();\n    const t = roll < 0.1 ? 0 : Math.floor(rand() * (maxTime + 1));\n    if (failing && rand() < 0.4) functions.push({ t, reject: `Error ${i}` });\n    else functions.push({ t, resolve: Math.floor(rand() * (size === 'small' ? 21 : 2001)) - (size === 'small' ? 10 : 1000) });\n  }\n  if (failing && !functions.some((spec) => spec.reject !== undefined)) {\n    const index = Math.floor(rand() * count);\n    functions[index] = { t: functions[index].t, reject: `Error ${index}` };\n  }\n  return [functions];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[{"t":200,"resolve":5}]],"expected":{"t":200,"resolved":[5]}},
+    {"name":"Example 2","input":[[{"t":200,"resolve":1},{"t":100,"reject":"Error"}]],"expected":{"t":100,"rejected":"Error"}},
+    {"name":"Example 3","input":[[{"t":50,"resolve":4},{"t":150,"resolve":10},{"t":100,"resolve":16}]],"expected":{"t":150,"resolved":[4,10,16]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[{"t":0,"resolve":42}]]},
+    {"name":"Test 2","input":[[{"t":0,"reject":"Oops"}]]},
+    {"name":"Test 3","input":[[{"t":300,"resolve":1},{"t":200,"resolve":2},{"t":100,"resolve":3}]]},
+    {"name":"Test 4","input":[[{"t":100,"reject":"A"},{"t":50,"reject":"B"},{"t":10,"resolve":7}]]},
+    {"name":"Test 5","input":[[{"t":10,"resolve":1},{"t":20,"resolve":2},{"t":500,"reject":"Late"}]]},
+    {"name":"Test 6","input":[[{"t":100,"resolve":5},{"t":100,"reject":"Tie"},{"t":100,"reject":"Other"}]]},
+    {"name":"Test 7","input":[[{"t":1000,"resolve":1},{"t":1000,"resolve":2},{"t":1000,"resolve":3},{"t":1000,"resolve":4},{"t":1000,"resolve":5},{"t":1000,"resolve":6},{"t":1000,"resolve":7},{"t":1000,"resolve":8},{"t":1000,"resolve":9},{"t":1000,"resolve":10}]]},
+    {"name":"Test 8","input":[[{"t":5,"resolve":-3},{"t":5,"resolve":-3},{"t":0,"resolve":0}]]},
+    {"name":"Test 9","input":[[{"t":400,"resolve":1},{"t":0,"reject":"Now"}]]},
+    {"name":"Test 10","input":[[{"t":0,"resolve":-1000},{"t":999,"resolve":1000},{"t":1,"resolve":0}]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nCalling every function first and only then waiting is what makes the work parallel: all the timers run side by side, so the total wait is the slowest one, not the sum. After that it is bookkeeping. Each value goes into the slot of its own index (finishing order does not matter), a counter of unfinished promises tells when the last one has arrived, and the first rejection settles the result immediately. Later settlements are harmless because a promise can only settle once. (The brute force reaches the same answer by repeatedly racing the promises that have not resolved yet.)\n\n## Approach\n\n1. Return a new promise and keep `resolve` and `reject` from its executor.\n2. Create `results`, an array with one slot per function, and set `pending` to the number of functions.\n3. For each `fn` with its `index`, call it right away to get its `promise`.\n4. When that promise resolves, store the value in `results[index]` and decrease `pending`; when `pending` reaches 0, resolve with `results`.\n5. When it rejects, call `reject` with its reason. Only the first call of `reject` or `resolve` has any effect.\n\n## Example 1, step by step\n\n`functions` has one entry that resolves with 5 after 200 ms.\n\n- At 0 ms `results = [empty]` and `pending = 1`. `functions[0]` is called, and its timer starts.\n- At 200 ms its promise resolves with 5: `results[0] = 5` and `pending` drops to 0.\n- So the returned promise resolves with `[5]` at 200 ms, and the answer is `{ t: 200, resolved: [5] }`.\n\n## Complexity\n\n- Time: O(n) work for n functions; the waiting time is that of the slowest promise, or of the earliest rejection.\n- Space: O(n) for `results`.\n\n## Pitfalls\n\n- Awaiting the functions one by one in a loop runs them in sequence: Example 3 would take 300 ms instead of 150.\n- Pushing values as they arrive puts them in finishing order; write to `results[index]` instead.\n- Checking `results.length === functions.length` does not work with `new Array(n)`, which already has length n; count with `pending`.\n- Forgetting the rejection handler leaves the returned promise waiting forever when a function fails.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `results` | the resolved values, each at its function's index |\n| `pending` | how many promises have not resolved yet |\n| `fn`, `index` | the function being started and its position |\n| `promise` | the promise that `fn` returned |\n| `resolve`, `reject` | settle the promise that `promiseAll` returns |",
+  "narration": {
+    "1": "promiseAll receives the list of functions that each produce a promise.",
+    "2": "Return a new promise; its resolve and reject are kept for when the outcomes arrive.",
+    "3": "results has one slot per function so each value can land at its own index.",
+    "4": "pending counts the promises that have not resolved yet.",
+    "5": "Visit every function in order, remembering its index.",
+    "6": "Call the function now, so all of them start at the same moment and run in parallel.",
+    "7": "Attach handlers for when this promise resolves or rejects.",
+    "8": "Store the value at the index of its function, whatever order the promises finish in.",
+    "9": "One fewer promise is still waiting.",
+    "10": "When none is left, every value is in place.",
+    "11": "Resolve the returned promise with the full list of values.",
+    "13": "This second handler runs if the promise rejects instead.",
+    "14": "A rejection settles the returned promise right away with its reason; later outcomes are ignored."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 1951,
+  "title": "All the Pairs With the Maximum Number of Common Followers",
+  "spec": "recalled",
+  "statement": "A social network stores who follows whom:\n\n- `Relations(user_id, follower_id)`: one row per follow, meaning `follower_id` follows `user_id`. `(user_id, follower_id)` is unique.\n\nFor two different users, their **common followers** are the people who follow both of them. Among all pairs of users, find the largest number of common followers, and report every pair that reaches it. Return the columns `user1_id` and `user2_id`, with `user1_id < user2_id` in each row, so a pair is reported once. Only pairs with at least one common follower are candidates: if no two users share a follower, return no rows. Rows may come in any order.",
+  "constraints": [
+    "(user_id, follower_id) is unique in Relations",
+    "a row means follower_id follows user_id",
+    "each pair is reported once, with user1_id < user2_id"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Relations": [["user_id","INT"],["follower_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Relations = [] }] = input;\n  const seen = new Set();\n  for (const [user, follower] of Relations) {\n    if (user === null || follower === null) return 'Every row needs a user_id and a follower_id.';\n    const key = `${user}|${follower}`;\n    if (seen.has(key)) return `${follower} follows ${user} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH pair_counts AS (\n  SELECT a.user_id AS user1_id, b.user_id AS user2_id, COUNT(*) AS common\n  FROM Relations AS a\n  JOIN Relations AS b\n    ON b.follower_id = a.follower_id\n   AND b.user_id > a.user_id\n  GROUP BY a.user_id, b.user_id\n),\nranked AS (\n  SELECT user1_id, user2_id, RANK() OVER (ORDER BY common DESC) AS rnk\n  FROM pair_counts\n)\nSELECT user1_id, user2_id\nFROM ranked\nWHERE rnk = 1;",
+  "brute": "SELECT x.user_id AS user1_id, y.user_id AS user2_id\nFROM Relations AS x, Relations AS y\nWHERE x.follower_id = y.follower_id\n  AND x.user_id < y.user_id\nGROUP BY x.user_id, y.user_id\nHAVING COUNT(*) = (\n  SELECT MAX(shared)\n  FROM (\n    SELECT COUNT(*) AS shared\n    FROM Relations AS p, Relations AS q\n    WHERE p.follower_id = q.follower_id\n      AND p.user_id < q.user_id\n    GROUP BY p.user_id, q.user_id\n  ) AS counts\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const users = small ? 2 + Math.floor(rand() * 4) : 120;\n  const followers = small ? 2 + Math.floor(rand() * 5) : 260;\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  // Ids come from one pool, so a user can also follow other users; nobody follows themself.\n  const userIds = [], seen = new Set(), Relations = [];\n  for (let i = 0; i < users; i++) userIds.push(small ? [1, 2, 3, 7, 9][i] : 1 + i * 2);\n  for (let attempt = 0; Relations.length < rows && attempt < rows * 20; attempt++) {\n    const user = userIds[Math.floor(rand() * userIds.length)];\n    const follower = 1 + Math.floor(rand() * followers) + (small ? 0 : 1);\n    if (follower === user || seen.has(`${user}|${follower}`)) continue;\n    seen.add(`${user}|${follower}`);\n    Relations.push([user, follower]);\n  }\n  return [{ Relations }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Relations":[[1,3],[2,3],[7,3],[1,4],[2,4],[7,4],[1,5],[2,6],[7,5]]}],"expected":{"columns":["user1_id","user2_id"],"rows":[[1,7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Relations":[]}]},
+    {"name":"Test 2","input":[{"Relations":[[1,2],[1,3],[1,4]]}]},
+    {"name":"Test 3","input":[{"Relations":[[1,3],[2,4],[5,6]]}]},
+    {"name":"Test 4","input":[{"Relations":[[1,5],[2,5]]}]},
+    {"name":"Test 5","input":[{"Relations":[[1,8],[2,8],[3,8],[1,9],[2,9],[3,9]]}]},
+    {"name":"Test 6","input":[{"Relations":[[9,10],[9,11],[9,12],[2,10],[2,11],[2,12],[4,10],[4,13]]}]},
+    {"name":"Test 7","input":[{"Relations":[[1,20],[2,20],[3,20],[4,20],[1,21],[2,21],[3,22],[4,22],[3,23],[4,23]]}]},
+    {"name":"Test 8","input":[{"Relations":[[1,2],[2,1],[1,3],[2,3],[3,1]]}]},
+    {"name":"Test 9","input":[{"Relations":[[1,30],[2,30],[1,31],[2,31],[3,32],[4,32],[3,33],[4,33],[1,32],[3,30]]}]},
+    {"name":"Test 10","input":[{"Relations":[[5,40],[6,40],[7,40],[5,41],[6,41],[5,42],[7,42],[6,43],[7,43]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA common follower is one follower id that appears under two different users. Joining `Relations` to itself on `follower_id` produces one row per (pair of users, shared follower), so grouping those rows by the pair and counting gives each pair's number of common followers. The answer is every pair whose count equals the largest count, and a rank over the counts finds them all, ties included.\n\n## Approach\n\n1. `pair_counts`: join `a` and `b` on the same `follower_id` with `b.user_id > a.user_id`, so each unordered pair appears once and nobody pairs with themself; group by the pair and `COUNT(*)` the shared followers as `common`.\n2. `ranked`: `RANK() OVER (ORDER BY common DESC)` gives rank 1 to every pair tied for the maximum.\n3. Return `user1_id` and `user2_id` of the rows with `rnk = 1`.\n\n## Example 1, step by step\n\nUsers 1, 2 and 7 are followed by {3, 4, 5}, {3, 4, 6} and {3, 4, 5}.\n\n| user1_id | user2_id | common | rnk |\n| --- | --- | --- | --- |\n| 1 | 7 | 3 | 1 |\n| 1 | 2 | 2 | 2 |\n| 2 | 7 | 2 | 2 |\n\nOnly (1, 7) has rank 1.\n\n## Complexity\n\n- Time: the self-join emits Σ k_f² / 2 rows, where follower f follows k_f users; grouping and ranking the P resulting pairs costs O(P log P).\n- Space: O(P) for `pair_counts`.\n\n## Pitfalls\n\n- Joining on `a.user_id <> b.user_id` reports each pair twice, as (1, 7) and (7, 1).\n- `ORDER BY common DESC LIMIT 1` keeps only one pair when several tie for the maximum.\n- `ROW_NUMBER()` has the same flaw as `LIMIT 1`; use `RANK()` or `DENSE_RANK()`.\n- Joining on `user_id` instead of `follower_id` counts something else entirely: pairs of followers of one user.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a`, `b` | two follow rows with the same follower, `b` for the larger user id |\n| `pair_counts` | one row per user pair with its `common` follower count |\n| `ranked` | the pairs with `rnk`, 1 for the largest count |",
+  "narration": {
+    "1": "The first stage counts the common followers of every pair of users.",
+    "3": "Start from one follow row, a, for the first user of the pair.",
+    "4": "Join a second follow row, b, so the pair can be formed.",
+    "5": "The two rows must share the follower; that follower is common to both users.",
+    "6": "Requiring the larger id in b lists each pair once and never pairs a user with themself.",
+    "7": "Group by the pair so COUNT(*) counts its shared followers.",
+    "9": "The second stage ranks the pairs.",
+    "10": "Rank the pairs by their count, largest first; tied pairs share a rank.",
+    "15": "Keep every pair at rank 1, which is every pair tied for the maximum."
+  }
+}

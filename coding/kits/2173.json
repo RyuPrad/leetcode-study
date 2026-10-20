@@ -1,0 +1,53 @@
+{
+  "number": 2173,
+  "title": "Longest Winning Streak",
+  "spec": "recalled",
+  "statement": "One table records every match each player has played:\n\n- `Matches(player_id, match_day, result)`: one row per match; `(player_id, match_day)` is unique, so a player plays at most once a day. `result` is one of `'Win'`, `'Draw'` or `'Lose'`.\n\nOrder each player's matches by `match_day`. A **winning streak** is a run of consecutive matches in that order that are all wins; any draw or loss ends it. Days between matches do not matter, only the order of the matches.\n\nFor every player in `Matches`, report `player_id` and `longest_streak`, the length of that player's longest winning streak (`0` for a player who never won). Rows may come in any order.",
+  "constraints": [
+    "(player_id, match_day) is unique in Matches",
+    "result is one of 'Win', 'Draw', 'Lose'",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Matches": [["player_id","INT"],["match_day","DATE"],["result","ENUM('Win', 'Draw', 'Lose')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Matches = [] }] = input;\n  const seen = new Set();\n  for (const [player, day, result] of Matches) {\n    if (player === null || day === null || result === null) return 'Matches rows may not contain null.';\n    if (!['Win', 'Draw', 'Lose'].includes(result)) return `result must be Win, Draw or Lose, not ${result}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)) return `match_day ${day} is not a date.`;\n    const key = `${player}|${day}`;\n    if (seen.has(key)) return `Player ${player} plays twice on ${day}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH tagged AS (\n  SELECT player_id, match_day, result,\n         SUM(CASE WHEN result = 'Win' THEN 0 ELSE 1 END)\n           OVER (PARTITION BY player_id ORDER BY match_day) AS streak_id\n  FROM Matches\n),\nstreaks AS (\n  SELECT player_id, streak_id,\n         SUM(CASE WHEN result = 'Win' THEN 1 ELSE 0 END) AS wins\n  FROM tagged\n  GROUP BY player_id, streak_id\n)\nSELECT player_id, MAX(wins) AS longest_streak\nFROM streaks\nGROUP BY player_id;",
+  "brute": "SELECT p.player_id, IFNULL(MAX(s.streak_len), 0) AS longest_streak\nFROM (SELECT DISTINCT player_id FROM Matches) AS p\nLEFT JOIN (\n  SELECT w.player_id, w.last_break, COUNT(*) AS streak_len\n  FROM (\n    SELECT m.player_id,\n           (SELECT MAX(x.match_day)\n            FROM Matches AS x\n            WHERE x.player_id = m.player_id\n              AND x.match_day < m.match_day\n              AND x.result <> 'Win') AS last_break\n    FROM Matches AS m\n    WHERE m.result = 'Win'\n  ) AS w\n  GROUP BY w.player_id, w.last_break\n) AS s\n  ON s.player_id = p.player_id\nGROUP BY p.player_id",
+  "generator": "function generate(rand, size) {\n  const day = n => new Date(Date.UTC(2022, 0, 1 + n)).toISOString().slice(0, 10);\n  const pick = () => { const r = rand(); return r < 0.6 ? 'Win' : r < 0.8 ? 'Draw' : 'Lose'; };\n  const Matches = [];\n  if (size === 'small') {\n    // A few players share a small pool of days, so partitions interleave and runs of wins are common.\n    const count = Math.floor(rand() * 9), seen = new Set();\n    for (let i = 0; i < count; i++) {\n      const player = 1 + Math.floor(rand() * 3), d = day(Math.floor(rand() * 10));\n      if (seen.has(`${player}|${d}`)) continue;\n      seen.add(`${player}|${d}`);\n      Matches.push([player, d, pick()]);\n    }\n  } else {\n    for (let player = 1; player <= 40; player++) {\n      let n = Math.floor(rand() * 5);\n      for (let i = 0; i < 50; i++) { n += 1 + Math.floor(rand() * 3); Matches.push([player, day(n), pick()]); }\n    }\n    for (let i = Matches.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Matches[i], Matches[j]] = [Matches[j], Matches[i]]; }\n  }\n  return [{ Matches }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Matches":[[1,"2022-01-17","Win"],[1,"2022-01-18","Win"],[1,"2022-01-25","Win"],[1,"2022-01-31","Draw"],[1,"2022-02-08","Win"],[2,"2022-02-06","Lose"],[2,"2022-02-08","Lose"],[3,"2022-03-30","Win"]]}],"expected":{"columns":["player_id","longest_streak"],"rows":[[1,3],[2,0],[3,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Matches":[]}]},
+    {"name":"Test 2","input":[{"Matches":[[4,"2022-05-01","Lose"]]}]},
+    {"name":"Test 3","input":[{"Matches":[[1,"2022-01-03","Win"],[1,"2022-01-01","Win"],[1,"2022-01-02","Win"],[1,"2022-01-09","Win"]]}]},
+    {"name":"Test 4","input":[{"Matches":[[1,"2022-01-05","Win"],[1,"2022-01-01","Win"],[1,"2022-01-03","Win"],[1,"2022-01-02","Lose"],[1,"2022-01-04","Draw"]]}]},
+    {"name":"Test 5","input":[{"Matches":[[2,"2022-02-01","Win"],[2,"2022-02-02","Win"],[2,"2022-02-03","Lose"],[2,"2022-02-04","Win"],[2,"2022-02-05","Win"],[2,"2022-02-06","Win"]]}]},
+    {"name":"Test 6","input":[{"Matches":[[1,"2022-03-01","Win"],[2,"2022-03-01","Win"],[1,"2022-03-02","Win"],[2,"2022-03-02","Lose"],[1,"2022-03-03","Draw"],[2,"2022-03-03","Win"]]}]},
+    {"name":"Test 7","input":[{"Matches":[[5,"2022-04-01","Win"],[5,"2022-04-02","Draw"],[5,"2022-04-03","Win"],[5,"2022-04-04","Lose"],[5,"2022-04-05","Win"]]}]},
+    {"name":"Test 8","input":[{"Matches":[[1,"2022-06-01","Draw"],[1,"2022-06-02","Draw"],[2,"2022-06-01","Lose"],[3,"2022-06-05","Win"],[3,"2022-06-06","Win"]]}]},
+    {"name":"Test 9","input":[{"Matches":[[7,"2021-12-30","Win"],[7,"2021-12-31","Win"],[7,"2022-01-01","Win"],[7,"2022-01-02","Lose"],[8,"2021-12-31","Lose"],[8,"2022-01-01","Win"],[8,"2022-01-02","Win"],[8,"2022-01-03","Win"],[8,"2022-01-04","Win"]]}]},
+    {"name":"Test 10","input":[{"Matches":[[1,"2022-01-17","Win"],[1,"2022-01-18","Win"],[1,"2022-01-25","Win"],[1,"2022-01-31","Draw"],[1,"2022-02-08","Win"],[1,"2022-02-09","Win"],[1,"2022-02-10","Win"],[2,"2022-02-06","Lose"],[2,"2022-02-08","Win"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a gaps-and-islands problem: each player's matches, in date order, form islands of wins separated by draws and losses. Give every row a label that stays the same along one island and changes whenever a non-win appears. A **running count of non-wins** does exactly that: it grows by one at each draw or loss and stays flat while the player keeps winning. Grouping by that label and counting the wins in each group measures every streak.\n\n## Approach\n\n1. `tagged`: for each player (`PARTITION BY player_id`), in `match_day` order, sum 1 for every non-win seen so far as `streak_id`. All wins of one streak share a `streak_id`; the draw or loss that precedes them shares it too.\n2. `streaks`: group by `player_id` and `streak_id` and count the wins in each group as `wins`. A group made only of a draw or loss gets 0.\n3. Take `MAX(wins)` per player as `longest_streak`. A player who never won has only 0-win groups, so the answer is 0 with no extra join.\n\n## Example 1, step by step\n\n- Player 1: 01-17 Win (0), 01-18 Win (0), 01-25 Win (0), 01-31 Draw (1), 02-08 Win (1). Group 0 has 3 wins, group 1 has 1, so 3.\n- Player 2: 02-06 Lose (1), 02-08 Lose (2). Both groups have 0 wins, so 0.\n- Player 3: 03-30 Win (0). One group with 1 win, so 1.\n\nResult: (1, 3), (2, 0), (3, 1).\n\n## Complexity\n\n- Time: O(M log M) for M matches, to sort each player's rows for the window; the two groupings are linear.\n- Space: O(M) for `tagged`.\n\n## Pitfalls\n\n- Ordering by insertion instead of `match_day`: rows need not arrive sorted, so the window must say `ORDER BY match_day`.\n- Forgetting `PARTITION BY player_id` lets one player's loss split another player's streak.\n- Filtering to wins before grouping drops players with no wins; here they must appear with 0.\n- Counting total wins instead of the longest run: in W W L W W W the answer is 3, not 5.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `tagged` | every match with its running count of non-wins |\n| `streak_id` | label shared by one streak and the non-win right before it |\n| `streaks` | one row per (player, streak_id) group |\n| `wins` | number of wins in that group, the streak's length |\n| `longest_streak` | the largest `wins` for the player |",
+  "narration": {
+    "1": "The first stage labels every match with the streak it belongs to.",
+    "3": "Each draw or loss adds 1 to a running total, while wins add 0, so the total stays flat along a streak.",
+    "4": "The running total restarts for every player and follows that player's matches in date order.",
+    "7": "The second stage measures every streak.",
+    "9": "Counting only the wins in a group gives the streak length; a lone draw or loss counts 0.",
+    "11": "One group per player and streak label.",
+    "13": "The longest streak is the largest group; a player who never won still has 0-win groups, so the answer is 0.",
+    "15": "One output row per player."
+  }
+}

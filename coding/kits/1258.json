@@ -1,0 +1,73 @@
+{
+  "number": 1258,
+  "title": "Synonymous Sentences",
+  "spec": "recalled",
+  "statement": "Each pair `[s, t]` in `synonyms` says that the words `s` and `t` mean the same thing. Synonymy works both ways and chains: if `a` is a synonym of `b` and `b` of `c`, then `a` and `c` are synonyms too, so the pairs split words into groups of interchangeable words.\n\n`text` is a sentence of words separated by single spaces. Independently for every word of `text`, you may keep it or replace it with any word of its group; a word that appears in no pair must stay as it is. Return every sentence that can be produced this way (`text` itself included), each once, sorted in lexicographic order, where strings are compared character by character by character code.",
+  "constraints": [
+    "0 <= synonyms.length <= 10",
+    "synonyms[i].length == 2",
+    "1 <= synonyms[i][0].length, synonyms[i][1].length <= 10",
+    "synonyms[i][0] != synonyms[i][1]",
+    "No pair of words appears twice in synonyms",
+    "text has 1 to 10 words, separated by single spaces",
+    "Every word consists of English letters"
+  ],
+  "signature": "List<String> generateSentences(List<List<String>> synonyms, String text)",
+  "entry": "generateSentences",
+  "kind": "function",
+  "parameters": [
+    "synonyms",
+    "text"
+  ],
+  "validator": "function validate([synonyms, text]) {\n  const isWord = (w) => typeof w === 'string' && /^[A-Za-z]+$/.test(w);\n  if (!Array.isArray(synonyms) || synonyms.length > 10) return 'Give at most 10 synonym pairs.';\n  const keys = new Set();\n  for (const pair of synonyms) {\n    if (!Array.isArray(pair) || pair.length !== 2) return 'Each synonym pair has exactly two words.';\n    const [s, t] = pair;\n    if (!isWord(s) || !isWord(t) || s.length > 10 || t.length > 10) return 'Synonym words have 1 to 10 English letters.';\n    if (s === t) return 'The two words of a pair must differ.';\n    if (keys.has(`${s} ${t}`) || keys.has(`${t} ${s}`)) return 'A pair of words is listed twice.';\n    keys.add(`${s} ${t}`);\n  }\n  if (typeof text !== 'string') return 'text must be a string.';\n  const words = text.split(' ');\n  if (words.length > 10) return 'text has at most 10 words.';\n  if (!words.every(isWord)) return 'text is English-letter words separated by single spaces.';\n  // Keep the answer small enough for the local judge.\n  const parent = new Map();\n  const find = (w) => (parent.get(w) === w ? w : find(parent.get(w)));\n  for (const [s, t] of synonyms) {\n    if (!parent.has(s)) parent.set(s, s);\n    if (!parent.has(t)) parent.set(t, t);\n    parent.set(find(s), find(t));\n  }\n  const groupSize = new Map();\n  for (const w of parent.keys()) groupSize.set(find(w), (groupSize.get(find(w)) || 0) + 1);\n  let count = 1;\n  for (const w of words) count *= parent.has(w) ? groupSize.get(find(w)) : 1;\n  if (count > 20000) return 'This input makes more than 20,000 sentences, too many for the local judge.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function generateSentences(synonyms, text) {\n  const parent = new Map();\n  const find = (word) => {\n    while (parent.get(word) !== word) {\n      parent.set(word, parent.get(parent.get(word)));\n      word = parent.get(word);\n    }\n    return word;\n  };\n  for (const [first, second] of synonyms) {\n    if (!parent.has(first)) parent.set(first, first);\n    if (!parent.has(second)) parent.set(second, second);\n    parent.set(find(first), find(second));\n  }\n\n  const groups = new Map();\n  for (const word of parent.keys()) {\n    const root = find(word);\n    if (!groups.has(root)) groups.set(root, []);\n    groups.get(root).push(word);\n  }\n  for (const group of groups.values()) {\n    group.sort();\n  }\n\n  const words = text.split(' ');\n  const result = [];\n  const current = [];\n  const build = (index) => {\n    if (index === words.length) {\n      result.push(current.join(' '));\n      return;\n    }\n    const word = words[index];\n    const options = parent.has(word) ? groups.get(find(word)) : [word];\n    for (const option of options) {\n      current.push(option);\n      build(index + 1);\n      current.pop();\n    }\n  };\n  build(0);\n  return result;\n}",
+  "brute": "function generateSentences(synonyms, text) {\n  // Swap one word for a direct synonym at a time until no new sentence appears, then sort.\n  const found = new Set([text]);\n  const pending = [text];\n  while (pending.length > 0) {\n    const words = pending.pop().split(' ');\n    for (let i = 0; i < words.length; i++) {\n      for (const [a, b] of synonyms) {\n        for (const [from, to] of [[a, b], [b, a]]) {\n          if (words[i] !== from) continue;\n          const next = [...words.slice(0, i), to, ...words.slice(i + 1)].join(' ');\n          if (!found.has(next)) {\n            found.add(next);\n            pending.push(next);\n          }\n        }\n      }\n    }\n  }\n  return [...found].sort();\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (k) => Math.floor(rand() * k);\n  const small = size === 'small';\n  const letters = small ? 'abc' : 'abcdefghijklmnopqrstuvwxyz';\n  const makeWord = () => {\n    const length = 1 + pick(small ? 3 : 10);\n    let word = '';\n    for (let i = 0; i < length; i++) word += letters[pick(letters.length)];\n    return rand() < 0.1 ? word[0].toUpperCase() + word.slice(1) : word;\n  };\n  for (;;) {\n    const pool = Array.from({ length: small ? 2 + pick(5) : 12 + pick(9) }, makeWord);\n    const pairCount = small ? pick(5) : 8 + pick(3);\n    const synonyms = [];\n    const keys = new Set();\n    for (let tries = 0; synonyms.length < pairCount && tries < 100; tries++) {\n      const s = pool[pick(pool.length)];\n      const t = pool[pick(pool.length)];\n      if (s === t || keys.has(`${s} ${t}`) || keys.has(`${t} ${s}`)) continue;\n      keys.add(`${s} ${t}`);\n      synonyms.push([s, t]);\n    }\n    const wordCount = small ? 1 + pick(5) : 10;\n    const words = Array.from({ length: wordCount }, () => (rand() < (small ? 0.6 : 0.4) ? pool[pick(pool.length)] : makeWord()));\n    // Count the sentences (product of group sizes) so the answer stays a reasonable size.\n    const links = new Map();\n    for (const [s, t] of synonyms) {\n      if (!links.has(s)) links.set(s, []);\n      if (!links.has(t)) links.set(t, []);\n      links.get(s).push(t);\n      links.get(t).push(s);\n    }\n    const groupSize = (word) => {\n      if (!links.has(word)) return 1;\n      const seen = new Set([word]);\n      const stack = [word];\n      while (stack.length) for (const next of links.get(stack.pop())) if (!seen.has(next)) { seen.add(next); stack.push(next); }\n      return seen.size;\n    };\n    const count = words.reduce((product, word) => product * groupSize(word), 1);\n    if (small ? count <= 200 : count >= 100 && count <= 2000) return [synonyms, words.join(' ')];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[["happy","joy"],["sad","sorrow"],["joy","cheerful"]],"I am happy today but was sad yesterday"],"expected":["I am cheerful today but was sad yesterday","I am cheerful today but was sorrow yesterday","I am happy today but was sad yesterday","I am happy today but was sorrow yesterday","I am joy today but was sad yesterday","I am joy today but was sorrow yesterday"]},
+    {"name":"Example 2","input":[[["happy","joy"],["cheerful","glad"]],"I am happy today but was sad yesterday"],"expected":["I am happy today but was sad yesterday","I am joy today but was sad yesterday"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],"hello"]},
+    {"name":"Test 2","input":[[["a","b"]],"a"]},
+    {"name":"Test 3","input":[[["b","a"]],"a a a"]},
+    {"name":"Test 4","input":[[["a","b"],["b","c"],["c","d"]],"d x a"]},
+    {"name":"Test 5","input":[[["ab","a"],["abc","b"]],"ab abc"]},
+    {"name":"Test 6","input":[[["Happy","glad"],["glad","joy"]],"I am Happy"]},
+    {"name":"Test 7","input":[[["x","y"],["p","q"]],"a b c"]},
+    {"name":"Test 8","input":[[["a","b"],["c","d"],["b","c"]],"d"]},
+    {"name":"Test 9","input":[[["one","uno"],["two","dos"],["three","tres"],["four","cuatro"],["five","cinco"],["six","seis"]],"one two three four five six"]},
+    {"name":"Test 10","input":[[["hub","a"],["hub","b"],["hub","c"],["hub","d"],["zz","z"]],"z hub hub"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBecause synonymy chains, the pairs are edges of a graph and the interchangeable words are its connected components. Union-find builds those groups directly: each pair merges two sets. After that every word of `text` has a fixed list of options (its group, or just itself), and the answer is every combination of options, which backtracking lists one word at a time. Sorting each group first makes the sentences come out already in order: letters all come after the space character, so comparing sentences character by character agrees with comparing them word by word. (The brute force instead keeps swapping single words for direct synonyms until no new sentence appears, then sorts.)\n\n## Approach\n\n1. Give every word in a pair its own set in `parent`, then `find` both words of each pair and link one root to the other.\n2. Collect `groups`: each root maps to the list of words in its set. Sort each list.\n3. Split `text` into `words`. `build(index)` chooses a word for position `index`: every word of its group if the word is in `parent`, otherwise the word itself.\n4. For each option, push it on `current`, build the rest, and pop it again.\n5. When `index` reaches the end, join `current` with spaces into `result`.\n\n## Example 1, step by step\n\nThe pairs give two groups: `{happy, joy, cheerful}` and `{sad, sorrow}`, sorted as `[cheerful, happy, joy]` and `[sad, sorrow]`. `build` keeps `I` and `am`, tries `cheerful` first, keeps `today but was`, then tries `sad` and `sorrow`, producing `I am cheerful today but was sad yesterday` and `... sorrow yesterday`. Then `happy` and `joy` give two sentences each: six sentences, already sorted.\n\n## Complexity\n\n- Time: O(P α(P) + R · L), where P is the number of pairs, R the number of sentences and L the length of a sentence: union-find is nearly linear and each sentence is built once.\n- Space: O(R · L) for the answer, plus O(P) for the groups.\n\n## Pitfalls\n\n- Treating only direct pairs as synonyms: `happy` and `cheerful` are linked through `joy`.\n- Forgetting that a word keeps its own spelling as one option: `text` itself must be in the answer.\n- Sorting the words of a group is enough here only because spaces sort before letters; sorting the final list is the safe fallback.\n- Looking up `groups.get(word)` instead of `groups.get(find(word))`: groups are stored under their root.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | union-find parent of each synonym word |\n| `find` | returns a word's root, halving paths on the way |\n| `groups` | root to the sorted list of words in its group |\n| `words` | the words of `text` |\n| `current` | the words chosen so far for the sentence being built |\n| `options` | the words that may stand at the current position |\n| `result` | every sentence, in sorted order |",
+  "narration": {
+    "2": "parent maps each synonym word to its parent in the union-find forest.",
+    "4": "Climb until reaching a word that is its own parent: the root.",
+    "5": "Path halving: point this word at its grandparent to shorten future searches.",
+    "10": "Each pair says its two words belong to the same group.",
+    "11": "A word seen for the first time starts as its own group.",
+    "13": "Merge the two groups by linking one root under the other.",
+    "17": "Gather the words of each group under their root.",
+    "23": "Sort every group so options are tried in character-code order.",
+    "26": "Split the sentence into its words.",
+    "29": "build chooses a word for position index and recurses on the rest.",
+    "30": "All positions are filled: one complete sentence.",
+    "31": "Join the chosen words and record the sentence.",
+    "35": "A word in some pair may become any word of its group; any other word stays as it is.",
+    "36": "Try each option in sorted order.",
+    "37": "Choose this option for the current position...",
+    "38": "...fill in the remaining positions...",
+    "39": "...then undo the choice before trying the next option.",
+    "42": "Start choosing from the first word.",
+    "43": "Sentences were produced in sorted order, so return them directly."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 2072,
+  "title": "The Winner University",
+  "spec": "recalled",
+  "statement": "Two universities report the exam scores of their students:\n\n- `NewYork(student_id, score)`: one row per New York University student; `student_id` is unique in this table.\n- `California(student_id, score)`: one row per California University student; `student_id` is unique in this table. The same id may appear in both tables; the tables are independent.\n\nA student is **excellent** when their `score` is at least `90`. The university with more excellent students wins.\n\nReturn a single row with one column, `winner`:\n\n- `'New York University'` when New York has more excellent students,\n- `'California University'` when California has more,\n- `'No Winner'` when both counts are equal (including when both are zero).",
+  "constraints": [
+    "student_id is unique in NewYork",
+    "student_id is unique in California",
+    "A student is excellent when score >= 90",
+    "The result always has exactly one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "NewYork": [["student_id","INT"],["score","INT"]],
+    "California": [["student_id","INT"],["score","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ NewYork = [], California = [] }] = input;\n  for (const [name, rows] of [['NewYork', NewYork], ['California', California]]) {\n    const seen = new Set();\n    for (const [id, score] of rows) {\n      if (id === null) return `Every row of ${name} needs a student_id.`;\n      if (seen.has(id)) return `student_id ${id} appears twice in ${name}.`;\n      if (score === null) return `Student ${id} in ${name} needs a score.`;\n      seen.add(id);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH excellent AS (\n  SELECT\n    (SELECT COUNT(*) FROM NewYork WHERE score >= 90) AS new_york,\n    (SELECT COUNT(*) FROM California WHERE score >= 90) AS california\n)\nSELECT\n  CASE\n    WHEN new_york > california THEN 'New York University'\n    WHEN new_york < california THEN 'California University'\n    ELSE 'No Winner'\n  END AS winner\nFROM excellent;",
+  "brute": "SELECT\n  CASE SIGN(SUM(side))\n    WHEN 1 THEN 'New York University'\n    WHEN -1 THEN 'California University'\n    ELSE 'No Winner'\n  END AS winner\nFROM (\n  SELECT 1 AS side FROM NewYork WHERE score >= 90\n  UNION ALL\n  SELECT -1 AS side FROM California WHERE score >= 90\n) AS votes",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const table = () => {\n    const count = size === 'small' ? Math.floor(rand() * 9) : 1500 + Math.floor(rand() * 501);\n    const rows = [];\n    for (let i = 0; i < count; i++) {\n      // Small cases stay near the 90 boundary so ties and off-by-one thresholds show up.\n      const score = size === 'small' ? pick([75, 88, 89, 90, 90, 91, 95, 100]) : Math.floor(rand() * 101);\n      rows.push([i + 1 + (size === 'small' ? Math.floor(rand() * 2) * 10 : 0), score]);\n    }\n    return rows;\n  };\n  return [{ NewYork: table(), California: table() }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"NewYork":[[1,90],[2,87]],"California":[[2,89],[3,88]]}],"expected":{"columns":["winner"],"rows":[["New York University"]]}},
+    {"name":"Example 2","input":[{"NewYork":[[1,89],[2,88]],"California":[[2,90],[3,87]]}],"expected":{"columns":["winner"],"rows":[["California University"]]}},
+    {"name":"Example 3","input":[{"NewYork":[[1,89],[2,90]],"California":[[2,87],[3,99]]}],"expected":{"columns":["winner"],"rows":[["No Winner"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"NewYork":[],"California":[]}]},
+    {"name":"Test 2","input":[{"NewYork":[[1,90]],"California":[]}]},
+    {"name":"Test 3","input":[{"NewYork":[],"California":[[7,100],[8,95]]}]},
+    {"name":"Test 4","input":[{"NewYork":[[1,90],[2,90]],"California":[[1,91]]}]},
+    {"name":"Test 5","input":[{"NewYork":[[1,80],[2,85],[3,89]],"California":[[1,70]]}]},
+    {"name":"Test 6","input":[{"NewYork":[[1,92],[2,60],[3,61],[4,62]],"California":[[1,93],[2,94]]}]},
+    {"name":"Test 7","input":[{"NewYork":[[1,95],[2,99],[3,40]],"California":[[5,90],[6,100],[7,89]]}]},
+    {"name":"Test 8","input":[{"NewYork":[[3,89],[4,89]],"California":[[3,90]]}]},
+    {"name":"Test 9","input":[{"NewYork":[[1,100],[2,100],[3,100]],"California":[[1,100],[2,100],[3,100],[4,100]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe whole answer depends on two numbers: how many New York students scored at least 90, and how many California students did. Count each with a scalar subquery, then turn the comparison of the two counts into one of three labels with `CASE`.\n\n## Approach\n\n1. CTE `excellent` builds a one-row table with two columns: `new_york` is `COUNT(*)` of `NewYork` rows with `score >= 90`, and `california` is the same count over `California`. Each count is its own scalar subquery, so the tables are never joined.\n2. The final `SELECT` reads that single row and maps the comparison to `winner`: greater means New York, smaller means California, and anything else (equal counts) means `'No Winner'`.\n\n## Example 1, step by step\n\n- `NewYork` scores are 90 and 87; only 90 qualifies, so `new_york = 1`.\n- `California` scores are 89 and 88; neither reaches 90, so `california = 0`.\n- `excellent` is the row `(new_york = 1, california = 0)`.\n- `1 > 0`, so `winner` is `'New York University'`.\n\n## Complexity\n\n- Time: O(N + C) for N New York rows and C California rows; each table is scanned once.\n- Space: O(1); the CTE holds one row.\n\n## Pitfalls\n\n- The threshold is inclusive: `score > 90` would miss a student who scored exactly 90 (Example 1).\n- Joining the two tables before counting multiplies rows and corrupts both counts; count each table on its own.\n- Counting all students instead of only excellent ones picks the bigger university, not the better one.\n- Empty tables must still produce one row: `COUNT(*)` returns 0 for no rows, while `SUM` would return `null`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `excellent` | one row with both excellent-student counts |\n| `new_york` | number of `NewYork` rows with `score >= 90` |\n| `california` | number of `California` rows with `score >= 90` |\n| `winner` | the label chosen by comparing the two counts |",
+  "narration": {
+    "1": "The CTE excellent will hold one row with the two counts the answer depends on.",
+    "3": "A scalar subquery counts New York students whose score is at least 90.",
+    "4": "A second, independent subquery counts excellent California students; the tables are never joined.",
+    "7": "CASE turns the comparison of the two counts into one of three labels.",
+    "10": "Equal counts, including zero against zero, mean there is no winner.",
+    "12": "The final SELECT reads the single row of excellent, so the result always has exactly one row."
+  }
+}

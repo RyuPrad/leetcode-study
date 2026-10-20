@@ -1,0 +1,52 @@
+{
+  "number": 1990,
+  "title": "Count the Number of Experiments",
+  "spec": "recalled",
+  "statement": "One table logs experiments run by a lab:\n\n- `Experiments(experiment_id, platform, experiment_name)`: one row per experiment; `experiment_id` is unique. `platform` is one of `'Android'`, `'IOS'` or `'Web'`, and `experiment_name` is one of `'Reading'`, `'Sports'` or `'Programming'`.\n\nFor **every** combination of the three platforms and the three experiment names (nine rows in all), report how many experiments of that name were run on that platform. A combination that never occurs in `Experiments` still appears, with a count of `0`.\n\nOutput the columns `platform`, `experiment_name` and `num_experiments`. Rows may come in any order.",
+  "constraints": [
+    "experiment_id is unique in Experiments",
+    "platform is 'Android', 'IOS' or 'Web'",
+    "experiment_name is 'Reading', 'Sports' or 'Programming'",
+    "The result always has exactly 9 rows"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Experiments": [["experiment_id","INT"],["platform","ENUM('Android', 'IOS', 'Web')"],["experiment_name","ENUM('Reading', 'Sports', 'Programming')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Experiments = [] }] = input;\n  const platforms = ['Android', 'IOS', 'Web'], names = ['Reading', 'Sports', 'Programming'];\n  const ids = new Set();\n  for (const [id, platform, name] of Experiments) {\n    if (id === null || platform === null || name === null) return 'Every column is required.';\n    if (ids.has(id)) return `experiment_id ${id} appears twice.`;\n    ids.add(id);\n    if (!platforms.includes(platform)) return `Unknown platform ${platform}.`;\n    if (!names.includes(name)) return `Unknown experiment_name ${name}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH platforms AS (\n  SELECT 'Android' AS platform\n  UNION ALL SELECT 'IOS'\n  UNION ALL SELECT 'Web'\n),\nexperiment_names AS (\n  SELECT 'Reading' AS experiment_name\n  UNION ALL SELECT 'Sports'\n  UNION ALL SELECT 'Programming'\n)\nSELECT\n  p.platform,\n  n.experiment_name,\n  COUNT(e.experiment_id) AS num_experiments\nFROM platforms AS p\nCROSS JOIN experiment_names AS n\nLEFT JOIN Experiments AS e\n  ON e.platform = p.platform\n  AND e.experiment_name = n.experiment_name\nGROUP BY p.platform, n.experiment_name;",
+  "brute": "SELECT\n  p.platform,\n  n.experiment_name,\n  (SELECT COUNT(*)\n   FROM Experiments AS e\n   WHERE e.platform = p.platform AND e.experiment_name = n.experiment_name) AS num_experiments\nFROM (SELECT 'Android' AS platform UNION SELECT 'IOS' UNION SELECT 'Web') AS p,\n     (SELECT 'Reading' AS experiment_name UNION SELECT 'Sports' UNION SELECT 'Programming') AS n",
+  "generator": "function generate(rand, size) {\n  const platforms = ['Android', 'IOS', 'Web'], names = ['Reading', 'Sports', 'Programming'];\n  const rows = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  // Small sets favour a few combinations so that some pairs repeat and others stay empty.\n  const pPool = size === 'small' ? platforms.slice(0, 1 + Math.floor(rand() * 3)) : platforms;\n  const nPool = size === 'small' ? names.slice(Math.floor(rand() * 2)) : names;\n  const Experiments = [];\n  let id = 1 + Math.floor(rand() * 5);\n  for (let i = 0; i < rows; i++) {\n    Experiments.push([id, pPool[Math.floor(rand() * pPool.length)], nPool[Math.floor(rand() * nPool.length)]]);\n    id += 1 + Math.floor(rand() * 3);\n  }\n  return [{ Experiments }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Experiments":[[4,"IOS","Programming"],[13,"IOS","Sports"],[14,"Android","Reading"],[8,"Web","Reading"],[12,"Web","Reading"],[18,"Web","Programming"]]}],"expected":{"columns":["platform","experiment_name","num_experiments"],"rows":[["Android","Reading",1],["Android","Sports",0],["Android","Programming",0],["IOS","Reading",0],["IOS","Sports",1],["IOS","Programming",1],["Web","Reading",2],["Web","Sports",0],["Web","Programming",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Experiments":[]}]},
+    {"name":"Test 2","input":[{"Experiments":[[1,"Web","Sports"]]}]},
+    {"name":"Test 3","input":[{"Experiments":[[1,"Android","Reading"],[2,"Android","Reading"],[3,"Android","Reading"],[4,"Android","Reading"]]}]},
+    {"name":"Test 4","input":[{"Experiments":[[1,"Android","Reading"],[2,"Android","Sports"],[3,"Android","Programming"],[4,"IOS","Reading"],[5,"IOS","Sports"],[6,"IOS","Programming"],[7,"Web","Reading"],[8,"Web","Sports"],[9,"Web","Programming"]]}]},
+    {"name":"Test 5","input":[{"Experiments":[[10,"IOS","Programming"],[20,"IOS","Programming"],[30,"Web","Programming"],[40,"Android","Programming"]]}]},
+    {"name":"Test 6","input":[{"Experiments":[[5,"Web","Reading"],[6,"Web","Sports"],[7,"Web","Sports"],[8,"Web","Programming"],[9,"Web","Programming"],[11,"Web","Programming"]]}]},
+    {"name":"Test 7","input":[{"Experiments":[[1,"Android","Sports"],[2,"IOS","Reading"],[3,"Android","Sports"],[4,"IOS","Reading"],[5,"Web","Reading"]]}]},
+    {"name":"Test 8","input":[{"Experiments":[[100,"IOS","Sports"],[3,"Android","Programming"],[57,"Web","Reading"],[8,"Android","Programming"],[21,"IOS","Sports"],[9,"IOS","Sports"],[44,"Web","Sports"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCounting with `GROUP BY platform, experiment_name` over `Experiments` only produces the pairs that actually occur, but the answer must list all nine pairs, including those with no experiments. So first build the full grid of nine pairs, then attach the experiments to it with a **left join** and count the matches. Pairs with no match keep their row and count `0`.\n\n## Approach\n\n1. `platforms`: a three-row table of the platform names, built with `UNION ALL`.\n2. `experiment_names`: a three-row table of the experiment names.\n3. `CROSS JOIN` them to get the nine (platform, name) pairs.\n4. `LEFT JOIN Experiments` on both columns, so every pair survives even without a match.\n5. `GROUP BY` the pair and `COUNT(e.experiment_id)`, which ignores the `null` produced by an unmatched pair.\n\n## Example 1, step by step\n\n- The grid has nine pairs, from (Android, Reading) to (Web, Programming).\n- Joining the six experiments: (Android, Reading) matches experiment 14; (IOS, Sports) matches 13; (IOS, Programming) matches 4; (Web, Reading) matches 8 and 12; (Web, Programming) matches 18.\n- The other four pairs, such as (Android, Sports), find nothing and keep one row with `e.experiment_id = null`.\n- Counting non-null ids gives 1, 1, 1, 2, 1 for the matched pairs and 0 for the rest.\n\n## Complexity\n\n- Time: O(E) for E experiments: each one joins to exactly one of nine grid rows.\n- Space: O(1) beyond the input: the grid and the result are nine rows.\n\n## Pitfalls\n\n- Grouping `Experiments` directly drops every pair with no experiments.\n- `COUNT(*)` after the left join counts the unmatched row itself and reports `1` instead of `0`; count a column from `Experiments`.\n- Joining on only one of the two columns mixes experiments from other names or platforms into the count.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `platforms` | the three platform names, one per row |\n| `experiment_names` | the three experiment names, one per row |\n| `p`, `n` | a platform and a name; their cross join is the nine-row grid |\n| `e` | `Experiments` rows matching the pair, or `null` when none |\n| `num_experiments` | the number of matched experiment ids per pair |",
+  "narration": {
+    "1": "The platforms CTE lists the three platforms as literal rows, since some may never appear in the data.",
+    "6": "The experiment_names CTE lists the three experiment names the same way.",
+    "14": "COUNT of a column from Experiments ignores the null of an unmatched pair, so empty pairs count 0.",
+    "15": "Start from the platform list.",
+    "16": "Pairing every platform with every name produces the full nine-row grid.",
+    "17": "A left join attaches the matching experiments while keeping pairs that have none.",
+    "18": "An experiment matches a pair only when both its platform and its name agree.",
+    "20": "Grouping by the pair collapses its matched experiments into one counted row."
+  }
+}

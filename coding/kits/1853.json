@@ -1,0 +1,48 @@
+{
+  "number": 1853,
+  "title": "Convert Date Format",
+  "spec": "recalled",
+  "statement": "One table holds a list of calendar dates:\n\n- `Days(day)`: one row per date; `day` is a `DATE` and is unique.\n\nRewrite every date as text of the form `\"<weekday>, <month> <day>, <year>\"`, for example `2022-04-12` becomes `Tuesday, April 12, 2022`:\n\n- the weekday and the month are written out in full in English, starting with a capital letter;\n- the day of the month has **no leading zero** (`August 9`, not `August 09`);\n- the year has four digits.\n\nReturn one row per date with a single column named `day` holding the text. Rows may come in any order.",
+  "constraints": [
+    "day is unique in Days",
+    "Every day is a valid date written as YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Days": [["day","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Days = [] }] = input;\n  const seen = new Set();\n  for (const [day] of Days) {\n    if (day === null) return 'Every row needs a day.';\n    const text = String(day);\n    const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(text);\n    if (!match) return `${text} is not a date in YYYY-MM-DD form.`;\n    const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];\n    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;\n    const length = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];\n    if (y < 1000 || !length || d < 1 || d > length) return `${text} is not a real date.`;\n    if (seen.has(text)) return `${text} appears twice in Days.`;\n    seen.add(text);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  DATE_FORMAT(\n    day,\n    '%W, %M %e, %Y'\n  ) AS day\nFROM Days;",
+  "brute": "SELECT CONCAT(DAYNAME(d.day), ', ', MONTHNAME(d.day), ' ', DAYOFMONTH(d.day), ', ', YEAR(d.day)) AS day\nFROM Days AS d",
+  "generator": "function generate(rand, size) {\n  const pad = n => String(n).padStart(2, '0');\n  const monthLength = (y, m) => [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];\n  if (size !== 'small') {\n    // Walk forward through the calendar in random steps, so every date is new.\n    let y = 1950, m = 1, d = 1;\n    const Days = [];\n    for (let i = 0; i < 2000; i++) {\n      Days.push([`${y}-${pad(m)}-${pad(d)}`]);\n      d += 1 + Math.floor(rand() * 20);\n      while (d > monthLength(y, m)) { d -= monthLength(y, m); m++; if (m > 12) { m = 1; y++; } }\n    }\n    return [{ Days }];\n  }\n  // Hand-picked dates cover single-digit days, month ends, leap days and the turn of a century.\n  const special = ['2022-04-12', '2021-08-09', '2020-06-26', '2020-02-29', '2000-01-01', '1999-12-31', '2024-03-01', '2023-11-05', '2010-07-04'];\n  const randomDay = () => {\n    const y = 1970 + Math.floor(rand() * 60), m = 1 + Math.floor(rand() * 12);\n    return `${y}-${pad(m)}-${pad(1 + Math.floor(rand() * monthLength(y, m)))}`;\n  };\n  const chosen = new Set();\n  for (let tries = Math.floor(rand() * 9); tries > 0; tries--) chosen.add(rand() < 0.5 ? special[Math.floor(rand() * special.length)] : randomDay());\n  return [{ Days: [...chosen].map(day => [day]) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Days":[["2022-04-12"],["2021-08-09"],["2020-06-26"]]}],"expected":{"columns":["day"],"rows":[["Tuesday, April 12, 2022"],["Monday, August 9, 2021"],["Friday, June 26, 2020"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Days":[]}]},
+    {"name":"Test 2","input":[{"Days":[["2021-05-08"]]}]},
+    {"name":"Test 3","input":[{"Days":[["2020-02-29"],["1995-02-28"]]}]},
+    {"name":"Test 4","input":[{"Days":[["2000-01-01"],["1999-12-31"]]}]},
+    {"name":"Test 5","input":[{"Days":[["2024-03-01"],["2023-11-05"],["2010-07-04"]]}]},
+    {"name":"Test 6","input":[{"Days":[["2023-01-31"],["2019-09-10"],["2026-10-20"]]}]},
+    {"name":"Test 7","input":[{"Days":[["2021-08-01"],["2021-08-02"],["2021-08-03"],["2021-08-04"],["2021-08-05"],["2021-08-06"],["2021-08-07"]]}]},
+    {"name":"Test 8","input":[{"Days":[["2022-01-11"],["2022-02-12"],["2022-03-13"],["2022-05-21"],["2022-06-22"],["2022-07-23"],["2022-09-30"],["2022-10-02"],["2022-12-03"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is pure formatting: each date maps to one string and no row depends on another. MySQL's `DATE_FORMAT(date, pattern)` builds the string from a pattern in which `%` codes stand for parts of the date and every other character is copied as it is. The whole task is choosing the right codes.\n\n## Approach\n\n1. Read every row of `Days`.\n2. Format it with the pattern `'%W, %M %e, %Y'`:\n   - `%W` is the full weekday name (`Tuesday`);\n   - `%M` is the full month name (`April`);\n   - `%e` is the day of the month **without** a leading zero (`9`), unlike `%d` (`09`);\n   - `%Y` is the four-digit year;\n   - the comma after the weekday, the spaces and the comma before the year are literal text.\n3. Name the result column `day`, the same name as the input column.\n\n## Example 1, step by step\n\n- `2022-04-12`: `%W` = Tuesday, `%M` = April, `%e` = 12, `%Y` = 2022, giving `Tuesday, April 12, 2022`.\n- `2021-08-09`: Monday, August, `%e` drops the zero of `09`, giving `Monday, August 9, 2021`.\n- `2020-06-26`: `Friday, June 26, 2020`.\n\n## Complexity\n\n- Time: O(N) for N dates; each is formatted once.\n- Space: O(N) for the result.\n\n## Pitfalls\n\n- `%d` keeps the leading zero (`August 09`), and `%D` adds an English suffix (`9th`); only `%e` gives `9` (Test 7).\n- `%a` and `%b` are the three-letter abbreviations (`Tue`, `Apr`); the output needs full names.\n- `%y` is a two-digit year, and `%m` is the month number, not its name.\n- Building the text with `CONCAT` also works, but then every separator (`', '`, `' '`) must be typed by hand and in the right place.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `DATE_FORMAT(day, ...)` | turns the date into text following the pattern |\n| `'%W, %M %e, %Y'` | weekday, comma, month, day without zero, comma, year |\n| `day` (output) | the formatted text, under the input column's name |",
+  "narration": {
+    "1": "One output column per row of Days; no joins or grouping are needed.",
+    "2": "DATE_FORMAT turns a date into text by following a pattern.",
+    "3": "The value to format is the row's date.",
+    "4": "Full weekday, comma, full month, day of month without a leading zero, comma, four-digit year.",
+    "5": "The formatted text is returned under the column name day.",
+    "6": "Every row of Days is converted; nothing is filtered out."
+  }
+}

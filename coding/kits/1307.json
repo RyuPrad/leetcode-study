@@ -1,0 +1,77 @@
+{
+  "number": 1307,
+  "title": "Verbal Arithmetic Puzzle",
+  "spec": "leetcode",
+  "statement": "You get an addition puzzle written in letters: the strings in `words` are added together, and their total should be `result`. Decide whether the letters can be replaced by digits so that the addition is correct. The replacement must follow these rules:\n\n- Every occurrence of a letter becomes the same digit, from 0 to 9.\n- Different letters become different digits.\n- Every word and `result`, read as a number, has no leading zero: a string of two or more letters cannot start with a letter that becomes 0 (a one-letter string may be 0).\n\nReturn `true` if at least one such replacement makes the numbers from `words` add up exactly to the number from `result`, and `false` otherwise.",
+  "constraints": [
+    "2 <= words.length <= 5",
+    "1 <= words[i].length <= 7",
+    "1 <= result.length <= 7",
+    "words[i] and result contain only uppercase English letters",
+    "At most 10 different letters appear in words and result together"
+  ],
+  "signature": "boolean isSolvable(String[] words, String result)",
+  "entry": "isSolvable",
+  "kind": "function",
+  "parameters": [
+    "words",
+    "result"
+  ],
+  "validator": "function validate([words, result]) {\n  if (!Array.isArray(words) || words.length < 2 || words.length > 5) return 'words needs 2 to 5 strings.';\n  for (const text of [...words, result]) {\n    if (typeof text !== 'string' || text.length < 1 || text.length > 7) return 'Each word and result has 1 to 7 letters.';\n    if (!/^[A-Z]+$/.test(text)) return 'Only uppercase English letters are allowed.';\n  }\n  if (new Set([...words.join(''), ...result]).size > 10) return 'At most 10 different letters may appear.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isSolvable(words, result) {\n  const weight = new Map();\n  const leading = new Set();\n  const addWeights = (text, sign) => {\n    let place = sign;\n    for (let i = text.length - 1; i >= 0; i--) {\n      weight.set(text[i], (weight.get(text[i]) ?? 0) + place);\n      place *= 10;\n    }\n    if (text.length > 1) {\n      leading.add(text[0]);\n    }\n  };\n  for (const word of words) {\n    addWeights(word, 1);\n  }\n  addWeights(result, -1);\n\n  const letters = [...weight.keys()].sort((a, b) => Math.abs(weight.get(b)) - Math.abs(weight.get(a)));\n  const maxRest = new Array(letters.length + 1).fill(0);\n  const minRest = new Array(letters.length + 1).fill(0);\n  for (let i = letters.length - 1; i >= 0; i--) {\n    maxRest[i] = maxRest[i + 1] + Math.max(0, 9 * weight.get(letters[i]));\n    minRest[i] = minRest[i + 1] + Math.min(0, 9 * weight.get(letters[i]));\n  }\n  const used = new Array(10).fill(false);\n\n  function solve(index, total) {\n    if (index === letters.length) {\n      return total === 0;\n    }\n    const f = weight.get(letters[index]);\n    const ends = f === 0 ? [0, 9] : [(-total - maxRest[index + 1]) / f, (-total - minRest[index + 1]) / f];\n    const low = Math.max(leading.has(letters[index]) ? 1 : 0, Math.ceil(Math.min(...ends)));\n    const high = Math.min(9, Math.floor(Math.max(...ends)));\n    for (let digit = low; digit <= high; digit++) {\n      if (!used[digit]) {\n        used[digit] = true;\n        if (solve(index + 1, total + digit * f)) {\n          return true;\n        }\n        used[digit] = false;\n      }\n    }\n    return false;\n  }\n\n  return solve(0, 0);\n}",
+  "brute": "function isSolvable(words, result) {\n  // Add the columns as on paper, from the ones digit up: guess each word's letter,\n  // and the result's letter in that column is forced to be the column total mod 10.\n  if (words.some(w => w.length > result.length)) return false;\n  const firsts = new Set([...words, result].filter(w => w.length > 1).map(w => w[0]));\n  const assigned = {};\n  const taken = new Array(10).fill(false);\n  const allowed = (ch, d) => !taken[d] && !(d === 0 && firsts.has(ch));\n  const go = (col, row, carry) => {\n    if (col === result.length) return carry === 0;\n    if (row === words.length) {\n      const ch = result[result.length - 1 - col], d = carry % 10;\n      if (ch in assigned) return assigned[ch] === d && go(col + 1, 0, Math.floor(carry / 10));\n      if (!allowed(ch, d)) return false;\n      assigned[ch] = d; taken[d] = true;\n      if (go(col + 1, 0, Math.floor(carry / 10))) return true;\n      delete assigned[ch]; taken[d] = false;\n      return false;\n    }\n    const w = words[row];\n    if (col >= w.length) return go(col, row + 1, carry);\n    const ch = w[w.length - 1 - col];\n    if (ch in assigned) return go(col, row + 1, carry + assigned[ch]);\n    for (let d = 0; d < 10; d++) {\n      if (!allowed(ch, d)) continue;\n      assigned[ch] = d; taken[d] = true;\n      if (go(col, row + 1, carry + d)) return true;\n      delete assigned[ch]; taken[d] = false;\n    }\n    return false;\n  };\n  return go(0, 0, 0);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const large = size === 'large';\n  for (;;) {\n    // Random letters over a small alphabet: usually unsolvable.\n    if (!large && rand() < 0.3) {\n      const alphabet = 'ABCDE'.slice(0, pick(2, 5));\n      const word = (length) => Array.from({ length }, () => alphabet[pick(0, alphabet.length - 1)]).join('');\n      const words = Array.from({ length: pick(2, 3) }, () => word(pick(1, 3)));\n      return [words, word(pick(1, 4))];\n    }\n    // Build a true addition, then write it in letters.\n    const count = large ? pick(3, 5) : pick(2, 3);\n    const numbers = Array.from({ length: count }, () => {\n      const length = large ? pick(3, 7) : pick(1, 3);\n      let value = length === 1 ? pick(0, 9) : pick(1, 9);\n      for (let i = 1; i < length; i++) value = value * 10 + pick(0, 9);\n      return value;\n    });\n    const total = numbers.reduce((a, b) => a + b, 0);\n    if (total >= 1e7) continue;\n    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');\n    for (let i = letters.length - 1; i > 0; i--) { const j = pick(0, i); [letters[i], letters[j]] = [letters[j], letters[i]]; }\n    const spell = (value) => String(value).split('').map(c => letters[Number(c)]).join('');\n    const words = numbers.map(spell);\n    let result = spell(total);\n    if (rand() < 0.4) {\n      // Change one letter of the result to a letter already in use: often breaks the puzzle.\n      const used = [...new Set([...words.join(''), ...result])];\n      const at = pick(0, result.length - 1);\n      result = result.slice(0, at) + used[pick(0, used.length - 1)] + result.slice(at + 1);\n    }\n    if (!large && new Set([...words.join(''), ...result]).size > 7) continue;\n    return [words, result];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[["SEND","MORE"],"MONEY"],"expected":true},
+    {"name":"Example 2","input":[["SIX","SEVEN","SEVEN"],"TWENTY"],"expected":true},
+    {"name":"Example 3","input":[["LEET","CODE"],"POINT"],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["A","B"],"A"]},
+    {"name":"Test 2","input":[["A","A"],"B"]},
+    {"name":"Test 3","input":[["AB","CD"],"AB"]},
+    {"name":"Test 4","input":[["THIS","IS","TOO"],"FUNNY"]},
+    {"name":"Test 5","input":[["ABCDEFG","ABCDEFG"],"ABC"]},
+    {"name":"Test 6","input":[["A","B"],"CD"]},
+    {"name":"Test 7","input":[["TO","GO"],"OUT"]},
+    {"name":"Test 8","input":[["CBA","CBA","CBA","CBA","CBA"],"EDD"]},
+    {"name":"Test 9","input":[["SATURN","URANUS"],"PLANETS"]},
+    {"name":"Test 10","input":[["A","A","A","A","A"],"BB"]},
+    {"name":"Test 11","input":[["ABCDE","FGHIJ"],"JIHGFE"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBrute force gives each of up to 10 letters a different digit (up to 10! ≈ 3.6 million assignments) and checks the addition each time. A better view turns the whole equation into one sum. A letter in the hundreds place of a word adds 100 × its digit, and in the hundreds place of `result` it subtracts 100 × its digit. Adding these place values per letter gives the letter's **weight**, and the puzzle holds exactly when the sum of weight × digit over all letters is 0.\n\nNow backtrack over the letters, heaviest weight first. Before choosing a digit, ask how far the remaining letters could still move the total: each one adds at most 9 × its weight. Only digits that keep 0 within reach are worth trying, and for the heavy letters that is usually just one or two digits.\n\n## Approach\n\n1. `addWeights` walks a string from right to left, adding place values (positive for words, negative for `result`) into `weight`. It also puts the first letter of every string with 2+ letters into `leading`.\n2. Sort `letters` by the size of their weight, largest first.\n3. `maxRest[i]` and `minRest[i]` are the most and least the letters from position `i` on can add.\n4. `solve(index, total)`: when every letter has a digit, succeed exactly when `total === 0`.\n5. Otherwise, with `f` the letter's weight, `digit * f` must lie between `-total - maxRest[index + 1]` and `-total - minRest[index + 1]`. Dividing by `f` gives `low` and `high` (at least 1 for a leading letter, any digit when `f` is 0).\n6. Try each free digit from `low` to `high`: mark it `used`, recurse with `total + digit * f`, and free it again if that branch fails.\n\n## Example 1, step by step\n\nThe weights are M = −9000, S = 1000, O = −900, E = 91, N = −90, R = 10, D = 1, Y = −1, already in sorted order. After M, the others can add between −8919 and 9918, so only M = 1 keeps 0 reachable. With the total at −9000, S's range is [9, 9], so S = 9. O's range is [0, 1] and 1 is taken, so O = 0. E = 2, 3 and 4 each fail a few letters deeper, when D or Y finds no free digit in its range. With E = 5, N's range is [5, 6], so N = 6; then R = 8, D = 7, and Y's range is [2, 2]. Y = 2 brings the total to exactly 0, so the answer is `true` (9567 + 1085 = 10652).\n\n## Complexity\n\n- Time: exponential in the worst case (at most 10! assignments), but the range check usually leaves very few digits per letter; building the weights is linear in the total length of the strings.\n- Space: O(k) for k ≤ 10 letters: the recursion depth, `maxRest`, `minRest` and `weight`.\n\n## Pitfalls\n\n- A one-letter string may be 0; only strings of two or more letters forbid a leading zero.\n- One letter can appear in several strings and places; add all of its place values into a single weight.\n- A word may be the same string as `result` (`[\"A\",\"B\"]` and `\"A\"`), so subtract the result's place values in a separate call instead of choosing the sign by comparing strings.\n- Free the digit (`used[digit] = false`) when its branch fails, or later branches lose it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `weight` | letter → total place value (words add, `result` subtracts) |\n| `leading` | letters that may not be 0 |\n| `letters` | the distinct letters, heaviest weight first |\n| `maxRest`, `minRest` | most and least the letters from a position on can add |\n| `used` | which digits are taken |\n| `index`, `total` | next letter to assign, and the weighted sum so far |\n| `f`, `low`, `high` | that letter's weight and the digits still worth trying |",
+  "narration": {
+    "2": "weight will hold each letter's total place value: positive in the words, negative in the result.",
+    "6": "Walk the string from its last letter, the ones place, to its first.",
+    "7": "Add this position's place value to the letter's weight.",
+    "8": "The next letter to the left is worth ten times as much.",
+    "10": "A string of two or more letters cannot start with 0.",
+    "17": "Subtract the result, so the puzzle holds exactly when the weighted sum of digits is 0.",
+    "19": "Handle the heaviest letters first; they swing the total the most and are pinned down fastest.",
+    "22": "From the back, add up the most and least the letters from each position on could still contribute.",
+    "26": "No digit is taken yet.",
+    "29": "Every letter has a digit.",
+    "30": "The addition is correct exactly when the weighted total is 0.",
+    "32": "The weight of the letter being assigned.",
+    "33": "digit * f must cancel the total together with whatever the later letters can add; these are the two limits.",
+    "34": "Smallest digit worth trying: never 0 for a leading letter.",
+    "35": "Largest digit worth trying.",
+    "36": "Try each digit in the range.",
+    "37": "Skip digits another letter already has.",
+    "38": "Give this digit to the letter.",
+    "39": "Assign the remaining letters with the updated total.",
+    "40": "A complete solution was found, so stop searching.",
+    "42": "That digit led nowhere: free it and try the next one.",
+    "45": "No digit works for this letter given the earlier choices.",
+    "48": "Start with the heaviest letter and a total of 0."
+  }
+}

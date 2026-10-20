@@ -1,0 +1,50 @@
+{
+  "number": 1978,
+  "title": "Employees Whose Manager Left the Company",
+  "spec": "leetcode",
+  "statement": "One table lists the current employees:\n\n- `Employees(employee_id, name, manager_id, salary)`: one row per employee; `employee_id` is unique. `manager_id` is the id of the employee's manager, or `null` when they have no manager.\n\nWhen a manager leaves, their row is deleted, but their reports keep the departed manager's id in `manager_id`. So a manager has left exactly when `manager_id` is not `null` and no row has that `employee_id`.\n\nReturn one column, `employee_id`, for every employee whose `salary` is strictly below `30000` and whose manager has left, ordered by `employee_id` ascending.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "manager_id is null for employees without a manager",
+    "manager_id may name an employee who is no longer in the table"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["name","VARCHAR(20)"],["manager_id","INT"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const ids = new Set();\n  for (const [id, name, , salary] of Employees) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (ids.has(id)) return `employee_id ${id} appears twice.`;\n    if (name === null) return `Employee ${id} needs a name.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT employee_id\nFROM Employees\nWHERE salary < 30000\n  AND manager_id NOT IN (SELECT employee_id FROM Employees)\nORDER BY employee_id;",
+  "brute": "SELECT e.employee_id\nFROM Employees AS e\nLEFT JOIN Employees AS m ON m.employee_id = e.manager_id\nWHERE e.salary < 30000\n  AND e.manager_id IS NOT NULL\n  AND m.employee_id IS NULL\nORDER BY e.employee_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const names = ['Mila', 'Antonella', 'Emery', 'Kalel', 'Mikaela', 'Joziah', 'Ana', 'Bob'];\n  // Small salaries sit on both sides of 30000, including the boundary itself.\n  const smallSalaries = [21241, 28485, 29999, 30000, 30001, 31000, 50937];\n  const count = small ? pick(9) : 2000, pool = small ? 10 : 2600;\n  const Employees = [], used = new Set();\n  while (Employees.length < count) {\n    const id = 1 + pick(pool);\n    if (used.has(id)) continue;\n    used.add(id);\n    // Managers come from a slightly wider id range, so some point at nobody (a manager who left).\n    const manager = rand() < 0.25 ? null : 1 + pick(pool + (small ? 3 : 300));\n    const salary = small ? smallSalaries[pick(smallSalaries.length)] : rand() < 0.02 ? 30000 : 10000 + pick(50000);\n    Employees.push([id, names[pick(names.length)], manager, salary]);\n  }\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[3,"Mila",9,60301],[12,"Antonella",null,31000],[13,"Emery",null,67084],[1,"Kalel",11,21241],[9,"Mikaela",null,50937],[11,"Joziah",6,28485]]}],"expected":{"columns":["employee_id"],"rows":[[11]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Ana",null,1000]]}]},
+    {"name":"Test 3","input":[{"Employees":[[4,"Bob",7,29999]]}]},
+    {"name":"Test 4","input":[{"Employees":[[4,"Bob",7,30000],[5,"Ana",7,30001]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Mila",null,80000],[2,"Kalel",1,20000],[3,"Emery",1,25000]]}]},
+    {"name":"Test 6","input":[{"Employees":[[9,"Mila",40,10000],[2,"Kalel",41,20000],[15,"Emery",40,25000],[7,"Ana",42,35000]]}]},
+    {"name":"Test 7","input":[{"Employees":[[1,"Mikaela",50,90000],[2,"Joziah",1,15000],[3,"Ana",2,12000],[4,"Bob",50,18000]]}]},
+    {"name":"Test 8","input":[{"Employees":[[5,"Ana",5,10000],[6,"Bob",null,12000],[8,"Emery",99,29000],[10,"Mila",6,9000]]}]},
+    {"name":"Test 9","input":[{"Employees":[[3,"Mila",9,60301],[12,"Antonella",null,31000],[13,"Emery",null,17084],[1,"Kalel",11,21241],[9,"Mikaela",null,50937],[11,"Joziah",6,28485],[20,"Ana",6,29999],[21,"Bob",13,1000]]}]},
+    {"name":"Test 10","input":[{"Employees":[[100,"Ana",1,100],[20,"Bob",2,200],[3,"Emery",3,300]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The manager left\" means the `manager_id` points at an id that no longer exists in the table. That is a membership test: `manager_id NOT IN (all current employee ids)`. Combine it with the salary filter and sort.\n\n## Approach\n\n1. Read `Employees` once as the source of candidates.\n2. `WHERE salary < 30000` keeps only the low earners.\n3. `AND manager_id NOT IN (SELECT employee_id FROM Employees)` keeps those whose manager's row is gone. A `null` `manager_id` makes `NOT IN` unknown, so employees without a manager drop out on their own.\n4. `ORDER BY employee_id`.\n\n## Example 1, step by step\n\n- Current ids: 3, 12, 13, 1, 9, 11.\n- Salary below 30000: Kalel (1, manager 11) and Joziah (11, manager 6).\n- Kalel's manager 11 is in the id list, so Kalel is dropped.\n- Joziah's manager 6 is not, so Joziah stays. Result: 11.\n\n## Complexity\n\n- Time: O(n) with a hashed `NOT IN` lookup over the n employees, plus O(k log k) to sort the k matches.\n- Space: O(n) for the set of current ids.\n\n## Pitfalls\n\n- `NOT EXISTS` or a `LEFT JOIN ... IS NULL` also matches employees whose `manager_id` is `null`; those need an extra `manager_id IS NOT NULL`.\n- The bound is strict: a salary of exactly 30000 does not qualify.\n- Only the direct manager matters: a report of a manager whose own manager left is not affected.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `Employees` (outer) | the candidates being filtered |\n| `salary < 30000` | the strict pay filter |\n| `SELECT employee_id FROM Employees` | the ids of everyone still in the company |\n| `manager_id NOT IN (...)` | true only when the manager's id is missing from that list |",
+  "narration": {
+    "1": "The output is a single column of employee ids.",
+    "2": "Every candidate comes from the Employees table.",
+    "3": "Keep only salaries strictly below 30000.",
+    "4": "The manager left when their id is not among current employee ids; a null manager_id never passes NOT IN.",
+    "5": "Sort the answer by employee_id, as the problem requires."
+  }
+}

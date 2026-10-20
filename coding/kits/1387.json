@@ -1,0 +1,61 @@
+{
+  "number": 1387,
+  "title": "Sort Integers by The Power Value",
+  "spec": "leetcode",
+  "statement": "Repeatedly apply this rule to a positive integer `x`: halve it when it is even, and replace it by `3 * x + 1` when it is odd. The **power** of `x` is how many times the rule must be applied until the value becomes `1` (so the power of `1` is `0`, and the power of `3` is `7`: 3, 10, 5, 16, 8, 4, 2, 1).\n\nGiven `lo`, `hi` and `k`, arrange every integer from `lo` to `hi` inclusive by increasing power, breaking ties between equal powers by putting the smaller integer first, and return the integer in position `k` of that order (counting from 1). Every integer in the range is guaranteed to reach `1`, and its power fits in a 32-bit signed integer.",
+  "constraints": [
+    "1 <= lo <= hi <= 1000",
+    "1 <= k <= hi - lo + 1"
+  ],
+  "signature": "int getKth(int lo, int hi, int k)",
+  "entry": "getKth",
+  "kind": "function",
+  "parameters": [
+    "lo",
+    "hi",
+    "k"
+  ],
+  "validator": "function validate([lo, hi, k]) {\n  if (![lo, hi, k].every(Number.isInteger)) return 'lo, hi and k are integers.';\n  if (lo < 1 || hi > 1000 || lo > hi) return 'Need 1 <= lo <= hi <= 1000.';\n  if (k < 1 || k > hi - lo + 1) return 'k is between 1 and the number of integers from lo to hi.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function getKth(lo, hi, k) {\n  const memo = new Map([[1, 0]]);\n  const ranked = [];\n  for (let x = lo; x <= hi; x++) {\n    const path = [];\n    let value = x;\n    while (!memo.has(value)) {\n      path.push(value);\n      value = value % 2 === 0 ? value / 2 : 3 * value + 1;\n    }\n    let steps = memo.get(value);\n    while (path.length > 0) {\n      steps++;\n      memo.set(path.pop(), steps);\n    }\n    ranked.push([memo.get(x), x]);\n  }\n  ranked.sort((a, b) => a[0] - b[0] || a[1] - b[1]);\n  return ranked[k - 1][1];\n}",
+  "brute": "function getKth(lo, hi, k) {\n  // Count the steps directly every time, then pick the smallest remaining integer k times.\n  const power = x => { let count = 0; while (x !== 1) { x = x % 2 === 1 ? 3 * x + 1 : x / 2; count++; } return count; };\n  const remaining = [];\n  for (let x = lo; x <= hi; x++) remaining.push(x);\n  let chosen = null;\n  for (let round = 0; round < k; round++) {\n    let best = 0;\n    for (let i = 1; i < remaining.length; i++) {\n      const a = power(remaining[i]), b = power(remaining[best]);\n      if (a < b || (a === b && remaining[i] < remaining[best])) best = i;\n    }\n    chosen = remaining.splice(best, 1)[0];\n  }\n  return chosen;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  let lo, hi;\n  if (size === 'large') {\n    lo = 1 + pick(60);\n    hi = 1000 - pick(60);\n  } else {\n    lo = rand() < 0.3 ? 1 + pick(5) : 1 + pick(990);\n    hi = Math.min(1000, lo + pick(15));\n  }\n  const k = 1 + pick(hi - lo + 1);\n  return [lo, hi, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[12,15,2],"expected":13},
+    {"name":"Example 2","input":[7,11,4],"expected":7}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1,1]},
+    {"name":"Test 2","input":[1,1000,1]},
+    {"name":"Test 3","input":[1,1000,1000]},
+    {"name":"Test 4","input":[12,15,4]},
+    {"name":"Test 5","input":[7,11,1]},
+    {"name":"Test 6","input":[27,27,1]},
+    {"name":"Test 7","input":[10,20,5]},
+    {"name":"Test 8","input":[1,10,10]},
+    {"name":"Test 9","input":[500,1000,250]},
+    {"name":"Test 10","input":[999,1000,2]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe task is a sort with a custom key: order by power, then by the integer itself. The only real work is computing powers cheaply. Simulating every chain from scratch is fine for one number, but many chains merge (13 goes through 40, 20, 10 and 5, and so does 12 via 6, 3, 10), so the same tails get recounted again and again. Remembering the power of every value a chain passes through means each tail is walked only once.\n\n## Approach\n\n1. Start a `memo` map with the known fact that the power of 1 is 0.\n2. For each `x` from `lo` to `hi`, follow the rule from `x`, pushing every value not yet in `memo` onto `path`, until `value` is one whose power is known.\n3. Walk `path` backwards: each value has one more step than the value after it, so add 1 to `steps` and store it.\n4. Push the pair `[power of x, x]` onto `ranked`.\n5. Sort `ranked` by power, then by the integer, and return the integer at index `k - 1`.\n\n## Example 1, step by step\n\n`lo = 12`, `hi = 15`, `k = 2`.\n\n- `x = 12`: the path is 12, 6, 3, 10, 5, 16, 8, 4, 2 before reaching 1. Unwinding gives 2 → 1, 4 → 2, ... up to 12 → 9.\n- `x = 13`: 13 and 40 and 20 are new, then 10 is already known with power 6, so 20 → 7, 40 → 8, 13 → 9.\n- `x = 14` and `x = 15` both come out at 17.\n- `ranked` sorted is `[[9, 12], [9, 13], [17, 14], [17, 15]]`; position 2 holds `13`.\n\n## Complexity\n\n- Time: O(n log n + S), where n = hi - lo + 1 and S is the number of distinct values visited by all the chains; each is stored once.\n- Space: O(n + S) for `ranked` and `memo`.\n\n## Pitfalls\n\n- `k` counts from 1, so the answer is `ranked[k - 1]`.\n- Ties must go to the smaller integer; a comparator on power alone leaves them in an unspecified order.\n- Chains climb far above `hi` (27 reaches 9232), so `memo` must be a map, or an array sized for those peaks, not one sized to `hi`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `memo` | known powers, keyed by value |\n| `x` | the integer of the range being measured |\n| `value` | the current value of the chain that starts at `x` |\n| `path` | chain values whose power is not yet known |\n| `steps` | the power of the value just stored while unwinding |\n| `ranked` | `[power, x]` pairs, sorted at the end |",
+  "narration": {
+    "2": "Seed the memo: 1 needs no steps.",
+    "4": "Measure each integer of the range in turn.",
+    "7": "Follow the chain until it reaches a value whose power is already known.",
+    "8": "This value is still unknown, so remember it for the unwinding.",
+    "9": "Apply the rule: halve an even value, map an odd one to 3 * value + 1.",
+    "11": "Start from the power of the first known value on the chain.",
+    "12": "Unwind the path from the value nearest that known one back to x.",
+    "13": "Each earlier value needs one more step than the one after it.",
+    "14": "Store that power so later chains can stop here.",
+    "16": "Record x together with its power.",
+    "18": "Order by power, and by the integer itself when powers tie.",
+    "19": "The k-th integer (counting from 1) is at index k - 1."
+  }
+}

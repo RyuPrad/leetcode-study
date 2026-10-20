@@ -1,0 +1,48 @@
+{
+  "number": 2026,
+  "title": "Low-Quality Problems",
+  "spec": "recalled",
+  "statement": "One table holds the votes on a site's problems:\n\n- `Problems(problem_id, likes, dislikes)`: one row per problem; `problem_id` is unique. `likes` and `dislikes` are the vote counts, never negative, and every problem has at least one vote.\n\nA problem's **like ratio** is `likes / (likes + dislikes)`. A problem is *low-quality* when its like ratio is **strictly below 60%** (a ratio of exactly 0.6 is not low-quality).\n\nReport the `problem_id` of every low-quality problem, in a single column named `problem_id`, ordered by `problem_id` ascending.",
+  "constraints": [
+    "problem_id is unique in Problems",
+    "likes >= 0 and dislikes >= 0",
+    "likes + dislikes > 0 for every problem"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Problems": [["problem_id","INT"],["likes","INT"],["dislikes","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Problems = [] }] = input;\n  const ids = new Set();\n  for (const [id, likes, dislikes] of Problems) {\n    if (id === null || likes === null || dislikes === null) return 'Every column is required.';\n    if (ids.has(id)) return `problem_id ${id} appears twice.`;\n    ids.add(id);\n    if (likes < 0 || dislikes < 0) return 'Vote counts cannot be negative.';\n    if (likes + dislikes === 0) return `Problem ${id} has no votes.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT problem_id\nFROM Problems\nWHERE likes / (likes + dislikes) < 0.6\nORDER BY problem_id;",
+  "brute": "SELECT problem_id\nFROM Problems\nWHERE problem_id NOT IN (\n  SELECT problem_id\n  FROM Problems\n  WHERE 2 * likes >= 3 * dislikes\n)\nORDER BY problem_id ASC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const ids = Array.from({ length: small ? 20 : 5000 }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  // Vote totals stay below 2000 so no ratio sits within 0.0001 of 0.6 unless it is exactly 0.6.\n  const Problems = [];\n  for (let i = 0; i < rows; i++) {\n    let likes, dislikes;\n    if (rand() < 0.4) {\n      // Near the boundary: exactly 60%, or one vote either side of it.\n      const k = 1 + Math.floor(rand() * (small ? 20 : 399)), shift = [-1, 0, 0, 1][Math.floor(rand() * 4)];\n      likes = 3 * k + shift;\n      dislikes = 2 * k - shift;\n    } else {\n      likes = Math.floor(rand() * (small ? 30 : 1000));\n      dislikes = Math.floor(rand() * (small ? 30 : 1000));\n      if (likes + dislikes === 0) dislikes = 1;\n    }\n    Problems.push([ids[i], likes, dislikes]);\n  }\n  return [{ Problems }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Problems":[[6,1290,425],[11,2677,8659],[1,4446,2760],[7,8569,6086],[13,2050,4164],[10,9002,7446]]}],"expected":{"columns":["problem_id"],"rows":[[7],[10],[11],[13]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Problems":[]}]},
+    {"name":"Test 2","input":[{"Problems":[[1,3,2]]}]},
+    {"name":"Test 3","input":[{"Problems":[[4,0,5]]}]},
+    {"name":"Test 4","input":[{"Problems":[[2,5,0],[1,60,40]]}]},
+    {"name":"Test 5","input":[{"Problems":[[3,599,401],[1,600,400],[2,601,399]]}]},
+    {"name":"Test 6","input":[{"Problems":[[9,1,1],[3,2,3],[7,0,1],[5,10,90]]}]},
+    {"name":"Test 7","input":[{"Problems":[[10,50,1],[20,7,3],[30,13,7],[40,300,199]]}]},
+    {"name":"Test 8","input":[{"Problems":[[8,5,4],[2,6,4],[6,2,1],[4,1,2],[12,59,41],[10,61,39]]}]},
+    {"name":"Test 9","input":[{"Problems":[[100,8,6],[1,6,8],[50,12,8],[25,11,8]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a pure row filter: each problem is judged on its own row, so a `WHERE` clause on the like ratio picks the low-quality ones, and `ORDER BY` fixes the order. The only care needed is in the arithmetic: the ratio is a fraction, and the comparison with 60% must be strict.\n\n## Approach\n\n1. Read every row of `Problems`.\n2. Keep a row when `likes / (likes + dislikes) < 0.6`. MySQL's `/` gives a decimal result, so the ratio is not truncated to 0 or 1.\n3. Return `problem_id`, sorted ascending.\n\n## Example 1, step by step\n\n| problem_id | likes | votes | ratio | low-quality? |\n| --- | --- | --- | --- | --- |\n| 6 | 1290 | 1715 | 0.7522 | no |\n| 11 | 2677 | 11336 | 0.2362 | yes |\n| 1 | 4446 | 7206 | 0.6170 | no |\n| 7 | 8569 | 14655 | 0.5847 | yes |\n| 13 | 2050 | 6214 | 0.3299 | yes |\n| 10 | 9002 | 16448 | 0.5473 | yes |\n\nSorting the four kept ids gives 7, 10, 11, 13.\n\n## Complexity\n\n- Time: O(n log n) for n problems: one pass to filter, then a sort of the kept ids.\n- Space: O(n) for the result.\n\n## Pitfalls\n\n- Integer division (`likes DIV (likes + dislikes)`, or `/` in engines that truncate) makes almost every ratio 0 and reports nearly every problem.\n- Using `<=` reports problems sitting at exactly 60%, such as 3 likes and 2 dislikes.\n- Dividing by `dislikes` alone, or by `likes`, is a different ratio; the denominator is all votes.\n- Forgetting `ORDER BY problem_id`: the result must be sorted.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `likes + dislikes` | total votes on the problem |\n| `likes / (likes + dislikes)` | the like ratio, between 0 and 1 |\n| `< 0.6` | strictly below 60% |\n| `ORDER BY problem_id` | ascending ids, as required |",
+  "narration": {
+    "1": "Only the problem id is reported.",
+    "2": "Every problem is judged on its own row, so no join or grouping is needed.",
+    "3": "Keep a problem when its likes are strictly less than 60% of all its votes; the division keeps the fraction.",
+    "4": "Sort the low-quality ids ascending, as the problem requires."
+  }
+}

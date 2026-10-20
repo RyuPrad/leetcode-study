@@ -1,0 +1,57 @@
+{
+  "number": 2051,
+  "title": "The Category of Each Member in the Store",
+  "spec": "recalled",
+  "statement": "Three tables track a store's members, their visits and what they bought:\n\n- `Members(member_id, name)`: one row per member; `member_id` is unique (names may repeat).\n- `Visits(visit_id, member_id, visit_date)`: one row per visit to the store; `visit_id` is unique and `member_id` is always a member listed in `Members`.\n- `Purchases(visit_id, charged_amount)`: one row per visit that ended in a purchase; `visit_id` is unique and always names a row of `Visits`. A visit has at most one purchase.\n\nA member's **conversion rate** is `100 * (number of their visits with a purchase) / (number of their visits)`. Each member gets one category:\n\n- `'Diamond'` when the conversion rate is at least 80;\n- `'Gold'` when it is at least 50 but below 80;\n- `'Silver'` when it is below 50 (including members who visited but never bought);\n- `'Bronze'` when the member never visited the store.\n\nReport every member with the columns `member_id`, `name` and `category`. Rows may come in any order.",
+  "constraints": [
+    "member_id is unique in Members",
+    "visit_id is unique in Visits",
+    "Visits.member_id always appears in Members",
+    "visit_id is unique in Purchases and always appears in Visits"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Members": [["member_id","INT"],["name","VARCHAR(30)"]],
+    "Visits": [["visit_id","INT"],["member_id","INT"],["visit_date","DATE"]],
+    "Purchases": [["visit_id","INT"],["charged_amount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Members = [], Visits = [], Purchases = [] }] = input;\n  const members = new Set(), visits = new Set(), bought = new Set();\n  for (const [id, name] of Members) {\n    if (id === null || name === null) return 'Every member needs an id and a name.';\n    if (members.has(id)) return `member_id ${id} appears twice in Members.`;\n    members.add(id);\n  }\n  for (const [visit, member, date] of Visits) {\n    if (visit === null || member === null || date === null) return 'Every Visits column is required.';\n    if (visits.has(visit)) return `visit_id ${visit} appears twice in Visits.`;\n    visits.add(visit);\n    if (!members.has(member)) return `Visit ${visit} names unknown member ${member}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `visit_date ${date} is not YYYY-MM-DD.`;\n  }\n  for (const [visit, amount] of Purchases) {\n    if (visit === null || amount === null) return 'Every Purchases column is required.';\n    if (bought.has(visit)) return `Visit ${visit} has two purchases.`;\n    bought.add(visit);\n    if (!visits.has(visit)) return `Purchase names unknown visit ${visit}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH member_stats AS (\n  SELECT\n    m.member_id,\n    m.name,\n    COUNT(v.visit_id) AS visits,\n    COUNT(p.visit_id) AS purchases\n  FROM Members AS m\n  LEFT JOIN Visits AS v\n    ON v.member_id = m.member_id\n  LEFT JOIN Purchases AS p\n    ON p.visit_id = v.visit_id\n  GROUP BY m.member_id, m.name\n)\nSELECT\n  member_id,\n  name,\n  CASE\n    WHEN visits = 0 THEN 'Bronze'\n    WHEN 100 * purchases / visits >= 80 THEN 'Diamond'\n    WHEN 100 * purchases / visits >= 50 THEN 'Gold'\n    ELSE 'Silver'\n  END AS category\nFROM member_stats;",
+  "brute": "SELECT m.member_id, m.name, 'Bronze' AS category\nFROM Members AS m\nWHERE NOT EXISTS (SELECT 1 FROM Visits AS v WHERE v.member_id = m.member_id)\nUNION ALL\nSELECT member_id, name,\n  IF(5 * bought >= 4 * visited, 'Diamond', IF(2 * bought >= visited, 'Gold', 'Silver'))\nFROM (\n  SELECT m.member_id, m.name,\n    (SELECT COUNT(*) FROM Visits AS v WHERE v.member_id = m.member_id) AS visited,\n    (SELECT COUNT(*) FROM Purchases AS p\n     WHERE p.visit_id IN (SELECT v.visit_id FROM Visits AS v WHERE v.member_id = m.member_id)) AS bought\n  FROM Members AS m\n) AS counted\nWHERE visited > 0",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Alice', 'Bob', 'Winston', 'Hercy', 'Narihan', 'Mia', 'Omar', 'Lena'];\n  const memberCount = small ? Math.floor(rand() * 7) : 500;\n  const visitCount = memberCount === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  const Members = [], Visits = [], Purchases = [];\n  let id = 1 + Math.floor(rand() * 3);\n  for (let i = 0; i < memberCount; i++) { Members.push([id, pick(names)]); id += 1 + Math.floor(rand() * 2); }\n  // Small sets send visits to the first few members only, so some members have none and others several.\n  const visitors = small ? Members.slice(0, 1 + Math.floor(rand() * Math.max(1, memberCount))) : Members;\n  // Each member gets a buying habit so that conversion rates spread over all categories.\n  const habit = new Map(Members.map(([member]) => [member, pick([0, 0.3, 0.5, 0.8, 1])]));\n  const visitIds = Array.from({ length: small ? 30 : 4000 }, (_, i) => i + 1);\n  for (let i = visitIds.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [visitIds[i], visitIds[j]] = [visitIds[j], visitIds[i]]; }\n  for (let i = 0; i < visitCount; i++) {\n    const [member] = pick(visitors);\n    const date = `2021-${String(1 + Math.floor(rand() * 12)).padStart(2, '0')}-${String(1 + Math.floor(rand() * 28)).padStart(2, '0')}`;\n    Visits.push([visitIds[i], member, date]);\n    if (rand() < habit.get(member)) Purchases.push([visitIds[i], 1000 * (1 + Math.floor(rand() * 10))]);\n  }\n  return [{ Members, Visits, Purchases }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Members":[[9,"Alice"],[11,"Bob"],[3,"Winston"],[8,"Hercy"],[1,"Narihan"]],"Visits":[[22,11,"2021-10-28"],[16,11,"2021-01-12"],[18,9,"2021-12-10"],[19,3,"2021-10-19"],[12,11,"2021-03-01"],[17,8,"2021-05-07"],[21,9,"2021-05-12"]],"Purchases":[[12,2000],[18,9000],[17,7000]]}],"expected":{"columns":["member_id","name","category"],"rows":[[1,"Narihan","Bronze"],[3,"Winston","Silver"],[8,"Hercy","Diamond"],[9,"Alice","Gold"],[11,"Bob","Silver"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Members":[],"Visits":[],"Purchases":[]}]},
+    {"name":"Test 2","input":[{"Members":[[1,"Ana"],[2,"Ben"]],"Visits":[],"Purchases":[]}]},
+    {"name":"Test 3","input":[{"Members":[[1,"Ana"],[2,"Ben"]],"Visits":[[1,1,"2021-01-01"],[2,1,"2021-01-02"],[3,1,"2021-01-03"],[4,1,"2021-01-04"],[5,1,"2021-01-05"],[6,2,"2021-02-01"],[7,2,"2021-02-02"],[8,2,"2021-02-03"],[9,2,"2021-02-04"],[10,2,"2021-02-05"]],"Purchases":[[1,100],[2,100],[3,100],[4,100],[6,50],[7,50],[8,50]]}]},
+    {"name":"Test 4","input":[{"Members":[[1,"Ana"],[2,"Ben"],[3,"Cleo"]],"Visits":[[1,1,"2021-03-01"],[2,1,"2021-03-02"],[3,2,"2021-03-01"],[4,2,"2021-03-02"],[5,2,"2021-03-03"],[6,3,"2021-03-01"],[7,3,"2021-03-02"],[8,3,"2021-03-03"],[9,3,"2021-03-04"]],"Purchases":[[1,500],[3,700],[6,200],[7,300]]}]},
+    {"name":"Test 5","input":[{"Members":[[5,"Dana"],[6,"Eli"]],"Visits":[[11,5,"2021-04-01"],[12,5,"2021-04-02"],[13,5,"2021-04-03"],[14,5,"2021-04-04"],[15,5,"2021-04-05"],[16,5,"2021-04-06"],[17,5,"2021-04-07"],[18,5,"2021-04-08"],[19,5,"2021-04-09"],[20,6,"2021-04-01"]],"Purchases":[[11,10],[12,10],[13,10],[14,10],[15,10],[16,10],[17,10],[20,99]]}]},
+    {"name":"Test 6","input":[{"Members":[[1,"Ana"],[2,"Ana"]],"Visits":[[1,1,"2021-05-01"],[2,1,"2021-05-01"]],"Purchases":[]}]},
+    {"name":"Test 7","input":[{"Members":[[4,"Finn"]],"Visits":[[3,4,"2021-06-01"]],"Purchases":[]}]},
+    {"name":"Test 8","input":[{"Members":[[7,"Gus"],[2,"Hana"],[5,"Ivy"]],"Visits":[[31,7,"2021-07-01"],[32,7,"2021-07-01"],[33,7,"2021-07-01"],[34,2,"2021-07-02"],[35,2,"2021-07-03"]],"Purchases":[[31,1000],[32,2000],[33,3000],[35,4000]]}]},
+    {"name":"Test 9","input":[{"Members":[[10,"Jo"],[20,"Kai"],[30,"Lia"],[40,"Max"]],"Visits":[[1,20,"2021-08-01"],[2,20,"2021-08-02"],[3,20,"2021-08-03"],[4,20,"2021-08-04"],[5,30,"2021-08-05"],[6,30,"2021-08-06"],[7,40,"2021-08-07"]],"Purchases":[[1,5],[2,5],[3,5],[5,5],[7,5]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach member needs two counts: how many visits they made and how many of those visits ended in a purchase. Joining `Members` to `Visits` to `Purchases` with **left joins** keeps every member and every visit, and counting the non-null ids on each side gives both numbers in one `GROUP BY`. A `CASE` then turns the counts into a category, checking \"no visits\" first so the division never sees a zero.\n\n## Approach\n\n1. `member_stats`: start from `Members` (`m`), left join their visits (`v`) and each visit's purchase (`p`). Group by member; `COUNT(v.visit_id)` is the number of visits and `COUNT(p.visit_id)` the number that ended in a purchase.\n2. The outer `SELECT` maps the counts to a category: `'Bronze'` when `visits = 0`, otherwise compare `100 * purchases / visits` with 80 and then 50, falling through to `'Silver'`.\n\n## Example 1, step by step\n\n| member_id | name | visits | purchases | rate | category |\n| --- | --- | --- | --- | --- | --- |\n| 9 | Alice | 2 (18, 21) | 1 (18) | 50 | Gold |\n| 11 | Bob | 3 (22, 16, 12) | 1 (12) | 33.33 | Silver |\n| 3 | Winston | 1 (19) | 0 | 0 | Silver |\n| 8 | Hercy | 1 (17) | 1 (17) | 100 | Diamond |\n| 1 | Narihan | 0 | 0 | none | Bronze |\n\n## Complexity\n\n- Time: O(M + V + P) with hashed joins on `member_id` and `visit_id`, for M members, V visits and P purchases.\n- Space: O(M) for one counted row per member.\n\n## Pitfalls\n\n- An inner join to `Visits` drops members who never visited, so no one is ever `'Bronze'`.\n- `COUNT(*)` counts the single null-padded row of a visitless member as a visit, making them `'Silver'` instead of `'Bronze'`.\n- A member who visited but never bought has rate 0 and is `'Silver'`, not `'Bronze'`.\n- The thresholds are inclusive: exactly 80 is `'Diamond'` and exactly 50 is `'Gold'`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `m` | `Members`, the table every output row comes from |\n| `v` | the member's visits, or `null` when they have none |\n| `p` | the purchase made on visit `v`, or `null` |\n| `member_stats` | one row per member with `visits` and `purchases` |\n| `category` | the tier picked by the `CASE` |",
+  "narration": {
+    "1": "The member_stats CTE counts visits and purchases for every member.",
+    "5": "COUNT of the visit id skips the null row of a member with no visits, so such a member gets 0.",
+    "6": "COUNT of the purchase id counts only the visits that matched a purchase.",
+    "7": "Members is the left-most table, so every member keeps a row.",
+    "8": "A left join attaches each of the member's visits, keeping members who never came.",
+    "10": "A second left join attaches the purchase made on each visit, if any.",
+    "12": "Grouping by member collapses their visits into one row of counts.",
+    "18": "A member with no visits is Bronze; testing this first keeps the division below from dividing by zero.",
+    "19": "A conversion rate of at least 80 is Diamond.",
+    "20": "Otherwise a rate of at least 50 is Gold, and anything lower falls through to Silver."
+  }
+}

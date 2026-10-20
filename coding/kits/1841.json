@@ -1,0 +1,60 @@
+{
+  "number": 1841,
+  "title": "League Statistics",
+  "spec": "recalled",
+  "statement": "A football league keeps two tables:\n\n- `Teams(team_id, team_name)`: one row per team; `team_id` is unique and so is `team_name`.\n- `Matches(home_team_id, away_team_id, home_team_goals, away_team_goals)`: one row per match that was played; `(home_team_id, away_team_id)` is unique. Both ids are teams in `Teams` and are different, and the goal counts are non-negative.\n\nA win is worth **3** points, a draw **1** point for each side and a loss **0**. Build the league table with one row per team that played at least one match (home or away) and the columns:\n\n- `team_name`;\n- `matches_played`: how many matches the team played, home and away together;\n- `points`: its total points;\n- `goal_for`: goals the team scored over all its matches;\n- `goal_against`: goals its opponents scored against it;\n- `goal_diff`: `goal_for - goal_against`.\n\nTeams with no match are not listed. Order the rows by `points` descending, then `goal_diff` descending, then `team_name` ascending.",
+  "constraints": [
+    "team_id is unique in Teams, and team_name is unique too",
+    "(home_team_id, away_team_id) is unique in Matches",
+    "home_team_id and away_team_id are different teams that exist in Teams",
+    "home_team_goals and away_team_goals are non-negative integers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Teams": [["team_id","INT"],["team_name","VARCHAR(20)"]],
+    "Matches": [["home_team_id","INT"],["away_team_id","INT"],["home_team_goals","INT"],["away_team_goals","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Teams = [], Matches = [] }] = input;\n  const teams = new Set(), names = new Set(), pairs = new Set();\n  for (const [id, name] of Teams) {\n    if (id === null) return 'Every team needs a team_id.';\n    if (teams.has(id)) return `team_id ${id} appears twice in Teams.`;\n    teams.add(id);\n    if (name === null) return `Team ${id} needs a name.`;\n    const key = String(name).toLowerCase();\n    if (names.has(key)) return `Team name ${name} is used twice.`;\n    names.add(key);\n  }\n  for (const [home, away, homeGoals, awayGoals] of Matches) {\n    if (!teams.has(home) || !teams.has(away)) return `Match ${home} vs ${away} names a team that is not in Teams.`;\n    if (home === away) return `Team ${home} cannot play itself.`;\n    const key = `${home}:${away}`;\n    if (pairs.has(key)) return `Match ${home} vs ${away} appears twice.`;\n    pairs.add(key);\n    for (const goals of [homeGoals, awayGoals]) {\n      if (!Number.isInteger(goals) || goals < 0) return `Match ${home} vs ${away} needs non-negative goal counts.`;\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH team_games AS (\n  SELECT home_team_id AS team_id, home_team_goals AS scored, away_team_goals AS conceded\n  FROM Matches\n  UNION ALL\n  SELECT away_team_id, away_team_goals, home_team_goals\n  FROM Matches\n)\nSELECT\n  t.team_name,\n  COUNT(*) AS matches_played,\n  SUM(CASE\n        WHEN g.scored > g.conceded THEN 3\n        WHEN g.scored = g.conceded THEN 1\n        ELSE 0\n      END) AS points,\n  SUM(g.scored) AS goal_for,\n  SUM(g.conceded) AS goal_against,\n  SUM(g.scored) - SUM(g.conceded) AS goal_diff\nFROM team_games AS g\nJOIN Teams AS t\n  ON t.team_id = g.team_id\nGROUP BY t.team_id, t.team_name\nORDER BY points DESC, goal_diff DESC, t.team_name;",
+  "brute": "WITH totals AS (\n  SELECT t.team_name,\n    (SELECT COUNT(*) FROM Matches AS m\n      WHERE m.home_team_id = t.team_id OR m.away_team_id = t.team_id) AS matches_played,\n    3 * (SELECT COUNT(*) FROM Matches AS m\n      WHERE (m.home_team_id = t.team_id AND m.home_team_goals > m.away_team_goals)\n         OR (m.away_team_id = t.team_id AND m.away_team_goals > m.home_team_goals))\n    + (SELECT COUNT(*) FROM Matches AS m\n      WHERE (m.home_team_id = t.team_id OR m.away_team_id = t.team_id)\n        AND m.home_team_goals = m.away_team_goals) AS points,\n    COALESCE((SELECT SUM(home_team_goals) FROM Matches WHERE home_team_id = t.team_id), 0)\n    + COALESCE((SELECT SUM(away_team_goals) FROM Matches WHERE away_team_id = t.team_id), 0) AS goal_for,\n    COALESCE((SELECT SUM(away_team_goals) FROM Matches WHERE home_team_id = t.team_id), 0)\n    + COALESCE((SELECT SUM(home_team_goals) FROM Matches WHERE away_team_id = t.team_id), 0) AS goal_against\n  FROM Teams AS t\n)\nSELECT team_name, matches_played, points, goal_for, goal_against, goal_for - goal_against AS goal_diff\nFROM totals\nWHERE matches_played > 0\nORDER BY points DESC, goal_diff DESC, team_name",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pool = ['Ajax', 'Arsenal', 'Dortmund', 'Benfica', 'Celtic', 'Porto', 'Inter', 'Lyon', 'Napoli', 'Roma'];\n  const shuffle = list => {\n    for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }\n    return list;\n  };\n  const teamCount = small ? Math.floor(rand() * 7) : 200;\n  const ids = shuffle(Array.from({ length: small ? 9 : 400 }, (_, i) => i + 1)).slice(0, teamCount);\n  const names = small ? shuffle(pool.slice()) : [];\n  const Teams = ids.map((id, i) => [id, small ? names[i] : `${pool[id % pool.length]} ${id}`]);\n  // Every ordered pair of different teams is a possible match; small cases use few goals so draws and ties are common.\n  const pairs = [];\n  for (const home of ids) for (const away of ids) if (home !== away) pairs.push([home, away]);\n  shuffle(pairs);\n  const matchCount = small ? Math.min(pairs.length, Math.floor(rand() * 9)) : Math.min(pairs.length, 2000);\n  const maxGoals = small ? 3 : 6;\n  const Matches = pairs.slice(0, matchCount).map(([home, away]) => [home, away, Math.floor(rand() * maxGoals), Math.floor(rand() * maxGoals)]);\n  return [{ Teams, Matches }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Teams":[[1,"Ajax"],[4,"Dortmund"],[6,"Arsenal"]],"Matches":[[1,4,0,1],[1,6,3,3],[4,1,5,2],[6,1,0,0]]}],"expected":{"columns":["team_name","matches_played","points","goal_for","goal_against","goal_diff"],"rows":[["Dortmund",2,6,6,2,4],["Arsenal",2,2,3,3,0],["Ajax",4,2,5,9,-4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Teams":[],"Matches":[]}]},
+    {"name":"Test 2","input":[{"Teams":[[1,"Ajax"],[2,"Porto"]],"Matches":[]}]},
+    {"name":"Test 3","input":[{"Teams":[[1,"Ajax"],[2,"Porto"],[3,"Celtic"]],"Matches":[[2,1,0,2]]}]},
+    {"name":"Test 4","input":[{"Teams":[[1,"Lyon"],[2,"Celtic"],[3,"Ajax"]],"Matches":[[1,2,1,1],[2,3,2,2],[3,1,0,0]]}]},
+    {"name":"Test 5","input":[{"Teams":[[1,"Roma"],[2,"Inter"],[3,"Benfica"],[4,"Napoli"]],"Matches":[[1,2,5,0],[3,4,1,0],[2,3,0,0],[4,1,2,0]]}]},
+    {"name":"Test 6","input":[{"Teams":[[1,"Porto"],[2,"Arsenal"],[3,"Lyon"]],"Matches":[[1,2,4,3],[2,3,6,0],[3,1,1,0]]}]},
+    {"name":"Test 7","input":[{"Teams":[[7,"Napoli"],[8,"Benfica"],[9,"Roma"]],"Matches":[[7,8,0,3],[8,7,1,2],[9,7,0,0],[7,9,0,0]]}]},
+    {"name":"Test 8","input":[{"Teams":[[1,"Inter"],[2,"Dortmund"],[3,"Roma"],[4,"Celtic"]],"Matches":[[1,2,0,1],[3,4,0,4],[2,3,2,2],[4,1,3,3],[1,3,1,0]]}]},
+    {"name":"Test 9","input":[{"Teams":[[1,"Ajax"],[2,"Arsenal"],[3,"Dortmund"],[4,"Porto"],[5,"Lyon"]],"Matches":[[1,2,2,1],[2,3,2,1],[3,1,2,1],[4,1,0,0],[2,4,0,3]]}]},
+    {"name":"Test 10","input":[{"Teams":[[1,"Ajax"],[4,"Dortmund"],[6,"Arsenal"],[9,"Benfica"]],"Matches":[[1,4,0,1],[1,6,3,3],[4,1,5,2],[6,1,0,0],[9,6,1,1],[4,9,0,2],[9,1,7,7]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery statistic is a sum over the matches a team took part in, but a team shows up in `Matches` in two different columns: as the home side and as the away side, with the goals swapped. Rewriting each match as **two rows seen from each team's side** (team, goals scored, goals conceded) turns the problem into one ordinary `GROUP BY team`: count rows, sum goals, and score each row as 3, 1 or 0.\n\n## Approach\n\n1. `team_games`: the first `SELECT` reads each match from the home team's side (`scored = home_team_goals`), the second from the away team's side (`scored = away_team_goals`); `UNION ALL` stacks them, so each match gives exactly two rows.\n2. Join `Teams` to get the name. The inner join also drops nothing that matters: a team with no rows in `team_games` played no match and must not appear.\n3. Group by team. `COUNT(*)` is `matches_played`; `SUM(CASE ...)` turns each row into 3, 1 or 0 points; `SUM(scored)` and `SUM(conceded)` give the goals, and their difference `goal_diff`.\n4. `ORDER BY points DESC, goal_diff DESC, team_name`.\n\n## Example 1, step by step\n\n- `team_games` has 8 rows. Ajax (1): (0,1), (3,3), (2,5), (0,0). Dortmund (4): (1,0), (5,2). Arsenal (6): (3,3), (0,0).\n- Ajax: 4 matches, a loss, a draw, a loss and a draw = 2 points, 5 scored, 9 conceded, diff -4.\n- Dortmund: 2 wins = 6 points, 6 scored, 2 conceded, diff 4.\n- Arsenal: 2 draws = 2 points, 3 scored, 3 conceded, diff 0.\n- Dortmund leads on points; Arsenal and Ajax tie on 2 points, and Arsenal's diff 0 beats Ajax's -4.\n\n## Complexity\n\n- Time: O(M) to build `team_games` from M matches (2·M rows), O(M) to join and group with hashing, and O(T log T) to sort T teams.\n- Space: O(M) for the stacked rows.\n\n## Pitfalls\n\n- Reading only `home_team_id` (or joining on it alone) loses every away match (Test 7).\n- `UNION` instead of `UNION ALL` merges two identical (team, scored, conceded) rows, such as Roma's two 0-0 draws in Test 7.\n- Forgetting the last tie-break, or sorting the name descending, misorders teams equal on points and goal difference (Test 4).\n- A `LEFT JOIN` from `Teams` lists teams that never played; they must be left out (Test 2).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `team_games` | one row per (match, side): `team_id`, `scored`, `conceded` |\n| `g` | a row of `team_games` |\n| `t` | `Teams`, the source of `team_name` |\n| `points` | the summed 3 / 1 / 0 score of the team's rows |\n| `goal_diff` | `SUM(scored) - SUM(conceded)` |",
+  "narration": {
+    "1": "team_games will hold every match twice, once from each team's side.",
+    "2": "Seen from the home team: it scored the home goals and conceded the away goals.",
+    "4": "UNION ALL keeps every row, even when two of a team's matches look the same.",
+    "5": "Seen from the away team: the goal columns swap roles.",
+    "10": "Each row of a team is one match it played, so counting rows gives matches_played.",
+    "11": "Score every match from the team's side: 3 for a win, 1 for a draw, 0 for a loss.",
+    "16": "goal_for adds up the goals the team scored.",
+    "17": "goal_against adds up the goals its opponents scored.",
+    "18": "The goal difference is the two sums subtracted.",
+    "20": "Join Teams to turn ids into names; teams with no matches have no rows to join.",
+    "22": "One group per team, so each team gets one line in the table.",
+    "23": "Points first, then goal difference, both descending, then the name alphabetically."
+  }
+}

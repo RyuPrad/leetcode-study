@@ -1,0 +1,54 @@
+{
+  "number": 2142,
+  "title": "The Number of Passengers in Each Bus I",
+  "spec": "recalled",
+  "statement": "Buses and passengers arrive at one station:\n\n- `Buses(bus_id, arrival_time)`: one row per bus; `bus_id` is unique, and no two buses arrive at the same time.\n- `Passengers(passenger_id, arrival_time)`: one row per passenger; `passenger_id` is unique. Several passengers may arrive at the same time.\n\nA passenger who reaches the station at time `t` boards the **first** bus whose `arrival_time` is `t` or later; a bus arriving at the very same moment is caught. Buses have unlimited room, and a passenger who arrives after the last bus boards nothing.\n\nReport every bus with the columns `bus_id` and `passengers_cnt` (how many passengers board it; `0` when nobody does), ordered by `bus_id` ascending.",
+  "constraints": [
+    "bus_id is unique in Buses",
+    "arrival_time is unique in Buses",
+    "passenger_id is unique in Passengers",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Buses": [["bus_id","INT"],["arrival_time","INT"]],
+    "Passengers": [["passenger_id","INT"],["arrival_time","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Buses = [], Passengers = [] }] = input;\n  const buses = new Set(), times = new Set(), passengers = new Set();\n  for (const [id, time] of Buses) {\n    if (id === null || time === null) return 'Buses rows may not contain null.';\n    if (buses.has(id)) return `bus_id ${id} appears twice in Buses.`;\n    if (times.has(time)) return `Two buses arrive at time ${time}.`;\n    buses.add(id); times.add(time);\n  }\n  for (const [id, time] of Passengers) {\n    if (id === null || time === null) return 'Passengers rows may not contain null.';\n    if (passengers.has(id)) return `passenger_id ${id} appears twice in Passengers.`;\n    passengers.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH boarding AS (\n  SELECT p.passenger_id, MIN(b.arrival_time) AS bus_time\n  FROM Passengers AS p\n  JOIN Buses AS b\n    ON b.arrival_time >= p.arrival_time\n  GROUP BY p.passenger_id\n)\nSELECT b.bus_id, COUNT(bd.passenger_id) AS passengers_cnt\nFROM Buses AS b\nLEFT JOIN boarding AS bd\n  ON bd.bus_time = b.arrival_time\nGROUP BY b.bus_id\nORDER BY b.bus_id;",
+  "brute": "SELECT w.bus_id,\n       (\n         SELECT COUNT(*)\n         FROM Passengers AS p\n         WHERE p.arrival_time <= w.arrival_time\n           AND (w.prev_time IS NULL OR p.arrival_time > w.prev_time)\n       ) AS passengers_cnt\nFROM (\n  SELECT b.bus_id, b.arrival_time,\n         (SELECT MAX(e.arrival_time) FROM Buses AS e WHERE e.arrival_time < b.arrival_time) AS prev_time\n  FROM Buses AS b\n) AS w\nORDER BY w.bus_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const busCount = small ? Math.floor(rand() * 5) : 300;\n  const passengerCount = small ? Math.floor(rand() * 9) : 2000;\n  const span = small ? 10 : 20000;\n  // Distinct bus times; bus ids are shuffled so id order and time order differ.\n  const times = new Set();\n  while (times.size < busCount) times.add(1 + Math.floor(rand() * span));\n  const ids = Array.from({ length: busCount }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Buses = [...times].map((time, i) => [ids[i], time]);\n  const Passengers = [];\n  for (let i = 0; i < passengerCount; i++) Passengers.push([small ? 11 + i : i + 1, 1 + Math.floor(rand() * (span + 1))]);\n  return [{ Buses, Passengers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Buses":[[1,2],[2,4],[3,7]],"Passengers":[[11,1],[12,5],[13,6],[14,7]]}],"expected":{"columns":["bus_id","passengers_cnt"],"rows":[[1,1],[2,0],[3,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Buses":[],"Passengers":[[1,3],[2,5]]}]},
+    {"name":"Test 2","input":[{"Buses":[[1,4],[2,9]],"Passengers":[]}]},
+    {"name":"Test 3","input":[{"Buses":[[1,5]],"Passengers":[[1,5],[2,4],[3,6]]}]},
+    {"name":"Test 4","input":[{"Buses":[[3,2],[1,10],[2,5]],"Passengers":[[1,1],[2,3],[3,4],[4,6],[5,10]]}]},
+    {"name":"Test 5","input":[{"Buses":[[1,20],[2,30],[3,40]],"Passengers":[[1,1],[2,2],[3,3],[4,19]]}]},
+    {"name":"Test 6","input":[{"Buses":[[7,3],[8,6]],"Passengers":[[1,4],[2,4],[3,4],[4,6],[5,7]]}]},
+    {"name":"Test 7","input":[{"Buses":[[1,2]],"Passengers":[[1,3]]}]},
+    {"name":"Test 8","input":[{"Buses":[[1,5],[2,6],[3,7],[4,8]],"Passengers":[[1,6],[2,7],[3,7],[4,9]]}]},
+    {"name":"Test 9","input":[{"Buses":[[4,1],[3,3],[2,5],[1,7]],"Passengers":[[1,1],[2,2],[3,3],[4,4],[5,5],[6,6],[7,7],[8,8]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach passenger catches exactly one bus: among the buses arriving at or after the passenger, the earliest one. Joining every passenger to every bus that is not yet gone and taking `MIN(b.arrival_time)` names that bus by its arrival time, which is unique. Counting passengers per bus is then a grouping, and a **left join** from `Buses` keeps the buses nobody boards, with a count of 0.\n\n## Approach\n\n1. `boarding`: join `Passengers` (`p`) to `Buses` (`b`) on `b.arrival_time >= p.arrival_time`, group by passenger, and keep `MIN(b.arrival_time)` as `bus_time`, the moment that passenger leaves. Passengers with no later bus have no join partner and drop out.\n2. Start again from `Buses` and `LEFT JOIN boarding` (`bd`) on `bd.bus_time = b.arrival_time`.\n3. Group by `b.bus_id` and count `bd.passenger_id`; `COUNT` of a column skips the nulls an unmatched bus produces, giving 0.\n4. `ORDER BY b.bus_id`.\n\n## Example 1, step by step\n\n- Buses arrive at 2 (bus 1), 4 (bus 2) and 7 (bus 3).\n- `boarding`: passenger 11 (time 1) can take buses at 2, 4, 7, minimum 2; passengers 12 (5), 13 (6) and 14 (7) can only take the bus at 7.\n- Bus 1 matches one row, bus 2 none, bus 3 three rows: (1, 1), (2, 0), (3, 3).\n\n## Complexity\n\n- Time: the range join builds up to P · B passenger-bus pairs for P passengers and B buses, so O(P · B) in the worst case; the grouping afterwards is linear.\n- Space: O(P) for `boarding`.\n\n## Pitfalls\n\n- An inner join from `Buses` drops bus 2 in Example 1 instead of reporting 0.\n- `COUNT(*)` counts the null row of an unmatched bus as 1; count `bd.passenger_id`.\n- Using `>` instead of `>=` makes passenger 14, who arrives at 7 exactly with bus 3, miss it.\n- Bus ids need not follow arrival order: order the output by `bus_id`, but decide boarding by `arrival_time`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p`, `b` | a passenger and a bus that arrives no earlier than that passenger |\n| `boarding` | one row per passenger who catches a bus |\n| `bus_time` | arrival time of the bus that passenger boards |\n| `bd` | `boarding` rows matched to each bus by `bus_time` |\n| `passengers_cnt` | number of `boarding` rows for the bus |",
+  "narration": {
+    "1": "The first stage decides which bus each passenger boards.",
+    "2": "Among all buses a passenger could take, the earliest arrival time is the one they actually board.",
+    "5": "Pair each passenger with every bus that arrives at or after them; a bus arriving at the same moment counts.",
+    "6": "One row per passenger, so each passenger is assigned exactly one bus.",
+    "8": "Count the passengers matched to each bus; nulls from unmatched buses are not counted.",
+    "10": "A left join keeps every bus, even one that nobody boards.",
+    "11": "Bus arrival times are unique, so bus_time identifies the bus.",
+    "13": "The answer is ordered by bus id, as required."
+  }
+}
