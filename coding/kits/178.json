@@ -1,0 +1,50 @@
+{
+  "number": 178,
+  "title": "Rank Scores",
+  "spec": "leetcode",
+  "statement": "One table holds game scores:\n\n- `Scores(id, score)`: one row per game; `id` is unique and `score` is a decimal with two digits after the point. Different games may have the same score.\n\nGive every row a rank by score: the highest score has rank 1, equal scores share the same rank, and the next lower score gets the next integer, so the ranks have no gaps (scores `4, 4, 3.85` get ranks `1, 1, 2`). Output one row per game with the columns `score` and `rank`, sorted by `score` from highest to lowest.",
+  "constraints": [
+    "id is unique in Scores",
+    "score is never null and has at most two decimal places (DECIMAL(3, 2))",
+    "Scores may repeat"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Scores": [["id","INT"],["score","DECIMAL(3, 2)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Scores = [] }] = input;\n  const ids = new Set();\n  for (const [id, score] of Scores) {\n    if (id === null) return 'Every score row needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Scores.`;\n    if (score === null) return `Row ${id} needs a score.`;\n    if (Math.abs(score) > 9.99) return `Score ${score} does not fit DECIMAL(3, 2).`;\n    if (Math.abs(score * 100 - Math.round(score * 100)) > 1e-6) return `Score ${score} has more than two decimal places.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  score,\n  DENSE_RANK() OVER (ORDER BY score DESC) AS `rank`\nFROM Scores\nORDER BY score DESC;",
+  "brute": "SELECT\n  s.score,\n  (\n    SELECT COUNT(DISTINCT higher.score)\n    FROM Scores AS higher\n    WHERE higher.score >= s.score\n  ) AS `rank`\nFROM Scores AS s\nORDER BY s.score DESC",
+  "generator": "function generate(rand, size) {\n  const Scores = [];\n  if (size === 'small') {\n    // A few values per table so ties at the top, middle and bottom are common.\n    const pool = [4, 3.85, 3.65, 3.5, 0, 9.99, 2.01, 3.99];\n    const values = pool.filter(() => rand() < 0.5);\n    if (values.length === 0) values.push(pool[Math.floor(rand() * pool.length)]);\n    const rows = Math.floor(rand() * 9);\n    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].sort(() => rand() - 0.5);\n    for (let i = 0; i < rows; i++) Scores.push([ids[i], values[Math.floor(rand() * values.length)]]);\n  } else {\n    for (let id = 1; id <= 2000; id++) Scores.push([id, Math.floor(rand() * 1000) / 100]);\n  }\n  return [{ Scores }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Scores":[[1,3.5],[2,3.65],[3,4],[4,3.85],[5,4],[6,3.65]]}],"expected":{"columns":["score","rank"],"rows":[[4,1],[4,1],[3.85,2],[3.65,3],[3.65,3],[3.5,4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Scores":[]}]},
+    {"name":"Test 2","input":[{"Scores":[[1,2.5]]}]},
+    {"name":"Test 3","input":[{"Scores":[[1,3.3],[2,3.3],[3,3.3]]}]},
+    {"name":"Test 4","input":[{"Scores":[[1,1.1],[2,2.2],[3,3.3],[4,4.4]]}]},
+    {"name":"Test 5","input":[{"Scores":[[1,5],[2,5],[3,5],[4,4.99],[5,1],[6,1]]}]},
+    {"name":"Test 6","input":[{"Scores":[[9,0],[3,9.99],[5,0],[7,4.5]]}]},
+    {"name":"Test 7","input":[{"Scores":[[1,4],[2,3.99],[3,4],[4,3.99],[5,3.98]]}]},
+    {"name":"Test 8","input":[{"Scores":[[10,2.01],[20,3.5],[30,3.5],[40,3.5],[50,2.01],[60,7.25],[70,0.5]]}]},
+    {"name":"Test 9","input":[{"Scores":[[6,1.5],[5,2.5],[4,3.5],[3,3.5],[2,2.5],[1,1.5]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA score's rank is one plus the number of **distinct** scores above it. That is exactly what `DENSE_RANK()` computes: it walks the rows in the window's order, keeps the same number while the ordering value repeats, and moves up by one (never more) when the value changes. `RANK()` would skip numbers after a tie, and `ROW_NUMBER()` would split ties, so neither fits.\n\n## Approach\n\n1. Read every row of `Scores`; each row produces one output row.\n2. `DENSE_RANK() OVER (ORDER BY score DESC)` numbers the scores from the highest down, sharing a number across equal scores.\n3. Name that value `rank`. It is a reserved word in MySQL 8, so it is quoted with backticks.\n4. `ORDER BY score DESC` sorts the output, as the window's order does not fix the result's order.\n\n## Example 1, step by step\n\n- Sorted from highest: 4.00 (id 3), 4.00 (id 5), 3.85, 3.65 (id 2), 3.65 (id 6), 3.50.\n- The two 4.00 rows share rank 1.\n- 3.85 is the next distinct value, so it gets rank 2 (not 3, as `RANK()` would give).\n- Both 3.65 rows get rank 3, and 3.50 gets rank 4.\n\n## Complexity\n\n- Time: O(S log S) for S rows, to sort the scores for the window and the output.\n- Space: O(S) for the sorted rows.\n\n## Pitfalls\n\n- `RANK()` leaves holes after ties (1, 1, 3); the task wants 1, 1, 2.\n- Writing `AS rank` without backticks is a syntax error in MySQL 8, where `RANK` is a keyword.\n- Ranking in ascending order gives the lowest score rank 1.\n- Omitting the final `ORDER BY`: the window's ordering does not guarantee the order of the returned rows.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `Scores` | the input rows, one per game |\n| `DENSE_RANK() OVER (ORDER BY score DESC)` | 1 plus the number of distinct higher scores |\n| `rank` | the output column holding that number |\n| `ORDER BY score DESC` | highest scores first in the result |",
+  "narration": {
+    "1": "Each row of Scores produces one output row.",
+    "2": "Keep the score itself as the first output column.",
+    "3": "DENSE_RANK numbers the scores from the highest down, sharing a number on ties and leaving no gaps; rank is quoted because it is a keyword.",
+    "4": "All rows come from the single Scores table.",
+    "5": "Sort the result from the highest score to the lowest, as the problem requires."
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "number": 889,
+  "title": "Construct Binary Tree from Preorder and Postorder Traversal",
+  "spec": "leetcode",
+  "statement": "A binary tree holds distinct values. You are given `preorder`, the list of its values in preorder (node, then left subtree, then right subtree), and `postorder`, the list of the same tree's values in postorder (left subtree, then right subtree, then node). Rebuild a binary tree that has exactly these two traversals and return its root.\n\nThe two traversals do not always pin down a single tree (a node with one child could hold it on either side); any tree whose preorder and postorder match the inputs is accepted.",
+  "constraints": [
+    "1 <= preorder.length <= 30",
+    "postorder.length == preorder.length",
+    "1 <= preorder[i], postorder[i] <= preorder.length",
+    "The values in preorder are distinct, and so are the values in postorder",
+    "preorder and postorder are guaranteed to be the preorder and postorder traversals of one binary tree"
+  ],
+  "signature": "TreeNode constructFromPrePost(int[] preorder, int[] postorder)",
+  "entry": "constructFromPrePost",
+  "kind": "function",
+  "parameters": [
+    "preorder",
+    "postorder"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [preorder, postorder] = input;\n  if (!Array.isArray(actual) || actual.length === 0 || typeof actual[0] !== 'number') return false;\n  // Rebuild the returned tree from its level-order form.\n  const nodes = [{ val: actual[0], left: null, right: null }];\n  let i = 1;\n  for (let q = 0; q < nodes.length && i < actual.length; q++) {\n    for (const side of ['left', 'right']) {\n      if (i < actual.length && actual[i] !== null) {\n        if (typeof actual[i] !== 'number') return false;\n        const node = { val: actual[i], left: null, right: null };\n        nodes[q][side] = node;\n        nodes.push(node);\n      }\n      i++;\n    }\n  }\n  if (actual.slice(i).some(v => v !== null) || nodes.length !== preorder.length) return false;\n  // Both of its traversals must reproduce the inputs.\n  const pre = [];\n  const post = [];\n  const walk = (node) => {\n    if (!node) return;\n    pre.push(node.val);\n    walk(node.left);\n    walk(node.right);\n    post.push(node.val);\n  };\n  walk(nodes[0]);\n  return pre.join() === preorder.join() && post.join() === postorder.join();\n}",
+  "validator": "function validate([preorder, postorder]) {\n  if (!Array.isArray(preorder) || !Array.isArray(postorder)) return 'preorder and postorder must be lists.';\n  const n = preorder.length;\n  if (n < 1 || n > 30) return 'preorder needs 1 to 30 values.';\n  if (postorder.length !== n) return 'postorder must be as long as preorder.';\n  for (const list of [preorder, postorder]) {\n    if (list.some(v => !Number.isInteger(v) || v < 1 || v > n)) return 'Each value is an integer from 1 to the length.';\n    if (new Set(list).size !== n) return 'Values must be distinct.';\n  }\n  // Rebuild the ranges recursively; every subtree's root must close its postorder range.\n  const position = new Map(postorder.map((v, i) => [v, i]));\n  const consistent = (preStart, preEnd, postStart) => {\n    if (preStart > preEnd) return true;\n    const postEnd = postStart + preEnd - preStart;\n    if (preorder[preStart] !== postorder[postEnd]) return false;\n    if (preStart === preEnd) return true;\n    const at = position.get(preorder[preStart + 1]);\n    if (at === undefined || at < postStart || at >= postEnd) return false;\n    const leftSize = at - postStart + 1;\n    return consistent(preStart + 1, preStart + leftSize, postStart) && consistent(preStart + leftSize + 1, preEnd, postStart + leftSize);\n  };\n  if (!consistent(0, n - 1, 0)) return 'These lists are not the traversals of one binary tree.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function constructFromPrePost(preorder, postorder) {\n  const postIndex = new Map();\n  for (let i = 0; i < postorder.length; i++) {\n    postIndex.set(postorder[i], i);\n  }\n\n  function build(preStart, preEnd, postStart) {\n    if (preStart > preEnd) {\n      return null;\n    }\n    const root = new TreeNode(preorder[preStart]);\n    if (preStart === preEnd) {\n      return root;\n    }\n    const leftRootValue = preorder[preStart + 1];\n    const leftSize = postIndex.get(leftRootValue) - postStart + 1;\n    root.left = build(preStart + 1, preStart + leftSize, postStart);\n    root.right = build(preStart + leftSize + 1, preEnd, postStart + leftSize);\n    return root;\n  }\n\n  return build(0, preorder.length - 1, 0);\n}",
+  "brute": "function constructFromPrePost(preorder, postorder) {\n  // Stack of the current root-to-node path: a node is finished once it is next in postorder.\n  const stack = [new TreeNode(preorder[0])];\n  let done = 0;\n  for (let k = 1; k < preorder.length; k++) {\n    const node = new TreeNode(preorder[k]);\n    while (stack[stack.length - 1].val === postorder[done]) {\n      stack.pop();\n      done++;\n    }\n    const parent = stack[stack.length - 1];\n    if (!parent.left) parent.left = node;\n    else parent.right = node;\n    stack.push(node);\n  }\n  return stack[0];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 30 : 1 + Math.floor(rand() * 7);\n  // Random shape: split the remaining nodes between the two subtrees, sometimes all to one side.\n  const shape = (count) => {\n    if (count === 0) return null;\n    const rest = count - 1;\n    const pick = rand();\n    const leftCount = pick < 0.2 ? rest : pick < 0.4 ? 0 : Math.floor(rand() * (rest + 1));\n    return { left: shape(leftCount), right: shape(rest - leftCount) };\n  };\n  const values = Array.from({ length: n }, (_, i) => i + 1);\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [values[i], values[j]] = [values[j], values[i]];\n  }\n  const preorder = [];\n  const postorder = [];\n  let next = 0;\n  const walk = (node) => {\n    if (!node) return;\n    const value = values[next++];\n    preorder.push(value);\n    walk(node.left);\n    walk(node.right);\n    postorder.push(value);\n  };\n  walk(shape(n));\n  return [preorder, postorder];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,4,5,3,6,7],[4,5,2,6,7,3,1]],"expected":[1,2,3,4,5,6,7]},
+    {"name":"Example 2","input":[[1],[1]],"expected":[1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2],[2,1]]},
+    {"name":"Test 2","input":[[1,2,3],[3,2,1]]},
+    {"name":"Test 3","input":[[2,1,3],[1,3,2]]},
+    {"name":"Test 4","input":[[3,1,2,4],[2,4,1,3]]},
+    {"name":"Test 5","input":[[5,4,3,2,1],[1,2,3,4,5]]},
+    {"name":"Test 6","input":[[1,2,4,8,9,5,10,11,3,6,12,13,7,14,15],[8,9,4,10,11,5,2,12,13,6,14,15,7,3,1]]},
+    {"name":"Test 7","input":[[4,7,2,6,1,5,3],[2,5,1,3,6,7,4]]},
+    {"name":"Test 8","input":[[10,3,1,7,6,5,8,9,4,2],[6,5,7,1,3,4,9,2,8,10]]},
+    {"name":"Test 9","input":[[2,1],[1,2]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIn preorder the first value is the root, and the value right after it is the root of the first (left) subtree. In postorder a subtree's root comes **last** among that subtree's values. So finding the left child's value in `postorder` tells us where the left subtree ends there, which gives its size. With the size known, both lists split into root, left part and right part, and the same reasoning repeats on each part: divide and conquer. A hash map from value to postorder index makes each lookup O(1).\n\nWhen a node has only one child, nothing in the two lists says which side it was on; this method always puts it on the left, which is one of the accepted answers.\n\n## Approach\n\n1. Store each value's index in `postorder` in `postIndex`.\n2. `build(preStart, preEnd, postStart)` makes the subtree whose preorder is `preorder[preStart..preEnd]` and whose postorder starts at `postStart`.\n3. An empty range gives `null`; a one-value range gives a lone `root`.\n4. Otherwise the left subtree's root is `preorder[preStart + 1]`. Its postorder index minus `postStart`, plus one, is `leftSize`.\n5. Build the left subtree from the next `leftSize` preorder values (postorder from `postStart`) and the right subtree from the rest (postorder from `postStart + leftSize`).\n\n## Example 1, step by step\n\n`build(0, 6, 0)`: the root is `1`; the left root is `2`, at postorder index 2, so `leftSize = 3`. The left call `build(1, 3, 0)` makes `2` with left root `4` (index 0, `leftSize = 1`): children `4` and `5`. The right call `build(4, 6, 3)` makes `3` with left root `6` (index 3, `leftSize = 1`): children `6` and `7`. The tree in level order is `[1, 2, 3, 4, 5, 6, 7]`.\n\n## Complexity\n\n- Time: O(n): each value becomes a node once and each lookup is O(1).\n- Space: O(n) for the map and the tree; recursion depth is the tree's height.\n\n## Pitfalls\n\n- `leftSize` counts the left child itself, hence the `+ 1`.\n- The right subtree's postorder starts at `postStart + leftSize`; the parent's root sits at the end of its range and is never included in a child's range.\n- Check `preStart === preEnd` before reading `preorder[preStart + 1]`, which would belong to another subtree.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `postIndex` | value → its index in `postorder` |\n| `preStart`, `preEnd` | the subtree's range in `preorder` |\n| `postStart` | where the subtree's values begin in `postorder` |\n| `root` | the node built for `preorder[preStart]` |\n| `leftRootValue` | value of the left child, the next preorder value |\n| `leftSize` | number of nodes in the left subtree |",
+  "narration": {
+    "2": "A map from each value to its position in postorder.",
+    "3": "Fill the map once so later lookups take constant time.",
+    "7": "build makes the subtree whose preorder is preorder[preStart..preEnd] and whose postorder begins at postStart.",
+    "8": "An empty range means there is no subtree here.",
+    "11": "The first preorder value of the range is the subtree's root.",
+    "12": "A single value is a leaf with nothing more to split.",
+    "15": "The next preorder value is the root of the left subtree.",
+    "16": "That root comes last in the left subtree's postorder, so its position gives the left subtree's size.",
+    "17": "Build the left subtree from the next leftSize preorder values.",
+    "18": "Everything after them in preorder forms the right subtree, whose postorder starts right after the left one.",
+    "19": "Hand the finished subtree back to its parent.",
+    "22": "Build the whole tree from the full ranges."
+  }
+}

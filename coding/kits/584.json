@@ -1,0 +1,48 @@
+{
+  "number": 584,
+  "title": "Find Customer Referee",
+  "spec": "leetcode",
+  "statement": "One table lists customers and who brought them in:\n\n- `Customer(id, name, referee_id)`: one row per customer; `id` is unique. `referee_id` is the `id` of the customer who referred this one, or `null` when nobody did.\n\nReport the `name` of every customer who was **not** referred by the customer with `id = 2`: that is, customers whose `referee_id` is a value other than 2, and customers with no referee at all (`null`). Output one column, `name`, with one row per qualifying customer (names may repeat). Rows may come in any order.",
+  "constraints": [
+    "id is unique in Customer",
+    "referee_id is null when the customer was not referred",
+    "Names are not unique; each qualifying customer gives its own row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customer": [["id","INT"],["name","VARCHAR(25)"],["referee_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Customer = [] }] = input;\n  const ids = new Set();\n  for (const [id] of Customer) {\n    if (id === null) return 'Every customer needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Customer.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT c.name\nFROM Customer AS c\nWHERE c.referee_id IS NULL\n   OR c.referee_id <> 2;",
+  "brute": "SELECT name\nFROM Customer\nWHERE id NOT IN (\n  SELECT id\n  FROM Customer\n  WHERE referee_id = 2\n)",
+  "generator": "function generate(rand, size) {\n  const names = ['Will', 'Jane', 'Alex', 'Bill', 'Zack', 'Mark', 'Ana', 'Lee'];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const Customer = [];\n  for (let id = 1; id <= count; id++) {\n    // Referees are often 2 or missing; other values may name anyone, even customers not in the table.\n    const r = rand();\n    const referee = r < 0.35 ? null : r < 0.65 ? 2 : 1 + Math.floor(rand() * (count + 3));\n    Customer.push([id, names[Math.floor(rand() * names.length)], referee]);\n  }\n  return [{ Customer }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customer":[[1,"Will",null],[2,"Jane",null],[3,"Alex",2],[4,"Bill",null],[5,"Zack",1],[6,"Mark",2]]}],"expected":{"columns":["name"],"rows":[["Will"],["Jane"],["Bill"],["Zack"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customer":[]}]},
+    {"name":"Test 2","input":[{"Customer":[[1,"Will",null]]}]},
+    {"name":"Test 3","input":[{"Customer":[[1,"Alex",2]]}]},
+    {"name":"Test 4","input":[{"Customer":[[3,"Alex",2],[4,"Mark",2],[5,"Lee",2]]}]},
+    {"name":"Test 5","input":[{"Customer":[[1,"Will",null],[2,"Jane",null],[3,"Bill",null]]}]},
+    {"name":"Test 6","input":[{"Customer":[[1,"Will",3],[2,"Jane",1],[3,"Alex",2],[4,"Zack",4]]}]},
+    {"name":"Test 7","input":[{"Customer":[[1,"Alex",null],[2,"Alex",2],[3,"Alex",5],[4,"Bill",2],[5,"Bill",null]]}]},
+    {"name":"Test 8","input":[{"Customer":[[10,"Ana",12],[11,"Lee",20],[12,"Mark",2],[13,"Zack",0],[14,"Jane",22]]}]},
+    {"name":"Test 9","input":[{"Customer":[[7,"Will",2],[8,"Jane",null],[9,"Bill",2],[10,"Mark",8]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe condition reads like a single comparison, `referee_id <> 2`, but SQL uses three-valued logic: comparing `null` with anything gives `unknown`, and `WHERE` keeps only rows whose condition is `true`. Customers with no referee would silently disappear, even though nobody (and so not customer 2) referred them. The fix is to accept the `null` case explicitly.\n\n## Approach\n\n1. Read every row of `Customer` (alias `c`).\n2. Keep a row when `c.referee_id IS NULL` (nobody referred the customer) **or** `c.referee_id <> 2` (someone other than customer 2 did).\n3. Select only `c.name`.\n\n## Example 1, step by step\n\n- Will, Jane and Bill have `referee_id = null`: the `IS NULL` test is true, so they are kept.\n- Zack has `referee_id = 1`: `1 <> 2` is true, so he is kept.\n- Alex and Mark have `referee_id = 2`: both tests are false, so they are dropped.\n\nThe result is Will, Jane, Bill and Zack.\n\n## Complexity\n\n- Time: O(N) for N customers; every row is checked once.\n- Space: O(N) for the result in the worst case.\n\n## Pitfalls\n\n- `WHERE referee_id <> 2` (or `!= 2`) alone drops every customer whose `referee_id` is `null`.\n- `WHERE NOT referee_id = 2` has the same problem: `NOT unknown` is still `unknown`.\n- Adding `DISTINCT` merges different customers who share a name; each customer is its own row.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `c` | `Customer`, the only table |\n| `c.referee_id IS NULL` | customers nobody referred |\n| `c.referee_id <> 2` | customers referred by someone other than customer 2 |",
+  "narration": {
+    "1": "Only the customer name is reported.",
+    "2": "Every customer row is a candidate.",
+    "3": "Keep customers with no referee: a null never equals 2, but a plain comparison would not say so.",
+    "4": "Also keep customers whose referee is someone other than customer 2."
+  }
+}

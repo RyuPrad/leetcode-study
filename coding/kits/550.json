@@ -1,0 +1,51 @@
+{
+  "number": 550,
+  "title": "Game Play Analysis IV",
+  "spec": "leetcode",
+  "statement": "One table logs player sessions:\n\n- `Activity(player_id, device_id, event_date, games_played)`: each row says a player logged in on `event_date` from `device_id` and played `games_played` games (possibly 0). A player has at most one row per date, so `(player_id, event_date)` is unique.\n\nA player's first login is their earliest `event_date`. Count the players who also have a row on the calendar day right after their first login, and divide by the number of distinct players in the table. Report that ratio rounded to 2 decimal places as a single row with one column named `fraction`.",
+  "constraints": [
+    "(player_id, event_date) is unique in Activity",
+    "games_played is 0 or more",
+    "event_date is a date written YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["player_id","INT"],["device_id","INT"],["event_date","DATE"],["games_played","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const keys = new Set();\n  for (const [player, device, date, games] of Activity) {\n    if (player === null || date === null) return 'player_id and event_date are required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `event_date ${date} is not YYYY-MM-DD.`;\n    const key = `${player}|${date}`;\n    if (keys.has(key)) return `Player ${player} has two rows on ${date}.`;\n    keys.add(key);\n    if (games !== null && games < 0) return 'games_played cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_login AS (\n  SELECT player_id, MIN(event_date) AS first_day\n  FROM Activity\n  GROUP BY player_id\n)\nSELECT ROUND(COUNT(next_day.player_id) / COUNT(*), 2) AS fraction\nFROM first_login AS f\nLEFT JOIN Activity AS next_day\n  ON next_day.player_id = f.player_id\n  AND next_day.event_date = DATE_ADD(f.first_day, INTERVAL 1 DAY);",
+  "brute": "SELECT ROUND(\n  (SELECT COUNT(*)\n   FROM Activity AS a\n   WHERE NOT EXISTS (\n       SELECT 1 FROM Activity AS e\n       WHERE e.player_id = a.player_id AND e.event_date < a.event_date)\n     AND EXISTS (\n       SELECT 1 FROM Activity AS n\n       WHERE n.player_id = a.player_id AND DATEDIFF(n.event_date, a.event_date) = 1))\n  / (SELECT COUNT(DISTINCT player_id) FROM Activity),\n  2) AS fraction",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  // Start dates sit next to month, leap-day and year boundaries so \"the next day\" crosses them.\n  const starts = [[2016, 1, 30], [2016, 2, 27], [2016, 12, 30], [2017, 2, 26], [2018, 6, 14]];\n  const day = (base, offset) => new Date(Date.UTC(base[0], base[1] - 1, base[2] + offset)).toISOString().slice(0, 10);\n  // The player count is never a multiple of 8, so the fraction never ends in an exact half at the third decimal.\n  const players = size === 'small' ? 1 + pick(4) : 399;\n  const rows = size === 'small' ? pick(9) : 2000;\n  const spread = size === 'small' ? 4 : 12;\n  const base = [], Activity = [], seen = new Set();\n  for (let p = 1; p <= players; p++) base[p] = [...starts[pick(starts.length)]];\n  if (size === 'large') for (let p = 1; p <= players; p++) base[p][2] += pick(20);\n  const add = player => {\n    const date = day(base[player], pick(spread));\n    if (seen.has(`${player}|${date}`)) return;\n    seen.add(`${player}|${date}`);\n    Activity.push([player, 1 + pick(5), date, pick(8)]);\n  };\n  if (size === 'large') for (let p = 1; p <= players; p++) add(p);\n  for (let tries = 0; Activity.length < rows && tries < rows * 20; tries++) add(1 + pick(players));\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,2,"2016-03-01",5],[1,2,"2016-03-02",6],[2,3,"2017-06-25",1],[3,1,"2016-03-02",0],[3,4,"2018-07-03",5]]}],"expected":{"columns":["fraction"],"rows":[[0.33]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[[1,1,"2020-05-05",3]]}]},
+    {"name":"Test 2","input":[{"Activity":[[1,1,"2020-05-05",3],[1,2,"2020-05-06",0]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-01-01",1],[1,1,"2019-01-03",1],[1,1,"2019-01-04",1],[2,2,"2019-01-10",0],[2,2,"2019-01-11",0]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2016-02-28",1],[1,1,"2016-02-29",1],[2,1,"2016-02-29",2],[2,1,"2016-03-01",2],[3,2,"2017-02-28",0],[3,2,"2017-03-01",0],[4,2,"2015-02-28",4],[4,2,"2015-03-02",4]]}]},
+    {"name":"Test 5","input":[{"Activity":[[7,3,"2016-12-31",5],[7,3,"2017-01-01",5],[8,3,"2016-11-30",1],[8,3,"2016-12-01",1],[9,1,"2016-04-30",0],[10,2,"2016-04-30",2],[10,2,"2016-05-01",2]]}]},
+    {"name":"Test 6","input":[{"Activity":[[1,1,"2021-03-01",1],[1,1,"2021-03-02",1],[2,1,"2021-03-05",1],[2,1,"2021-03-06",1],[3,1,"2021-03-09",1]]}]},
+    {"name":"Test 7","input":[{"Activity":[[5,1,"2018-07-04",2],[5,1,"2018-07-03",2],[6,2,"2018-07-10",0],[6,2,"2018-07-02",0]]}]},
+    {"name":"Test 8","input":[{"Activity":[[1,1,"2020-01-01",1],[1,1,"2020-01-02",1],[1,1,"2020-01-03",1],[1,1,"2020-01-04",1],[2,2,"2020-01-01",0],[3,3,"2020-01-05",0]]}]},
+    {"name":"Test 9","input":[{"Activity":[[1,1,"2020-01-01",1],[2,1,"2020-01-02",1],[3,1,"2020-01-03",1],[4,1,"2020-01-04",1],[5,1,"2020-01-05",1],[6,1,"2020-01-06",1],[7,1,"2020-01-07",1],[7,1,"2020-01-08",1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo numbers are needed: how many players exist, and how many of them came back on the day after their first login. Both are per-player facts, so first collapse each player to one row holding their first login date. Then look for a second row from the same player dated exactly one day later. A **left join** keeps every player (the denominator) while only the players who returned get a matched row (the numerator), so one pass over the joined rows yields both counts.\n\n## Approach\n\n1. CTE `first_login`: `GROUP BY player_id` with `MIN(event_date)` gives one row per player and their `first_day`.\n2. `LEFT JOIN Activity` as `next_day` on the same player and `event_date = DATE_ADD(first_day, INTERVAL 1 DAY)`. Because a player has at most one row per date, each player matches at most once.\n3. `COUNT(*)` counts all players; `COUNT(next_day.player_id)` skips the nulls of unmatched players, so it counts only the returners.\n4. Divide, `ROUND(..., 2)`, and name the value `fraction`.\n\n## Example 1, step by step\n\n- `first_login`: `(1, 2016-03-01)`, `(2, 2017-06-25)`, `(3, 2016-03-02)`.\n- Player 1 looks for 2016-03-02 and finds it. Player 2 looks for 2017-06-26: none. Player 3 looks for 2016-03-03: none (their other login is 2018-07-03).\n- `COUNT(next_day.player_id) = 1`, `COUNT(*) = 3`, and `ROUND(1 / 3, 2) = 0.33`.\n\n## Complexity\n\n- Time: O(n) to group n rows, plus the join, O(p) with an index on `(player_id, event_date)` (the primary key) for p players.\n- Space: O(p) for the `first_login` rows.\n\n## Pitfalls\n\n- Counting any two consecutive days misreads the task: a player who logs in on days 1, 3 and 4 did not return the day after their first login.\n- An inner join drops non-returning players from `COUNT(*)`, so the denominator shrinks and the answer becomes 1.\n- `event_date + 1` in MySQL is arithmetic on the number 20160331, not a date, and fails at month ends; use `DATE_ADD` or `DATEDIFF`.\n- Counting rows instead of players: the numerator and the denominator must both be distinct players.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_login` | one row per player: `player_id` and their earliest date `first_day` |\n| `f` | a row of `first_login` |\n| `next_day` | the player's login on `first_day + 1`, or nulls when there is none |\n| `fraction` | returners divided by all players, rounded to 2 decimals |",
+  "narration": {
+    "1": "Stage one, first_login, finds each player's earliest login date.",
+    "2": "MIN over a player's rows gives first_day; grouping makes one row per player.",
+    "6": "Divide players with a next-day match by all players and round to 2 decimals.",
+    "7": "Every player from first_login is a row here, so COUNT(*) is the number of players.",
+    "8": "A left join keeps players who never returned; their next_day columns are null.",
+    "9": "A matching row must belong to the same player.",
+    "10": "It must also be dated exactly one day after that player's first login."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "number": 580,
+  "title": "Count Student Number in Departments",
+  "spec": "recalled",
+  "statement": "A university records its departments and the students majoring in them:\n\n- `Student(student_id, student_name, gender, dept_id)`: one row per student; `student_id` is unique, `gender` is `'M'` or `'F'`, and `dept_id` always names a department in `Department`.\n- `Department(dept_id, dept_name)`: one row per department; `dept_id` is unique.\n\nFor **every** department in `Department`, report its `dept_name` and `student_number`, the number of students whose `dept_id` is that department. A department with no students is still listed, with `student_number = 0`.\n\nOrder the rows by `student_number` from largest to smallest; break ties by `dept_name` in alphabetical order.",
+  "constraints": [
+    "student_id is unique in Student",
+    "dept_id is unique in Department",
+    "gender is 'M' or 'F'",
+    "Every Student.dept_id appears in Department"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Student": [["student_id","INT"],["student_name","VARCHAR(45)"],["gender","VARCHAR(6)"],["dept_id","INT"]],
+    "Department": [["dept_id","INT"],["dept_name","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Student = [], Department = [] }] = input;\n  const depts = new Set(), students = new Set();\n  for (const [id] of Department) {\n    if (id === null) return 'Every department needs a dept_id.';\n    if (depts.has(id)) return `dept_id ${id} appears twice in Department.`;\n    depts.add(id);\n  }\n  for (const [id, , gender, dept] of Student) {\n    if (id === null) return 'Every student needs a student_id.';\n    if (students.has(id)) return `student_id ${id} appears twice in Student.`;\n    if (gender !== 'M' && gender !== 'F') return `gender must be M or F, not ${gender}.`;\n    if (!depts.has(dept)) return `Student ${id} has unknown dept_id ${dept}.`;\n    students.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT d.dept_name, COUNT(s.student_id) AS student_number\nFROM Department AS d\nLEFT JOIN Student AS s\n  ON s.dept_id = d.dept_id\nGROUP BY d.dept_id, d.dept_name\nORDER BY student_number DESC, d.dept_name;",
+  "brute": "SELECT dept_name,\n  (SELECT COUNT(*) FROM Student WHERE Student.dept_id = Department.dept_id) AS student_number\nFROM Department\nORDER BY 2 DESC, 1",
+  "generator": "function generate(rand, size) {\n  const pool = ['Engineering', 'Science', 'Law', 'Art', 'Music', 'History', 'Biology', 'Physics'];\n  const first = ['Jack', 'Jane', 'Mark', 'Ana', 'Lee', 'Kim', 'Ravi', 'Sofia'];\n  const Department = [], Student = [];\n  const deptCount = size === 'small' ? Math.floor(rand() * 7) : 300;\n  // Shuffle ids so that dept_id order differs from name order.\n  const ids = Array.from({ length: deptCount }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  ids.forEach((id, i) => Department.push([id, i < pool.length ? pool[i] : `${pool[i % pool.length]} ${Math.floor(i / pool.length)}`]));\n  const studentCount = deptCount === 0 ? 0 : size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const busy = Math.max(1, Math.ceil(deptCount * 0.7));\n  for (let id = 1; id <= studentCount; id++) {\n    const dept = ids[Math.floor(rand() * busy)];\n    Student.push([id, first[Math.floor(rand() * first.length)], rand() < 0.5 ? 'M' : 'F', dept]);\n  }\n  return [{ Student, Department }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Student":[[1,"Jack","M",1],[2,"Jane","F",1],[3,"Mark","M",2]],"Department":[[1,"Engineering"],[2,"Science"],[3,"Law"]]}],"expected":{"columns":["dept_name","student_number"],"rows":[["Engineering",2],["Science",1],["Law",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Student":[],"Department":[]}]},
+    {"name":"Test 2","input":[{"Student":[],"Department":[[2,"Science"],[1,"Art"]]}]},
+    {"name":"Test 3","input":[{"Student":[[1,"Ana","F",1],[2,"Lee","M",2]],"Department":[[1,"Science"],[2,"Art"],[3,"Music"]]}]},
+    {"name":"Test 4","input":[{"Student":[[1,"Kim","F",3],[2,"Ravi","M",3],[3,"Jack","M",3]],"Department":[[3,"Law"]]}]},
+    {"name":"Test 5","input":[{"Student":[[1,"Ana","F",1],[2,"Jane","F",2],[3,"Mark","M",2],[4,"Sofia","F",4]],"Department":[[1,"History"],[2,"Biology"],[3,"Physics"],[4,"Art"]]}]},
+    {"name":"Test 6","input":[{"Student":[[5,"Jack","M",9]],"Department":[[9,"Music"],[8,"Law"],[7,"Engineering"]]}]},
+    {"name":"Test 7","input":[{"Student":[[1,"Lee","M",2],[2,"Lee","M",2],[3,"Kim","F",1],[4,"Kim","F",1],[5,"Ana","F",3]],"Department":[[1,"Physics"],[2,"Biology"],[3,"Art"],[4,"Law"]]}]},
+    {"name":"Test 8","input":[{"Student":[[1,"Jack","M",1],[2,"Jane","F",1],[3,"Mark","M",2]],"Department":[[1,"Engineering"],[2,"Science"],[3,"Law"],[4,"Art"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"small"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery department must appear, including empty ones, so the query starts from `Department` and **left joins** the students: a department with no students still yields one row, with `null` student columns. Grouping by department and counting a student column (not `*`) turns those rows into counts, where the lone null row of an empty department counts as 0.\n\n## Approach\n\n1. Read every department from `Department` (alias `d`).\n2. `LEFT JOIN Student` (alias `s`) on `dept_id`: one row per student, or one all-null row for a department without students.\n3. `GROUP BY d.dept_id, d.dept_name` and compute `COUNT(s.student_id)` as `student_number`; `COUNT` of a column skips nulls.\n4. `ORDER BY student_number DESC, d.dept_name`.\n\n## Example 1, step by step\n\nAfter the left join:\n\n- Engineering (1) joins Jack and Jane: two rows.\n- Science (2) joins Mark: one row.\n- Law (3) has no students: one row with `s.student_id = null`.\n\nCounting non-null `student_id` per group gives Engineering 2, Science 1, Law 0, which is already in descending order of `student_number`.\n\n## Complexity\n\n- Time: O(D + S) for the hash join and grouping, plus O(D log D) to sort, for D departments and S students.\n- Space: O(D) groups.\n\n## Pitfalls\n\n- `COUNT(*)` counts the null row of an empty department and reports 1 instead of 0.\n- An inner join drops departments with no students entirely.\n- Without the `dept_name` tie-break, departments with equal counts come out in an arbitrary order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `d` | `Department`, one group per department |\n| `s` | `Student`, joined on `dept_id`; null for empty departments |\n| `student_number` | `COUNT(s.student_id)`, the department's student count |",
+  "narration": {
+    "1": "Report each department name with the number of its students, counting only real student ids.",
+    "2": "Department drives the query so that every department produces a row.",
+    "3": "A left join keeps departments without students, with null student columns.",
+    "4": "Students are matched to their department by dept_id.",
+    "5": "One group per department; the null row of an empty department counts as 0.",
+    "6": "Largest counts first, and equal counts in alphabetical order of dept_name."
+  }
+}

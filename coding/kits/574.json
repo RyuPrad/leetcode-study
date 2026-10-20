@@ -1,0 +1,53 @@
+{
+  "number": 574,
+  "title": "Winning Candidate",
+  "spec": "recalled",
+  "statement": "An election is stored in two tables:\n\n- `Candidate(id, name)`: one row per candidate; `id` is unique. Two candidates may share a `name`.\n- `Vote(id, candidateId)`: one row per ballot; `id` is unique and `candidateId` always names a row of `Candidate`.\n\nThe winner is the candidate who received the most ballots. The data guarantees exactly one winner: there is at least one ballot and no tie for the top count. Report a single row with one column, `name`, holding the winner's name.",
+  "constraints": [
+    "id is unique in Candidate and in Vote",
+    "Vote.candidateId always exists in Candidate",
+    "Candidate names may repeat",
+    "Exactly one candidate has the most votes"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Candidate": [["id","INT"],["name","VARCHAR(255)"]],
+    "Vote": [["id","INT"],["candidateId","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Candidate = [], Vote = [] }] = input;\n  const candidates = new Set(), ballots = new Set(), counts = new Map();\n  for (const [id] of Candidate) {\n    if (id === null) return 'Every candidate needs an id.';\n    if (candidates.has(id)) return `Candidate id ${id} appears twice.`;\n    candidates.add(id);\n  }\n  for (const [id, candidateId] of Vote) {\n    if (id === null) return 'Every vote needs an id.';\n    if (ballots.has(id)) return `Vote id ${id} appears twice.`;\n    if (!candidates.has(candidateId)) return `Vote ${id} names candidate ${candidateId}, who is not in Candidate.`;\n    ballots.add(id);\n    counts.set(candidateId, (counts.get(candidateId) ?? 0) + 1);\n  }\n  if (Vote.length === 0) return 'There must be at least one vote.';\n  const top = Math.max(...counts.values());\n  if ([...counts.values()].filter(c => c === top).length > 1) return 'Two candidates tie for the most votes.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH tally AS (\n  SELECT candidateId, COUNT(*) AS votes\n  FROM Vote\n  GROUP BY candidateId\n)\nSELECT c.name\nFROM tally AS t\nJOIN Candidate AS c\n  ON c.id = t.candidateId\nORDER BY t.votes DESC\nLIMIT 1;",
+  "brute": "SELECT c.name\nFROM Candidate AS c\nWHERE (SELECT COUNT(*) FROM Vote AS v WHERE v.candidateId = c.id) = (\n  SELECT MAX(per_candidate.cnt)\n  FROM (SELECT COUNT(*) AS cnt FROM Vote GROUP BY candidateId) AS per_candidate\n)",
+  "generator": "function generate(rand, size) {\n  const names = ['A', 'B', 'C', 'Ana', 'Bob', 'Lee', 'Kim', 'Ravi'];\n  const small = size === 'small';\n  const people = small ? 1 + Math.floor(rand() * 6) : 300;\n  const ballots = small ? 1 + Math.floor(rand() * 7) : 1999;\n  const Candidate = [], Vote = [];\n  // Ids are spaced so that a ballot id rarely equals the candidate it names.\n  for (let i = 1; i <= people; i++) Candidate.push([i * 3, names[Math.floor(rand() * names.length)]]);\n  const counts = new Map();\n  for (let i = 1; i <= ballots; i++) {\n    // Skew the choice so that a few candidates collect most of the votes.\n    const pick = Candidate[Math.floor(rand() * rand() * people)][0];\n    Vote.push([i, pick]);\n    counts.set(pick, (counts.get(pick) ?? 0) + 1);\n  }\n  // Break a tie at the top with one extra ballot so the winner is unique.\n  const top = Math.max(...counts.values());\n  const leaders = [...counts.keys()].filter(id => counts.get(id) === top);\n  if (leaders.length > 1) Vote.push([ballots + 1, leaders[Math.floor(rand() * leaders.length)]]);\n  // Shuffle ballot order so the winner's votes are spread through the table.\n  for (let i = Vote.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Vote[i][1], Vote[j][1]] = [Vote[j][1], Vote[i][1]]; }\n  return [{ Candidate, Vote }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Candidate":[[1,"A"],[2,"B"],[3,"C"],[4,"D"],[5,"E"]],"Vote":[[1,2],[2,4],[3,3],[4,2],[5,5]]}],"expected":{"columns":["name"],"rows":[["B"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Candidate":[[1,"Ann"]],"Vote":[[1,1]]}]},
+    {"name":"Test 2","input":[{"Candidate":[[1,"A"],[2,"B"],[3,"C"]],"Vote":[[1,3],[2,3]]}]},
+    {"name":"Test 3","input":[{"Candidate":[[1,"A"],[2,"A"],[3,"B"]],"Vote":[[1,1],[2,1],[3,2],[4,2],[5,3],[6,3],[7,3]]}]},
+    {"name":"Test 4","input":[{"Candidate":[[1,"Ann"],[2,"Bob"],[3,"Cy"]],"Vote":[[1,2],[2,2],[3,1]]}]},
+    {"name":"Test 5","input":[{"Candidate":[[10,"X"],[20,"Y"],[30,"Z"]],"Vote":[[1,30],[2,10],[3,30],[4,20],[5,30],[6,10]]}]},
+    {"name":"Test 6","input":[{"Candidate":[[1,"Lee"],[2,"Kim"],[3,"Ravi"],[4,"Sofia"]],"Vote":[[1,1],[2,2],[3,3],[4,4],[5,1]]}]},
+    {"name":"Test 7","input":[{"Candidate":[[5,"E"],[6,"F"]],"Vote":[[1,6],[2,6],[3,6],[4,5]]}]},
+    {"name":"Test 8","input":[{"Candidate":[[1,"Zed"],[2,"Amy"]],"Vote":[[3,2]]}]},
+    {"name":"Test 9","input":[{"Candidate":[[1,"Ana"],[2,"Bob"],[3,"Ravi"],[4,"Kim"],[5,"Lee"],[6,"Sofia"]],"Vote":[[1,4],[2,6],[3,4],[4,6],[5,2],[6,6],[7,1],[8,4],[9,6]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Most votes\" is a counting question, so the first move is to collapse `Vote` into one row per candidate with the number of ballots they received. Once that tally exists, the winner is simply its largest row, and a join turns the winning `candidateId` into a name. Because the data promises a single winner, sorting the tally and keeping the first row is enough.\n\n## Approach\n\n1. CTE `tally`: group `Vote` by `candidateId` and count the ballots of each group as `votes`.\n2. Join `tally` (alias `t`) to `Candidate` (alias `c`) on `c.id = t.candidateId` to fetch each candidate's name.\n3. `ORDER BY t.votes DESC LIMIT 1` keeps only the candidate with the highest count, and the query returns that `name`.\n\n## Example 1, step by step\n\n- `tally` has four rows: candidate 2 with 2 votes, and candidates 3, 4 and 5 with 1 vote each. Candidate 1 received nothing, so it does not appear at all.\n- Joining adds the names: (B, 2), (D, 1), (C, 1), (E, 1).\n- Sorting by `votes` descending puts B first; `LIMIT 1` keeps it, so the answer is `B`.\n\n## Complexity\n\n- Time: O(V) to group V votes (with hashing), plus O(K log K) to sort the K candidates that received votes and an indexed lookup for the join.\n- Space: O(K) for the tally.\n\n## Pitfalls\n\n- Grouping by `name` instead of by id merges different candidates who share a name and can crown the wrong one.\n- Joining on `Vote.id` instead of `Vote.candidateId` matches ballots to unrelated candidates.\n- Forgetting `DESC` returns the candidate with the fewest votes; forgetting the `ORDER BY` makes `LIMIT 1` pick an arbitrary row.\n- Without the uniqueness guarantee, `LIMIT 1` would silently hide a tie; comparing against the maximum count (as a subquery) is the safer shape when ties are possible.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `tally` | one row per candidate who received votes: `candidateId` and `votes` |\n| `t` | alias for `tally` in the final query |\n| `c` | `Candidate`, supplies the name for each `candidateId` |\n| `ORDER BY ... LIMIT 1` | keeps the single row with the largest `votes` |",
+  "narration": {
+    "1": "The tally CTE turns the ballot list into one count per candidate.",
+    "2": "Count the ballots in each group; this number decides the election.",
+    "4": "Group by candidateId so each candidate is counted separately, even when names repeat.",
+    "7": "Start from the tally, which only holds candidates with at least one vote.",
+    "8": "Join Candidate to translate the winning candidateId into a name.",
+    "10": "Sort the counts from largest to smallest so the winner comes first.",
+    "11": "Keep only the top row; the data guarantees it is not tied."
+  }
+}

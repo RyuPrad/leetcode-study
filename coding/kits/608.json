@@ -1,0 +1,54 @@
+{
+  "number": 608,
+  "title": "Tree Node",
+  "spec": "leetcode",
+  "statement": "One table stores a rooted tree:\n\n- `Tree(id, p_id)`: one row per node; `id` is unique. `p_id` is the id of the node's parent, or `null` for the root. The rows always form one valid tree: exactly one root, every `p_id` names a node in the table, and there are no cycles.\n\nLabel every node with its kind:\n\n- `'Root'` when it has no parent (`p_id` is `null`), even if it also has children;\n- `'Inner'` when it has a parent and at least one child;\n- `'Leaf'` when it has a parent and no children.\n\nReturn the columns `id` and `type`, one row per node, in any order.",
+  "constraints": [
+    "id is unique in Tree",
+    "Exactly one node has p_id = null (the root)",
+    "Every non-null p_id is the id of a node in Tree",
+    "The parent links contain no cycles"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tree": [["id","INT"],["p_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Tree = [] }] = input;\n  const parent = new Map();\n  let roots = 0;\n  for (const [id, p] of Tree) {\n    if (id === null) return 'Every node needs an id.';\n    if (parent.has(id)) return `id ${id} appears twice.`;\n    parent.set(id, p);\n    if (p === null) roots++;\n  }\n  if (roots !== 1) return 'The tree needs exactly one root.';\n  for (const p of parent.values()) if (p !== null && !parent.has(p)) return `Parent ${p} is not a node.`;\n  // With one root and known parents, the links form a tree exactly when every node reaches the root.\n  const reaches = new Set();\n  for (const start of parent.keys()) {\n    const path = [];\n    let node = start;\n    while (node !== null && !reaches.has(node)) {\n      if (path.length > parent.size) return 'The parent links form a cycle.';\n      path.push(node);\n      node = parent.get(node);\n    }\n    for (const n of path) reaches.add(n);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH parents AS (\n  SELECT DISTINCT p_id AS id\n  FROM Tree\n  WHERE p_id IS NOT NULL\n)\nSELECT t.id,\n  CASE\n    WHEN t.p_id IS NULL THEN 'Root'\n    WHEN t.id IN (SELECT id FROM parents) THEN 'Inner'\n    ELSE 'Leaf'\n  END AS type\nFROM Tree AS t;",
+  "brute": "SELECT id, 'Root' AS type\nFROM Tree\nWHERE p_id IS NULL\nUNION ALL\nSELECT t.id, 'Inner'\nFROM Tree AS t\nWHERE t.p_id IS NOT NULL\n  AND EXISTS (SELECT 1 FROM Tree AS c WHERE c.p_id = t.id)\nUNION ALL\nSELECT t.id, 'Leaf'\nFROM Tree AS t\nWHERE t.p_id IS NOT NULL\n  AND NOT EXISTS (SELECT 1 FROM Tree AS c WHERE c.p_id = t.id)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? 1 + Math.floor(rand() * 8) : 2000;\n  // Distinct ids drawn from a pool, so ids are not always 1..n.\n  const pool = Array.from({ length: small ? 20 : 5000 }, (_, i) => i + 1);\n  for (let i = 0; i < count; i++) {\n    const j = i + Math.floor(rand() * (pool.length - i));\n    [pool[i], pool[j]] = [pool[j], pool[i]];\n  }\n  const ids = pool.slice(0, count);\n  // Each node after the first hangs under an earlier node; small trees sometimes grow as chains.\n  const chain = small && rand() < 0.25;\n  const Tree = ids.map((id, i) => [id, i === 0 ? null : ids[chain ? i - 1 : Math.floor(rand() * i)]]);\n  // Shuffle the rows so parents do not always come first.\n  for (let i = Tree.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Tree[i], Tree[j]] = [Tree[j], Tree[i]];\n  }\n  return [{ Tree }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tree":[[1,null],[2,1],[3,1],[4,2],[5,2]]}],"expected":{"columns":["id","type"],"rows":[[1,"Root"],[2,"Inner"],[3,"Leaf"],[4,"Leaf"],[5,"Leaf"]]}},
+    {"name":"Example 2","input":[{"Tree":[[1,null]]}],"expected":{"columns":["id","type"],"rows":[[1,"Root"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tree":[[7,null]]}]},
+    {"name":"Test 2","input":[{"Tree":[[1,null],[2,1]]}]},
+    {"name":"Test 3","input":[{"Tree":[[1,null],[2,1],[3,2],[4,3]]}]},
+    {"name":"Test 4","input":[{"Tree":[[10,null],[11,10],[12,10],[13,10],[14,10]]}]},
+    {"name":"Test 5","input":[{"Tree":[[9,4],[4,15],[15,null],[6,15],[2,9]]}]},
+    {"name":"Test 6","input":[{"Tree":[[1,null],[2,1],[3,1],[4,2],[5,3],[6,3],[7,6],[8,6]]}]},
+    {"name":"Test 7","input":[{"Tree":[[0,null],[5,0],[3,5],[8,0]]}]},
+    {"name":"Test 8","input":[{"Tree":[[3,1],[1,null],[2,1],[4,3],[5,3],[6,2]]}]},
+    {"name":"Test 9","input":[{"Tree":[[20,30],[30,40],[40,50],[50,null],[60,50],[70,60]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA node's kind depends on two facts: does it have a parent, and does any node name it as a parent. The first is visible in the node's own row (`p_id IS NULL`). The second needs the set of ids that appear in the `p_id` column. With that set, a `CASE` expression checks the conditions in priority order: the root first, because a root with children would otherwise look inner.\n\n## Approach\n\n1. CTE `parents`: the distinct non-null `p_id` values, i.e. every node that has at least one child.\n2. Scan `Tree` (alias `t`) and build `type` with `CASE`:\n   - `p_id IS NULL` → `'Root'`;\n   - otherwise, `id` is in `parents` → `'Inner'`;\n   - otherwise → `'Leaf'`.\n\n## Example 1, step by step\n\n- `parents` holds the `p_id` values 1 and 2 (node 1 is the parent of 2 and 3, node 2 the parent of 4 and 5).\n- Node 1 has `p_id = null`, so it is `Root`; the first branch wins even though 1 is also in `parents`.\n- Node 2 has a parent and is in `parents`: `Inner`.\n- Nodes 3, 4 and 5 have parents and are not in `parents`: `Leaf`.\n\n## Complexity\n\n- Time: O(n log n) for n nodes to build `parents` and probe it (O(n) with hashing).\n- Space: O(n) for `parents`.\n\n## Pitfalls\n\n- Testing \"has children\" before \"has no parent\" labels a root with children as `Inner`; branch order matters in `CASE`.\n- `id NOT IN (SELECT p_id FROM Tree)` is never true, because that list contains the root's `null`; drop the nulls (as `parents` does) or use `NOT EXISTS`.\n- An inner join from a node to its children drops leaves, and without `DISTINCT` a node with several children can be reported more than once.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `parents` | ids of nodes that have at least one child |\n| `t` | `Tree`, one output row per node |\n| `CASE ... END AS type` | `'Root'`, `'Inner'` or `'Leaf'`, checked in that order |",
+  "narration": {
+    "1": "The CTE collects every node that is somebody's parent.",
+    "2": "DISTINCT keeps one row per parent, however many children it has.",
+    "4": "The root's null p_id is dropped so the list holds only real node ids.",
+    "6": "Every node in Tree produces exactly one output row with its id.",
+    "8": "A node without a parent is the root; this branch comes first so a root with children is not called inner.",
+    "9": "A node with a parent that also appears in the parents list has children, so it is inner.",
+    "10": "Everything else has a parent but no children: a leaf.",
+    "11": "The CASE result is named type, the required output column."
+  }
+}

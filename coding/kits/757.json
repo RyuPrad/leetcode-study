@@ -1,0 +1,61 @@
+{
+  "number": 757,
+  "title": "Set Intersection Size At Least Two",
+  "spec": "leetcode",
+  "statement": "Each entry `intervals[i] = [start_i, end_i]` stands for every integer from `start_i` up to `end_i`, both ends included. Choose a set of integers so that every interval holds at least two of the chosen integers. Return the smallest number of integers such a set can have.",
+  "constraints": [
+    "1 <= intervals.length <= 3000",
+    "intervals[i].length == 2",
+    "0 <= start_i < end_i <= 10^8"
+  ],
+  "signature": "int intersectionSizeTwo(int[][] intervals)",
+  "entry": "intersectionSizeTwo",
+  "kind": "function",
+  "parameters": [
+    "intervals"
+  ],
+  "validator": "function validate([intervals]) {\n  if (!Array.isArray(intervals) || intervals.length < 1 || intervals.length > 3000) return 'intervals needs 1 to 3000 entries.';\n  for (const pair of intervals) {\n    if (!Array.isArray(pair) || pair.length !== 2 || !pair.every(Number.isInteger)) return 'Each interval is a pair of integers [start, end].';\n    if (pair[0] < 0 || pair[1] > 100000000) return 'Interval ends are between 0 and 10^8.';\n    if (pair[0] >= pair[1]) return 'Each interval needs start < end.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function intersectionSizeTwo(intervals) {\n  intervals.sort((a, b) => a[1] - b[1] || b[0] - a[0]);\n  let count = 0;\n  let secondLargest = -1;\n  let largest = -1;\n\n  for (const [start, end] of intervals) {\n    if (start > largest) {\n      count += 2;\n      secondLargest = end - 1;\n      largest = end;\n    } else if (start > secondLargest) {\n      count += 1;\n      secondLargest = largest;\n      largest = end;\n    }\n  }\n  return count;\n}",
+  "brute": "function intersectionSizeTwo(intervals) {\n  // Integers between two neighbouring cut points lie in exactly the same intervals,\n  // so the first two integers of each such stretch are the only candidates needed.\n  const cuts = [...new Set(intervals.flatMap(([s, e]) => [s, e + 1]))].sort((a, b) => a - b);\n  const points = [];\n  for (let i = 0; i + 1 < cuts.length; i++) {\n    points.push(cuts[i]);\n    if (cuts[i] + 1 < cuts[i + 1]) points.push(cuts[i] + 1);\n  }\n  // Try every subset of the candidates, counting in binary with an array of flags.\n  const take = new Array(points.length).fill(false);\n  let best = Infinity;\n  for (;;) {\n    const chosen = points.filter((_, b) => take[b]);\n    if (chosen.length < best && intervals.every(([s, e]) => chosen.filter(x => x >= s && x <= e).length >= 2)) best = chosen.length;\n    let b = 0;\n    while (b < take.length && take[b]) take[b++] = false;\n    if (b === take.length) break;\n    take[b] = true;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  if (size === 'large') {\n    const reach = [10, 1000, 100000, 10000000][pick(4)];\n    return [Array.from({ length: 2000 }, () => {\n      const start = pick(100000000 - 1);\n      const end = Math.min(100000000, start + 1 + pick(reach));\n      return [start, end];\n    })];\n  }\n  const top = 4 + pick(8);\n  const n = 1 + pick(7);\n  return [Array.from({ length: n }, () => {\n    const start = pick(top);\n    return [start, start + 1 + pick(top - start)];\n  })];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,3],[3,7],[8,9]]],"expected":5},
+    {"name":"Example 2","input":[[[1,3],[1,4],[2,5],[3,5]]],"expected":3},
+    {"name":"Example 3","input":[[[1,2],[2,3],[2,4],[4,5]]],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1]]]},
+    {"name":"Test 2","input":[[[1,2],[1,2],[1,2]]]},
+    {"name":"Test 3","input":[[[0,100000000]]]},
+    {"name":"Test 4","input":[[[1,2],[2,3]]]},
+    {"name":"Test 5","input":[[[1,2],[3,4],[5,6]]]},
+    {"name":"Test 6","input":[[[1,10],[2,9],[3,8],[4,7],[5,6]]]},
+    {"name":"Test 7","input":[[[0,2],[2,4],[4,6],[6,8]]]},
+    {"name":"Test 8","input":[[[0,2],[2,5],[4,5],[5,7]]]},
+    {"name":"Test 9","input":[[[0,10],[5,15],[10,20]]]},
+    {"name":"Test 10","input":[[[6,9],[0,3],[3,6],[1,8],[2,4],[7,10]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every subset of points is exponential. Instead, handle the intervals by their right end, smallest first. When an interval still lacks points, it should get points as far to the right as possible: they serve it just as well, and every interval handled later ends at or after this one, so right-hand points are the ones most likely to lie inside those later intervals too. Because each new point is placed at the current right end, the chosen points only grow, and only the two largest can still matter.\n\n## Approach\n\n1. Sort by `end` ascending; for equal ends put the larger `start` (the narrower interval) first.\n2. Keep `count` and the two largest chosen points, `secondLargest < largest`, both `-1` at first.\n3. If `start > largest`, the interval holds no chosen point: add `end - 1` and `end` and count 2.\n4. Otherwise, if `start > secondLargest`, it holds only `largest`: add `end`, shift `largest` into `secondLargest`, and count 1.\n5. Otherwise it already holds two chosen points. Return `count` at the end.\n\n## Example 1, step by step\n\n`intervals = [[1,3],[3,7],[8,9]]` is already sorted. `[1,3]`: `1 > -1`, so pick 2 and 3 (`count = 2`, points `2, 3`). `[3,7]`: 3 is not above `largest = 3` but is above `secondLargest = 2`, so only 3 is inside; pick 7 (`count = 3`, points `3, 7`). `[8,9]`: `8 > 7`, pick 8 and 9 (`count = 5`). The answer is `5`, from the set `{2, 3, 7, 8, 9}`.\n\n## Complexity\n\n- Time: O(n log n) for the sort; the scan is O(n).\n- Space: O(1) besides the sort.\n\n## Pitfalls\n\n- Ties on `end` must put the larger `start` first. Otherwise, on `[[0,2],[2,5],[4,5],[5,7]]`, `[2,5]` picks 5, then `[4,5]` picks 5 again and the count goes wrong (4 instead of 5).\n- Compare with strict `>`: a point equal to `start` is inside the interval.\n- Only counts are returned, but the points must stay the real largest two; update `secondLargest` before `largest`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | number of points chosen so far |\n| `largest` | the largest chosen point |\n| `secondLargest` | the second largest chosen point |\n| `start`, `end` | ends of the current interval |",
+  "narration": {
+    "2": "Sort by right end; for equal ends, the interval with the larger start (the narrower one) comes first.",
+    "3": "No points have been chosen yet.",
+    "4": "The two largest chosen points start below every possible value, as no point exists yet.",
+    "7": "Handle the intervals in order of their right end.",
+    "8": "Even the largest chosen point is left of this interval, so it holds none of them.",
+    "9": "It needs two new points.",
+    "10": "Pick the two rightmost integers, end - 1 and end, so later intervals can reuse them.",
+    "12": "Only the largest chosen point is inside; the interval needs one more.",
+    "13": "Count that one extra point.",
+    "14": "The old largest point becomes the second largest...",
+    "15": "...and the new point, placed at end, becomes the largest.",
+    "18": "Every interval now holds two chosen points; return how many were used."
+  }
+}

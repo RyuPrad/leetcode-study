@@ -1,0 +1,74 @@
+{
+  "number": 924,
+  "title": "Minimize Malware Spread",
+  "spec": "leetcode",
+  "statement": "A network has `n` nodes described by the `n x n` matrix `graph`: nodes `i` and `j` share a direct link exactly when `graph[i][j] == 1`. The nodes listed in `initial` start out infected. Infection travels along links: as long as some link joins an infected node to a clean one, the clean one becomes infected, and this repeats until nothing changes. Let `M` be the number of infected nodes once spreading stops.\n\nYou must take exactly one node out of `initial` before the spreading begins. Return the node whose removal makes `M` as small as possible; if several removals give the same smallest `M`, return the smallest node index among them. A removed node is only taken off the starting list: it can still get infected through its links.",
+  "constraints": [
+    "n == graph.length == graph[i].length",
+    "2 <= n <= 300",
+    "graph[i][j] is 0 or 1",
+    "graph[i][j] == graph[j][i]",
+    "graph[i][i] == 1",
+    "1 <= initial.length <= n",
+    "0 <= initial[i] <= n - 1",
+    "All values in initial are distinct"
+  ],
+  "signature": "int minMalwareSpread(int[][] graph, int[] initial)",
+  "entry": "minMalwareSpread",
+  "kind": "function",
+  "parameters": [
+    "graph",
+    "initial"
+  ],
+  "validator": "function validate([graph, initial]) {\n  const n = graph.length;\n  if (n < 2 || n > 300) return 'graph needs 2 to 300 nodes.';\n  for (let i = 0; i < n; i++) {\n    if (!Array.isArray(graph[i]) || graph[i].length !== n) return 'graph must be a square n x n matrix.';\n    if (graph[i][i] !== 1) return 'Every node must link to itself (graph[i][i] == 1).';\n    for (let j = 0; j < n; j++) {\n      if (graph[i][j] !== 0 && graph[i][j] !== 1) return 'graph entries are 0 or 1.';\n      if (j < i && graph[i][j] !== graph[j][i]) return 'graph must be symmetric.';\n    }\n  }\n  if (initial.length < 1 || initial.length > n) return 'initial needs 1 to n nodes.';\n  if (initial.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each initial node is between 0 and n - 1.';\n  if (new Set(initial).size !== initial.length) return 'initial nodes must be distinct.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minMalwareSpread(graph, initial) {\n  const n = graph.length;\n  const parent = Array.from({ length: n }, (_, i) => i);\n  const size = new Array(n).fill(1);\n\n  const find = (x) => {\n    while (parent[x] !== x) {\n      parent[x] = parent[parent[x]];\n      x = parent[x];\n    }\n    return x;\n  };\n\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      if (graph[i][j] === 1) {\n        const rootI = find(i);\n        const rootJ = find(j);\n        if (rootI !== rootJ) {\n          parent[rootI] = rootJ;\n          size[rootJ] += size[rootI];\n        }\n      }\n    }\n  }\n\n  const infectedCount = new Array(n).fill(0);\n  for (const node of initial) {\n    infectedCount[find(node)]++;\n  }\n\n  let answer = Math.min(...initial);\n  let bestSaved = 0;\n  for (const node of initial) {\n    const root = find(node);\n    if (infectedCount[root] === 1) {\n      const saved = size[root];\n      if (saved > bestSaved || (saved === bestSaved && node < answer)) {\n        bestSaved = saved;\n        answer = node;\n      }\n    }\n  }\n  return answer;\n}",
+  "brute": "function minMalwareSpread(graph, initial) {\n  // Simulate the spread for every possible removal and keep the best one.\n  const n = graph.length;\n  const spread = (sources) => {\n    const infected = new Array(n).fill(false);\n    const stack = [...sources];\n    for (const s of sources) infected[s] = true;\n    while (stack.length) {\n      const u = stack.pop();\n      for (let v = 0; v < n; v++) {\n        if (graph[u][v] === 1 && !infected[v]) { infected[v] = true; stack.push(v); }\n      }\n    }\n    return infected.filter(Boolean).length;\n  };\n  let best = -1;\n  let bestCount = Infinity;\n  for (const removed of initial) {\n    const count = spread(initial.filter(x => x !== removed));\n    if (count < bestCount || (count === bestCount && removed < best)) {\n      bestCount = count;\n      best = removed;\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(80, 100) : int(2, 8);\n  // Random relabelling so components are not made of consecutive indices.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = int(0, i); [label[i], label[j]] = [label[j], label[i]]; }\n  const graph = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));\n  const link = (a, b) => { graph[label[a]][label[b]] = 1; graph[label[b]][label[a]] = 1; };\n  // Split the nodes into groups and connect each group with a random tree plus a few extra links.\n  const maxGroup = size === 'large' ? int(3, 25) : int(1, 4);\n  for (let start = 0; start < n; ) {\n    const len = Math.min(n - start, int(1, maxGroup));\n    for (let i = 1; i < len; i++) link(start + i, start + int(0, i - 1));\n    const extra = Math.floor(rand() * len);\n    for (let e = 0; e < extra; e++) link(start + int(0, len - 1), start + int(0, len - 1));\n    start += len;\n  }\n  // Occasionally add a few random links across groups.\n  if (rand() < 0.3) {\n    const cross = int(1, size === 'large' ? 5 : 2);\n    for (let e = 0; e < cross; e++) link(int(0, n - 1), int(0, n - 1));\n  }\n  const order = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = int(0, i); [order[i], order[j]] = [order[j], order[i]]; }\n  const k = size === 'large' ? int(1, 40) : int(1, n);\n  return [graph, order.slice(0, k)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,1,0],[1,1,0],[0,0,1]],[0,1]],"expected":0},
+    {"name":"Example 2","input":[[[1,0,0],[0,1,0],[0,0,1]],[0,2]],"expected":0},
+    {"name":"Example 3","input":[[[1,1,1],[1,1,1],[1,1,1]],[1,2]],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,0],[0,1]],[1]]},
+    {"name":"Test 2","input":[[[1,1],[1,1]],[1,0]]},
+    {"name":"Test 3","input":[[[1,1,0,0,0,0],[1,1,1,0,0,0],[0,1,1,0,0,0],[0,0,0,1,1,0],[0,0,0,1,1,0],[0,0,0,0,0,1]],[5,3,0]]},
+    {"name":"Test 4","input":[[[1,1,0,0],[1,1,0,0],[0,0,1,1],[0,0,1,1]],[3,1]]},
+    {"name":"Test 5","input":[[[1,1,0,0,0],[1,1,1,0,0],[0,1,1,1,0],[0,0,1,1,0],[0,0,0,0,1]],[2,0,4]]},
+    {"name":"Test 6","input":[[[1,1,0,0,0,0,0],[1,1,1,0,0,0,0],[0,1,1,1,0,0,0],[0,0,1,1,1,0,0],[0,0,0,1,1,0,0],[0,0,0,0,0,1,1],[0,0,0,0,0,1,1]],[1,6,3]]},
+    {"name":"Test 7","input":[[[1,0,0,0,0],[0,1,0,0,0],[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,1]],[4,2,0,3,1]]},
+    {"name":"Test 8","input":[[[1,1,0,0,0,0,0,0],[1,1,1,0,0,0,0,0],[0,1,1,1,0,0,0,0],[0,0,1,1,1,0,0,0],[0,0,0,1,1,1,0,0],[0,0,0,0,1,1,1,0],[0,0,0,0,0,1,1,1],[0,0,0,0,0,0,1,1]],[7]]},
+    {"name":"Test 9","input":[[[1,0,0,0,0],[0,1,1,0,0],[0,1,1,1,0],[0,0,1,1,1],[0,0,0,1,1]],[0,4]]},
+    {"name":"Test 10","input":[[[1,1,0,0,0,1],[1,1,1,0,0,0],[0,1,1,1,0,0],[0,0,1,1,1,0],[0,0,0,1,1,1],[1,0,0,0,1,1]],[5,2,4]]},
+    {"name":"Test 11","input":[[[1,0,1,0,0,0,0,0,0],[0,1,0,0,0,0,0,0,0],[1,0,1,0,0,0,0,0,0],[0,0,0,1,0,1,0,0,0],[0,0,0,0,1,0,1,0,0],[0,0,0,1,0,1,0,1,0],[0,0,0,0,1,0,1,0,1],[0,0,0,0,0,1,0,1,0],[0,0,0,0,0,0,1,0,1]],[3,4,1,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nInfection fills whole connected components: once any node in a component is infected, every node in it ends up infected. So removing a node from `initial` only helps if it was the **only** starting infection in its component; then that entire component stays clean. If a component holds two or more starting infections, removing one of them changes nothing. The best removal is therefore the sole infection of the largest such component. A brute force would rerun the spread once per candidate, costing O(k·n²).\n\n## Approach\n\n1. Build a union-find over the `n` nodes, joining `i` and `j` whenever `graph[i][j] === 1`, and keep each root's component `size`.\n2. Count, for every root, how many nodes of `initial` lie in its component (`infectedCount`).\n3. Start with `answer` as the smallest node in `initial` (the right choice when no removal saves anything) and `bestSaved = 0`.\n4. For each `node` whose component has exactly one starting infection, removing it saves `size[root]` nodes. Keep the node with the largest saving, breaking ties by the smaller index.\n5. Return `answer`.\n\n## Example 1, step by step\n\n`graph = [[1,1,0],[1,1,0],[0,0,1]]`, `initial = [0, 1]`. The pair (0, 1) is linked, so nodes 0 and 1 share a root with `size` 2, and node 2 is alone. Both 0 and 1 land in the same component, so its `infectedCount` is 2. Neither node is a sole infection, `bestSaved` stays 0, and `answer` keeps its starting value `Math.min(0, 1) = 0`.\n\n## Complexity\n\n- Time: O(n² · α(n)): every matrix cell is read once and each union or find is nearly constant.\n- Space: O(n) for `parent`, `size` and `infectedCount`.\n\n## Pitfalls\n\n- `initial` is not sorted: the default answer is its minimum, not `initial[0]`.\n- A component with two starting infections cannot be saved by one removal, however large it is.\n- Ties on the saved size go to the smaller node index, not the one seen first.\n- Read `size` at the root returned by `find`, since only roots hold correct sizes.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | union-find parent pointers |\n| `size` | component size, valid at each root |\n| `find` | returns a node's root, halving paths as it goes |\n| `rootI`, `rootJ` | roots of the two linked nodes being merged |\n| `infectedCount` | starting infections per component root |\n| `answer` | node to remove so far |\n| `bestSaved` | nodes saved by removing `answer` |\n| `saved` | nodes saved by removing the current `node` |",
+  "narration": {
+    "3": "Every node starts as its own component root.",
+    "4": "Each component starts with a single node.",
+    "6": "find walks up to a node's root.",
+    "8": "Path halving: point the node at its grandparent to keep trees shallow.",
+    "14": "Look at each pair of nodes once.",
+    "16": "A direct link means the two nodes end up in the same component.",
+    "19": "Only merge when the nodes are in different components so far.",
+    "20": "Hang one root under the other.",
+    "21": "The surviving root absorbs the other component's size.",
+    "29": "Count how many starting infections fall in each component.",
+    "32": "If no removal saves anything, the smallest starting node is the answer.",
+    "33": "No nodes saved yet.",
+    "34": "Consider removing each starting node in turn.",
+    "36": "Removing a node only helps if it is the sole infection in its component.",
+    "37": "Then the whole component stays clean.",
+    "38": "Prefer a bigger saving, and on a tie the smaller index.",
+    "44": "Return the node whose removal saves the most."
+  }
+}

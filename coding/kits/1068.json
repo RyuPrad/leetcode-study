@@ -1,0 +1,49 @@
+{
+  "number": 1068,
+  "title": "Product Sales Analysis I",
+  "spec": "leetcode",
+  "statement": "Two tables record sales and the products sold:\n\n- `Sales(sale_id, product_id, year, quantity, price)`: one row per sale in a year; the pair `(sale_id, year)` is unique, so one `sale_id` can appear in several years. `price` is the price of one unit. Every `product_id` exists in `Product`.\n- `Product(product_id, product_name)`: one row per product; `product_id` is unique.\n\nFor every row of `Sales`, report the product's name, the sale's year and its unit price, as the columns `product_name`, `year` and `price`. Products that were never sold do not appear. Rows may come in any order.",
+  "constraints": [
+    "(sale_id, year) is unique in Sales",
+    "product_id is unique in Product",
+    "Every Sales.product_id appears in Product"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sales": [["sale_id","INT"],["product_id","INT"],["year","INT"],["quantity","INT"],["price","INT"]],
+    "Product": [["product_id","INT"],["product_name","VARCHAR(10)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Sales = [], Product = [] }] = input;\n  const products = new Set(), sales = new Set();\n  for (const [id] of Product) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    products.add(id);\n  }\n  for (const [saleId, productId, year] of Sales) {\n    if (saleId === null || year === null) return 'Every sale needs a sale_id and a year.';\n    const key = `${saleId}/${year}`;\n    if (sales.has(key)) return `Sale ${saleId} appears twice in year ${year}.`;\n    sales.add(key);\n    if (!products.has(productId)) return `Sale ${saleId} names product ${productId}, which is not in Product.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT p.product_name, s.year, s.price\nFROM Sales AS s\nJOIN Product AS p\n  ON p.product_id = s.product_id;",
+  "brute": "SELECT\n  (SELECT product_name FROM Product WHERE Product.product_id = Sales.product_id) AS product_name,\n  year,\n  price\nFROM Sales",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Nokia', 'Apple', 'Samsung', 'LG', 'Sony', 'Xiaomi', 'Oppo', 'Nokia'];\n  const productCount = small ? Math.floor(rand() * 5) : 1000;\n  const Product = [];\n  for (let i = 0; i < productCount; i++) Product.push([100 * (i + 1), small ? pick(names) : `P${i}`]);\n  const Sales = [];\n  if (productCount > 0) {\n    // A few sale ids spread over a few years, so one sale_id can repeat in different years.\n    const saleCount = small ? Math.floor(rand() * 9) : 2000;\n    const used = new Set();\n    while (Sales.length < saleCount) {\n      const saleId = 1 + Math.floor(rand() * (small ? 6 : 1500)), year = 2005 + Math.floor(rand() * (small ? 4 : 20));\n      if (used.has(`${saleId}/${year}`)) continue;\n      used.add(`${saleId}/${year}`);\n      const price = small ? pick([500, 5000, 9000, 9000]) : 100 * (1 + Math.floor(rand() * 100));\n      Sales.push([saleId, pick(Product)[0], year, 1 + Math.floor(rand() * 20), price]);\n    }\n  }\n  return [{ Sales, Product }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sales":[[1,100,2008,10,5000],[2,100,2009,12,5000],[7,200,2011,15,9000]],"Product":[[100,"Nokia"],[200,"Apple"],[300,"Samsung"]]}],"expected":{"columns":["product_name","year","price"],"rows":[["Nokia",2008,5000],["Nokia",2009,5000],["Apple",2011,9000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sales":[],"Product":[[100,"Nokia"],[200,"Apple"]]}]},
+    {"name":"Test 2","input":[{"Sales":[[1,100,2020,3,700]],"Product":[[100,"Nokia"]]}]},
+    {"name":"Test 3","input":[{"Sales":[[1,100,2019,2,400],[1,100,2020,2,400],[1,200,2021,5,900]],"Product":[[100,"Sony"],[200,"LG"]]}]},
+    {"name":"Test 4","input":[{"Sales":[[3,300,2010,1,100],[4,300,2010,1,100]],"Product":[[100,"Apple"],[300,"Oppo"],[500,"Xiaomi"]]}]},
+    {"name":"Test 5","input":[{"Sales":[[5,10,2001,40,25],[6,20,2002,25,40]],"Product":[[10,"Apple"],[20,"Apple"]]}]},
+    {"name":"Test 6","input":[{"Sales":[[1,1,2015,0,0],[2,2,2015,9,0]],"Product":[[1,"Kiwi"],[2,"Fig"]]}]},
+    {"name":"Test 7","input":[{"Sales":[[9,200,2008,10,5000],[8,100,2009,12,5000],[7,200,2011,15,9000],[6,300,2011,1,9000]],"Product":[[300,"Samsung"],[200,"Apple"],[100,"Nokia"],[400,"LG"]]}]},
+    {"name":"Test 8","input":[{"Sales":[[1,100,2008,10,5000],[2,100,2009,12,5000],[7,200,2011,15,9000],[7,200,2012,15,9500]],"Product":[[100,"Nokia"],[200,"Apple"],[300,"Samsung"]]}]},
+    {"name":"Test 9","input":[{"Sales":[[2,100,2000,7,100],[3,100,2000,7,100],[4,100,2000,7,100]],"Product":[[100,"Sony"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n`Sales` already holds the year and the price; only the product's name lives elsewhere, in `Product`. Each sale points at exactly one product through `product_id`, and that id always exists, so an **inner join** on `product_id` attaches the right name to every sale and drops nothing. Products that were never sold have no matching sale and simply do not appear.\n\n## Approach\n\n1. Read from `Sales` (alias `s`): every output row comes from one sale.\n2. `JOIN Product` (alias `p`) on `p.product_id = s.product_id` to find each sale's product.\n3. Select `p.product_name`, `s.year` and `s.price`, keeping repeated rows: two sales of the same product in the same year at the same price are two output rows.\n\n## Example 1, step by step\n\n- Sale 1 (product 100, 2008, 5000) joins Nokia, giving `(Nokia, 2008, 5000)`.\n- Sale 2 (product 100, 2009, 5000) also joins Nokia, giving `(Nokia, 2009, 5000)`.\n- Sale 7 (product 200, 2011, 9000) joins Apple, giving `(Apple, 2011, 9000)`.\n- Samsung (300) has no sale, so it never appears.\n\n## Complexity\n\n- Time: O(S + P) for S sales and P products with a hash or index on `Product.product_id`, its primary key.\n- Space: O(S) for the result.\n\n## Pitfalls\n\n- Starting from `Product` with a left join reports unsold products with null years and prices.\n- `SELECT DISTINCT` merges different sales that share a product, year and price; each sale is its own row.\n- `price` is the unit price, so it is reported as is; multiplying by `quantity` answers a different question.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Sales`, one row per sale and per output row |\n| `p` | `Product`, joined to give each sale its product's name |\n| `JOIN ... ON` | matches a sale to its product through `product_id` |",
+  "narration": {
+    "1": "Choose the three output columns: the name from Product, the year and unit price from Sales.",
+    "2": "Sales drives the query, so every sale produces one row.",
+    "3": "An inner join is enough: every sale names a product that exists, and unsold products should not appear.",
+    "4": "Each sale is matched with its product through product_id."
+  }
+}

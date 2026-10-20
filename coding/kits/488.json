@@ -1,0 +1,79 @@
+{
+  "number": 488,
+  "title": "Zuma Game",
+  "spec": "leetcode",
+  "statement": "A row of colored balls is given as the string `board`, and the balls you hold are given as the string `hand`. Every ball is one of `'R'`, `'Y'`, `'B'`, `'G'` or `'W'`.\n\nA move takes any one ball out of your hand and inserts it anywhere in the row: in front of the first ball, after the last ball, or between two neighbours. Then, while the row contains a group of three or more adjacent balls of one color, that group disappears and the two sides close up; this can bring together a new group of three or more, which disappears in turn.\n\nReturn the smallest number of moves that leaves the row empty, or `-1` if no sequence of moves using balls from your hand empties it. You may stop before your hand is used up. The starting row never contains three equal adjacent balls.",
+  "constraints": [
+    "1 <= board.length <= 16",
+    "1 <= hand.length <= 5",
+    "board and hand contain only 'R', 'Y', 'B', 'G' and 'W'",
+    "board has no group of three or more equal adjacent balls"
+  ],
+  "signature": "int findMinStep(String board, String hand)",
+  "entry": "findMinStep",
+  "kind": "function",
+  "parameters": [
+    "board",
+    "hand"
+  ],
+  "validator": "function validate([board, hand]) {\n  if (typeof board !== 'string' || board.length < 1 || board.length > 16) return 'board holds 1 to 16 balls.';\n  if (typeof hand !== 'string' || hand.length < 1 || hand.length > 5) return 'hand holds 1 to 5 balls.';\n  if (!/^[RYBGW]+$/.test(board) || !/^[RYBGW]+$/.test(hand)) return \"Balls are 'R', 'Y', 'B', 'G' or 'W'.\";\n  if (/(.)\\1\\1/.test(board)) return 'board must not start with three equal balls in a row.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMinStep(board, hand) {\n  // Remove the run around index at, then any run formed where the two sides meet.\n  const collapse = (row, at) => {\n    let left = at;\n    let right = at;\n    while (left >= 0 && right < row.length && row[left] === row[right]) {\n      let start = left;\n      let end = right;\n      while (start > 0 && row[start - 1] === row[left]) start--;\n      while (end < row.length - 1 && row[end + 1] === row[right]) end++;\n      if (end - start + 1 < 3) break;\n      row = row.slice(0, start) + row.slice(end + 1);\n      left = start - 1;\n      right = start;\n    }\n    return row;\n  };\n\n  const sorted = [...hand].sort().join('');\n  const seen = new Set([board + ' ' + sorted]);\n  let queue = [[board, sorted]];\n  for (let steps = 1; queue.length > 0; steps++) {\n    const next = [];\n    for (const [row, balls] of queue) {\n      for (let i = 0; i <= row.length; i++) {\n        for (let j = 0; j < balls.length; j++) {\n          const color = balls[j];\n          if (j > 0 && color === balls[j - 1]) continue;\n          if (i > 0 && row[i - 1] === color) continue;\n          const grows = row[i] === color;\n          const splits = i > 0 && row[i - 1] === row[i];\n          if (!grows && !splits) continue;\n          const after = collapse(row.slice(0, i) + color + row.slice(i), i);\n          if (after === '') return steps;\n          const rest = balls.slice(0, j) + balls.slice(j + 1);\n          const key = after + ' ' + rest;\n          if (seen.has(key)) continue;\n          seen.add(key);\n          next.push([after, rest]);\n        }\n      }\n    }\n    queue = next;\n  }\n  return -1;\n}",
+  "brute": "function findMinStep(board, hand) {\n  // Try every ball of the hand at every position, with no pruning, memoised on (row, hand).\n  const shrink = row => {\n    for (;;) {\n      let found = false;\n      for (let i = 0; i < row.length && !found; ) {\n        let j = i;\n        while (j < row.length && row[j] === row[i]) j++;\n        if (j - i >= 3) { row = row.slice(0, i) + row.slice(j); found = true; }\n        i = j;\n      }\n      if (!found) return row;\n    }\n  };\n  const memo = new Map();\n  const best = (row, balls) => {\n    if (row === '') return 0;\n    if (balls === '') return Infinity;\n    const key = row + '|' + balls;\n    if (memo.has(key)) return memo.get(key);\n    let result = Infinity;\n    for (let j = 0; j < balls.length; j++) {\n      if (j > 0 && balls[j] === balls[j - 1]) continue;\n      const rest = balls.slice(0, j) + balls.slice(j + 1);\n      for (let i = 0; i <= row.length; i++) result = Math.min(result, 1 + best(shrink(row.slice(0, i) + balls[j] + row.slice(i)), rest));\n    }\n    memo.set(key, result);\n    return result;\n  };\n  const answer = best(board, [...hand].sort().join(''));\n  return answer === Infinity ? -1 : answer;\n}",
+  "generator": "function generate(rand, size) {\n  const palette = ['R', 'Y', 'B', 'G', 'W'];\n  for (let i = palette.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [palette[i], palette[j]] = [palette[j], palette[i]];\n  }\n  // Two or three colors give a good mix of clearable and hopeless rows; sometimes allow more.\n  const count = rand() < 0.15 ? 4 + Math.floor(rand() * 2) : 2 + Math.floor(rand() * 2);\n  const colors = palette.slice(0, count);\n  const pick = () => colors[Math.floor(rand() * colors.length)];\n  const length = size === 'large' ? 12 + Math.floor(rand() * 5) : 1 + Math.floor(rand() * 8);\n  let board = '';\n  while (board.length < length) {\n    const color = pick();\n    if (board.length >= 2 && board[board.length - 1] === color && board[board.length - 2] === color) continue;\n    board += color;\n  }\n  const handSize = size === 'large' ? 5 : 1 + Math.floor(rand() * 4);\n  let hand = '';\n  for (let k = 0; k < handSize; k++) hand += rand() < 0.1 ? palette[Math.floor(rand() * 5)] : pick();\n  return [board, hand];\n}",
+  "examples": [
+    {"name":"Example 1","input":["WRRBBW","RB"],"expected":-1},
+    {"name":"Example 2","input":["WWRRBBWW","WRBRW"],"expected":2},
+    {"name":"Example 3","input":["G","GGGGG"],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["RRWWRRBBRR","WB"]},
+    {"name":"Test 2","input":["RWYWRRWRR","YRY"]},
+    {"name":"Test 3","input":["WWBBWBBWW","BB"]},
+    {"name":"Test 4","input":["RBYYBBRRB","YRBGB"]},
+    {"name":"Test 5","input":["G","G"]},
+    {"name":"Test 6","input":["RR","R"]},
+    {"name":"Test 7","input":["BRRB","RB"]},
+    {"name":"Test 8","input":["RRYGGYRR","GY"]},
+    {"name":"Test 9","input":["RG","RRGGB"]},
+    {"name":"Test 10","input":["RRGB","RGGBB"]},
+    {"name":"Test 11","input":["BBRRBBRRBBRRBBRR","RBRBR"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThink of a state as the current row together with the balls still in hand; a move leads to a new state. The fewest moves to an empty row is then a shortest path, so breadth-first search over the number of moves finds it: the first move that empties the row ends the search. Trying every ball at every spot recursively also works (that is the brute force), but the graph explodes, so three rules skip moves that can never do better than another one:\n\n- Equal balls in hand are interchangeable, so sort `hand` and skip a color equal to the one just tried.\n- Inserting color `c` right after a ball of color `c` gives the same row as inserting it right before that ball, so only insert at the start of a run.\n- A ball is only useful next to its own color (it grows that run) or between two equal balls of another color (it splits them, as in `\"RRWWRRBBRR\"` with `\"WB\"`, where the W must go between the last two R's). A ball between two different colors that do not match it is wasted.\n\n## Approach\n\n1. Sort the hand. `queue` holds the states reachable with the current number of moves; `seen` holds every state key `row + ' ' + balls` already queued.\n2. For `steps = 1, 2, ...`, expand each `[row, balls]` in `queue`: for every position `i` and every distinct `color` in `balls`, apply the three rules.\n3. Insert the ball and `collapse`: grow the run around the new ball; if it has at least three balls, cut it out, then check whether the two balls now touching start a new run of three or more, and repeat.\n4. If the row is empty, return `steps`. Otherwise queue the new state in `next` unless it was seen before.\n5. If a level produces no new states, no sequence of moves clears the row: return `-1`.\n\n## Example 1, step by step\n\n`board = \"WRRBBW\"`, sorted hand `\"BR\"`. Level 1 has four useful moves: R into RR gives `\"WRRRBBW\"` and collapses to `\"WBBW\"`; B into BB gives `\"WRRW\"`; B between the two R's gives `\"WRBRBBW\"`; R between the two B's gives `\"WRRBRBW\"`. Level 2 uses the last ball of each state: the best result is `\"WW\"`, which is not empty, and the other four rows are not empty either. Every level-2 state has an empty hand, so level 3 is empty and the answer is `-1`.\n\n## Complexity\n\n- Time: O((n·m)^m · n) in the worst case for a row of n balls and a hand of m balls: each level multiplies the states by at most (n + 1)·m moves, and each move costs O(n) to build and collapse. The rules and `seen` keep the real number of states far smaller.\n- Space: O((n·m)^m · n) for `seen` and the queues, under the same bound.\n\n## Pitfalls\n\n- Allowing only insertions next to the same color misses answers such as `\"RRWWRRBBRR\"` with `\"WB\"` (answer 2).\n- After a run vanishes, re-check where the two sides meet; removals can chain several times.\n- A state is the row and the remaining hand together: the same row with different balls left is a different state.\n- Count moves by BFS level, not by states visited, and return as soon as a move empties the row.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `collapse` | removes the run around the inserted ball and any chain it triggers |\n| `left`, `right` | the two balls that must match for a (next) run to form |\n| `start`, `end` | the full extent of that run |\n| `sorted` | the hand with equal colors next to each other |\n| `queue`, `next` | states with `steps - 1` and `steps` moves made |\n| `seen` | keys of states already queued |\n| `row`, `balls` | the state being expanded |\n| `i`, `j`, `color` | where to insert and which ball |\n| `grows`, `splits` | whether the move extends a run or splits two equal balls |\n| `after`, `rest` | the row after collapsing and the hand without that ball |",
+  "narration": {
+    "3": "collapse takes a row and the index of the ball just inserted.",
+    "6": "A run can form only while the balls at left and right have the same color.",
+    "9": "Stretch the run to the left over balls of that color...",
+    "10": "...and to the right.",
+    "11": "Fewer than three balls: nothing disappears, so stop.",
+    "12": "Cut the run out of the row.",
+    "13": "The ball before the gap and the ball after it now touch; check them next.",
+    "19": "Sort the hand so equal colors sit together and are tried once.",
+    "20": "seen records every state (row and remaining hand) already queued.",
+    "21": "Level 0 holds only the starting state.",
+    "22": "Each pass of this loop makes one more move from every state of the previous level.",
+    "24": "Expand every state reachable in steps - 1 moves.",
+    "25": "Try every insertion position, including the very end.",
+    "26": "Try every ball of the hand.",
+    "28": "Skip a color equal to the previous ball: the result would be the same.",
+    "29": "Inserting after a ball of the same color equals inserting before it, so only use the start of a run.",
+    "30": "Does the new ball touch a ball of its own color?",
+    "31": "Or does it go between two equal balls of another color?",
+    "32": "Neither: the ball would sit alone and only waste a move.",
+    "33": "Insert the ball and let groups of three or more vanish.",
+    "34": "The row is empty: BFS reaches it first with the fewest moves.",
+    "35": "The hand without the ball just used.",
+    "37": "This state was already reached with no more moves.",
+    "39": "Queue the new state for the next level.",
+    "43": "Move on to the states made with one more ball.",
+    "45": "No sequence of moves empties the row."
+  }
+}

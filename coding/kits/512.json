@@ -1,0 +1,50 @@
+{
+  "number": 512,
+  "title": "Game Play Analysis II",
+  "spec": "recalled",
+  "statement": "One table logs player sessions:\n\n- `Activity(player_id, device_id, event_date, games_played)`: each row says a player logged in on `event_date` from `device_id` and played `games_played` games (possibly 0). A player has at most one row per date, so `(player_id, event_date)` is unique.\n\nFor each player that appears in `Activity`, report the device they used on their earliest login date. Return the columns `player_id` and `device_id`, one row per player. Rows may come in any order.",
+  "constraints": [
+    "(player_id, event_date) is unique in Activity",
+    "games_played is 0 or more",
+    "event_date is a date written YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["player_id","INT"],["device_id","INT"],["event_date","DATE"],["games_played","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const keys = new Set();\n  for (const [player, device, date, games] of Activity) {\n    if (player === null || date === null) return 'player_id and event_date are required.';\n    if (device === null) return `Player ${player} needs a device_id on ${date}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `event_date ${date} is not YYYY-MM-DD.`;\n    const key = `${player}|${date}`;\n    if (keys.has(key)) return `Player ${player} has two rows on ${date}.`;\n    keys.add(key);\n    if (games !== null && games < 0) return 'games_played cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_login AS (\n  SELECT player_id, MIN(event_date) AS first_date\n  FROM Activity\n  GROUP BY player_id\n)\nSELECT a.player_id, a.device_id\nFROM Activity AS a\nWHERE (a.player_id, a.event_date) IN (\n  SELECT f.player_id, f.first_date\n  FROM first_login AS f\n);",
+  "brute": "SELECT a.player_id, a.device_id\nFROM Activity AS a\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Activity AS earlier\n  WHERE earlier.player_id = a.player_id\n    AND earlier.event_date < a.event_date\n)",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const day = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;\n  const rows = size === 'small' ? pick(9) : 2000;\n  const players = size === 'small' ? 4 : 400;\n  const years = size === 'small' ? [2016, 2017] : [2015, 2016, 2017, 2018, 2019];\n  const Activity = [], seen = new Set();\n  for (let tries = 0; Activity.length < rows && tries < rows * 20; tries++) {\n    const player = 1 + pick(players);\n    const date = size === 'small' ? day(years[pick(2)], 1 + pick(3), 1 + pick(3)) : day(years[pick(years.length)], 1 + pick(12), 1 + pick(28));\n    if (seen.has(`${player}|${date}`)) continue;\n    seen.add(`${player}|${date}`);\n    Activity.push([player, 1 + pick(5), date, pick(8)]);\n  }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,2,"2016-03-01",5],[1,2,"2016-05-02",6],[2,3,"2017-06-25",1],[3,1,"2016-03-02",0],[3,4,"2018-07-03",5]]}],"expected":{"columns":["player_id","device_id"],"rows":[[1,2],[2,3],[3,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[7,4,"2020-02-29",0]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-05-10",3],[1,5,"2019-01-02",1],[1,1,"2019-03-15",0]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2017-01-01",2],[1,3,"2016-12-31",4],[2,2,"2016-12-31",0],[2,1,"2017-01-01",9]]}]},
+    {"name":"Test 5","input":[{"Activity":[[5,3,"2018-07-03",5],[4,2,"2018-07-03",5],[3,1,"2018-07-03",5]]}]},
+    {"name":"Test 6","input":[{"Activity":[[2,1,"2021-10-09",0],[2,9,"2021-09-10",0],[8,1,"2021-09-10",3],[2,1,"2021-09-11",2]]}]},
+    {"name":"Test 7","input":[{"Activity":[[1,4,"2016-03-02",0],[1,2,"2016-03-01",5],[2,3,"2016-03-03",1],[2,2,"2018-03-01",2],[3,3,"2015-11-30",7],[3,1,"2015-12-01",1]]}]},
+    {"name":"Test 8","input":[{"Activity":[[10,1,"2019-08-01",1],[10,2,"2019-08-02",1],[10,3,"2019-08-03",1],[10,4,"2019-07-31",1]]}]},
+    {"name":"Test 9","input":[{"Activity":[[6,2,"2020-01-05",0],[6,2,"2020-01-01",0],[6,1,"2020-01-03",4],[7,2,"2020-01-02",0]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe device belongs to one specific row, the player's earliest one, so an aggregate alone is not enough: `MIN(event_date)` tells us **which** date is first but throws the rest of that row away. The fix is two steps. First find each player's first date, then go back to `Activity` and keep the row whose player and date match that pair; that row carries the device.\n\n## Approach\n\n1. `first_login`: `GROUP BY player_id` and take `MIN(event_date)` as `first_date`, one row per player.\n2. Read `Activity` again (alias `a`) and keep a row only when the pair `(a.player_id, a.event_date)` is **in** `first_login`.\n3. Output `player_id` and `device_id` from those rows. Since `(player_id, event_date)` is unique, each player keeps exactly one row.\n\n## Example 1, step by step\n\n- `first_login` holds `(1, 2016-03-01)`, `(2, 2017-06-25)` and `(3, 2016-03-02)`.\n- Player 1's row on 2016-03-01 matches and has device 2; the 2016-05-02 row does not match.\n- Player 2's only row matches, with device 3.\n- Player 3's row on 2016-03-02 matches, with device 1; the 2018-07-03 row (device 4) is dropped.\n\nThe result is `(1, 2)`, `(2, 3)` and `(3, 1)`.\n\n## Complexity\n\n- Time: O(n) with hash grouping and a hashed membership test over n rows (O(n log n) if the database sorts).\n- Space: O(p) for the p rows of `first_login`.\n\n## Pitfalls\n\n- `SELECT player_id, device_id, MIN(event_date) ... GROUP BY player_id` is rejected under MySQL's `ONLY_FULL_GROUP_BY`, and where accepted the device need not come from the first row.\n- `MIN(device_id)` picks the smallest device number, not the first one used; a player who starts on device 5 and later uses device 1 breaks it.\n- Matching on the date alone (`event_date IN (SELECT MIN(...))`) mixes players: one player's first date can be another player's later date.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_login` | one row per player with their earliest `event_date` |\n| `first_date` | that earliest date |\n| `a` | `Activity`, scanned again to recover the device |\n| `f` | `first_login` inside the membership subquery |",
+  "narration": {
+    "1": "The first stage finds each player's earliest login date.",
+    "2": "MIN(event_date) is the first date; ISO dates compare correctly as text.",
+    "4": "Grouping by player_id gives one row per player.",
+    "6": "The final stage returns the player and the device from the matching row.",
+    "7": "Read Activity again, because the device lives in the full rows, not in the aggregate.",
+    "8": "Keep a row only when its (player, date) pair is a player's first login; the pair must match together, not each column separately."
+  }
+}

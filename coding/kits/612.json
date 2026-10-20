@@ -1,0 +1,51 @@
+{
+  "number": 612,
+  "title": "Shortest Distance in a Plane",
+  "spec": "recalled",
+  "statement": "One table lists points on a plane:\n\n- `Point2D(x, y)`: one row per point with integer coordinates; the pair `(x, y)` is unique, so no two rows are the same point. The table holds at least two points.\n\nThe distance between `(x1, y1)` and `(x2, y2)` is the Euclidean distance `sqrt((x2 - x1)^2 + (y2 - y1)^2)`.\n\nReturn a single row with one column, `shortest`: the smallest distance between any two different points of the table, rounded to 2 decimal places.",
+  "constraints": [
+    "(x, y) is unique in Point2D",
+    "Point2D holds at least two points",
+    "x and y are integers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Point2D": [["x","INT"],["y","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Point2D = [] }] = input;\n  if (Point2D.length < 2) return 'Point2D needs at least two points.';\n  const seen = new Set();\n  for (const [x, y] of Point2D) {\n    if (x === null || y === null) return 'Every point needs both x and y.';\n    const key = `${x},${y}`;\n    if (seen.has(key)) return `Point (${key}) appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH pairs AS (\n  SELECT a.x AS x1, a.y AS y1, b.x AS x2, b.y AS y2,\n    (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) AS squared\n  FROM Point2D AS a\n  JOIN Point2D AS b\n    ON a.x < b.x OR (a.x = b.x AND a.y < b.y)\n)\nSELECT ROUND(SQRT(MIN(squared)), 2) AS shortest\nFROM pairs;",
+  "brute": "SELECT ROUND(MIN(nearest), 2) AS shortest\nFROM (\n  SELECT (\n    SELECT MIN(SQRT(POW(q.x - p.x, 2) + POW(q.y - p.y, 2)))\n    FROM Point2D AS q\n    WHERE q.x <> p.x OR q.y <> p.y\n  ) AS nearest\n  FROM Point2D AS p\n) AS per_point",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? 2 + Math.floor(rand() * 7) : 800;\n  const range = small ? 3 : 10000;\n  const seen = new Set(), Point2D = [];\n  while (Point2D.length < count) {\n    const x = Math.floor(rand() * (2 * range + 1)) - range, y = Math.floor(rand() * (2 * range + 1)) - range;\n    if (seen.has(`${x},${y}`)) continue;\n    seen.add(`${x},${y}`);\n    Point2D.push([x, y]);\n  }\n  return [{ Point2D }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Point2D":[[-1,-1],[0,0],[-1,-2]]}],"expected":{"columns":["shortest"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Point2D":[[0,0],[3,4]]}]},
+    {"name":"Test 2","input":[{"Point2D":[[0,0],[1,1],[3,0]]}]},
+    {"name":"Test 3","input":[{"Point2D":[[2,-5],[2,5],[2,0]]}]},
+    {"name":"Test 4","input":[{"Point2D":[[-1000,-1000],[1000,1000]]}]},
+    {"name":"Test 5","input":[{"Point2D":[[0,0],[1,100],[2,1]]}]},
+    {"name":"Test 6","input":[{"Point2D":[[0,0],[0,1],[1,0],[1,1]]}]},
+    {"name":"Test 7","input":[{"Point2D":[[-3,7],[4,7],[10,7],[0,-1]]}]},
+    {"name":"Test 8","input":[{"Point2D":[[0,0],[2,3],[5,5]]}]},
+    {"name":"Test 9","input":[{"Point2D":[[100,-50],[0,0],[7,7]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"small"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe closest pair can be any two points, so the straightforward way is to look at **every pair**. A self-join of `Point2D` with itself produces those pairs; one aggregate, `MIN`, then picks the smallest distance. Since the square root only grows with its argument, it is enough to find the smallest *squared* distance with plain integer arithmetic and take one square root at the end.\n\n## Approach\n\n1. CTE `pairs`: join `Point2D` as `a` with itself as `b`, keeping a pair only when `a` comes before `b` (smaller `x`, or equal `x` and smaller `y`). This drops a point paired with itself and lists each unordered pair once. For every pair compute `squared = (a.x - b.x)^2 + (a.y - b.y)^2`.\n2. Take `MIN(squared)`, apply `SQRT` and `ROUND(..., 2)`, and name the column `shortest`.\n\n## Example 1, step by step\n\nOrdering the points as (-1, -2) < (-1, -1) < (0, 0), `pairs` holds three rows:\n\n- (-1, -2) and (-1, -1): squared = 0 + 1 = 1\n- (-1, -2) and (0, 0): squared = 1 + 4 = 5\n- (-1, -1) and (0, 0): squared = 1 + 1 = 2\n\nThe minimum is 1, its square root is 1, so `shortest = 1.00`.\n\n## Complexity\n\n- Time: O(N²) for N points, since every pair is examined once.\n- Space: O(N²) if the pairs are materialized, O(1) extra when the database streams them into `MIN`.\n\n## Pitfalls\n\n- Joining without excluding equal points pairs each point with itself, and the answer collapses to 0.\n- Excluding pairs with `a.x <> b.x AND a.y <> b.y` also drops pairs that share a column or a row, such as the vertical pair in Example 1.\n- Checking only neighbours in `x` order misses close pairs that are far apart in that order, like (0, 0) and (2, 1) when (1, 100) sits between them.\n- Rounding before taking the minimum, or forgetting `ROUND`, changes the reported value.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pairs` | each unordered pair of distinct points with its squared distance |\n| `a`, `b` | the two copies of `Point2D`; `a` is always the earlier point of the pair |\n| `squared` | `(a.x - b.x)^2 + (a.y - b.y)^2`, an integer |\n| `shortest` | square root of the smallest `squared`, rounded to 2 decimals |",
+  "narration": {
+    "1": "The CTE pairs lists every unordered pair of distinct points.",
+    "3": "The squared distance needs only integer arithmetic, and its minimum marks the closest pair.",
+    "4": "The first copy of Point2D, alias a, supplies one point of each pair.",
+    "5": "Joining Point2D with itself, alias b, supplies the other point.",
+    "6": "Keeping a only when it comes before b drops self-pairs and counts each pair once.",
+    "8": "The square root of the smallest squared distance is the shortest distance, rounded to 2 decimals."
+  }
+}

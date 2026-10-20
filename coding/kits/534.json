@@ -1,0 +1,50 @@
+{
+  "number": 534,
+  "title": "Game Play Analysis III",
+  "spec": "recalled",
+  "statement": "One table records a game's daily sessions:\n\n- `Activity(player_id, device_id, event_date, games_played)`: one row per player per day; `(player_id, event_date)` is unique. The row says the player logged in on `event_date` from `device_id` and played `games_played` games (possibly 0) before logging out.\n\nFor **every** row, report how many games that player has played in total up to and including that date, across all devices. Output the columns `player_id`, `event_date` and `games_played_so_far` (the running total). Rows may come in any order.",
+  "constraints": [
+    "(player_id, event_date) is unique in Activity",
+    "games_played is a non-negative integer, never null",
+    "event_date is a date written as YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["player_id","INT"],["device_id","INT"],["event_date","DATE"],["games_played","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const seen = new Set();\n  for (const [playerId, deviceId, eventDate, gamesPlayed] of Activity) {\n    if (playerId === null || deviceId === null) return 'Every row needs a player_id and a device_id.';\n    if (typeof eventDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)) return `event_date ${eventDate} must be a YYYY-MM-DD date.`;\n    if (gamesPlayed === null || gamesPlayed < 0) return `games_played must be a non-negative number (player ${playerId}, ${eventDate}).`;\n    const key = `${playerId}|${eventDate}`;\n    if (seen.has(key)) return `Player ${playerId} has two rows on ${eventDate}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  player_id,\n  event_date,\n  SUM(games_played) OVER (\n    PARTITION BY player_id\n    ORDER BY event_date\n  ) AS games_played_so_far\nFROM Activity;",
+  "brute": "SELECT\n  a.player_id,\n  a.event_date,\n  (\n    SELECT SUM(earlier.games_played)\n    FROM Activity AS earlier\n    WHERE earlier.player_id = a.player_id\n      AND earlier.event_date <= a.event_date\n  ) AS games_played_so_far\nFROM Activity AS a",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = offset => new Date(Date.UTC(2016, 11, 28) + offset * 86400000).toISOString().slice(0, 10);\n  // Small tables use 3 players and 8 dates around a year boundary, so players share dates and switch devices.\n  const players = small ? 3 : 100, days = small ? 8 : 60, target = small ? Math.floor(rand() * 9) : 2000;\n  const Activity = [], seen = new Set();\n  for (let tries = 0; Activity.length < target && tries < target * 4; tries++) {\n    const playerId = 1 + Math.floor(rand() * players);\n    const eventDate = day(small ? Math.floor(rand() * days) : Math.floor(rand() * days) * 7);\n    const key = `${playerId}|${eventDate}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Activity.push([playerId, 1 + Math.floor(rand() * 3), eventDate, Math.floor(rand() * 7)]);\n  }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,2,"2016-03-01",5],[1,2,"2016-05-02",6],[1,3,"2017-06-25",1],[3,1,"2016-03-02",0],[3,4,"2018-07-03",5]]}],"expected":{"columns":["player_id","event_date","games_played_so_far"],"rows":[[1,"2016-03-01",5],[1,"2016-05-02",11],[1,"2017-06-25",12],[3,"2016-03-02",0],[3,"2018-07-03",5]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[7,1,"2020-01-01",0]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-03-05",4],[1,1,"2019-03-01",2],[1,1,"2019-03-09",1],[1,1,"2019-03-03",3]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2019-01-01",5],[2,1,"2019-01-01",7],[1,1,"2019-01-02",1],[2,1,"2019-01-02",2],[3,2,"2019-01-02",9]]}]},
+    {"name":"Test 5","input":[{"Activity":[[4,1,"2016-12-31",3],[4,1,"2017-01-01",4],[4,1,"2016-02-29",1],[4,1,"2017-10-01",2]]}]},
+    {"name":"Test 6","input":[{"Activity":[[1,1,"2020-05-01",0],[1,2,"2020-05-02",0],[2,1,"2020-05-01",0]]}]},
+    {"name":"Test 7","input":[{"Activity":[[1,1,"2021-01-01",2],[1,2,"2021-01-02",3],[1,1,"2021-01-03",4],[1,2,"2021-01-04",5]]}]},
+    {"name":"Test 8","input":[{"Activity":[[1,1,"2018-06-01",6],[2,2,"2018-06-02",8],[3,3,"2018-06-03",0]]}]},
+    {"name":"Test 9","input":[{"Activity":[[2,1,"2017-02-01",1],[1,1,"2017-02-03",10],[2,2,"2017-02-02",0],[1,2,"2017-02-01",4],[2,1,"2017-02-05",3],[1,1,"2017-02-02",0]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA running total is a sum over a window that grows one row at a time. For each row we want the sum of `games_played` over the rows of the **same player** whose date is **not later** than this row's date. `SUM(...) OVER (PARTITION BY player_id ORDER BY event_date)` describes exactly that window: the partition separates players, and an `ORDER BY` inside `OVER` makes the frame run from the player's first date up to the current one. Every input row stays in the output, which a `GROUP BY` would not allow.\n\n## Approach\n\n1. Read every row of `Activity`; nothing is filtered or grouped away.\n2. `PARTITION BY player_id` restarts the total for each player, ignoring `device_id`.\n3. `ORDER BY event_date` inside the window sums the player's rows from the earliest date through the current row.\n4. Name the result `games_played_so_far`.\n\n## Example 1, step by step\n\n- Player 1, ordered by date: 2016-03-01 adds 5 (total 5), 2016-05-02 adds 6 (total 11), 2017-06-25 adds 1 (total 12). The device change on the last day does not matter.\n- Player 3: 2016-03-02 adds 0 (total 0), 2018-07-03 adds 5 (total 5).\n\nThat gives the five rows (1, 2016-03-01, 5), (1, 2016-05-02, 11), (1, 2017-06-25, 12), (3, 2016-03-02, 0) and (3, 2018-07-03, 5).\n\n## Complexity\n\n- Time: O(n log n) for n rows, to sort each player's rows by date; the running sum itself is one pass.\n- Space: O(n) for the sorted partitions and the output.\n\n## Pitfalls\n\n- Leaving out `ORDER BY` inside `OVER` makes every row show the player's grand total instead of a running total.\n- Leaving out `PARTITION BY player_id` (or partitioning by `device_id` as well) mixes players together or restarts the total when the player switches devices.\n- Rows can be stored in any order; the window's `ORDER BY event_date` defines \"so far\", not the order of the table.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `PARTITION BY player_id` | one running total per player |\n| `ORDER BY event_date` | the total covers the player's rows up to the current date |\n| `games_played_so_far` | the player's games summed through `event_date` |",
+  "narration": {
+    "1": "Every row of Activity produces one output row.",
+    "4": "A window sum adds up games_played without collapsing rows the way GROUP BY would.",
+    "5": "The total restarts for each player, whatever device they used.",
+    "6": "Ordering by date makes the window run from the first date up to the current row: a running total.",
+    "7": "The running total is reported as games_played_so_far.",
+    "8": "All rows come straight from Activity; nothing is filtered."
+  }
+}

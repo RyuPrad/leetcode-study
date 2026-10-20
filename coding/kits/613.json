@@ -1,0 +1,46 @@
+{
+  "number": 613,
+  "title": "Shortest Distance in a Line",
+  "spec": "recalled",
+  "statement": "One table holds points on a number line:\n\n- `Point(x)`: one row per point; `x` is its position on the x-axis and is unique, so no two points coincide. The table has at least two points.\n\nFind the smallest distance between any two different points, where the distance between positions `a` and `b` is `|a - b|`. Return one row with one column, `shortest`.",
+  "constraints": [
+    "x is unique in Point",
+    "Point has at least two rows"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Point": [["x","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Point = [] }] = input;\n  const seen = new Set();\n  for (const [x] of Point) {\n    if (x === null) return 'Every point needs an x.';\n    if (seen.has(x)) return `x ${x} appears twice.`;\n    seen.add(x);\n  }\n  if (seen.size < 2) return 'Point needs at least two rows.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT MIN(right_point.x - left_point.x) AS shortest\nFROM Point AS left_point\nJOIN Point AS right_point\n  ON right_point.x > left_point.x;",
+  "brute": "WITH gaps AS (\n  SELECT x - LAG(x) OVER (ORDER BY x) AS gap\n  FROM Point\n)\nSELECT MIN(gap) AS shortest\nFROM gaps",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? 2 + Math.floor(rand() * 7) : 1200;\n  // Walk right by positive gaps so the points are distinct, then shuffle the rows out of sorted order.\n  const maxGap = small ? 5 : 1500;\n  let x = Math.floor(rand() * (small ? 21 : 2000001)) - (small ? 10 : 1000000);\n  const Point = [];\n  for (let i = 0; i < count; i++) {\n    Point.push([x]);\n    x += 1 + Math.floor(rand() * maxGap);\n  }\n  for (let i = Point.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Point[i], Point[j]] = [Point[j], Point[i]];\n  }\n  return [{ Point }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Point":[[-1],[0],[2]]}],"expected":{"columns":["shortest"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Point":[[0],[5]]}]},
+    {"name":"Test 2","input":[{"Point":[[-3],[-7]]}]},
+    {"name":"Test 3","input":[{"Point":[[10],[1],[4],[11]]}]},
+    {"name":"Test 4","input":[{"Point":[[0],[3],[6],[9]]}]},
+    {"name":"Test 5","input":[{"Point":[[-1000000],[1000000]]}]},
+    {"name":"Test 6","input":[{"Point":[[50],[0],[49],[100]]}]},
+    {"name":"Test 7","input":[{"Point":[[-2],[2],[7]]}]},
+    {"name":"Test 8","input":[{"Point":[[30],[-30],[12],[-5],[21],[3]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is a property of *pairs* of points, and a self-join is the way to form pairs in SQL: join `Point` to itself and every combination of two rows appears. Requiring the right point to lie strictly to the right of the left one keeps each pair once, skips a point paired with itself (distance 0), and makes the difference `right - left` already positive, so no `ABS` is needed. The smallest such difference is the answer.\n\n## Approach\n\n1. Take `Point` twice, as `left_point` and `right_point`.\n2. Join them `ON right_point.x > left_point.x`: each unordered pair of distinct points becomes one row.\n3. `MIN(right_point.x - left_point.x)` over all those rows, named `shortest`.\n\n## Example 1, step by step\n\n- The join produces three pairs: (-1, 0), (-1, 2) and (0, 2).\n- Their differences are 1, 3 and 2.\n- The minimum is 1, so the result is one row with `shortest = 1`.\n\n## Complexity\n\n- Time: O(n²) for n points, since the join forms n(n-1)/2 pairs.\n- Space: O(1) beyond the join, as `MIN` keeps a single running value.\n- Follow-up: the closest pair is always two neighbours in sorted order, so sorting (or an index on `x`) and comparing each point with the previous one (`LAG(x) OVER (ORDER BY x)`) brings the cost down to O(n log n), or O(n) when the rows are already sorted.\n\n## Pitfalls\n\n- Joining on `<>` or with no condition and taking `MIN(ABS(...))` without excluding the point itself returns 0.\n- Comparing each row with the one listed before it in the table (instead of in sorted order) misses the true neighbours, as in a table listed 50, 0, 49, 100.\n- The aggregate must cover all pairs: a `GROUP BY left_point.x` would return one minimum per point instead of a single row.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `left_point` | the point on the left of a pair |\n| `right_point` | a point strictly to its right |\n| `ON right_point.x > left_point.x` | each pair of distinct points once, ordered left to right |\n| `shortest` | the smallest gap over all pairs |",
+  "narration": {
+    "1": "Over all pairs, the smallest right-minus-left difference is the shortest distance.",
+    "2": "The first copy of Point supplies the left point of each pair.",
+    "3": "A second copy of the same table supplies the other point, so rows become pairs.",
+    "4": "Keeping only right points strictly greater lists each pair once, skips self-pairs and keeps the difference positive."
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "number": 813,
+  "title": "Largest Sum of Averages",
+  "spec": "leetcode",
+  "statement": "Cut the integer array `nums` into at most `k` pieces, where each piece is a non-empty run of consecutive elements and every element lands in exactly one piece (the order is kept). The score of such a cut is the sum of the pieces' averages (each piece's total divided by its length), which may be fractional.\n\nReturn the highest score any valid cut can reach. An answer within `10^-5` of the exact maximum is accepted.",
+  "constraints": [
+    "1 <= nums.length <= 100",
+    "1 <= nums[i] <= 10^4",
+    "1 <= k <= nums.length"
+  ],
+  "signature": "double largestSumOfAverages(int[] nums, int k)",
+  "entry": "largestSumOfAverages",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "compare": "float",
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100) return 'nums needs 1 to 100 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 10000)) return 'Each value is a whole number from 1 to 10^4.';\n  if (!Number.isInteger(k) || k < 1 || k > nums.length) return 'k is between 1 and nums.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function largestSumOfAverages(nums, k) {\n  const n = nums.length;\n  const prefix = new Array(n + 1).fill(0);\n  for (let i = 0; i < n; i++) {\n    prefix[i + 1] = prefix[i] + nums[i];\n  }\n\n  // dp[groups][start]: best score for nums[start..] cut into at most `groups` pieces.\n  const dp = Array.from({ length: k + 1 }, () => new Array(n).fill(0));\n  for (let start = 0; start < n; start++) {\n    dp[1][start] = (prefix[n] - prefix[start]) / (n - start);\n  }\n\n  for (let groups = 2; groups <= k; groups++) {\n    for (let start = 0; start < n; start++) {\n      let best = dp[groups - 1][start];\n      for (let end = start + 1; end < n; end++) {\n        const average = (prefix[end] - prefix[start]) / (end - start);\n        best = Math.max(best, average + dp[groups - 1][end]);\n      }\n      dp[groups][start] = best;\n    }\n  }\n  return dp[k][0];\n}",
+  "brute": "function largestSumOfAverages(nums, k) {\n  // Try every way to cut the array into at most k pieces, left to right.\n  let best = -Infinity;\n  const explore = (start, piecesLeft, score) => {\n    if (start === nums.length) { best = Math.max(best, score); return; }\n    if (piecesLeft === 0) return;\n    let sum = 0;\n    for (let end = start; end < nums.length; end++) {\n      sum += nums[end];\n      explore(end + 1, piecesLeft - 1, score + sum / (end - start + 1));\n    }\n  };\n  explore(0, k, 0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 10);\n  const top = size === 'large' || rand() < 0.3 ? 10000 : (rand() < 0.5 ? 3 : 20);\n  const nums = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  const k = 1 + Math.floor(rand() * n);\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[9,1,2,3,9],3],"expected":20},
+    {"name":"Example 2","input":[[1,2,3,4,5,6,7],4],"expected":20.5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],1]},
+    {"name":"Test 2","input":[[5,5,5,5],2]},
+    {"name":"Test 3","input":[[1,10000],1]},
+    {"name":"Test 4","input":[[1,10000],2]},
+    {"name":"Test 5","input":[[9,1,2,3,9],2]},
+    {"name":"Test 6","input":[[4,1,7,5,6,2,3],1]},
+    {"name":"Test 7","input":[[4,1,7,5,6,2,3],7]},
+    {"name":"Test 8","input":[[1,1,1,10000,1,1,1,10000,1,1],3]},
+    {"name":"Test 9","input":[[3,8,2,9,4,7,1,6,5,10,2,2],5]},
+    {"name":"Test 10","input":[[10000,1,1,1,1,1,1,1,1,9999],2]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every way to place the cuts takes 2^(n-1) checks. But the best way to finish the array from some index onward does not depend on how the earlier part was cut, only on where the suffix starts and how many pieces are still allowed. That gives a table over (pieces allowed, start index), and prefix sums make any piece's average an O(1) lookup.\n\n## Approach\n\n1. Build `prefix`, where `prefix[i]` is the sum of the first `i` elements, so a piece `nums[start..end-1]` has average `(prefix[end] - prefix[start]) / (end - start)`.\n2. With one piece allowed, the suffix from `start` must stay whole: `dp[1][start]` is its average.\n3. For `groups` from 2 to `k` and every `start`, begin with `best = dp[groups - 1][start]` (using fewer pieces is allowed).\n4. Try every `end` for the first piece `nums[start..end-1]`; its `average` plus `dp[groups - 1][end]` for the rest is a candidate for `best`.\n5. Store `best` in `dp[groups][start]` and return `dp[k][0]`.\n\n## Example 1, step by step\n\n`nums = [9, 1, 2, 3, 9]`, `k = 3`, so `prefix = [0, 9, 10, 12, 15, 24]`.\n\n- One piece: `dp[1] = [4.8, 3.75, 4.67, 6, 9]` (the suffix averages).\n- Two pieces: `dp[2][1] = 2 + 9 = 11` (`[1, 2, 3]` then `[9]`), `dp[2][2] = 2.5 + 9 = 11.5`, `dp[2][0] = 12.75`.\n- Three pieces from index 0: taking `[9]` first gives `9 + dp[2][1] = 20`; `[9, 1]` gives `5 + 11.5 = 16.5`; longer first pieces do worse. So the answer is `20`.\n\n## Complexity\n\n- Time: O(k · n²): for each of the `k · n` states, `end` scans up to `n` positions.\n- Space: O(k · n) for `dp` (one row per piece count could be dropped to O(n)).\n\n## Pitfalls\n\n- \"At most `k` pieces\": start `best` from `dp[groups - 1][start]` rather than forcing exactly `groups` pieces when the suffix is shorter.\n- `end` stops before `n` so the remaining suffix is never empty.\n- Divide in floating point and keep the result as a decimal; rounding to an integer loses the `.5` in Example 2.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | length of `nums` |\n| `prefix` | `prefix[i]` = sum of `nums[0..i-1]` |\n| `dp[groups][start]` | best score for `nums[start..]` in at most `groups` pieces |\n| `best` | best candidate for the current state |\n| `end` | where the first piece of the suffix stops (exclusive) |\n| `average` | the first piece's average |",
+  "narration": {
+    "3": "prefix[i] will hold the sum of the first i numbers.",
+    "4": "Walk once through nums to fill the prefix sums.",
+    "5": "Each prefix sum extends the previous one by one element.",
+    "9": "A table indexed by pieces allowed and the start of the remaining suffix.",
+    "10": "Base case: with one piece left, the whole suffix is one piece.",
+    "11": "Its score is simply the suffix's average, read from the prefix sums.",
+    "14": "Allow more and more pieces, building on the row for one fewer.",
+    "15": "Solve the suffix that starts at every index.",
+    "16": "Using fewer pieces is allowed, so the previous row is a valid starting point.",
+    "17": "Choose where the first piece ends; the rest must stay non-empty.",
+    "18": "The first piece's average in O(1) from prefix sums.",
+    "19": "That piece plus the best split of what follows with one fewer piece.",
+    "21": "Record the best score for this suffix and piece budget.",
+    "24": "The whole array with up to k pieces is the answer."
+  }
+}

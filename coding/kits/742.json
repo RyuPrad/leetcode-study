@@ -1,0 +1,69 @@
+{
+  "number": 742,
+  "title": "Closest Leaf in a Binary Tree",
+  "spec": "recalled",
+  "statement": "You get the `root` of a binary tree in which every node holds a different value, and an integer `k` that is the value of one of its nodes. A leaf is a node with no children. Return the value of the leaf that is nearest to the node holding `k`, where the distance between two nodes is the number of edges on the path joining them (the path may climb up through parents and then go down again). The node holding `k` may itself be a leaf, at distance 0. When several leaves are equally near, returning any one of them is accepted.",
+  "constraints": [
+    "The tree has between 1 and 1000 nodes.",
+    "1 <= Node.val <= 1000",
+    "All node values are distinct.",
+    "Some node in the tree has Node.val == k."
+  ],
+  "signature": "int findClosestLeaf(TreeNode root, int k)",
+  "entry": "findClosestLeaf",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "k"
+  ],
+  "compare": "checker",
+  "checker": "function check([root, k], actual) {\n  if (typeof actual !== 'number') return false;\n  const nodes = [{ val: root[0], links: [], children: 0 }];\n  const order = [0];\n  let head = 0;\n  for (let i = 1; i < root.length; i += 2) {\n    const parent = order[head++];\n    for (const value of [root[i], root[i + 1]]) {\n      if (value === null || value === undefined) continue;\n      nodes.push({ val: value, links: [parent], children: 0 });\n      nodes[parent].links.push(nodes.length - 1);\n      nodes[parent].children++;\n      order.push(nodes.length - 1);\n    }\n  }\n  const from = nodes.findIndex(node => node.val === k);\n  const dist = new Array(nodes.length).fill(-1);\n  dist[from] = 0;\n  const queue = [from];\n  for (let q = 0; q < queue.length; q++) {\n    for (const next of nodes[queue[q]].links) {\n      if (dist[next] === -1) { dist[next] = dist[queue[q]] + 1; queue.push(next); }\n    }\n  }\n  let nearest = Infinity;\n  for (let i = 0; i < nodes.length; i++) if (nodes[i].children === 0) nearest = Math.min(nearest, dist[i]);\n  const chosen = nodes.findIndex(node => node.val === actual);\n  return chosen !== -1 && nodes[chosen].children === 0 && dist[chosen] === nearest;\n}",
+  "validator": "function validate([root, k]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs at least one node.';\n  let count = 1;\n  let slots = 2;\n  for (let i = 1; i < root.length; i++) {\n    if (slots === 0) return 'Some values have no parent in the level-order list.';\n    slots--;\n    if (root[i] !== null) {\n      count++;\n      slots += 2;\n    }\n  }\n  if (count > 1000) return 'The tree has at most 1000 nodes.';\n  const values = root.filter(v => v !== null);\n  if (values.some(v => !Number.isInteger(v) || v < 1 || v > 1000)) return 'Each value is an integer between 1 and 1000.';\n  if (new Set(values).size !== values.length) return 'All node values must be different.';\n  if (!values.includes(k)) return 'k must be the value of a node in the tree.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function findClosestLeaf(root, k) {\n  const parent = new Map();\n  const stack = [root];\n  let target = null;\n  while (stack.length > 0) {\n    const node = stack.pop();\n    if (node.val === k) {\n      target = node;\n    }\n    for (const child of [node.left, node.right]) {\n      if (child) {\n        parent.set(child, node);\n        stack.push(child);\n      }\n    }\n  }\n\n  const queue = [target];\n  const seen = new Set([target]);\n  for (let head = 0; head < queue.length; head++) {\n    const node = queue[head];\n    if (!node.left && !node.right) {\n      return node.val;\n    }\n    for (const next of [node.left, node.right, parent.get(node)]) {\n      if (next && !seen.has(next)) {\n        seen.add(next);\n        queue.push(next);\n      }\n    }\n  }\n  return -1;\n}",
+  "brute": "function findClosestLeaf(root, k) {\n  const paths = [];\n  const walk = (node, above) => {\n    if (!node) return;\n    const path = above.concat(node.val);\n    paths.push({ node, path });\n    walk(node.left, path);\n    walk(node.right, path);\n  };\n  walk(root, []);\n  const goal = paths.find(entry => entry.node.val === k).path;\n  let answer = null;\n  let shortest = Infinity;\n  for (const { node, path } of paths) {\n    if (node.left || node.right) continue;\n    let shared = 0;\n    while (shared < path.length && shared < goal.length && path[shared] === goal[shared]) shared++;\n    const length = path.length + goal.length - 2 * shared;\n    if (length < shortest) { shortest = length; answer = node.val; }\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 950 + pick(51) : 1 + pick(12);\n  const pool = Array.from({ length: size === 'large' ? 1000 : 30 }, (_, i) => i + 1);\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const shape = pick(3);\n  const nodes = [{ val: pool[0], left: null, right: null }];\n  for (let i = 1; i < n; i++) {\n    const node = { val: pool[i], left: null, right: null };\n    for (;;) {\n      // shape 0: anywhere; shape 1: near the newest node (long paths); shape 2: fill in order (complete tree).\n      const parent = shape === 0 ? nodes[pick(nodes.length)] : shape === 1 ? nodes[nodes.length - 1 - pick(Math.min(3, nodes.length))] : nodes[(i - 1) >> 1];\n      const side = shape === 2 ? (i % 2 === 1 ? 'left' : 'right') : rand() < 0.5 ? 'left' : 'right';\n      const other = side === 'left' ? 'right' : 'left';\n      if (!parent[side]) { parent[side] = node; break; }\n      if (!parent[other]) { parent[other] = node; break; }\n    }\n    nodes.push(node);\n  }\n  const out = [];\n  const queue = [nodes[0]];\n  for (let q = 0; q < queue.length; q++) {\n    const node = queue[q];\n    if (!node) { out.push(null); continue; }\n    out.push(node.val);\n    queue.push(node.left, node.right);\n  }\n  while (out[out.length - 1] === null) out.pop();\n  return [out, nodes[pick(n)].val];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,3,2],1],"expected":2},
+    {"name":"Example 2","input":[[1],1],"expected":1},
+    {"name":"Example 3","input":[[1,2,3,4,null,null,null,5,null,6],2],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7],7]},
+    {"name":"Test 2","input":[[1,2],1]},
+    {"name":"Test 3","input":[[1,2],2]},
+    {"name":"Test 4","input":[[1,2,3,4,null,null,null,5,null,6],5]},
+    {"name":"Test 5","input":[[1,null,2,null,3,null,4,null,5],1]},
+    {"name":"Test 6","input":[[1,2,3,4,5,null,null,6,null,null,null,7,null,8],4]},
+    {"name":"Test 7","input":[[1,2,3,4,5,null,null,6,null,null,null,7,null,8],6]},
+    {"name":"Test 8","input":[[1,2,3,4,5,6,7],3]},
+    {"name":"Test 9","input":[[1000,999,998],999]},
+    {"name":"Test 10","input":[[50,20,80,10,30,null,90,5,null,25,35,null,95,1,null,null,null,null,40,null,99,null,2,null,45],80]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nDistances in a tree can go up as well as down, so the nearest leaf to the node `k` might sit in a completely different branch. If every node also knew its parent, the tree would be an ordinary undirected graph, and the nearest leaf would simply be the first leaf a breadth-first search from `k` reaches, because BFS visits nodes in order of distance. (A slower idea compares root-to-node paths: the distance between two nodes is the sum of their depths minus twice the depth of their deepest shared ancestor.)\n\n## Approach\n\n1. Walk the whole tree once with a `stack`, recording `parent` for every child and remembering the `target` node whose value is `k`.\n2. Start a BFS from `target` with a `queue` and a `seen` set.\n3. Take nodes from the front in order. The first node with no children is a nearest leaf; return its value.\n4. Otherwise push its unvisited neighbours: `left`, `right` and `parent`.\n\n## Example 1, step by step\n\n`root = [1,3,2]`, `k = 1`. The first walk records that `3` and `2` have parent `1`, and `target` is the root. The BFS starts with `queue = [1]`; node `1` has children, so `3` and `2` are queued. Node `3` comes out next and is a leaf, so the reference returns `3`. Leaf `2` is also one edge away, so the stated answer `2` is equally correct; either value is accepted.\n\n## Complexity\n\n- Time: O(n): the walk and the BFS each touch every node at most once.\n- Space: O(n) for `parent`, `seen`, the stack and the queue.\n\n## Pitfalls\n\n- Searching only below `k` is wrong: in Example 3 the nearest leaf `3` is reached by going up to the root first.\n- Mark nodes as seen when they are queued, otherwise a node and its parent keep queueing each other.\n- The node `k` itself can be a leaf; check the node taken from the queue before expanding it, so that case returns at distance 0.\n- A leaf has neither child; a node with just one child is not a leaf.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | map from each node to its parent |\n| `stack` | nodes still to visit in the first walk |\n| `target` | the node whose value is `k` |\n| `queue`, `head` | BFS queue and the index of its front |\n| `seen` | nodes already queued |\n| `next` | a neighbour: left child, right child or parent |",
+  "narration": {
+    "2": "Tree nodes only point down, so record each node's parent to be able to move up too.",
+    "3": "Walk the whole tree with an explicit stack, starting at the root.",
+    "5": "Keep going until every node has been visited.",
+    "7": "Is this the node holding k?",
+    "8": "Remember it as the BFS starting point.",
+    "10": "Look at both children of the current node.",
+    "12": "Record the parent link for this child...",
+    "13": "...and visit the child later.",
+    "18": "Start the breadth-first search at the node holding k.",
+    "19": "Mark the start as seen so it is never queued again.",
+    "20": "Take nodes in queue order, which is the order of their distance from k.",
+    "22": "A node without children is a leaf, and BFS reaches the nearest leaf first.",
+    "23": "Return that leaf's value.",
+    "25": "Neighbours in the tree are the two children and the parent.",
+    "26": "Skip missing neighbours and nodes already queued.",
+    "27": "Mark the neighbour when it is queued, not when it is taken out.",
+    "28": "It is one edge further from k than the current node.",
+    "32": "Never reached: every tree has a leaf, so the search always returns above."
+  }
+}

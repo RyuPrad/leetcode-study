@@ -1,0 +1,61 @@
+{
+  "number": 808,
+  "title": "Soup Servings",
+  "spec": "leetcode",
+  "statement": "Two soups, A and B, each begin with `n` mL. Every turn, one of these four servings is picked uniformly at random (probability 1/4 each, independently of earlier turns), and both of its amounts are poured at the same moment:\n\n- 100 mL of A and 0 mL of B\n- 75 mL of A and 25 mL of B\n- 50 mL of A and 50 mL of B\n- 25 mL of A and 75 mL of B\n\nWhen a serving asks for more of a soup than is left, all of what is left is poured. The process ends right after the first turn that leaves at least one soup empty; if `n` is 0, both soups are empty from the start and count as running out together.\n\nReturn the probability that A runs out before B, plus one half of the probability that both run out in the same turn. Any answer within 10^-5 of the true value is accepted.",
+  "constraints": [
+    "0 <= n <= 10^9"
+  ],
+  "signature": "double soupServings(int n)",
+  "entry": "soupServings",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "compare": "float",
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 0 || n > 1000000000) return 'n is an integer from 0 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function soupServings(n) {\n  if (n > 4800) {\n    return 1;\n  }\n  const units = Math.ceil(n / 25);\n  const memo = Array.from({ length: units + 1 }, () => new Array(units + 1).fill(-1));\n\n  const serve = (a, b) => {\n    if (a <= 0 && b <= 0) {\n      return 0.5;\n    }\n    if (a <= 0) {\n      return 1;\n    }\n    if (b <= 0) {\n      return 0;\n    }\n    if (memo[a][b] >= 0) {\n      return memo[a][b];\n    }\n    const total = serve(a - 4, b) + serve(a - 3, b - 1) + serve(a - 2, b - 2) + serve(a - 1, b - 3);\n    memo[a][b] = total / 4;\n    return memo[a][b];\n  };\n\n  return serve(units, units);\n}",
+  "brute": "function soupServings(n) {\n  // Push probability mass forward turn by turn in real millilitres; past 10000 mL the answer is 1 to within 1e-10.\n  if (n > 10000) return 1;\n  if (n === 0) return 0.5;\n  const pours = [[100, 0], [75, 25], [50, 50], [25, 75]];\n  let answer = 0;\n  let layer = new Map([[n + ',' + n, 1]]);\n  while (layer.size > 0) {\n    const next = new Map();\n    for (const [key, chance] of layer) {\n      const [soupA, soupB] = key.split(',').map(Number);\n      for (const [pourA, pourB] of pours) {\n        const restA = soupA - pourA, restB = soupB - pourB, share = chance / 4;\n        if (restA <= 0 && restB <= 0) answer += share / 2;\n        else if (restA <= 0) answer += share;\n        else if (restB > 0) next.set(restA + ',' + restB, (next.get(restA + ',' + restB) || 0) + share);\n      }\n    }\n    layer = next;\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'small') {\n    const pick = rand();\n    if (pick < 0.1) return [0];\n    if (pick < 0.4) return [25 * Math.floor(rand() * 25)];\n    return [Math.floor(rand() * 601)];\n  }\n  if (rand() < 0.6) return [3500 + Math.floor(rand() * 2501)];\n  return [Math.floor(rand() * 1000000001)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[50],"expected":0.625},
+    {"name":"Example 2","input":[100],"expected":0.71875}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0]},
+    {"name":"Test 2","input":[1]},
+    {"name":"Test 3","input":[25]},
+    {"name":"Test 4","input":[26]},
+    {"name":"Test 5","input":[75]},
+    {"name":"Test 6","input":[660]},
+    {"name":"Test 7","input":[1234]},
+    {"name":"Test 8","input":[4800]},
+    {"name":"Test 9","input":[4801]},
+    {"name":"Test 10","input":[1000000000]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery serving is a multiple of 25 mL, so measure the soups in units of 25 mL, rounding up: 26 mL behaves like 2 units because one 25 mL pour still leaves some soup. The state is then just the pair of remaining amounts `(a, b)`, and the answer from a state is the average of the answers from its four next states. Following every sequence of servings would branch four ways per turn, but many sequences reach the same state, so memoising states turns that exponential search into a small table.\n\nFor large `n` the soups are not treated fairly: an average turn takes 2.5 units of A but only 1.5 of B, so A almost surely runs out first. Above 4800 mL the answer is already within 10^-5 of 1, so the reference returns 1 there.\n\n## Approach\n\n1. If `n > 4800`, return 1.\n2. Convert to `units = ceil(n / 25)` and make a `memo` table filled with -1 (not computed yet).\n3. `serve(a, b)` returns 0.5 when both are empty, 1 when only A is empty, and 0 when only B is empty.\n4. Otherwise it returns the stored value, or averages the four servings `(a-4, b)`, `(a-3, b-1)`, `(a-2, b-2)`, `(a-1, b-3)` and stores the result.\n5. Return `serve(units, units)`.\n\n## Example 1, step by step\n\n`n = 50` gives `units = 2`. From `(2, 2)` the four servings lead to `(-2, 2)` (A empty: 1), `(-1, 1)` (A empty: 1), `(0, 0)` (both empty: 0.5) and `(1, -1)` (B empty: 0). The total is 2.5 and `2.5 / 4 = 0.625`.\n\n## Complexity\n\n- Time: O(m²) with `m = ceil(min(n, 4800) / 25)`, at most 192: each state is solved once with four lookups.\n- Space: O(m²) for `memo`, plus a recursion depth of at most `m`.\n\n## Pitfalls\n\n- Round up, not down, when converting to units: 10 mL is one unit, not zero.\n- Both soups emptying in one turn is worth 0.5, and that check must come before the single-soup checks.\n- Without the cutoff, `n = 10^9` would need a table with about 1.6 × 10^15 cells.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `units` | starting amount of each soup in 25 mL units |\n| `memo` | `memo[a][b]` is the answer from state `(a, b)`, or -1 if not computed |\n| `serve(a, b)` | the answer when A has `a` units and B has `b` units left |\n| `total` | sum of the four next states' answers |",
+  "narration": {
+    "2": "Above 4800 mL, A runs out first so reliably that the answer is within 10^-5 of 1.",
+    "3": "Return 1 without building any table.",
+    "5": "Every pour is a multiple of 25 mL, so count soup in 25 mL units, rounding a partial unit up.",
+    "6": "One cell per (a, b) state; -1 marks a state not solved yet.",
+    "8": "serve(a, b) is the answer when A has a units and B has b units left.",
+    "9": "Both soups ran out in the same turn...",
+    "10": "...which counts half.",
+    "12": "Only A ran out: this outcome counts fully.",
+    "15": "Only B ran out: this outcome counts nothing.",
+    "18": "This state was reached before along another path...",
+    "19": "...so reuse its stored answer.",
+    "21": "Try the four servings, each taking 4, 3, 2 or 1 units of A and 0, 1, 2 or 3 units of B.",
+    "22": "Each serving has probability 1/4, so the answer is their average; store it.",
+    "26": "Start from both soups full."
+  }
+}

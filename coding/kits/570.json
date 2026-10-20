@@ -1,0 +1,54 @@
+{
+  "number": 570,
+  "title": "Managers with at Least 5 Direct Reports",
+  "spec": "leetcode",
+  "statement": "One table lists the staff and who each person reports to:\n\n- `Employee(id, name, department, managerId)`: one row per employee; `id` is unique. `managerId` is the `id` of the employee's direct manager, or `null` when the employee has none. Nobody manages themselves. A `managerId` may name an id that has no row in the table.\n\nA **direct report** of a manager is an employee whose `managerId` is that manager's `id`. Report the `name` of every employee who has **five or more** direct reports, in a single column named `name`. Each such manager gives one row, even when two managers share a name; ids without a row in `Employee` are not reported. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Employee",
+    "managerId is null or differs from the row's own id",
+    "managerId may name an id that is not in Employee"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["name","VARCHAR(255)"],["department","VARCHAR(255)"],["managerId","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const ids = new Set();\n  for (const [id, , , managerId] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Employee.`;\n    if (managerId === id) return `Employee ${id} cannot manage themselves.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH report_counts AS (\n  SELECT managerId, COUNT(*) AS reports\n  FROM Employee\n  WHERE managerId IS NOT NULL\n  GROUP BY managerId\n  HAVING COUNT(*) >= 5\n)\nSELECT m.name\nFROM Employee AS m\nJOIN report_counts AS r\n  ON r.managerId = m.id;",
+  "brute": "SELECT m.name\nFROM Employee AS m\nWHERE (\n  SELECT COUNT(*)\n  FROM Employee AS report\n  WHERE report.managerId = m.id\n) >= 5",
+  "generator": "function generate(rand, size) {\n  const names = ['John', 'Dan', 'James', 'Amy', 'Anne', 'Ron', 'Sam', 'Ana'];\n  const departments = ['A', 'B', 'C'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Small tables pile reports onto ids 1 and 2 so counts near 5 are common; id 9 is a manager with no row.\n  const bosses = small ? [null, 1, 1, 1, 2, 2, 9] : null;\n  const Employee = [];\n  for (let id = 1; id <= count; id++) {\n    let managerId;\n    if (small) managerId = pick(bosses);\n    else managerId = rand() < 0.05 ? null : rand() < 0.1 ? 2001 + Math.floor(rand() * 20) : 1 + Math.floor(rand() * 400);\n    if (managerId === id) managerId = null;\n    Employee.push([id, small ? pick(names) : `Emp${id % 700}`, pick(departments), managerId]);\n  }\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[101,"John","A",null],[102,"Dan","A",101],[103,"James","A",101],[104,"Amy","A",101],[105,"Anne","A",101],[106,"Ron","B",101]]}],"expected":{"columns":["name"],"rows":[["John"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,"Ana","A",null],[2,"Dan","A",1],[3,"Amy","A",1],[4,"Ron","B",1],[5,"Sam","B",1]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,"Ana","A",null],[2,"Dan","A",1],[3,"Amy","A",1],[4,"Ron","B",1],[5,"Sam","B",1],[6,"Lee","C",1]]}]},
+    {"name":"Test 4","input":[{"Employee":[[2,"Dan","A",7],[3,"Amy","A",7],[4,"Ron","B",7],[5,"Sam","B",7],[6,"Lee","C",7],[8,"Kim","C",null]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,"Sam","A",null],[2,"Sam","B",1],[3,"Amy","A",1],[4,"Ron","A",1],[5,"Dan","A",1],[6,"Lee","A",1],[7,"Kim","B",2],[8,"Joe","B",2],[9,"Max","B",2],[10,"Eve","B",2],[11,"Ray","B",2]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,"Ana","A",null],[2,"Bob","A",null],[3,"Dan","A",1],[4,"Amy","A",1],[5,"Ron","A",1],[6,"Sam","B",2],[7,"Lee","B",2],[8,"Kim","B",2]]}]},
+    {"name":"Test 7","input":[{"Employee":[[1,"Ann","A",null],[2,"Ann","B",1],[3,"Dan","A",1],[4,"Amy","A",1],[5,"Ron","B",2],[6,"Sam","B",2]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,"Ana","A",null],[2,"Dan","A",null],[3,"Amy","B",null]]}]},
+    {"name":"Test 9","input":[{"Employee":[[10,"Boss","A",null],[11,"Lead","A",10],[12,"Mia","A",10],[13,"Ola","A",10],[14,"Pat","A",10],[15,"Quinn","A",10],[16,"Rae","A",10],[17,"Sue","B",11],[18,"Tom","B",11],[19,"Uma","B",11],[20,"Vic","B",11]]}]},
+    {"name":"Test 10","input":[{"Employee":[[1,"Ana","A",2],[2,"Bob","A",1],[3,"Cy","A",2],[4,"Di","A",2],[5,"Ed","A",2],[6,"Flo","B",2]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCounting direct reports means grouping employees by the person they report to: every group under one `managerId` is that manager's team, and `COUNT(*)` is its size. Groups with at least five rows identify the managers, but only by id. A join back to `Employee` on `id` turns each qualifying id into the manager's name, and silently drops ids that have no row of their own.\n\n## Approach\n\n1. `report_counts`: take employees that have a manager, group them by `managerId`, and keep groups with `COUNT(*) >= 5`; each row holds a manager id and its number of `reports`.\n2. Join `Employee` (alias `m`, the manager) to `report_counts` (alias `r`) on `r.managerId = m.id`.\n3. Output `m.name`, one row per qualifying manager.\n\n## Example 1, step by step\n\n- Only John (101) has no manager, so five rows remain and they all have `managerId = 101`.\n- Grouping gives one group, 101, with `reports = 5`; it passes `>= 5`.\n- The join finds employee 101, John, so the answer is the single row `John`.\n\n## Complexity\n\n- Time: O(n) for n employees with hash grouping, plus O(n) for the join on the primary key `id`.\n- Space: O(k) for the k distinct manager ids being counted.\n\n## Pitfalls\n\n- `HAVING COUNT(*) > 5` misses managers with exactly five reports.\n- Grouping by the manager's `name` instead of the id merges two different people who share a name, and adding `DISTINCT` collapses two qualifying managers called Sam into one row.\n- Returning the grouped ids, or using a left join from the counts, reports a manager id that has no row (with a `null` name); the inner join leaves it out.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `report_counts` | each manager id with five or more direct reports, and that count as `reports` |\n| `m` | `Employee` read as the manager whose name is reported |\n| `r` | the `report_counts` row whose `managerId` equals `m.id` |",
+  "narration": {
+    "1": "report_counts finds the manager ids with enough direct reports.",
+    "2": "Each group is one manager's team; COUNT(*) is its size.",
+    "4": "Employees without a manager belong to no team.",
+    "5": "Group the reports by the id they report to, not by any name.",
+    "6": "Keep teams of five or more; >= includes exactly five.",
+    "8": "Report the manager's name.",
+    "9": "Read Employee again, this time as the managers.",
+    "10": "Join each qualifying manager id to its employee row.",
+    "11": "Ids with no row of their own find no match and are not reported."
+  }
+}

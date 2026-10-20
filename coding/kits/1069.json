@@ -1,0 +1,49 @@
+{
+  "number": 1069,
+  "title": "Product Sales Analysis II",
+  "spec": "recalled",
+  "statement": "Two tables record sales and the products sold:\n\n- `Sales(sale_id, product_id, year, quantity, price)`: one row per sale in a year; the pair `(sale_id, year)` is unique, so one `sale_id` can appear in several years. `quantity` is the number of units sold and `price` the price of one unit. Every `product_id` exists in `Product`.\n- `Product(product_id, product_name)`: one row per product; `product_id` is unique.\n\nFor every product that appears in `Sales`, report its `product_id` and the total number of units sold across all its sales and years, as `total_quantity`. Products that were never sold do not appear. Rows may come in any order.",
+  "constraints": [
+    "(sale_id, year) is unique in Sales",
+    "product_id is unique in Product",
+    "Every Sales.product_id appears in Product",
+    "quantity and price are non-negative integers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sales": [["sale_id","INT"],["product_id","INT"],["year","INT"],["quantity","INT"],["price","INT"]],
+    "Product": [["product_id","INT"],["product_name","VARCHAR(10)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Sales = [], Product = [] }] = input;\n  const products = new Set(), sales = new Set();\n  for (const [id] of Product) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    products.add(id);\n  }\n  for (const [saleId, productId, year, quantity, price] of Sales) {\n    if (saleId === null || year === null) return 'Every sale needs a sale_id and a year.';\n    const key = `${saleId}/${year}`;\n    if (sales.has(key)) return `Sale ${saleId} appears twice in year ${year}.`;\n    sales.add(key);\n    if (!products.has(productId)) return `Sale ${saleId} names product ${productId}, which is not in Product.`;\n    if (quantity === null || quantity < 0) return `Sale ${saleId} needs a non-negative quantity.`;\n    if (price === null || price < 0) return `Sale ${saleId} needs a non-negative price.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.product_id, SUM(s.quantity) AS total_quantity\nFROM Sales AS s\nGROUP BY s.product_id;",
+  "brute": "SELECT DISTINCT\n  s.product_id,\n  (SELECT SUM(other.quantity) FROM Sales AS other WHERE other.product_id = s.product_id) AS total_quantity\nFROM Sales AS s",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Nokia', 'Apple', 'Samsung', 'LG', 'Sony', 'Xiaomi', 'Oppo', 'Nokia'];\n  const productCount = small ? Math.floor(rand() * 5) : 300;\n  const Product = [];\n  for (let i = 0; i < productCount; i++) Product.push([100 * (i + 1), small ? pick(names) : `P${i}`]);\n  const Sales = [];\n  if (productCount > 0) {\n    // A few sale ids spread over a few years, so one sale_id can repeat in different years.\n    const saleCount = small ? Math.floor(rand() * 9) : 2000;\n    const used = new Set();\n    while (Sales.length < saleCount) {\n      const saleId = 1 + Math.floor(rand() * (small ? 6 : 1500)), year = 2005 + Math.floor(rand() * (small ? 4 : 20));\n      if (used.has(`${saleId}/${year}`)) continue;\n      used.add(`${saleId}/${year}`);\n      const quantity = small ? pick([0, 1, 5, 10, 12, 15]) : Math.floor(rand() * 50);\n      const price = small ? pick([500, 5000, 9000]) : 100 * (1 + Math.floor(rand() * 100));\n      Sales.push([saleId, pick(Product)[0], year, quantity, price]);\n    }\n  }\n  return [{ Sales, Product }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sales":[[1,100,2008,10,5000],[2,100,2009,12,5000],[7,200,2011,15,9000]],"Product":[[100,"Nokia"],[200,"Apple"],[300,"Samsung"]]}],"expected":{"columns":["product_id","total_quantity"],"rows":[[100,22],[200,15]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sales":[],"Product":[[100,"Nokia"],[200,"Apple"]]}]},
+    {"name":"Test 2","input":[{"Sales":[[1,100,2020,3,700]],"Product":[[100,"Nokia"]]}]},
+    {"name":"Test 3","input":[{"Sales":[[1,100,2019,2,400],[1,100,2020,2,400],[1,200,2021,5,900]],"Product":[[100,"Sony"],[200,"LG"]]}]},
+    {"name":"Test 4","input":[{"Sales":[[3,300,2010,7,100],[4,300,2010,1,100],[5,300,2011,4,100]],"Product":[[100,"Apple"],[300,"Oppo"],[500,"Xiaomi"]]}]},
+    {"name":"Test 5","input":[{"Sales":[[5,10,2001,40,25],[6,20,2002,25,40]],"Product":[[10,"Apple"],[20,"Apple"]]}]},
+    {"name":"Test 6","input":[{"Sales":[[1,1,2015,0,0],[2,2,2015,9,0],[3,1,2016,0,30]],"Product":[[1,"Kiwi"],[2,"Fig"]]}]},
+    {"name":"Test 7","input":[{"Sales":[[9,200,2008,10,5000],[8,100,2009,12,5000],[7,200,2011,15,9000],[6,300,2011,1,9000]],"Product":[[300,"Samsung"],[200,"Apple"],[100,"Nokia"],[400,"LG"]]}]},
+    {"name":"Test 8","input":[{"Sales":[[1,100,2008,10,5000],[2,100,2009,12,5000],[7,200,2011,15,9000],[7,200,2012,20,9500]],"Product":[[100,"Nokia"],[200,"Apple"],[300,"Samsung"]]}]},
+    {"name":"Test 9","input":[{"Sales":[[2,100,2000,7,100],[3,100,2000,7,100],[4,100,2000,7,100]],"Product":[[100,"Sony"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is one number per product: the sum of `quantity` over all of that product's sales. Everything needed (`product_id` and `quantity`) already sits in `Sales`, so no join is required. **Grouping** `Sales` by `product_id` collects each product's sales into one group, and `SUM` adds up their units.\n\n## Approach\n\n1. Read `Sales` (alias `s`).\n2. `GROUP BY s.product_id`: one group per product that was sold, across all years and sale ids.\n3. Select `s.product_id` and `SUM(s.quantity) AS total_quantity` for each group. Products without sales form no group, so they are not reported.\n\n## Example 1, step by step\n\n| product_id | sales in the group | quantities | total_quantity |\n| --- | --- | --- | --- |\n| 100 | sale 1 (2008), sale 2 (2009) | 10 + 12 | 22 |\n| 200 | sale 7 (2011) | 15 | 15 |\n\nProduct 300 (Samsung) has no sale, so it has no group and no row. The result is `(100, 22)` and `(200, 15)`.\n\n## Complexity\n\n- Time: O(S) for S sales with hash grouping (O(S log S) if the database sorts to group).\n- Space: O(G) for G distinct products in `Sales`.\n\n## Pitfalls\n\n- `COUNT(*)` counts sales, not units; the total is `SUM(quantity)`.\n- Starting from `Product` with a left join reports unsold products with a null (or zero) total, which is not asked for.\n- `quantity * price` is revenue, a different measure from units sold.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Sales`, one row per sale in a year |\n| `GROUP BY s.product_id` | one group per product that was sold |\n| `total_quantity` | `SUM(s.quantity)`, the units sold for that product |",
+  "narration": {
+    "1": "For each product, output its id and the sum of the quantities of its sales, named total_quantity.",
+    "2": "All the needed columns live in Sales, so no join with Product is required.",
+    "3": "Grouping by product_id gathers every sale of a product, whatever its year or sale_id, into one group for the sum."
+  }
+}

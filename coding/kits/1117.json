@@ -1,0 +1,60 @@
+{
+  "number": 1117,
+  "title": "Building H2O",
+  "spec": "leetcode",
+  "statement": "On LeetCode this is a multithreading problem. Here each thread is an asynchronous task, and you coordinate the tasks with promises.\n\nHydrogen and oxygen threads arrive at a barrier that they may only cross in groups forming one water molecule: two hydrogens and one oxygen. Write a class `H2O` with two methods. A hydrogen thread calls `hydrogen(releaseHydrogen)` and an oxygen thread calls `oxygen(releaseOxygen)`; each method must call its callback exactly once, and that call is the moment the thread crosses. A thread may cross only as part of a complete molecule: an oxygen waits until two hydrogens are there for it, a hydrogen until another hydrogen and an oxygen are. All three threads of one molecule cross before any thread of the next one, so cutting the sequence of crossings into consecutive groups of three gives exactly two `H` and one `O` in every group. Which threads end up together does not matter, and inside a group any order is fine.\n\nEach case gives `water` and `starts`: thread `i` is a hydrogen thread when `water[i]` is `'H'` and an oxygen thread when it is `'O'`, and it arrives at `starts[i]` ms. Threads arriving at the same time arrive in index order. The answer is `{ output, times }`: the letters of the threads in the order they crossed, and the time in ms of each crossing. A molecule must cross as soon as it can be formed: the `k`-th molecule crosses at the moment the `2k`-th hydrogen and the `k`-th oxygen have both arrived, so wait on promises rather than on timers. Any answer that follows these rules is accepted.",
+  "constraints": [
+    "water.length == 3 * n",
+    "1 <= n <= 20",
+    "water contains only \"H\" and \"O\"",
+    "water has exactly 2 * n \"H\" and n \"O\"",
+    "starts.length == water.length",
+    "0 <= starts[i] <= 1000"
+  ],
+  "signature": "Object H2O(String water, int[] starts)",
+  "entry": "H2O",
+  "kind": "function",
+  "parameters": [
+    "water",
+    "starts"
+  ],
+  "io": {
+    "events": true
+  },
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [water, starts] = input;\n  if (!actual || typeof actual.output !== 'string' || !Array.isArray(actual.times)) return false;\n  const { output, times } = actual;\n  if (output.length !== water.length || times.length !== water.length) return false;\n  // Arrival times of each kind, earliest first: molecule g is complete once hydrogen 2g+1 and oxygen g are in.\n  const arrivals = { H: [], O: [] };\n  for (let i = 0; i < water.length; i++) arrivals[water[i]].push(starts[i]);\n  arrivals.H.sort((a, b) => a - b);\n  arrivals.O.sort((a, b) => a - b);\n  for (let g = 0; 3 * g < water.length; g++) {\n    const group = output.slice(3 * g, 3 * g + 3);\n    if (group.split('H').length - 1 !== 2 || group.split('O').length - 1 !== 1) return false;\n    const ready = Math.max(arrivals.H[2 * g + 1], arrivals.O[g]);\n    for (let k = 3 * g; k < 3 * g + 3; k++) if (times[k] !== ready) return false;\n  }\n  return true;\n}",
+  "validator": "function validate(input) {\n  const [water, starts] = input;\n  if (!/^[HO]+$/.test(water)) return 'water may contain only H and O.';\n  if (water.length % 3 !== 0 || water.length > 60) return 'water.length must be 3 * n with 1 <= n <= 20.';\n  if (water.split('O').length - 1 !== water.length / 3) return 'water needs exactly twice as many H as O.';\n  if (starts.length !== water.length) return 'starts needs one start time per thread.';\n  if (!starts.every((t) => Number.isInteger(t) && t >= 0 && t <= 1000)) return 'Each start time is an integer from 0 to 1000 ms.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [water, starts] = input, start = Date.now(), crossings = [];\n  const h2o = new solve();\n  for (const name of ['hydrogen', 'oxygen']) if (!h2o || typeof h2o[name] !== 'function') throw new Error(`H2O needs a method ${name}.`);\n  let failure = null;\n  [...water].forEach((atom, i) => {\n    const method = atom === 'H' ? 'hydrogen' : 'oxygen';\n    let crossed = false;\n    const release = () => {\n      if (crossed) failure = failure ?? `Thread ${i + 1} (${atom}) crossed the barrier twice.`;\n      crossed = true;\n      crossings.push({ atom, t: Date.now() - start });\n      kit.trace(`Thread ${i + 1} (${atom}) crosses the barrier`);\n    };\n    setTimeout(() => {\n      kit.trace(`Thread ${i + 1} (${atom}) arrives and calls ${method}()`);\n      const result = h2o[method](release);\n      if (result && typeof result.then === 'function') result.then(null, (error) => { failure = failure ?? `${method}() failed: ${error && error.message || error}`; });\n    }, starts[i]);\n  });\n  // A correct solution has released every thread by the last arrival; the extra time shows late crossings.\n  return new Promise((resolve, reject) => setTimeout(() => {\n    if (failure) reject(new Error(failure));\n    else resolve({ output: crossings.map((c) => c.atom).join(''), times: crossings.map((c) => c.t) });\n  }, Math.max(...starts) + 50));\n}",
+  "starters": {
+    "javascript": "class H2O {\n  constructor() {\n    // Write your code here.\n  }\n\n  /** Called by a hydrogen thread. @param {() => void} releaseHydrogen crosses the barrier */\n  async hydrogen(releaseHydrogen) {\n    releaseHydrogen();\n  }\n\n  /** Called by an oxygen thread. @param {() => void} releaseOxygen crosses the barrier */\n  async oxygen(releaseOxygen) {\n    releaseOxygen();\n  }\n}\n",
+    "typescript": "class H2O {\n  constructor() {\n    // Write your code here.\n  }\n\n  async hydrogen(releaseHydrogen: () => void): Promise<void> {\n    releaseHydrogen();\n  }\n\n  async oxygen(releaseOxygen: () => void): Promise<void> {\n    releaseOxygen();\n  }\n}\n"
+  },
+  "api": "class H2O { hydrogen(releaseHydrogen: () => void): void | Promise<void>; oxygen(releaseOxygen: () => void): void | Promise<void> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class H2O {\n  constructor() {\n    this.hydrogens = [];\n    this.oxygens = [];\n  }\n\n  async hydrogen(releaseHydrogen) {\n    const pass = new Promise((resolve) => this.hydrogens.push(resolve));\n    this.formMolecule();\n    await pass;\n    releaseHydrogen();\n  }\n\n  async oxygen(releaseOxygen) {\n    const pass = new Promise((resolve) => this.oxygens.push(resolve));\n    this.formMolecule();\n    await pass;\n    releaseOxygen();\n  }\n\n  formMolecule() {\n    if (this.hydrogens.length < 2 || this.oxygens.length < 1) return;\n    this.hydrogens.shift()();\n    this.hydrogens.shift()();\n    this.oxygens.shift()();\n  }\n}",
+  "brute": "class H2O {\n  constructor() {\n    this.waiting = [];\n  }\n\n  // The arriving thread joins the waiting room; once two H and one O wait, release the earliest of them.\n  arrive(atom, release) {\n    this.waiting.push({ atom, release });\n    const hydrogens = this.waiting.filter((w) => w.atom === 'H');\n    const oxygens = this.waiting.filter((w) => w.atom === 'O');\n    if (hydrogens.length < 2 || oxygens.length < 1) return;\n    const molecule = [hydrogens[0], hydrogens[1], oxygens[0]];\n    this.waiting = this.waiting.filter((w) => !molecule.includes(w));\n    for (const w of molecule) w.release();\n  }\n\n  hydrogen(releaseHydrogen) { this.arrive('H', releaseHydrogen); }\n  oxygen(releaseOxygen) { this.arrive('O', releaseOxygen); }\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'small' ? 1 + Math.floor(rand() * 4) : 15 + Math.floor(rand() * 6);\n  const atoms = [...'H'.repeat(2 * n), ...'O'.repeat(n)];\n  for (let i = atoms.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [atoms[i], atoms[j]] = [atoms[j], atoms[i]];\n  }\n  const top = size === 'small' ? 30 : 1000, roll = rand();\n  const step = 1 + Math.floor(rand() * Math.floor(top / atoms.length));\n  const starts = atoms.map((_, i) => (roll < 0.25 ? 0 : roll < 0.45 ? i * step : Math.floor(rand() * (top + 1))));\n  return [atoms.join(''), starts];\n}",
+  "examples": [
+    {"name":"Example 1","input":["HOH",[0,0,0]],"expected":{"output":"HHO","times":[0,0,0]}},
+    {"name":"Example 2","input":["OOHHHH",[0,0,0,0,0,0]],"expected":{"output":"HHOHHO","times":[0,0,0,0,0,0]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["HHO",[0,0,0]]},
+    {"name":"Test 2","input":["OHH",[0,10,20]]},
+    {"name":"Test 3","input":["HOH",[5,0,5]]},
+    {"name":"Test 4","input":["HHHHOO",[0,1,2,3,4,5]]},
+    {"name":"Test 5","input":["OOOHHHHHH",[0,0,0,100,100,200,200,300,300]]},
+    {"name":"Test 6","input":["HHHHHHOOO",[0,0,0,0,0,0,1000,500,0]]},
+    {"name":"Test 7","input":["OHHOHH",[1000,999,998,997,996,995]]},
+    {"name":"Test 8","input":["HOHOHHOHH",[0,10,20,30,40,50,60,70,80]]},
+    {"name":"Test 9","input":["HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHOOOOOOOOOOOOOOOOOOOO",[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]},
+    {"name":"Test 10","input":["OOOOOOOOOOOOOOOOOOOOHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",[1000,990,980,970,960,950,940,930,920,910,900,890,880,870,860,850,840,830,820,810,800,790,780,770,760,750,740,730,720,710,700,690,680,670,660,650,640,630,620,610,600,590,580,570,560,550,540,530,520,510,500,490,480,470,460,450,440,430,420,410]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe barrier is a waiting room with two lines, one for hydrogens and one for oxygens. Every thread joins its line and waits. A molecule can form only when an arrival makes both lines long enough: two hydrogens and one oxygen. At that moment exactly one molecule's worth of threads is let through, the earliest of each line, and everyone else keeps waiting. Because only an arrival can complete a molecule, one check per arrival is enough. (The brute force does the same with a single waiting list it filters on every arrival.)\n\n## Approach\n\n1. Keep two queues of resolve functions: `hydrogens` and `oxygens`.\n2. A thread creates its `pass` promise, pushing the resolve function onto its queue, then calls `formMolecule`.\n3. `formMolecule` does nothing unless there are at least two hydrogens and one oxygen; otherwise it resolves the first two hydrogens and the first oxygen.\n4. The thread awaits its `pass` and then calls its release callback.\n\nWith real threads the classic version uses a semaphore with 2 permits for hydrogen, one with 1 permit for oxygen, and a barrier for 3 parties: a thread acquires its semaphore, waits at the barrier until the other two members arrive, crosses, and releases its permit. The semaphores keep a fourth thread out of a molecule, and the barrier makes the three wait for each other. Here the queues do both jobs, and resolving a promise is the signal.\n\n## Example 1, step by step\n\n`water = \"HOH\"`, all threads arrive at 0 ms.\n\n- Thread 1 (H) joins `hydrogens`; no molecule yet.\n- Thread 2 (O) joins `oxygens`; still only one hydrogen.\n- Thread 3 (H) joins `hydrogens`: two hydrogens and one oxygen wait, so all three are resolved and cross at 0 ms.\n- The reference answers `{ output: \"HOH\", times: [0, 0, 0] }`; LeetCode's `\"HHO\"` is just as valid.\n\n## Complexity\n\n- Time: O(1) per thread with real queues (`shift` on these short arrays is cheap); O(n) overall.\n- Space: O(n) for the threads waiting in the queues.\n\n## Pitfalls\n\n- Letting a hydrogen cross as soon as another hydrogen is there: it must also wait for an oxygen.\n- Releasing threads one at a time as they arrive mixes molecules; release a full molecule together.\n- Polling counters with `setTimeout` crosses late; wait on the promise itself.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `hydrogens` | resolve functions of hydrogen threads waiting at the barrier, oldest first |\n| `oxygens` | resolve functions of oxygen threads waiting at the barrier, oldest first |\n| `pass` | the promise a thread awaits; it resolves when its molecule is complete |",
+  "narration": {}
+}

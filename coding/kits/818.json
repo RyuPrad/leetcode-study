@@ -1,0 +1,59 @@
+{
+  "number": 818,
+  "title": "Race Car",
+  "spec": "leetcode",
+  "statement": "A car sits on an endless number line at position `0` with speed `+1`; it may move into negative positions. It obeys a string of commands, each `'A'` or `'R'`:\n\n- `'A'` (accelerate): first `position += speed`, then `speed *= 2`.\n- `'R'` (reverse): the position is unchanged; `speed` becomes `-1` if it was positive and `1` otherwise.\n\nReturn the fewest commands in any command string that leaves the car at position `target` (its final speed does not matter).",
+  "constraints": [
+    "1 <= target <= 10^4"
+  ],
+  "signature": "int racecar(int target)",
+  "entry": "racecar",
+  "kind": "function",
+  "parameters": [
+    "target"
+  ],
+  "validator": "function validate([target]) {\n  if (!Number.isInteger(target)) return 'target must be a whole number.';\n  if (target < 1 || target > 10000) return 'target is between 1 and 10^4.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function racecar(target) {\n  const dp = new Array(target + 1).fill(0);\n  for (let t = 1; t <= target; t++) {\n    let k = 1;\n    while ((1 << k) - 1 < t) {\n      k++;\n    }\n    const full = (1 << k) - 1;\n    if (full === t) {\n      dp[t] = k;\n      continue;\n    }\n    dp[t] = k + 1 + dp[full - t];\n    const short = (1 << (k - 1)) - 1;\n    for (let back = 0; back < k - 1; back++) {\n      const returned = (1 << back) - 1;\n      dp[t] = Math.min(dp[t], k + 1 + back + dp[t - short + returned]);\n    }\n  }\n  return dp[target];\n}",
+  "brute": "function racecar(target) {\n  // Breadth-first search over (position, speed) states inside a generous window.\n  const low = -2 * target - 4;\n  const high = 4 * target + 4;\n  const seen = new Set(['0,1']);\n  let frontier = [[0, 1]];\n  for (let steps = 0; ; steps++) {\n    const next = [];\n    for (const [pos, speed] of frontier) {\n      if (pos === target) return steps;\n      const moves = [[pos + speed, speed * 2], [pos, speed > 0 ? -1 : 1]];\n      for (const [p, v] of moves) {\n        const key = p + ',' + v;\n        if (p < low || p > high || seen.has(key)) continue;\n        seen.add(key);\n        next.push([p, v]);\n      }\n    }\n    frontier = next;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const pick = rand();\n    if (pick < 0.2) return [10000];\n    if (pick < 0.35) return [8191];\n    if (pick < 0.5) return [8192];\n    return [5000 + Math.floor(rand() * 5001)];\n  }\n  if (rand() < 0.2) {\n    const power = 1 << (1 + Math.floor(rand() * 7));\n    return [Math.max(1, power - 1 + Math.floor(rand() * 3) - 1)];\n  }\n  return [1 + Math.floor(rand() * 150)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[3],"expected":2},
+    {"name":"Example 2","input":[6],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[2]},
+    {"name":"Test 3","input":[4]},
+    {"name":"Test 4","input":[5]},
+    {"name":"Test 5","input":[7]},
+    {"name":"Test 6","input":[64]},
+    {"name":"Test 7","input":[100]},
+    {"name":"Test 8","input":[330]},
+    {"name":"Test 9","input":[1023]},
+    {"name":"Test 10","input":[1234]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":16,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTreating each `(position, speed)` pair as a node, a breadth-first search finds the answer, but the state space is large. A better view: after `k` straight `A`s the car has moved exactly `2^k - 1`. An optimal route to `t` never wanders far, so with `k` the bit length of `t` (the smallest `k` with `2^k - 1 >= t`) there are only two shapes, each ending in a smaller subproblem:\n\n- **Overshoot**: `k` `A`s to `2^k - 1`, one `R`, then cover the remaining `2^k - 1 - t` back the other way.\n- **Undershoot**: `k - 1` `A`s to `2^(k-1) - 1`, `R`, `back` `A`s backwards (`back < k - 1`), `R` again, then cover what is left forwards.\n\nDistance is symmetric in direction, so `dp[d]` (fewest commands to travel `d` starting with speed +1) answers both.\n\n## Approach\n\n1. Fill `dp[t]` for `t = 1 ... target`.\n2. Find `k` and `full = 2^k - 1`. If `full === t`, `k` accelerations are enough.\n3. Otherwise try the overshoot: `k + 1 + dp[full - t]`.\n4. Let `short = 2^(k-1) - 1`. For each `back` with `returned = 2^back - 1`, try `(k - 1) + 1 + back + 1 + dp[t - short + returned]`, written `k + 1 + back + dp[...]`.\n5. Return `dp[target]`.\n\n## Example 1, step by step\n\n`dp[1] = 1` (`full = 1`), `dp[2]`: `k = 2`, `full = 3`; overshoot gives `2 + 1 + dp[1] = 4`; undershoot with `back = 0` gives `3 + dp[2 - 1 + 0] = 4`. So `dp[2] = 4`. For `t = 3`, `k = 2` and `full = 3 = t`, so `dp[3] = 2` (\"AA\").\n\n## Complexity\n\n- Time: O(T log T): each `t` tries at most `k ≈ log₂ T` undershoot options.\n- Space: O(T) for `dp`.\n\n## Pitfalls\n\n- The undershoot needs a second `R` to face forward again; forgetting it undercounts by 1.\n- `back = 0` (two `R`s in a row) is a real option: it resets the speed to 1 without moving.\n- `dp` indices must stay below `t`: `t - short + returned` is at most `t - 2^(k-1) + 2^back < t` because `back < k - 1`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[t]` | fewest commands to travel distance `t` from speed +1 |\n| `k` | bit length of `t`: `2^k - 1` is the first all-`A` distance reaching `t` |\n| `full` | `2^k - 1`, distance after `k` accelerations |\n| `short` | `2^(k-1) - 1`, distance after `k - 1` accelerations |\n| `back`, `returned` | accelerations taken backwards and the distance `2^back - 1` they undo |",
+  "narration": {
+    "2": "dp[t] will hold the fewest commands to travel distance t starting at speed +1.",
+    "3": "Solve every distance from 1 up to target, smaller ones first.",
+    "5": "Grow k until k straight accelerations (distance 2^k - 1) reach or pass t.",
+    "8": "full is the distance covered by k accelerations in a row.",
+    "9": "Landing exactly on t with only A's is optimal.",
+    "10": "k commands, nothing else needed.",
+    "13": "Overshoot: k A's, one R, then travel the extra full - t back.",
+    "14": "short is where k - 1 accelerations stop, just before t.",
+    "15": "Undershoot: after k - 1 A's and an R, try every number of backward A's that stays short of the start.",
+    "16": "Those back accelerations undo 2^back - 1 of the progress.",
+    "17": "(k - 1) A's + R + back A's + R, then the remaining distance forwards; keep the cheaper total.",
+    "20": "The answer for the whole target."
+  }
+}

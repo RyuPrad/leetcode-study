@@ -1,0 +1,53 @@
+{
+  "number": 578,
+  "title": "Get Highest Answer Rate Question",
+  "spec": "recalled",
+  "statement": "One table logs what users did with survey questions:\n\n- `SurveyLog(id, action, question_id, answer_id, q_num, timestamp)`: one row per action. `id` is the user, `action` is one of `'show'`, `'answer'` or `'skip'`, and `question_id` is the question acted on. `answer_id` holds the chosen answer on `'answer'` rows and is `null` on the others. `q_num` is the question's position in the user's session and `timestamp` is when the action happened. The table has no key, so identical rows can repeat, and every repeat counts.\n\nThe **answer rate** of a question is the number of its `'answer'` rows divided by the number of its `'show'` rows. Every question in the table has at least one `'show'` row, so the rate is always defined.\n\nReport the question with the highest answer rate as a single column named `survey_log` holding its `question_id`. When several questions share the highest rate, report the smallest `question_id` among them. Output exactly one row, or no rows when the table is empty.",
+  "constraints": [
+    "action is one of 'show', 'answer' or 'skip'",
+    "answer_id is not null exactly on 'answer' rows",
+    "SurveyLog has no primary key; duplicate rows may appear and each one counts",
+    "Every question_id in SurveyLog has at least one 'show' row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "SurveyLog": [["id","INT"],["action","VARCHAR(255)"],["question_id","INT"],["answer_id","INT"],["q_num","INT"],["timestamp","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ SurveyLog = [] }] = input;\n  const seen = new Set(), shown = new Set();\n  for (const [id, action, question, answer] of SurveyLog) {\n    if (id === null || question === null) return 'id and question_id cannot be null.';\n    if (!['show', 'answer', 'skip'].includes(action)) return `Unknown action ${action}.`;\n    if ((action === 'answer') !== (answer !== null)) return 'answer_id must be set on answer rows and only there.';\n    seen.add(question);\n    if (action === 'show') shown.add(question);\n  }\n  for (const question of seen) if (!shown.has(question)) return `Question ${question} is never shown.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH counts AS (\n  SELECT question_id,\n         SUM(IF(action = 'answer', 1, 0)) AS answers,\n         SUM(IF(action = 'show', 1, 0)) AS shows\n  FROM SurveyLog\n  GROUP BY question_id\n)\nSELECT question_id AS survey_log\nFROM counts\nORDER BY answers / shows DESC, question_id\nLIMIT 1;",
+  "brute": "WITH tallies AS (\n  SELECT question_id,\n         COUNT(CASE WHEN action = 'answer' THEN 1 END) AS a,\n         COUNT(CASE WHEN action = 'show' THEN 1 END) AS s\n  FROM SurveyLog\n  GROUP BY question_id\n)\nSELECT t.question_id AS survey_log\nFROM tallies AS t\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM tallies AS u\n  WHERE u.a * t.s > t.a * u.s\n     OR (u.a * t.s = t.a * u.s AND u.question_id < t.question_id)\n)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const questions = small ? [285, 369, 7, 12] : Array.from({ length: 300 }, (_, i) => i + 1);\n  const users = small ? [1, 2, 5] : Array.from({ length: 50 }, (_, i) => i + 1);\n  const limit = small ? Math.floor(rand() * 9) : 1990;\n  // Answer odds differ per question so rates spread out; small cases also hit exact ties.\n  const odds = new Map(questions.map(q => [q, pick([0, 0.3, 0.5, 0.8, 1])]));\n  const SurveyLog = [], session = new Map();\n  let time = 100;\n  const push = row => { if (SurveyLog.length < limit) SurveyLog.push(row); };\n  while (SurveyLog.length < limit) {\n    const user = pick(users), question = pick(questions);\n    const q = (session.get(user) ?? 0) + 1;\n    session.set(user, q);\n    push([user, 'show', question, null, q, time++]);\n    const r = rand();\n    if (r < odds.get(question)) push([user, 'answer', question, 1000 + Math.floor(rand() * 9000), q, time++]);\n    else if (r < 0.9) push([user, 'skip', question, null, q, time++]);\n    // Logs may repeat a row exactly; the repeat counts as another action.\n    if (rand() < 0.1 && SurveyLog.length) push([...SurveyLog[SurveyLog.length - 1]]);\n  }\n  return [{ SurveyLog }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"SurveyLog":[[5,"show",285,null,1,123],[5,"answer",285,124124,1,124],[5,"show",369,null,2,125],[5,"skip",369,null,2,126]]}],"expected":{"columns":["survey_log"],"rows":[[285]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"SurveyLog":[]}]},
+    {"name":"Test 2","input":[{"SurveyLog":[[1,"show",40,null,1,10],[1,"skip",40,null,1,11]]}]},
+    {"name":"Test 3","input":[{"SurveyLog":[[1,"show",7,null,1,10],[1,"answer",7,70,1,11],[2,"show",3,null,1,12],[2,"answer",3,30,1,13],[3,"show",9,null,1,14],[3,"skip",9,null,1,15]]}]},
+    {"name":"Test 4","input":[{"SurveyLog":[[1,"show",8,null,1,10],[1,"skip",8,null,1,11],[2,"show",5,null,1,12],[3,"show",6,null,1,13],[3,"skip",6,null,1,14]]}]},
+    {"name":"Test 5","input":[{"SurveyLog":[[1,"show",10,null,1,10],[1,"show",10,null,1,10],[1,"answer",10,100,1,11],[2,"show",20,null,1,12],[2,"answer",20,200,1,13],[3,"show",20,null,1,14],[3,"answer",20,201,1,15],[4,"show",20,null,1,16],[4,"skip",20,null,1,17]]}]},
+    {"name":"Test 6","input":[{"SurveyLog":[[1,"show",1,null,1,10],[1,"answer",1,11,1,11],[2,"show",1,null,1,12],[3,"show",1,null,1,13],[1,"show",2,null,2,14],[1,"answer",2,21,2,15],[2,"show",2,null,2,16],[2,"answer",2,22,2,17],[3,"show",2,null,2,18],[3,"skip",2,null,2,19]]}]},
+    {"name":"Test 7","input":[{"SurveyLog":[[1,"show",5,null,1,10],[1,"answer",5,51,1,11],[2,"show",5,null,1,12],[2,"answer",5,52,1,13],[3,"show",5,null,1,14],[4,"show",5,null,1,15],[4,"skip",5,null,1,16],[5,"show",9,null,1,17],[5,"answer",9,91,1,18]]}]},
+    {"name":"Test 8","input":[{"SurveyLog":[[1,"show",8,null,1,10],[1,"answer",8,81,1,11],[2,"show",8,null,1,12],[3,"show",4,null,1,13],[3,"answer",4,41,1,14],[4,"show",4,null,1,15],[4,"answer",4,42,1,16],[5,"show",4,null,1,17],[6,"show",4,null,1,18],[6,"skip",4,null,1,19],[7,"show",6,null,1,20],[7,"answer",6,61,1,21],[8,"show",6,null,1,22],[9,"show",6,null,1,23]]}]},
+    {"name":"Test 9","input":[{"SurveyLog":[[1,"show",300,null,1,10],[1,"answer",300,3001,1,11],[1,"show",100,null,2,12],[1,"skip",100,null,2,13],[2,"show",100,null,1,14],[2,"answer",100,1001,1,15],[2,"show",200,null,2,16],[2,"answer",200,2001,2,17],[3,"show",200,null,1,18],[3,"answer",200,2002,1,19]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer rate is a per-question ratio, so first collapse the log into one row per question holding two counts: how many `'answer'` rows and how many `'show'` rows it has. Once every question has its counts, the winner is simply the first row after sorting by `answers / shows` from high to low, with `question_id` ascending as the tie-break.\n\n## Approach\n\n1. `counts`: group `SurveyLog` by `question_id` and add up `IF(action = 'answer', 1, 0)` and `IF(action = 'show', 1, 0)`. Each row contributes 1 to at most one of the two sums; skips contribute to neither.\n2. Sort `counts` by `answers / shows` descending, then by `question_id` ascending, so the smallest id wins a tie.\n3. `LIMIT 1` keeps only the top question and renames its id to `survey_log`.\n\n## Example 1, step by step\n\n- Question 285 has one show and one answer: `answers = 1`, `shows = 1`, rate 1.0.\n- Question 369 has one show and one skip: `answers = 0`, `shows = 1`, rate 0.0.\n- Sorted by rate descending, 285 comes first, so the result is the single row `survey_log = 285`.\n\n## Complexity\n\n- Time: O(R) to group R log rows (plus a hash or sort for the grouping), then O(Q log Q) to sort the Q questions.\n- Space: O(Q) for the per-question counts.\n\n## Pitfalls\n\n- Ordering by the number of answers instead of the rate picks a question that was shown many times over one answered every time it was shown.\n- Forgetting the `question_id` tie-break lets any of the tied questions come back.\n- `answers DIV shows` (integer division) turns every rate below 1 into 0 and creates false ties; MySQL's `/` keeps the fraction.\n- Counting `DISTINCT` users or rows ignores repeated log rows, but every repeat is a separate action.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `counts` | one row per question with its `answers` and `shows` |\n| `answers` | number of `'answer'` rows for the question |\n| `shows` | number of `'show'` rows for the question |\n| `survey_log` | the winning `question_id` |",
+  "narration": {
+    "1": "The counts stage collapses the log into one row per question.",
+    "3": "IF turns each 'answer' row into 1 and everything else into 0, so the sum counts answers.",
+    "4": "The same trick counts the 'show' rows, the denominator of the rate.",
+    "6": "Grouping by question_id makes each question one row with its two counts.",
+    "8": "The final query reads the per-question counts and renames the id to survey_log.",
+    "10": "Sort by answer rate from high to low; ties fall back to the smaller question_id.",
+    "11": "Only the top question is reported."
+  }
+}

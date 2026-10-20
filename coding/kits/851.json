@@ -1,0 +1,68 @@
+{
+  "number": 851,
+  "title": "Loud and Rich",
+  "spec": "leetcode",
+  "statement": "There are `n` people numbered `0` to `n - 1`; no two of them have the same wealth and no two have the same quietness. Each pair `richer[i] = [a, b]` is a fact saying person `a` has more money than person `b`, and `quiet[x]` is the quietness score of person `x` (a smaller score means louder). The facts never contradict each other, and they chain: if `a` is richer than `b` and `b` is richer than `c`, then `a` is known to be richer than `c`.\n\nFor each person `x`, look at `x` together with everyone the facts prove to be richer than `x`, and let `answer[x]` be the person in that group whose `quiet` value is smallest. Return the array `answer` of length `n`.",
+  "constraints": [
+    "n == quiet.length",
+    "1 <= n <= 500",
+    "0 <= quiet[i] < n",
+    "All values of quiet are unique",
+    "0 <= richer.length <= n * (n - 1) / 2",
+    "0 <= a_i, b_i < n",
+    "a_i != b_i",
+    "All pairs in richer are unique",
+    "The facts in richer are logically consistent (no cycles)"
+  ],
+  "signature": "int[] loudAndRich(int[][] richer, int[] quiet)",
+  "entry": "loudAndRich",
+  "kind": "function",
+  "parameters": [
+    "richer",
+    "quiet"
+  ],
+  "validator": "function validate([richer, quiet]) {\n  const n = quiet.length;\n  if (n < 1 || n > 500) return 'quiet needs 1 to 500 people.';\n  if (quiet.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each quiet value is from 0 to n - 1.';\n  if (new Set(quiet).size !== n) return 'All quiet values must be different.';\n  const seen = new Set();\n  const indegree = new Array(n).fill(0);\n  const out = Array.from({ length: n }, () => []);\n  for (const pair of richer) {\n    if (!Array.isArray(pair) || pair.length !== 2) return 'Each fact is a pair [a, b].';\n    const [a, b] = pair;\n    if (![a, b].every(v => Number.isInteger(v) && v >= 0 && v < n)) return 'People in richer are numbered 0 to n - 1.';\n    if (a === b) return 'A fact must name two different people.';\n    if (seen.has(a * n + b)) return 'Each fact appears only once.';\n    seen.add(a * n + b);\n    out[a].push(b);\n    indegree[b]++;\n  }\n  // The facts must not loop back on themselves.\n  const queue = [];\n  for (let i = 0; i < n; i++) if (indegree[i] === 0) queue.push(i);\n  let visited = 0;\n  for (let head = 0; head < queue.length; head++) {\n    visited++;\n    for (const next of out[queue[head]]) if (--indegree[next] === 0) queue.push(next);\n  }\n  if (visited !== n) return 'The facts in richer contradict each other (they form a cycle).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function loudAndRich(richer, quiet) {\n  const n = quiet.length;\n  const richerThan = Array.from({ length: n }, () => []);\n  for (const [rich, poor] of richer) {\n    richerThan[poor].push(rich);\n  }\n  const answer = new Array(n).fill(-1);\n\n  const dfs = (person) => {\n    if (answer[person] !== -1) {\n      return answer[person];\n    }\n    answer[person] = person;\n    for (const other of richerThan[person]) {\n      const candidate = dfs(other);\n      if (quiet[candidate] < quiet[answer[person]]) {\n        answer[person] = candidate;\n      }\n    }\n    return answer[person];\n  };\n\n  for (let person = 0; person < n; person++) {\n    dfs(person);\n  }\n  return answer;\n}",
+  "brute": "function loudAndRich(richer, quiet) {\n  // Build the full \"at least as rich\" relation with a transitive closure, then scan each column.\n  const n = quiet.length;\n  const atLeast = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j));\n  for (const [a, b] of richer) atLeast[a][b] = true;\n  for (let k = 0; k < n; k++)\n    for (let i = 0; i < n; i++)\n      for (let j = 0; j < n; j++)\n        if (atLeast[i][k] && atLeast[k][j]) atLeast[i][j] = true;\n  const result = [];\n  for (let x = 0; x < n; x++) {\n    let best = x;\n    for (let y = 0; y < n; y++) if (atLeast[y][x] && quiet[y] < quiet[best]) best = y;\n    result.push(best);\n  }\n  return result;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 500 : 1 + Math.floor(rand() * 7);\n  const shuffle = (list) => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  // A hidden wealth order keeps every fact consistent: wealth[0] is the richest person.\n  const wealth = shuffle(Array.from({ length: n }, (_, i) => i));\n  const quiet = shuffle(Array.from({ length: n }, (_, i) => i));\n  const maxPairs = n * (n - 1) / 2;\n  const target = size === 'large' ? 2000 : Math.floor(rand() * (maxPairs + 1));\n  const used = new Set();\n  const richer = [];\n  // Large inputs often include the full chain, so the facts reach 500 levels deep.\n  if (size === 'large' && rand() < 0.5) {\n    for (let i = 0; i + 1 < n; i++) {\n      used.add(wealth[i] * n + wealth[i + 1]);\n      richer.push([wealth[i], wealth[i + 1]]);\n    }\n  }\n  while (richer.length < target) {\n    const i = Math.floor(rand() * n);\n    const j = Math.floor(rand() * n);\n    if (i === j) continue;\n    const a = wealth[Math.min(i, j)];\n    const b = wealth[Math.max(i, j)];\n    if (used.has(a * n + b)) continue;\n    used.add(a * n + b);\n    richer.push([a, b]);\n  }\n  return [shuffle(richer), quiet];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,0],[2,1],[3,1],[3,7],[4,3],[5,3],[6,3]],[3,2,5,4,6,1,7,0]],"expected":[5,5,2,5,4,5,6,7]},
+    {"name":"Example 2","input":[[],[0]],"expected":[0]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],[1,0]]},
+    {"name":"Test 2","input":[[[0,1],[1,2],[2,3]],[0,1,2,3]]},
+    {"name":"Test 3","input":[[[0,1],[1,2],[2,3]],[3,2,1,0]]},
+    {"name":"Test 4","input":[[[0,1],[0,2],[1,3],[2,3]],[2,3,0,1]]},
+    {"name":"Test 5","input":[[[0,1],[0,2],[0,3],[0,4]],[0,4,3,2,1]]},
+    {"name":"Test 6","input":[[[1,0],[3,2],[5,4]],[5,0,1,4,3,2]]},
+    {"name":"Test 7","input":[[[4,3],[3,2],[2,1],[1,0],[4,2],[4,1],[4,0],[3,1],[3,0],[2,0]],[1,3,0,4,2]]},
+    {"name":"Test 8","input":[[[2,0],[2,1],[5,3],[5,4],[6,2],[6,5]],[6,5,4,3,2,1,0]]},
+    {"name":"Test 9","input":[[[3,0],[0,4],[4,1],[2,1]],[4,3,0,1,2]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nDraw an arrow from each poorer person to each person known to be richer. The people \"at least as rich as `x`\" are `x` plus everyone reachable from `x` along those arrows. Searching from every person separately costs O(n·(n + m)), but the answers overlap: if `y` is richer than `x`, everyone richer than `y` is also richer than `x`. So `answer[x]` is the loudest among `x` itself and `answer[y]` for each direct richer neighbour `y`. A depth-first search that stores each answer the first time it is computed (memoisation) visits every person and every fact once.\n\n## Approach\n\n1. Build `richerThan[poor]`, the list of people directly known to be richer than `poor`.\n2. Fill `answer` with `-1` to mark \"not computed yet\".\n3. `dfs(person)`: if `answer[person]` is known, return it. Otherwise start with the person themself as the loudest.\n4. For every `other` in `richerThan[person]`, get `candidate = dfs(other)` and keep it if its `quiet` value is smaller.\n5. Call `dfs` on every person and return `answer`.\n\nThe facts form no cycle, so a person is never reached again while their own search is still running.\n\n## Example 1, step by step\n\n`dfs(0)` sets `answer[0] = 0` (quiet 3) and goes to person 1, who goes to 2 (stays 2, quiet 5) and to 3. Person 3 checks 4 (quiet 6), 5 (quiet 1) and 6 (quiet 7), so `answer[3] = 5`. That beats person 1's own quiet 2, so `answer[1] = 5`, and then `answer[0] = 5`. Later `dfs(7)` starts with quiet 0, sees `answer[3] = 5` with quiet 1, and keeps 7. The result is `[5, 5, 2, 5, 4, 5, 6, 7]`.\n\n## Complexity\n\n- Time: O(n + m), where m is `richer.length`: each person's search runs once and each fact is followed once.\n- Space: O(n + m) for the lists, the answers and the recursion stack.\n\n## Pitfalls\n\n- Point the arrows from poorer to richer; reversing them answers \"who is poorer\" instead.\n- Compare `quiet` values, not person numbers, and include the person themself.\n- Without memoisation a long chain of facts makes the search revisit the same people many times.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of people |\n| `richerThan` | for each person, those directly known to be richer |\n| `answer` | loudest person at least as rich as each person, `-1` until computed |\n| `dfs` | computes and stores `answer[person]` |\n| `other` | a person directly richer than the current one |\n| `candidate` | the loudest person at least as rich as `other` |",
+  "narration": {
+    "3": "Prepare an empty list for each person of the people known to be richer.",
+    "4": "Each fact says rich has more money than poor...",
+    "5": "...so record rich as an arrow out of poor.",
+    "7": "-1 marks a person whose answer has not been computed yet.",
+    "10": "If this person's answer is already known, reuse it instead of searching again.",
+    "13": "Before looking further, the person is the loudest one known in their own group.",
+    "14": "Visit each person directly richer than this one.",
+    "15": "Their best answer covers everyone at least as rich as them, which is also richer than this person.",
+    "16": "Is that candidate louder (smaller quiet) than the best so far?",
+    "17": "Yes: they become this person's answer.",
+    "20": "Return the stored answer so callers can use it.",
+    "23": "Make sure every person gets an answer, even those nobody points to.",
+    "26": "Every entry is filled; return the answers."
+  }
+}

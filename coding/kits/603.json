@@ -1,0 +1,51 @@
+{
+  "number": 603,
+  "title": "Consecutive Available Seats",
+  "spec": "recalled",
+  "statement": "A cinema keeps one row per seat:\n\n- `Cinema(seat_id, free)`: `seat_id` is an auto-increment key, so the seats are numbered `1, 2, ..., n` with no gaps. `free` is a boolean: `1` when the seat is available, `0` when it is taken.\n\nTwo seats are consecutive when their `seat_id` values differ by exactly 1. Report every free seat that has at least one free neighbour (the seat just before it or just after it), as a single column `seat_id`. Each such seat appears once, even when both of its neighbours are free. Order the rows by `seat_id` ascending.",
+  "constraints": [
+    "seat_id is the primary key of Cinema",
+    "seat_id values are 1, 2, ..., n with no gaps",
+    "free is 1 (available) or 0 (taken)"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Cinema": [["seat_id","INT"],["free","BOOL"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Cinema = [] }] = input;\n  const seats = new Set();\n  for (const [id, free] of Cinema) {\n    if (id === null) return 'Every seat needs a seat_id.';\n    if (seats.has(id)) return `seat_id ${id} appears twice.`;\n    seats.add(id);\n    if (free !== 0 && free !== 1) return `free must be 0 or 1 (seat ${id}).`;\n  }\n  for (let id = 1; id <= seats.size; id++) if (!seats.has(id)) return `seat_id values must be 1..${seats.size} with no gaps; ${id} is missing.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT seat.seat_id\nFROM Cinema AS seat\nJOIN Cinema AS neighbour\n  ON ABS(seat.seat_id - neighbour.seat_id) = 1\nWHERE seat.free = 1\n  AND neighbour.free = 1\nORDER BY seat.seat_id;",
+  "brute": "SELECT c.seat_id\nFROM Cinema AS c\nWHERE c.free = 1\n  AND (\n    EXISTS (SELECT 1 FROM Cinema AS b WHERE b.seat_id = c.seat_id - 1 AND b.free = 1)\n    OR EXISTS (SELECT 1 FROM Cinema AS a WHERE a.seat_id = c.seat_id + 1 AND a.free = 1)\n  )\nORDER BY c.seat_id",
+  "generator": "function generate(rand, size) {\n  const n = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const pFree = size === 'small' ? 0.35 + rand() * 0.45 : 0.5;\n  const Cinema = [];\n  for (let id = 1; id <= n; id++) Cinema.push([id, rand() < pFree ? 1 : 0]);\n  // Rows may be stored in any order; shuffle some sets so the ORDER BY matters.\n  if (rand() < 0.5) {\n    for (let i = Cinema.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [Cinema[i], Cinema[j]] = [Cinema[j], Cinema[i]];\n    }\n  }\n  return [{ Cinema }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Cinema":[[1,1],[2,0],[3,1],[4,1],[5,1]]}],"expected":{"columns":["seat_id"],"rows":[[3],[4],[5]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Cinema":[]}]},
+    {"name":"Test 2","input":[{"Cinema":[[1,1]]}]},
+    {"name":"Test 3","input":[{"Cinema":[[1,1],[2,1]]}]},
+    {"name":"Test 4","input":[{"Cinema":[[1,1],[2,0],[3,1],[4,0],[5,1]]}]},
+    {"name":"Test 5","input":[{"Cinema":[[1,1],[2,1],[3,0],[4,1],[5,1]]}]},
+    {"name":"Test 6","input":[{"Cinema":[[1,0],[2,0],[3,0],[4,0]]}]},
+    {"name":"Test 7","input":[{"Cinema":[[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]]}]},
+    {"name":"Test 8","input":[{"Cinema":[[5,1],[3,0],[1,1],[4,1],[2,1],[7,1],[6,0]]}]},
+    {"name":"Test 9","input":[{"Cinema":[[1,0],[2,1],[3,1],[4,0],[5,0],[6,1],[7,0],[8,1],[9,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA free seat qualifies when the seat right before it or right after it is also free. Pairing every seat with its neighbours is a **self-join**: join `Cinema` to itself, keep pairs whose ids differ by one, and require both seats in the pair to be free. Every seat on the left side of a surviving pair belongs to a run of at least two free seats.\n\n## Approach\n\n1. Read `Cinema` as `seat`, the seat we may report.\n2. Join `Cinema` again as `neighbour` on `ABS(seat.seat_id - neighbour.seat_id) = 1`, which matches the seat before and the seat after.\n3. Keep pairs where `seat.free = 1` and `neighbour.free = 1`.\n4. A seat with two free neighbours appears in two pairs, so `SELECT DISTINCT` reports it once.\n5. `ORDER BY seat.seat_id`.\n\n## Example 1, step by step\n\nSeats 1, 3, 4 and 5 are free; seat 2 is taken.\n\n- Seat 1 pairs only with seat 2, which is taken: no row.\n- Seat 3 pairs with seat 2 (taken) and seat 4 (free): one row, 3.\n- Seat 4 pairs with seats 3 and 5, both free: two rows, 4 and 4.\n- Seat 5 pairs with seat 4 (free): one row, 5.\n\nThe joined rows are 3, 4, 4, 5; `DISTINCT` and the ordering give 3, 4, 5.\n\n## Complexity\n\n- Time: O(n²) for n seats with a plain nested-loop join on `ABS(...)`; O(n) if the database looks neighbours up through an index on `seat_id`.\n- Space: O(n) for the joined pairs and the result.\n\n## Pitfalls\n\n- Checking only the next seat (`neighbour.seat_id = seat.seat_id + 1`) misses the last seat of every run, such as seat 5 in Example 1.\n- Forgetting `DISTINCT` reports a seat twice when both of its neighbours are free.\n- Testing only `seat.free = 1` lets a free seat pair with a taken neighbour.\n- The answer must be sorted; without `ORDER BY` the self-join can return seats in any order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `seat` | the candidate seat that may be reported |\n| `neighbour` | a seat whose id is one less or one more than `seat` |\n| `ABS(seat.seat_id - neighbour.seat_id) = 1` | pairs each seat with the seat before and after it |\n| `DISTINCT` | collapses the two rows of a seat whose neighbours are both free |",
+  "narration": {
+    "1": "Report each qualifying seat once, even when it pairs with two free neighbours.",
+    "2": "The first copy of Cinema holds the seat that may be reported.",
+    "3": "Join Cinema to itself to look at another seat next to it.",
+    "4": "Ids that differ by exactly one are the seat just before and the seat just after.",
+    "5": "The reported seat itself must be free.",
+    "6": "Its neighbour must be free too, so the two form a run of free seats.",
+    "7": "The problem asks for the seats in ascending seat_id order."
+  }
+}

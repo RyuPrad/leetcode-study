@@ -1,0 +1,72 @@
+{
+  "number": 1115,
+  "title": "Print FooBar Alternately",
+  "spec": "leetcode",
+  "statement": "On LeetCode this is a multithreading problem. Here each thread is an asynchronous task, and you coordinate the tasks with promises.\n\nWrite a class `FooBar` whose constructor receives `n` and which has two methods, `foo(printFoo)` and `bar(printBar)`. A single instance is shared by two threads: thread A calls `foo`, which must call `printFoo` (it prints `\"foo\"`) exactly `n` times, and thread B calls `bar`, which must call `printBar` (it prints `\"bar\"`) exactly `n` times. Make the two methods take turns so that the combined output is `\"foobar\"` repeated `n` times, no matter which thread starts first. A method may be `async` and wait on promises between its prints.\n\nEach case gives `n` and `starts`: thread A starts at `starts[0]` ms and thread B at `starts[1]` ms; if both start at the same moment, thread A starts first. The answer is `{ output, times }`: every printed word joined together, and the time in ms of each print, in the order the prints happened. Print each word as soon as it is allowed (the k-th `\"foo\"` once thread A has started and the previous `\"bar\"` is out, the k-th `\"bar\"` once thread B has started and the k-th `\"foo\"` is out), so wait on promises rather than on timers.",
+  "constraints": [
+    "1 <= n <= 1000",
+    "starts.length == 2",
+    "0 <= starts[i] <= 1000"
+  ],
+  "signature": "Object FooBar(int n, int[] starts)",
+  "entry": "FooBar",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "starts"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [n, starts] = input;\n  if (!Number.isInteger(n) || n < 1 || n > 1000) return 'n must be an integer from 1 to 1000.';\n  if (!Array.isArray(starts) || starts.length !== 2) return 'starts needs 2 start times, one per thread.';\n  if (!starts.every((t) => Number.isInteger(t) && t >= 0 && t <= 1000)) return 'Each start time is an integer from 0 to 1000 ms.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [n, starts] = input, start = Date.now(), prints = [];\n  const fooBar = new solve(n);\n  for (const name of ['foo', 'bar']) if (!fooBar || typeof fooBar[name] !== 'function') throw new Error(`FooBar needs a method ${name}.`);\n  const printer = (word) => () => {\n    prints.push({ text: word, t: Date.now() - start });\n    kit.trace(`\"${word}\" is printed`);\n  };\n  setTimeout(() => {\n    kit.trace('Thread A starts and calls foo()');\n    fooBar.foo(printer('foo'));\n  }, starts[0]);\n  setTimeout(() => {\n    kit.trace('Thread B starts and calls bar()');\n    fooBar.bar(printer('bar'));\n  }, starts[1]);\n  // A correct solution has printed everything by the later start; the extra time shows late prints.\n  return new Promise((resolve) => setTimeout(() => resolve({\n    output: prints.map((p) => p.text).join(''),\n    times: prints.map((p) => p.t),\n  }), Math.max(...starts) + 50));\n}",
+  "starters": {
+    "javascript": "class FooBar {\n  /** @param {number} n */\n  constructor(n) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  /** @param {() => void} printFoo prints \"foo\" */\n  async foo(printFoo) {\n    for (let i = 0; i < this.n; i++) {\n      printFoo();\n    }\n  }\n\n  /** @param {() => void} printBar prints \"bar\" */\n  async bar(printBar) {\n    for (let i = 0; i < this.n; i++) {\n      printBar();\n    }\n  }\n}\n",
+    "typescript": "class FooBar {\n  n: number;\n\n  constructor(n: number) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  async foo(printFoo: () => void): Promise<void> {\n    for (let i = 0; i < this.n; i++) {\n      printFoo();\n    }\n  }\n\n  async bar(printBar: () => void): Promise<void> {\n    for (let i = 0; i < this.n; i++) {\n      printBar();\n    }\n  }\n}\n"
+  },
+  "api": "class FooBar { constructor(n: number); foo(printFoo: () => void): void | Promise<void>; bar(printBar: () => void): void | Promise<void> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class FooBar {\n  constructor(n) {\n    this.n = n;\n    this.fooGate = Promise.resolve();\n    this.barGate = new Promise((resolve) => {\n      this.openBar = resolve;\n    });\n  }\n\n  async foo(printFoo) {\n    for (let i = 0; i < this.n; i++) {\n      await this.fooGate;\n      this.fooGate = new Promise((resolve) => {\n        this.openFoo = resolve;\n      });\n      printFoo();\n      this.openBar();\n    }\n  }\n\n  async bar(printBar) {\n    for (let i = 0; i < this.n; i++) {\n      await this.barGate;\n      this.barGate = new Promise((resolve) => {\n        this.openBar = resolve;\n      });\n      printBar();\n      this.openFoo();\n    }\n  }\n}",
+  "brute": "class FooBar {\n  constructor(n) {\n    this.n = n;\n    this.turn = 0;\n    this.parked = [null, null];\n  }\n\n  // Side 0 is foo and side 1 is bar; an even turn belongs to foo.\n  wait(side) {\n    if (this.turn % 2 === side) return Promise.resolve();\n    return new Promise((resolve) => { this.parked[side] = resolve; });\n  }\n\n  pass() {\n    this.turn += 1;\n    const wake = this.parked[this.turn % 2];\n    this.parked[this.turn % 2] = null;\n    if (wake) wake();\n  }\n\n  async foo(printFoo) {\n    for (let i = 0; i < this.n; i++) { await this.wait(0); printFoo(); this.pass(); }\n  }\n\n  async bar(printBar) {\n    for (let i = 0; i < this.n; i++) { await this.wait(1); printBar(); this.pass(); }\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const n = size === 'small' ? 1 + pick(5) : 500 + pick(501);\n  const top = size === 'small' ? 30 : 1000, roll = rand();\n  const same = pick(top + 1);\n  const starts = roll < 0.25 ? [same, same] : [pick(top + 1), pick(top + 1)];\n  return [n, starts];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,[0,0]],"expected":{"output":"foobar","times":[0,0]}},
+    {"name":"Example 2","input":[2,[0,0]],"expected":{"output":"foobarfoobar","times":[0,0,0,0]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[3,[0,0]]},
+    {"name":"Test 2","input":[1,[10,0]]},
+    {"name":"Test 3","input":[1,[0,10]]},
+    {"name":"Test 4","input":[5,[100,0]]},
+    {"name":"Test 5","input":[5,[0,100]]},
+    {"name":"Test 6","input":[2,[7,7]]},
+    {"name":"Test 7","input":[1000,[0,0]]},
+    {"name":"Test 8","input":[10,[1000,1000]]},
+    {"name":"Test 9","input":[4,[999,1]]},
+    {"name":"Test 10","input":[7,[3,500]]},
+    {"name":"Test 11","input":[1000,[1000,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe two loops must take turns: `foo` may print only when it is foo's turn, and each print hands the turn to the other side. That is two gates, one per side. Foo's gate starts open (foo goes first) and bar's starts closed. Each side waits at its own gate, closes it behind itself, prints, and opens the other side's gate. Since the gates exist from the constructor on, it does not matter which thread starts first: a thread that arrives early simply waits. (The brute force keeps a turn counter instead and parks the side that is not on turn.)\n\nA promise is a one-time gate, so closing a gate means replacing it with a fresh pending promise and keeping its resolve function as the key that opens it.\n\n## Approach\n\n1. In the constructor, `fooGate` is an already resolved promise and `barGate` a pending one whose resolve function is `openBar`.\n2. `foo` repeats `n` times: await `fooGate`, replace it with a new pending promise (its resolve function becomes `openFoo`), print `\"foo\"`, then call `openBar()`.\n3. `bar` does the mirror image: await `barGate`, replace it (new `openBar`), print `\"bar\"`, then call `openFoo()`.\n\nWith real threads this is the classic pair of semaphores: `fooSem` starts with 1 permit and `barSem` with 0. `foo` does `fooSem.acquire(); printFoo(); barSem.release();` and `bar` does `barSem.acquire(); printBar(); fooSem.release();`. Awaiting a gate plays the part of acquire, and calling its resolve function the part of release. A lock with a condition variable and a boolean `fooTurn` works too, as long as each side waits in a loop until the flag says it is its turn.\n\n## Example 1, step by step\n\n`n = 1`, both threads start at 0 ms.\n\n- Thread A calls `foo`. `fooGate` is already resolved, so foo passes it, installs a closed `fooGate`, prints `\"foo\"` and calls `openBar()`.\n- Thread B calls `bar`. It waits on `barGate` until foo opens it, then installs a closed `barGate`, prints `\"bar\"` and calls `openFoo()`.\n- Both loops have run once, so both methods end. The answer is `{ output: \"foobar\", times: [0, 0] }`.\n\n## Complexity\n\n- Time: O(n) in total: each of the 2n prints costs one await and one new promise.\n- Space: O(1): two gates and their two resolve functions at any moment.\n\n## Pitfalls\n\n- Opening the other gate before printing lets the other side print first; print, then open.\n- Reusing one promise for every round does not work: once resolved it stays open, so a side would print twice in a row. Each round needs a fresh gate.\n- Waiting with `setTimeout` polling prints late (and, with threads, busy-waiting burns CPU). Wait on the gate itself.\n- Starting both gates closed deadlocks: nobody ever opens the first one.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `n` | how many times each word is printed |\n| `fooGate` | promise that foo awaits before each `\"foo\"` |\n| `barGate` | promise that bar awaits before each `\"bar\"` |\n| `openFoo` | resolve function of the current `fooGate`, called by bar |\n| `openBar` | resolve function of the current `barGate`, called by foo |\n| `printFoo`, `printBar` | callbacks that print each word |",
+  "narration": {
+    "3": "Remember how many rounds each method must print.",
+    "4": "Foo goes first, so its gate starts open: a promise that is already resolved.",
+    "5": "Bar must wait for the first \"foo\", so its gate starts closed.",
+    "6": "Keep the key to bar's gate; foo calls it after printing.",
+    "11": "Each round of foo prints one \"foo\".",
+    "12": "Wait until foo's gate is open; the first time it already is.",
+    "13": "Close the gate behind us with a fresh pending promise, so the next round has to wait again.",
+    "14": "Its resolve function becomes the key bar uses to let foo go again.",
+    "16": "It is foo's turn, so print \"foo\".",
+    "17": "Hand the turn to bar by opening its gate.",
+    "23": "Bar waits until foo has opened its gate for this round.",
+    "24": "Close bar's gate again for the next round.",
+    "25": "Store the new key, which foo will call after its next \"foo\".",
+    "27": "It is bar's turn, so print \"bar\".",
+    "28": "Hand the turn back to foo."
+  }
+}

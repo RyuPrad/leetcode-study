@@ -1,0 +1,71 @@
+{
+  "number": 1116,
+  "title": "Print Zero Even Odd",
+  "spec": "leetcode",
+  "statement": "On LeetCode this is a multithreading problem. Here each thread is an asynchronous task, and you coordinate the tasks with promises.\n\nWrite a class `ZeroEvenOdd` whose constructor takes `n`. One shared instance is handed to three threads: one calls `zero(printNumber)`, one calls `even(printNumber)` and one calls `odd(printNumber)`. Calling `printNumber(x)` prints the integer `x`. Between them the three methods must print `0, 1, 0, 2, 0, 3, ..., 0, n`: every number from 1 to `n` in increasing order, each preceded by a 0, so `2n` prints that read `\"010203...\"` when joined. `zero` prints only the zeros (all `n` of them), `even` only the even numbers of 1..n and `odd` only the odd ones. Each method keeps going until its whole share is printed, so make the methods `async` and `await` promises between prints.\n\nEach case gives `n`, `threads` and `starts`: thread `i` starts at `starts[i]` ms and calls the method named `threads[i]`. Threads with the same start time start in index order. The answer is `{ output, times }`: everything printed, joined into one string, and the time in ms of each print, in the order the prints happened. A number must be printed as soon as it is allowed, that is, once its thread has started and the print before it has happened, so wait on promises rather than on timers.",
+  "constraints": [
+    "1 <= n <= 1000",
+    "threads is a permutation of [\"zero\", \"even\", \"odd\"]",
+    "starts.length == 3",
+    "0 <= starts[i] <= 1000"
+  ],
+  "signature": "Object ZeroEvenOdd(int n, String[] threads, int[] starts)",
+  "entry": "ZeroEvenOdd",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "threads",
+    "starts"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [n, threads, starts] = input;\n  if (!Number.isInteger(n) || n < 1 || n > 1000) return 'n must be an integer from 1 to 1000.';\n  if (threads.length !== 3 || [...threads].sort().join() !== 'even,odd,zero') return 'threads must list \"zero\", \"even\" and \"odd\" once each.';\n  if (starts.length !== 3) return 'starts needs 3 start times, one per thread.';\n  if (!starts.every((t) => Number.isInteger(t) && t >= 0 && t <= 1000)) return 'Each start time is an integer from 0 to 1000 ms.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [n, threads, starts] = input, start = Date.now(), prints = [];\n  const allowed = { zero: (x) => x === 0, even: (x) => x % 2 === 0 && x >= 2 && x <= n, odd: (x) => x % 2 === 1 && x <= n };\n  const zeo = new solve(n);\n  for (const name of threads) if (!zeo || typeof zeo[name] !== 'function') throw new Error(`ZeroEvenOdd needs a method ${name}.`);\n  let failure = null;\n  threads.forEach((name, i) => {\n    const printNumber = (x) => {\n      if (!Number.isInteger(x) || !allowed[name](x)) failure = failure ?? `${name}() may not print ${x}.`;\n      prints.push({ text: String(x), t: Date.now() - start });\n      kit.trace(`${name}() prints ${x}`);\n    };\n    setTimeout(() => {\n      kit.trace(`Thread ${'ABC'[i]} starts and calls ${name}()`);\n      const result = zeo[name](printNumber);\n      if (result && typeof result.then === 'function') result.then(null, (error) => { failure = failure ?? `${name}() failed: ${error && error.message || error}`; });\n    }, starts[i]);\n  });\n  // A correct solution has printed everything by the last start; the extra time shows late prints.\n  return new Promise((resolve, reject) => setTimeout(() => {\n    if (failure) reject(new Error(failure));\n    else resolve({ output: prints.map((p) => p.text).join(''), times: prints.map((p) => p.t) });\n  }, Math.max(...starts) + 50));\n}",
+  "starters": {
+    "javascript": "class ZeroEvenOdd {\n  /** @param {number} n */\n  constructor(n) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  /** Prints the n zeros. @param {(x: number) => void} printNumber */\n  async zero(printNumber) {\n  }\n\n  /** Prints the even numbers of 1..n. @param {(x: number) => void} printNumber */\n  async even(printNumber) {\n  }\n\n  /** Prints the odd numbers of 1..n. @param {(x: number) => void} printNumber */\n  async odd(printNumber) {\n  }\n}\n",
+    "typescript": "class ZeroEvenOdd {\n  n: number;\n\n  constructor(n: number) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  async zero(printNumber: (x: number) => void): Promise<void> {\n  }\n\n  async even(printNumber: (x: number) => void): Promise<void> {\n  }\n\n  async odd(printNumber: (x: number) => void): Promise<void> {\n  }\n}\n"
+  },
+  "api": "class ZeroEvenOdd { constructor(n: number); zero(printNumber: (x: number) => void): void | Promise<void>; even(printNumber: (x: number) => void): void | Promise<void>; odd(printNumber: (x: number) => void): void | Promise<void> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class ZeroEvenOdd {\n  constructor(n) {\n    this.n = n;\n    this.turn = 'zero';\n    this.parked = {};\n  }\n\n  waitTurn(name) {\n    if (this.turn === name) return Promise.resolve();\n    return new Promise((resolve) => {\n      this.parked[name] = resolve;\n    });\n  }\n\n  giveTurn(name) {\n    this.turn = name;\n    const wake = this.parked[name];\n    this.parked[name] = null;\n    if (wake) wake();\n  }\n\n  async zero(printNumber) {\n    for (let i = 1; i <= this.n; i++) {\n      await this.waitTurn('zero');\n      printNumber(0);\n      this.giveTurn(i % 2 === 1 ? 'odd' : 'even');\n    }\n  }\n\n  async even(printNumber) {\n    for (let i = 2; i <= this.n; i += 2) {\n      await this.waitTurn('even');\n      printNumber(i);\n      this.giveTurn('zero');\n    }\n  }\n\n  async odd(printNumber) {\n    for (let i = 1; i <= this.n; i += 2) {\n      await this.waitTurn('odd');\n      printNumber(i);\n      this.giveTurn('zero');\n    }\n  }\n}",
+  "brute": "class ZeroEvenOdd {\n  constructor(n) {\n    this.n = n;\n    this.next = 0;\n    this.printers = {};\n  }\n\n  // Position k of the sequence: even k is a zero, odd k is the number (k + 1) / 2.\n  owner(k) {\n    if (k % 2 === 0) return 'zero';\n    return ((k + 1) / 2) % 2 === 0 ? 'even' : 'odd';\n  }\n\n  // Record the arriving printer, then print every position whose owner has arrived.\n  arrive(name, printNumber) {\n    this.printers[name] = printNumber;\n    while (this.next < 2 * this.n && this.printers[this.owner(this.next)]) {\n      const k = this.next++;\n      this.printers[this.owner(k)](k % 2 === 0 ? 0 : (k + 1) / 2);\n    }\n  }\n\n  zero(printNumber) { this.arrive('zero', printNumber); }\n  even(printNumber) { this.arrive('even', printNumber); }\n  odd(printNumber) { this.arrive('odd', printNumber); }\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'small' ? 1 + Math.floor(rand() * 12) : 900 + Math.floor(rand() * 101);\n  const threads = ['zero', 'even', 'odd'];\n  for (let i = 2; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [threads[i], threads[j]] = [threads[j], threads[i]];\n  }\n  const top = size === 'small' ? 30 : 1000, roll = rand();\n  const same = Math.floor(rand() * (top + 1));\n  const starts = threads.map(() => (roll < 0.25 ? 0 : roll < 0.4 ? same : Math.floor(rand() * (top + 1))));\n  return [n, threads, starts];\n}",
+  "examples": [
+    {"name":"Example 1","input":[2,["zero","even","odd"],[0,0,0]],"expected":{"output":"0102","times":[0,0,0,0]}},
+    {"name":"Example 2","input":[5,["zero","even","odd"],[0,0,0]],"expected":{"output":"0102030405","times":[0,0,0,0,0,0,0,0,0,0]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,["zero","even","odd"],[0,0,0]]},
+    {"name":"Test 2","input":[1,["odd","even","zero"],[0,0,0]]},
+    {"name":"Test 3","input":[2,["odd","even","zero"],[0,10,20]]},
+    {"name":"Test 4","input":[3,["zero","odd","even"],[0,50,100]]},
+    {"name":"Test 5","input":[4,["even","zero","odd"],[5,5,5]]},
+    {"name":"Test 6","input":[6,["zero","even","odd"],[0,1000,0]]},
+    {"name":"Test 7","input":[7,["odd","zero","even"],[30,0,10]]},
+    {"name":"Test 8","input":[10,["even","odd","zero"],[0,0,0]]},
+    {"name":"Test 9","input":[15,["zero","odd","even"],[1000,1000,1000]]},
+    {"name":"Test 10","input":[1000,["zero","even","odd"],[0,0,0]]},
+    {"name":"Test 11","input":[999,["even","zero","odd"],[500,0,1000]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe three threads take turns, and the next turn is always known: after a zero comes the next number, odd or even depending on its parity, and after any number comes a zero. So keep one piece of shared state, `turn`, naming whose go it is. A method whose turn has not come parks: it stores the resolve function of a fresh promise and awaits it. Handing over the turn resolves that promise, which wakes exactly the right thread. (The brute force instead lets whichever thread arrives last print every position whose owner has already arrived.)\n\n## Approach\n\n1. Start with `turn = 'zero'` and an empty `parked` table.\n2. `waitTurn(name)` returns a resolved promise if it is already `name`'s turn; otherwise it parks `name` by saving the resolve function in `parked[name]`.\n3. `giveTurn(name)` sets `turn` and wakes `parked[name]` if that thread is waiting.\n4. `zero` loops `i` from 1 to `n`: wait, print 0, then give the turn to `odd` if `i` is odd, else to `even`.\n5. `even` and `odd` loop over their own numbers: wait, print `i`, give the turn back to `zero`.\n\nWith real threads the same design uses three semaphores: `zeroSem` starts at 1, `oddSem` and `evenSem` at 0. Each method acquires its own semaphore before printing and releases the next one afterwards. Or one lock with a condition variable: wait while `turn` is not yours, print, set `turn`, `notifyAll`. Awaiting a parked promise plays the part of acquire or wait, and calling its resolve function the part of release or notify.\n\n## Example 1, step by step\n\n`n = 2`; threads start in the order zero, even, odd at 0 ms.\n\n- `zero` has the turn: it prints 0, gives the turn to `odd`, then parks.\n- `even` arrives and parks; `odd` arrives, finds its turn, prints 1 and wakes `zero`.\n- `zero` prints 0 and wakes `even`, which prints 2. The answer is `{ output: \"0102\", times: [0, 0, 0, 0] }`.\n\n## Complexity\n\n- Time: O(n): 2n prints, each with O(1) handoff work.\n- Space: O(1): the turn and at most three parked resolve functions.\n\n## Pitfalls\n\n- The first odd number follows the first zero; giving the turn to `even` when `i` is odd prints numbers out of order.\n- Printing before waiting: every print, including the first zero, must check the turn.\n- Polling a flag with `setTimeout` prints late; wait on the promise itself.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `turn` | which method may print next: `'zero'`, `'odd'` or `'even'` |\n| `parked` | resolve function of each thread that is waiting for its turn |\n| `i` | the loop counter: a zero's index in `zero`, the number to print in `even` and `odd` |\n| `wake` | the resolve function that `giveTurn` calls, if that thread is waiting |",
+  "narration": {
+    "4": "The zero thread has the first turn, because the sequence starts with 0.",
+    "5": "parked will hold the resolve function of each thread that is waiting for its turn.",
+    "9": "If it is already this thread's turn, it may go on at once.",
+    "11": "Otherwise park: keep the resolve function so the thread that hands over the turn can wake this one.",
+    "16": "Record whose turn it is now, so a thread that arrives later sees it.",
+    "19": "If that thread is already parked, resolving its promise wakes it.",
+    "23": "zero prints one 0 before each of the numbers 1 to n.",
+    "24": "Wait until zero holds the turn.",
+    "26": "The number after this zero is i: odd i goes to odd(), even i to even().",
+    "32": "even() waits for its turn before each even number.",
+    "34": "After every number the turn goes back to zero().",
+    "41": "odd() prints its number i once its turn has come."
+  }
+}

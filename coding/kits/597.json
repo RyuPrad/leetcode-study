@@ -1,0 +1,53 @@
+{
+  "number": 597,
+  "title": "Friend Requests I: Overall Acceptance Rate",
+  "spec": "recalled",
+  "statement": "A social network logs friend requests and acceptances:\n\n- `FriendRequest(sender_id, send_to_id, request_date)`: `sender_id` sent a friend request to `send_to_id` on `request_date`. The table has no key, so the same request can appear several times.\n- `RequestAccepted(requester_id, accepter_id, accept_date)`: `accepter_id` accepted a request from `requester_id` on `accept_date`. It has no key either, and an acceptance need not match any row of `FriendRequest`.\n\nReport the overall acceptance rate in one row with one column named `accept_rate`: the number of **distinct** accepted `(requester_id, accepter_id)` pairs divided by the number of **distinct** `(sender_id, send_to_id)` request pairs, rounded to 2 decimal places. Repeated rows for the same pair count once; a pair is directed, so `(1, 2)` and `(2, 1)` are different. Acceptances are counted whether or not a matching request exists. When there are no requests at all, `accept_rate` is `0.00`.",
+  "constraints": [
+    "Neither table has a primary key; rows may repeat",
+    "An accepted pair need not appear in FriendRequest",
+    "Ids are never null",
+    "Dates are text in YYYY-MM-DD form"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "FriendRequest": [["sender_id","INT"],["send_to_id","INT"],["request_date","DATE"]],
+    "RequestAccepted": [["requester_id","INT"],["accepter_id","INT"],["accept_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ FriendRequest = [], RequestAccepted = [] }] = input;\n  const date = /^\\d{4}-\\d{2}-\\d{2}$/;\n  for (const [table, rows] of [['FriendRequest', FriendRequest], ['RequestAccepted', RequestAccepted]])\n    for (const [a, b, day] of rows) {\n      if (a === null || b === null) return `${table} ids must not be null.`;\n      if (typeof day !== 'string' || !date.test(day)) return `${table} has a bad date ${day}.`;\n    }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH requests AS (\n  SELECT DISTINCT sender_id, send_to_id\n  FROM FriendRequest\n),\naccepts AS (\n  SELECT DISTINCT requester_id, accepter_id\n  FROM RequestAccepted\n)\nSELECT ROUND(\n  IFNULL((SELECT COUNT(*) FROM accepts) / (SELECT COUNT(*) FROM requests), 0),\n  2) AS accept_rate;",
+  "brute": "SELECT CASE\n  WHEN (SELECT COUNT(*) FROM FriendRequest) = 0 THEN 0\n  ELSE ROUND(\n    (SELECT COUNT(DISTINCT CONCAT(requester_id, '-', accepter_id)) FROM RequestAccepted)\n    / (SELECT COUNT(DISTINCT CONCAT(sender_id, '-', send_to_id)) FROM FriendRequest), 2)\nEND AS accept_rate",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const users = small ? 4 : 60;\n  const pick = n => 1 + Math.floor(rand() * n);\n  const day = () => `2016-06-${String(pick(small ? 10 : 28)).padStart(2, '0')}`;\n  const pair = () => { const a = pick(users); let b = pick(users - 1); if (b >= a) b += 1; return [a, b]; };\n  const FriendRequest = [], RequestAccepted = [];\n  const requests = small ? Math.floor(rand() * 8) : 2000;\n  for (let i = 0; i < requests; i++) {\n    // Some rows repeat an earlier request exactly or with a later date.\n    const [a, b] = FriendRequest.length && rand() < 0.25 ? FriendRequest[Math.floor(rand() * FriendRequest.length)] : pair();\n    FriendRequest.push([a, b, day()]);\n  }\n  const accepts = small ? Math.floor(rand() * 8) : 2000;\n  for (let i = 0; i < accepts; i++) {\n    // Most acceptances answer a real request; some do not, and some repeat.\n    const [a, b] = FriendRequest.length && rand() < 0.7 ? FriendRequest[Math.floor(rand() * FriendRequest.length)] : pair();\n    RequestAccepted.push([a, b, day()]);\n  }\n  return [{ FriendRequest, RequestAccepted }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"FriendRequest":[[1,2,"2016-06-01"],[1,3,"2016-06-01"],[1,4,"2016-06-01"],[2,3,"2016-06-02"],[3,4,"2016-06-09"]],"RequestAccepted":[[1,2,"2016-06-03"],[1,3,"2016-06-08"],[2,3,"2016-06-08"],[3,4,"2016-06-09"],[3,4,"2016-06-10"]]}],"expected":{"columns":["accept_rate"],"rows":[[0.8]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"FriendRequest":[],"RequestAccepted":[]}]},
+    {"name":"Test 2","input":[{"FriendRequest":[],"RequestAccepted":[[1,2,"2016-06-03"]]}]},
+    {"name":"Test 3","input":[{"FriendRequest":[[1,2,"2016-06-01"],[2,3,"2016-06-02"]],"RequestAccepted":[]}]},
+    {"name":"Test 4","input":[{"FriendRequest":[[1,2,"2016-06-01"],[1,2,"2016-06-05"],[1,3,"2016-06-01"]],"RequestAccepted":[[1,2,"2016-06-02"],[1,2,"2016-06-06"]]}]},
+    {"name":"Test 5","input":[{"FriendRequest":[[1,2,"2016-06-01"]],"RequestAccepted":[[1,2,"2016-06-02"],[3,4,"2016-06-02"],[4,1,"2016-06-03"]]}]},
+    {"name":"Test 6","input":[{"FriendRequest":[[1,2,"2016-06-01"],[2,1,"2016-06-01"],[3,1,"2016-06-02"]],"RequestAccepted":[[2,1,"2016-06-04"]]}]},
+    {"name":"Test 7","input":[{"FriendRequest":[[1,2,"2016-06-01"],[1,3,"2016-06-01"],[1,4,"2016-06-01"]],"RequestAccepted":[[1,2,"2016-06-02"],[1,4,"2016-06-03"]]}]},
+    {"name":"Test 8","input":[{"FriendRequest":[[5,6,"2016-06-01"],[6,7,"2016-06-02"],[7,5,"2016-06-03"]],"RequestAccepted":[[5,6,"2016-06-02"],[6,7,"2016-06-03"],[7,5,"2016-06-03"],[7,5,"2016-06-04"]]}]},
+    {"name":"Test 9","input":[{"FriendRequest":[[1,2,"2016-06-01"],[1,3,"2016-06-01"],[1,4,"2016-06-02"],[2,4,"2016-06-02"],[3,4,"2016-06-03"],[4,2,"2016-06-03"],[2,3,"2016-06-04"]],"RequestAccepted":[[1,2,"2016-06-02"],[1,3,"2016-06-02"],[1,4,"2016-06-03"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"small"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rate is one number built from two counts, and the only subtlety is what to count. Repeated rows describe the same request or acceptance, so each table is first reduced to its distinct directed pairs. Then the answer is a ratio of two `COUNT(*)`s, with a guard for the case where there are no requests and the division has nothing to divide by.\n\n## Approach\n\n1. CTE `requests`: `SELECT DISTINCT sender_id, send_to_id` from `FriendRequest`, one row per distinct request pair.\n2. CTE `accepts`: `SELECT DISTINCT requester_id, accepter_id` from `RequestAccepted`, one row per distinct accepted pair.\n3. Divide `(SELECT COUNT(*) FROM accepts)` by `(SELECT COUNT(*) FROM requests)`. In MySQL a division by zero gives `null`, and `IFNULL(..., 0)` turns that into 0.\n4. `ROUND(..., 2)` and name the column `accept_rate`.\n\n## Example 1, step by step\n\n- `requests` holds five pairs: (1,2), (1,3), (1,4), (2,3), (3,4).\n- `RequestAccepted` has five rows, but (3,4) appears twice, so `accepts` holds four pairs: (1,2), (1,3), (2,3), (3,4).\n- 4 / 5 = 0.8, reported as `0.80`.\n\n## Complexity\n\n- Time: O(R + A) to deduplicate R request rows and A acceptance rows with hashing (O((R + A) log(R + A)) with sorting).\n- Space: O(R + A) for the distinct pairs.\n\n## Pitfalls\n\n- Counting raw rows instead of distinct pairs inflates both counts when rows repeat.\n- `COUNT(DISTINCT requester_id)` deduplicates one column, not the pair, and undercounts users who accepted several requests.\n- Without `IFNULL`, an empty `FriendRequest` yields `null` instead of `0.00`.\n- Do not join the tables: acceptances without a matching request still count, so the rate can exceed 1.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `requests` | distinct `(sender_id, send_to_id)` pairs |\n| `accepts` | distinct `(requester_id, accepter_id)` pairs |\n| `IFNULL(..., 0)` | turns the null from a division by zero into 0 |\n| `accept_rate` | the rounded ratio of the two counts |",
+  "narration": {
+    "1": "The requests stage reduces FriendRequest to its distinct sender/receiver pairs.",
+    "2": "DISTINCT on both columns makes repeated requests between the same two users count once.",
+    "5": "The accepts stage does the same for RequestAccepted.",
+    "9": "The final SELECT computes a single value from the two stages.",
+    "10": "Distinct acceptances divided by distinct requests; with no requests the division gives null and IFNULL makes it 0.",
+    "11": "Round to 2 decimal places and name the column accept_rate."
+  }
+}

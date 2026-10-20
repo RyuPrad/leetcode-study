@@ -1,0 +1,47 @@
+{
+  "number": 1050,
+  "title": "Actors and Directors Who Cooperated At Least Three Times",
+  "spec": "leetcode",
+  "statement": "One table logs every collaboration between an actor and a director:\n\n- `ActorDirector(actor_id, director_id, timestamp)`: one row per collaboration; `timestamp` is unique, so the same actor and director can appear together on many rows.\n\nFind every pair (`actor_id`, `director_id`) that appears on **three or more** rows. The pair is ordered: actor 1 with director 2 is a different pair from actor 2 with director 1. Report the columns `actor_id` and `director_id`, one row per qualifying pair, in any order.",
+  "constraints": [
+    "timestamp is unique in ActorDirector",
+    "actor_id and director_id are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "ActorDirector": [["actor_id","INT"],["director_id","INT"],["timestamp","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ ActorDirector = [] }] = input;\n  const stamps = new Set();\n  for (const [actor, director, stamp] of ActorDirector) {\n    if (actor === null || director === null) return 'Every row needs an actor_id and a director_id.';\n    if (stamp === null) return 'Every row needs a timestamp.';\n    if (stamps.has(stamp)) return `timestamp ${stamp} appears twice.`;\n    stamps.add(stamp);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT actor_id, director_id\nFROM ActorDirector\nGROUP BY actor_id, director_id\nHAVING COUNT(*) >= 3;",
+  "brute": "SELECT DISTINCT outer_row.actor_id, outer_row.director_id\nFROM ActorDirector AS outer_row\nWHERE (\n  SELECT COUNT(*)\n  FROM ActorDirector AS same_pair\n  WHERE same_pair.actor_id = outer_row.actor_id\n    AND same_pair.director_id = outer_row.director_id\n) >= 3",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Few people in small tables make pairs repeat; a large table spreads 2,000 rows over about 150 pairs.\n  const people = small ? 3 : 12;\n  const ActorDirector = [];\n  const stamps = Array.from({ length: count }, (_, i) => i);\n  for (let i = stamps.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [stamps[i], stamps[j]] = [stamps[j], stamps[i]];\n  }\n  for (let i = 0; i < count; i++) {\n    ActorDirector.push([1 + Math.floor(rand() * people), 1 + Math.floor(rand() * people), stamps[i]]);\n  }\n  return [{ ActorDirector }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"ActorDirector":[[1,1,0],[1,1,1],[1,1,2],[1,2,3],[1,2,4],[2,1,5],[2,1,6]]}],"expected":{"columns":["actor_id","director_id"],"rows":[[1,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"ActorDirector":[]}]},
+    {"name":"Test 2","input":[{"ActorDirector":[[1,1,0]]}]},
+    {"name":"Test 3","input":[{"ActorDirector":[[4,7,10],[4,7,3],[4,7,8]]}]},
+    {"name":"Test 4","input":[{"ActorDirector":[[4,7,10],[4,7,3]]}]},
+    {"name":"Test 5","input":[{"ActorDirector":[[1,1,0],[1,2,1],[1,3,2],[2,3,3],[3,3,4]]}]},
+    {"name":"Test 6","input":[{"ActorDirector":[[1,2,0],[2,1,1],[1,2,2],[2,1,3]]}]},
+    {"name":"Test 7","input":[{"ActorDirector":[[1,2,0],[1,2,1],[1,2,2],[1,2,3],[1,2,4],[3,3,5],[3,3,6],[3,3,7],[2,1,8],[2,1,9]]}]},
+    {"name":"Test 8","input":[{"ActorDirector":[[5,9,100],[6,9,200],[5,9,300],[6,9,400],[5,9,500],[6,9,600],[7,9,700]]}]},
+    {"name":"Test 9","input":[{"ActorDirector":[[2,2,9],[1,1,8],[2,2,7],[1,1,6],[2,2,5],[1,1,4],[3,1,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery row is one collaboration, so \"how often did this actor work with this director\" is just the number of rows that share both ids. Grouping by the pair (`actor_id`, `director_id`) collapses each pair's rows into one group, `COUNT(*)` counts them, and `HAVING` keeps the groups whose count reaches three. `HAVING` is needed rather than `WHERE` because the count only exists after grouping.\n\n## Approach\n\n1. Read every row of `ActorDirector`.\n2. `GROUP BY actor_id, director_id`: one group per ordered pair.\n3. `HAVING COUNT(*) >= 3`: keep pairs with at least three collaborations.\n4. Select the two ids; each surviving group yields exactly one row.\n\n## Example 1, step by step\n\n- Pair (1, 1) has timestamps 0, 1 and 2: count 3.\n- Pair (1, 2) has timestamps 3 and 4: count 2.\n- Pair (2, 1) has timestamps 5 and 6: count 2.\n- Only (1, 1) reaches three, so the result is the single row `actor_id = 1`, `director_id = 1`.\n\n## Complexity\n\n- Time: O(n) with hash grouping over n rows, or O(n log n) if the database sorts to group.\n- Space: O(p) for p distinct pairs.\n\n## Pitfalls\n\n- `> 3` instead of `>= 3` drops pairs that worked together exactly three times, like (1, 1) in Example 1.\n- Grouping by `actor_id` alone counts an actor's films with every director together.\n- The pair is ordered: (1, 2) and (2, 1) are counted separately, so do not merge them with `LEAST`/`GREATEST`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY actor_id, director_id` | one group per actor-director pair |\n| `COUNT(*)` | number of collaborations in the group |\n| `HAVING` | filters groups after they are counted |",
+  "narration": {
+    "1": "Report the two ids that identify a pair.",
+    "2": "Every row of ActorDirector is one collaboration.",
+    "3": "Group rows by the actor and the director together, so each group holds one pair's collaborations.",
+    "4": "Keep only groups with at least three rows; HAVING is used because the count exists only after grouping."
+  }
+}

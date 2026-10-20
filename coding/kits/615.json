@@ -1,0 +1,57 @@
+{
+  "number": 615,
+  "title": "Average Salary: Departments VS Company",
+  "spec": "recalled",
+  "statement": "Two tables record who works where and what they were paid:\n\n- `Salary(id, employee_id, amount, pay_date)`: one row per payment; `id` is unique and `employee_id` names an employee in `Employee`. An employee is paid at most once in a given month.\n- `Employee(employee_id, department_id)`: one row per employee; `employee_id` is unique.\n\nFor each month, the **company average** is the average `amount` over all payments made that month, and a department's average is the average `amount` over that month's payments to its employees.\n\nFor every month and department that has at least one payment in that month, report `pay_month` (the month as `'YYYY-MM'`), `department_id` and `comparison`: `'higher'` if the department's average is above the company average for that month, `'lower'` if it is below, and `'same'` if they are equal. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Salary",
+    "employee_id is unique in Employee",
+    "Every Salary.employee_id appears in Employee",
+    "An employee has at most one payment per month",
+    "pay_date is a date 'YYYY-MM-DD'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salary": [["id","INT"],["employee_id","INT"],["amount","INT"],["pay_date","DATE"]],
+    "Employee": [["employee_id","INT"],["department_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Salary = [], Employee = [] }] = input;\n  const employees = new Set(), payments = new Set(), monthly = new Set();\n  for (const [id, dept] of Employee) {\n    if (id === null || dept === null) return 'Every employee needs an employee_id and a department_id.';\n    if (employees.has(id)) return `employee_id ${id} appears twice in Employee.`;\n    employees.add(id);\n  }\n  for (const [id, emp, amount, date] of Salary) {\n    if (id === null || amount === null) return 'Every payment needs an id and an amount.';\n    if (payments.has(id)) return `id ${id} appears twice in Salary.`;\n    if (!employees.has(emp)) return `Payment ${id} names unknown employee_id ${emp}.`;\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `Payment ${id} needs a pay_date like 2017-03-31.`;\n    const key = `${emp}@${date.slice(0, 7)}`;\n    if (monthly.has(key)) return `Employee ${emp} is paid twice in ${date.slice(0, 7)}.`;\n    payments.add(id); monthly.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH dept_avg AS (\n  SELECT DATE_FORMAT(s.pay_date, '%Y-%m') AS pay_month, e.department_id,\n    AVG(s.amount) AS dept_amount\n  FROM Salary AS s\n  JOIN Employee AS e\n    ON e.employee_id = s.employee_id\n  GROUP BY pay_month, e.department_id\n),\ncompany_avg AS (\n  SELECT DATE_FORMAT(pay_date, '%Y-%m') AS pay_month, AVG(amount) AS company_amount\n  FROM Salary\n  GROUP BY pay_month\n)\nSELECT d.pay_month, d.department_id,\n  CASE\n    WHEN d.dept_amount > c.company_amount THEN 'higher'\n    WHEN d.dept_amount < c.company_amount THEN 'lower'\n    ELSE 'same'\n  END AS comparison\nFROM dept_avg AS d\nJOIN company_avg AS c\n  ON c.pay_month = d.pay_month;",
+  "brute": "SELECT DISTINCT pay_month, department_id,\n  IF(dept_amount > company_amount, 'higher', IF(dept_amount < company_amount, 'lower', 'same')) AS comparison\nFROM (\n  SELECT LEFT(s.pay_date, 7) AS pay_month, e.department_id,\n    AVG(s.amount) OVER (PARTITION BY LEFT(s.pay_date, 7), e.department_id) AS dept_amount,\n    AVG(s.amount) OVER (PARTITION BY LEFT(s.pay_date, 7)) AS company_amount\n  FROM Salary AS s, Employee AS e\n  WHERE e.employee_id = s.employee_id\n) AS per_payment",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const months = small ? ['2016-12', '2017-01', '2017-02'] : Array.from({ length: 10 }, (_, i) => `2017-${String(i + 1).padStart(2, '0')}`);\n  const days = ['01', '15', '28'];\n  const employeeCount = small ? Math.floor(rand() * 6) : 200;\n  const deptCount = small ? 3 : 30;\n  const Employee = [], Salary = [];\n  for (let id = 1; id <= employeeCount; id++) Employee.push([id, 1 + Math.floor(rand() * deptCount)]);\n  // Amounts come from a short list so that department and company averages often tie.\n  const amounts = [5000, 6000, 7000, 8000, 9000, 10000];\n  for (const month of months) {\n    for (let id = 1; id <= employeeCount; id++) {\n      if (small && (rand() < 0.35 || Salary.length >= 8)) continue;\n      Salary.push([Salary.length + 1, id, amounts[Math.floor(rand() * amounts.length)], `${month}-${days[Math.floor(rand() * days.length)]}`]);\n    }\n  }\n  return [{ Salary, Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salary":[[1,1,9000,"2017-03-31"],[2,2,6000,"2017-03-31"],[3,3,10000,"2017-03-31"],[4,1,7000,"2017-02-28"],[5,2,6000,"2017-02-28"],[6,3,8000,"2017-02-28"]],"Employee":[[1,1],[2,2],[3,2]]}],"expected":{"columns":["pay_month","department_id","comparison"],"rows":[["2017-02",1,"same"],["2017-03",1,"higher"],["2017-02",2,"same"],["2017-03",2,"lower"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salary":[],"Employee":[[1,1],[2,2]]}]},
+    {"name":"Test 2","input":[{"Salary":[[1,1,5000,"2017-05-31"]],"Employee":[[1,4]]}]},
+    {"name":"Test 3","input":[{"Salary":[[1,1,9000,"2017-01-31"],[2,2,3000,"2017-01-31"],[3,3,6000,"2017-01-31"]],"Employee":[[1,1],[2,2],[3,3]]}]},
+    {"name":"Test 4","input":[{"Salary":[[1,1,9000,"2016-03-31"],[2,2,5000,"2016-03-31"],[3,1,5000,"2017-03-31"],[4,2,9000,"2017-03-31"]],"Employee":[[1,1],[2,2]]}]},
+    {"name":"Test 5","input":[{"Salary":[[1,1,7000,"2017-02-28"],[2,2,8000,"2017-02-28"]],"Employee":[[1,1],[2,2],[3,3]]}]},
+    {"name":"Test 6","input":[{"Salary":[[1,1,6000,"2017-04-01"],[2,2,8000,"2017-04-30"],[3,3,7000,"2017-04-15"]],"Employee":[[1,1],[2,1],[3,2]]}]},
+    {"name":"Test 7","input":[{"Salary":[[1,1,6000,"2017-06-30"],[2,2,4000,"2017-06-30"],[3,3,4000,"2017-06-30"],[4,4,4000,"2017-06-30"],[5,5,4800,"2017-06-30"]],"Employee":[[1,1],[2,2],[3,2],[4,2],[5,3]]}]},
+    {"name":"Test 8","input":[{"Salary":[[1,1,8000,"2017-07-31"],[2,2,8000,"2017-07-31"],[3,3,5000,"2017-07-31"],[4,1,6000,"2017-08-31"],[5,3,9000,"2017-08-31"]],"Employee":[[1,10],[2,10],[3,20]]}]},
+    {"name":"Test 9","input":[{"Salary":[[1,1,7000,"2016-12-31"],[2,2,7000,"2016-12-31"],[3,1,9000,"2017-01-31"],[4,2,5000,"2017-01-31"],[5,3,7000,"2017-01-31"]],"Employee":[[1,1],[2,2],[3,3]]}]},
+    {"name":"Test 10","input":[{"Salary":[[1,1,9000,"2017-03-31"],[2,2,6000,"2017-03-31"],[3,3,10000,"2017-03-31"],[4,1,7000,"2017-02-28"],[5,2,6000,"2017-02-28"],[6,3,8000,"2017-02-28"],[7,4,8000,"2017-02-28"]],"Employee":[[1,1],[2,2],[3,2],[4,3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"small"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo different averages are needed for the same month: one per department and one for the whole company. Each is a plain `GROUP BY` aggregation, just at a different grain, so compute them separately, line them up by month, and turn the comparison into a word with `CASE`.\n\n## Approach\n\n1. CTE `dept_avg`: join `Salary` (alias `s`) to `Employee` (alias `e`) to learn each payment's department, format the date as `DATE_FORMAT(s.pay_date, '%Y-%m')`, and group by month and department to get `dept_amount = AVG(s.amount)`.\n2. CTE `company_avg`: group all of `Salary` by the same month string to get `company_amount = AVG(amount)`.\n3. Join the two CTEs (aliases `d` and `c`) on `pay_month`, so each department row meets its month's company average.\n4. `CASE` maps `>` to `'higher'`, `<` to `'lower'`, and equality to `'same'`.\n\n## Example 1, step by step\n\n`dept_avg`:\n\n- 2017-03, department 1: 9000 → 9000\n- 2017-03, department 2: 6000 and 10000 → 8000\n- 2017-02, department 1: 7000 → 7000\n- 2017-02, department 2: 6000 and 8000 → 7000\n\n`company_avg`: 2017-03 → (9000 + 6000 + 10000) / 3 = 8333.33; 2017-02 → (7000 + 6000 + 8000) / 3 = 7000.\n\nComparing: March gives department 1 `higher` and department 2 `lower`; February gives `same` for both.\n\n## Complexity\n\n- Time: O(S) to group S payments twice (plus the join to E employees), and O(M · D) for the final join over M months and D departments.\n- Space: O(M · D) for the two CTEs.\n\n## Pitfalls\n\n- Grouping by `MONTH(pay_date)` alone merges March 2016 with March 2017; the month key must include the year.\n- The company average is over all payments of the month, not the average of the department averages; they differ when departments have different head counts.\n- Grouping by `pay_date` instead of the month splits a month whose payments fall on different days.\n- Starting from `Employee` with a left join reports departments that were not paid that month, with null months.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `dept_avg` | one row per month and department with its average payment `dept_amount` |\n| `company_avg` | one row per month with the average of all its payments, `company_amount` |\n| `s`, `e` | `Salary` and `Employee`, joined to tag each payment with a department |\n| `d`, `c` | the two CTEs, joined on `pay_month` |\n| `comparison` | `'higher'`, `'lower'` or `'same'` from the `CASE` |",
+  "narration": {
+    "1": "The CTE dept_avg computes each department's average payment per month.",
+    "2": "DATE_FORMAT turns a pay date into its year and month, the grouping key.",
+    "5": "Joining Employee tells us which department each payment belongs to.",
+    "7": "Grouping by month and department gives one average per department per month.",
+    "9": "The CTE company_avg averages every payment of the month, regardless of department.",
+    "14": "The final SELECT keeps the month and department and adds the comparison.",
+    "16": "A department above the company average is labelled higher.",
+    "21": "Each department row is matched with the company average of the same month."
+  }
+}

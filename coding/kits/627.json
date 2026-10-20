@@ -1,0 +1,49 @@
+{
+  "number": 627,
+  "title": "Swap Sex of Employees",
+  "spec": "leetcode",
+  "statement": "One table lists employees:\n\n- `Salary(id, name, sex, salary)`: one row per employee; `id` is unique. `sex` is always either `'m'` or `'f'`.\n\nYour answer is a single `UPDATE` statement that flips every employee's `sex`: each `'m'` becomes `'f'` and each `'f'` becomes `'m'`. No `SELECT` statement and no temporary table may be used; a query that only lists the flipped rows changes nothing. The other columns stay as they are. What gets judged is `Salary` itself once your statement has run, with its columns `id`, `name`, `sex` and `salary`; the order of its rows does not matter.",
+  "constraints": [
+    "id is unique in Salary",
+    "sex is one of 'm' or 'f'",
+    "The answer is one UPDATE statement; Salary afterwards is judged"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salary": [["id","INT"],["name","VARCHAR(100)"],["sex","CHAR(1)"],["salary","INT"]]
+  },
+  "ordered": false,
+  "modifies": "Salary",
+  "validator": "function validate(input) {\n  const [{ Salary = [] }] = input;\n  const ids = new Set();\n  for (const [id, , sex] of Salary) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Salary.`;\n    if (sex !== 'm' && sex !== 'f') return `Employee ${id} has sex ${sex}; it must be 'm' or 'f'.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "UPDATE Salary\nSET sex = CASE sex\n  WHEN 'm' THEN 'f'\n  WHEN 'f' THEN 'm'\nEND;",
+  "brute": "UPDATE Salary\nSET sex = REPLACE('fm', sex, '')",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const names = ['A', 'B', 'C', 'D', 'Ana', 'Bob', 'Kim', 'Ravi', 'Sofia', 'Lee'];\n  // Ids are drawn from a shuffled range so they are unique but not in insertion order.\n  const ids = Array.from({ length: small ? 20 : count }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  // A per-table bias makes all-'m' or all-'f' tables appear now and then.\n  const bias = rand() < 0.2 ? 0 : rand() < 0.25 ? 1 : rand();\n  const Salary = [];\n  for (let i = 0; i < count; i++) Salary.push([ids[i], names[Math.floor(rand() * names.length)], rand() < bias ? 'm' : 'f', 100 * Math.floor(rand() * 100)]);\n  return [{ Salary }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salary":[[1,"A","m",2500],[2,"B","f",1500],[3,"C","m",5500],[4,"D","f",500]]}],"expected":{"columns":["id","name","sex","salary"],"rows":[[1,"A","f",2500],[2,"B","m",1500],[3,"C","f",5500],[4,"D","m",500]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salary":[]}]},
+    {"name":"Test 2","input":[{"Salary":[[1,"Ana","f",3000]]}]},
+    {"name":"Test 3","input":[{"Salary":[[7,"Bob","m",1200]]}]},
+    {"name":"Test 4","input":[{"Salary":[[1,"A","m",100],[2,"B","m",200],[3,"C","m",300]]}]},
+    {"name":"Test 5","input":[{"Salary":[[1,"A","f",100],[2,"B","f",200],[3,"C","f",300]]}]},
+    {"name":"Test 6","input":[{"Salary":[[5,"Kim","f",0],[3,"Kim","m",0],[9,"Lee","f",4500],[1,"Ravi","m",4500]]}]},
+    {"name":"Test 7","input":[{"Salary":[[10,"m","f",900],[20,"f","m",800]]}]},
+    {"name":"Test 8","input":[{"Salary":[[2,"Sofia","m",7000],[4,"Ana","f",6500],[6,"Bob","f",6000],[8,"Lee","m",5500],[11,"Kim","f",5000]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row's new `sex` depends only on its old `sex`, so one pass over the table can rewrite every row at once. A `CASE` expression maps the old value to the new one, and because an `UPDATE` evaluates the right-hand side from each row's values **before** the change, `'m'` rows and `'f'` rows are swapped together without stepping on each other.\n\n## Approach\n\n1. `UPDATE Salary` names the table being changed; with no `WHERE`, every row is touched.\n2. `SET sex = CASE sex ...` computes the new value from the current one.\n3. `WHEN 'm' THEN 'f'` turns men into women, and `WHEN 'f' THEN 'm'` does the reverse. No `ELSE` is needed because the column only ever holds these two values.\n\n## Example 1, step by step\n\n- Row 1 (A) has `'m'`; the first branch matches, so it becomes `'f'`.\n- Row 2 (B) has `'f'`; the second branch matches, so it becomes `'m'`.\n- Rows 3 (C) and 4 (D) follow the same pattern: `'m'` to `'f'` and `'f'` to `'m'`.\n\n`Salary` ends with sexes f, m, f, m and unchanged names and salaries, as expected.\n\n## Complexity\n\n- Time: O(S) for S rows; each row is read and rewritten once.\n- Space: O(1) beyond the table itself.\n\n## Pitfalls\n\n- Two separate updates (`'m'` to `'f'`, then `'f'` to `'m'`) leave everyone as `'m'`, because the second one also catches the rows the first just changed. The task allows one statement for this reason.\n- A `SELECT` that shows the flipped values leaves the table untouched; only the `UPDATE` is judged.\n- `SET sex = 'f' WHERE sex = 'm'` handles only one direction.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `UPDATE Salary` | the table rewritten in place, every row since there is no `WHERE` |\n| `CASE sex` | compares each row's current `sex` with the listed values |\n| `WHEN ... THEN` | the old value on the left, its replacement on the right |",
+  "narration": {
+    "1": "Change the Salary table in place; with no WHERE clause every row is rewritten.",
+    "2": "The new sex is computed from the current one with a simple CASE on sex.",
+    "3": "Rows holding 'm' get 'f'.",
+    "4": "Rows holding 'f' get 'm'; both directions use the old value, so the swap happens at once.",
+    "5": "Every row holds one of the two listed values, so no ELSE branch is needed."
+  }
+}

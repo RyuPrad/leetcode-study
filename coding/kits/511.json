@@ -1,0 +1,47 @@
+{
+  "number": 511,
+  "title": "Game Play Analysis I",
+  "spec": "leetcode",
+  "statement": "One table logs player sessions:\n\n- `Activity(player_id, device_id, event_date, games_played)`: each row says a player logged in on `event_date` from `device_id` and played `games_played` games (possibly 0). A player has at most one row per date, so `(player_id, event_date)` is unique.\n\nFor each player that appears in `Activity`, report the earliest date they logged in. Return the columns `player_id` and `first_login`, one row per player. Rows may come in any order.",
+  "constraints": [
+    "(player_id, event_date) is unique in Activity",
+    "games_played is 0 or more",
+    "event_date is a date written YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["player_id","INT"],["device_id","INT"],["event_date","DATE"],["games_played","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const keys = new Set();\n  for (const [player, device, date, games] of Activity) {\n    if (player === null || date === null) return 'player_id and event_date are required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `event_date ${date} is not YYYY-MM-DD.`;\n    const key = `${player}|${date}`;\n    if (keys.has(key)) return `Player ${player} has two rows on ${date}.`;\n    keys.add(key);\n    if (games !== null && games < 0) return 'games_played cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  player_id,\n  MIN(event_date) AS first_login\nFROM Activity\nGROUP BY player_id;",
+  "brute": "SELECT a.player_id, a.event_date AS first_login\nFROM Activity AS a\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Activity AS earlier\n  WHERE earlier.player_id = a.player_id\n    AND earlier.event_date < a.event_date\n)",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const day = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;\n  const rows = size === 'small' ? pick(9) : 2000;\n  const players = size === 'small' ? 4 : 400;\n  const years = size === 'small' ? [2016, 2017] : [2015, 2016, 2017, 2018, 2019];\n  const Activity = [], seen = new Set();\n  for (let tries = 0; Activity.length < rows && tries < rows * 20; tries++) {\n    const player = 1 + pick(players);\n    const date = size === 'small' ? day(years[pick(2)], 1 + pick(3), 1 + pick(3)) : day(years[pick(years.length)], 1 + pick(12), 1 + pick(28));\n    if (seen.has(`${player}|${date}`)) continue;\n    seen.add(`${player}|${date}`);\n    Activity.push([player, 1 + pick(5), date, pick(8)]);\n  }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,2,"2016-03-01",5],[1,2,"2016-05-02",6],[2,3,"2017-06-25",1],[3,1,"2016-03-02",0],[3,4,"2018-07-03",5]]}],"expected":{"columns":["player_id","first_login"],"rows":[[1,"2016-03-01"],[2,"2017-06-25"],[3,"2016-03-02"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[7,1,"2020-02-29",0]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-05-10",3],[1,2,"2019-01-02",1],[1,1,"2019-03-15",0]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2017-01-01",2],[1,1,"2016-12-31",4],[2,3,"2016-12-31",0],[2,3,"2017-01-01",9]]}]},
+    {"name":"Test 5","input":[{"Activity":[[5,1,"2018-07-03",5],[4,1,"2018-07-03",5],[3,1,"2018-07-03",5]]}]},
+    {"name":"Test 6","input":[{"Activity":[[2,9,"2021-10-09",0],[2,1,"2021-09-10",0],[8,9,"2021-09-10",3]]}]},
+    {"name":"Test 7","input":[{"Activity":[[1,4,"2016-03-02",0],[1,2,"2016-03-01",5],[2,3,"2016-03-03",1],[2,2,"2018-03-01",2],[3,3,"2015-11-30",7],[3,1,"2015-12-01",1]]}]},
+    {"name":"Test 8","input":[{"Activity":[[10,1,"2019-08-01",1],[10,2,"2019-08-02",1],[10,3,"2019-08-03",1],[10,4,"2019-07-31",1]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach player can have many login rows, and we want one summary value per player: the smallest date. That is exactly what an aggregate does. Grouping the rows by `player_id` and taking `MIN(event_date)` collapses each player's history into their first login. Dates written `YYYY-MM-DD` order correctly, so the minimum is the earliest day.\n\n## Approach\n\n1. Read all rows of `Activity`.\n2. `GROUP BY player_id` so each player becomes one group.\n3. In each group, `MIN(event_date)` picks the earliest date; name it `first_login`.\n4. Output `player_id` with that date. The device and game count are not needed.\n\n## Example 1, step by step\n\n- Player 1 has dates 2016-03-01 and 2016-05-02; the minimum is 2016-03-01.\n- Player 2 has only 2017-06-25.\n- Player 3 has 2016-03-02 and 2018-07-03; the minimum is 2016-03-02.\n\nThe result is the three rows `(1, 2016-03-01)`, `(2, 2017-06-25)`, `(3, 2016-03-02)`.\n\n## Complexity\n\n- Time: O(n) with hash grouping over n rows (O(n log n) if the database sorts to group).\n- Space: O(p) for p distinct players.\n\n## Pitfalls\n\n- `ORDER BY event_date LIMIT 1` returns one row for the whole table, not one per player.\n- Adding `device_id` to the select list without grouping by it is rejected by MySQL's `ONLY_FULL_GROUP_BY`; even where accepted, the device shown is not guaranteed to be the one from the first login.\n- `MAX` instead of `MIN` gives the latest login; check with a player whose rows are not stored in date order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY player_id` | one group per player |\n| `MIN(event_date)` | the earliest login date in the group |\n| `first_login` | output name for that earliest date |",
+  "narration": {
+    "2": "Each output row is one player, the key of the grouping below.",
+    "3": "MIN picks the earliest event_date in the player's group and reports it as first_login.",
+    "4": "Every login row of Activity takes part.",
+    "5": "Group rows by player so MIN works over one player's history at a time."
+  }
+}

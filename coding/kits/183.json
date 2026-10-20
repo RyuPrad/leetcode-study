@@ -1,0 +1,50 @@
+{
+  "number": 183,
+  "title": "Customers Who Never Order",
+  "spec": "leetcode",
+  "statement": "Two tables record a shop's customers and their orders:\n\n- `Customers(id, name)`: one row per customer; `id` is unique. Two customers may have the same `name`.\n- `Orders(id, customerId)`: one row per order; `id` is unique, and `customerId` always names a row of `Customers`. A customer may have many orders.\n\nReport the customers who have no row at all in `Orders`, one row per such customer, in a single column named `Customers` holding the customer's `name`. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Customers",
+    "id is unique in Orders",
+    "Orders.customerId is never null and always exists in Customers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customers": [["id","INT"],["name","VARCHAR(255)"]],
+    "Orders": [["id","INT"],["customerId","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Customers = [], Orders = [] }] = input;\n  const customers = new Set(), orders = new Set();\n  for (const [id] of Customers) {\n    if (id === null) return 'Every customer needs an id.';\n    if (customers.has(id)) return `Customer id ${id} appears twice.`;\n    customers.add(id);\n  }\n  for (const [id, customerId] of Orders) {\n    if (id === null) return 'Every order needs an id.';\n    if (orders.has(id)) return `Order id ${id} appears twice.`;\n    if (!customers.has(customerId)) return `Order ${id} names customer ${customerId}, who is not in Customers.`;\n    orders.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH buyers AS (\n  SELECT DISTINCT customerId\n  FROM Orders\n)\nSELECT c.name AS Customers\nFROM Customers AS c\nWHERE c.id NOT IN (SELECT b.customerId FROM buyers AS b);",
+  "brute": "SELECT c.name AS Customers\nFROM Customers AS c\nLEFT JOIN Orders AS o\n  ON o.customerId = c.id\nWHERE o.id IS NULL",
+  "generator": "function generate(rand, size) {\n  const names = ['Joe', 'Henry', 'Sam', 'Max', 'Ana', 'Ravi'];\n  const small = size === 'small';\n  const Customers = [], Orders = [];\n  const customerCount = small ? Math.floor(rand() * 7) : 1000;\n  const ids = [];\n  for (let i = 0; i < customerCount; i++) {\n    // Gaps in the ids keep order ids and customer ids from lining up by accident.\n    const id = small ? i * 2 + 1 + Math.floor(rand() * 2) : i + 1;\n    ids.push(id);\n    Customers.push([id, names[Math.floor(rand() * names.length)]]);\n  }\n  if (ids.length > 0) {\n    // Orders favour a few customers, so some customers have several orders and others none.\n    const buyers = ids.filter(() => rand() < 0.6);\n    if (buyers.length > 0) {\n      const orderCount = small ? Math.floor(rand() * 9) : 2000;\n      for (let id = 1; id <= orderCount; id++) Orders.push([id, buyers[Math.floor(rand() * buyers.length)]]);\n    }\n  }\n  return [{ Customers, Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customers":[[1,"Joe"],[2,"Henry"],[3,"Sam"],[4,"Max"]],"Orders":[[1,3],[2,1]]}],"expected":{"columns":["Customers"],"rows":[["Henry"],["Max"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customers":[],"Orders":[]}]},
+    {"name":"Test 2","input":[{"Customers":[[1,"Ana"]],"Orders":[]}]},
+    {"name":"Test 3","input":[{"Customers":[[1,"Ana"]],"Orders":[[1,1],[2,1]]}]},
+    {"name":"Test 4","input":[{"Customers":[[1,"Joe"],[2,"Sam"],[3,"Max"]],"Orders":[[10,2],[11,3],[12,1]]}]},
+    {"name":"Test 5","input":[{"Customers":[[4,"Joe"],[7,"Henry"],[9,"Ravi"]],"Orders":[]}]},
+    {"name":"Test 6","input":[{"Customers":[[1,"Joe"],[2,"Joe"],[3,"Max"]],"Orders":[[1,2]]}]},
+    {"name":"Test 7","input":[{"Customers":[[1,"Joe"],[2,"Henry"],[3,"Sam"]],"Orders":[[1,3],[2,3],[3,3]]}]},
+    {"name":"Test 8","input":[{"Customers":[[5,"Ana"],[6,"Sam"],[7,"Max"],[8,"Ravi"]],"Orders":[[5,6],[6,8],[7,6]]}]},
+    {"name":"Test 9","input":[{"Customers":[[1,"Joe"],[2,"Joe"],[3,"Henry"],[4,"Henry"]],"Orders":[[1,1],[2,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA customer qualifies when their `id` never shows up as a `customerId` in `Orders`. So first collect the set of ids that did order, then keep the customers outside that set. Both steps are plain set operations, which a subquery expresses directly: `id NOT IN (the buyers)`.\n\n## Approach\n\n1. `buyers`: the distinct `customerId` values found in `Orders`, i.e. everyone who ordered at least once.\n2. Read `Customers` (alias `c`) and keep a row only when `c.id` is **not in** `buyers`.\n3. Output the name under the required column name `Customers`.\n\n## Example 1, step by step\n\n- `Orders` has customerIds 3 and 1, so `buyers` = {3, 1}.\n- Joe (id 1) is in `buyers`: dropped.\n- Henry (id 2) is not: kept.\n- Sam (id 3) is in `buyers`: dropped.\n- Max (id 4) is not: kept.\n\nThe result is Henry and Max.\n\n## Complexity\n\n- Time: O(C + O) for C customers and O orders when the membership test uses a hash or index; O(C · O) if the database scans `buyers` for each customer.\n- Space: O(O) for the set of buyers.\n\n## Pitfalls\n\n- `NOT IN` returns no rows at all if the subquery contains a `null`; here `customerId` is never null, but with nullable columns `NOT EXISTS` is the safe choice.\n- Comparing against `Orders.id` instead of `Orders.customerId` mixes up order ids with customer ids.\n- An inner join finds the customers who **did** order; the join-based answer needs a `LEFT JOIN` plus `WHERE o.id IS NULL`.\n- Selecting `DISTINCT name` would merge two different customers who share a name.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `buyers` | each `customerId` that has at least one order |\n| `c` | `Customers`, the rows being filtered |\n| `b` | `buyers` inside the membership subquery |\n| `Customers` (output) | the name of a customer with no orders |",
+  "narration": {
+    "1": "The first stage collects the customers who ordered at least once.",
+    "2": "DISTINCT keeps each ordering customer once, however many orders they placed.",
+    "5": "Report each surviving customer's name under the column name Customers.",
+    "6": "Every customer is a candidate, so the query reads the whole Customers table.",
+    "7": "Keep a customer only when their id is missing from the set of buyers."
+  }
+}

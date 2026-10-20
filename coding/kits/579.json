@@ -1,0 +1,53 @@
+{
+  "number": 579,
+  "title": "Find Cumulative Salary of an Employee",
+  "spec": "recalled",
+  "statement": "One table holds monthly pay for the year 2020:\n\n- `Employee(id, month, salary)`: the employee `id` was paid `salary` in `month` (1 to 12). `(id, month)` is unique; an employee may skip months.\n\nFor each employee and each month they were paid, compute a **3-month sum**: their salary in that month plus their salaries in the two calendar months before it. A month in that window with no row for the employee contributes 0, so a gap is not filled by an older month. Leave out each employee's **latest** paid month, and never report a month the employee was not paid.\n\nReturn the columns `id`, `month` and `Salary` (the 3-month sum), ordered by `id` ascending and, for the same `id`, by `month` descending.",
+  "constraints": [
+    "(id, month) is unique in Employee",
+    "1 <= month <= 12",
+    "salary is a non-negative integer, never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["month","INT"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const seen = new Set();\n  for (const [id, month, salary] of Employee) {\n    if (id === null || month === null) return 'Every row needs an id and a month.';\n    if (month < 1 || month > 12) return `Month ${month} is outside 1..12.`;\n    if (salary === null || salary < 0) return `Employee ${id} needs a non-negative salary in month ${month}.`;\n    const key = `${id}|${month}`;\n    if (seen.has(key)) return `Employee ${id} has two rows for month ${month}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH windowed AS (\n  SELECT\n    id,\n    month,\n    SUM(salary) OVER (\n      PARTITION BY id\n      ORDER BY month\n      RANGE BETWEEN 2 PRECEDING AND CURRENT ROW\n    ) AS Salary,\n    MAX(month) OVER (PARTITION BY id) AS last_month\n  FROM Employee\n)\nSELECT id, month, Salary\nFROM windowed\nWHERE month < last_month\nORDER BY id ASC, month DESC;",
+  "brute": "SELECT e.id, e.month, SUM(prev.salary) AS Salary\nFROM Employee AS e\nJOIN Employee AS prev\n  ON prev.id = e.id\n  AND prev.month BETWEEN e.month - 2 AND e.month\nWHERE e.month < (SELECT MAX(latest.month) FROM Employee AS latest WHERE latest.id = e.id)\nGROUP BY e.id, e.month\nORDER BY e.id ASC, e.month DESC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const people = small ? 1 + Math.floor(rand() * 3) : 180;\n  const Employee = [];\n  for (let id = 1; id <= people; id++) {\n    // Each employee works a random subset of months, often with gaps.\n    const chance = small ? 0.15 + rand() * 0.4 : 0.3 + rand() * 0.7;\n    for (let month = 1; month <= 12; month++) {\n      if (small && Employee.length >= 8) break;\n      if (rand() < chance) Employee.push([id, month, 10 * (1 + Math.floor(rand() * 9))]);\n    }\n  }\n  // Shuffle so row order carries no information.\n  for (let i = Employee.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Employee[i], Employee[j]] = [Employee[j], Employee[i]]; }\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,1,20],[2,1,20],[1,2,30],[2,2,30],[3,2,40],[1,3,40],[3,3,60],[1,4,60],[3,4,70],[1,7,90],[1,8,90]]}],"expected":{"columns":["id","month","Salary"],"rows":[[1,7,90],[1,4,130],[1,3,90],[1,2,50],[1,1,20],[2,1,20],[3,3,100],[3,2,40]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[[1,5,100]]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,1,10],[1,2,20],[1,3,30],[1,4,40]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,1,10],[1,3,20],[1,4,40],[1,6,80],[1,9,5]]}]},
+    {"name":"Test 4","input":[{"Employee":[[2,3,50],[1,2,10],[2,1,30],[1,1,20],[2,2,40],[1,3,60]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,1,10],[1,2,10],[1,3,10],[2,1,20],[2,2,20],[2,3,20],[2,4,20],[2,5,20]]}]},
+    {"name":"Test 6","input":[{"Employee":[[7,2,70],[7,12,90]]}]},
+    {"name":"Test 7","input":[{"Employee":[[3,1,15],[3,11,25],[3,12,35],[4,12,50]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,4,0],[1,5,30],[1,6,0],[1,7,10],[2,4,30],[2,6,30],[2,8,30]]}]},
+    {"name":"Test 9","input":[{"Employee":[[10,10,100],[10,8,80],[10,9,90],[5,6,60],[5,3,30],[5,5,50],[8,1,10]]}]},
+    {"name":"Test 10","input":[{"Employee":[]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe 3-month sum is a sliding window over each employee's own history, measured in **calendar months**, not in rows. A window function with a value-based frame, `RANGE BETWEEN 2 PRECEDING AND CURRENT ROW` over `month`, adds exactly the rows whose month lies in `[month - 2, month]`; missing months simply have no row, so they count as 0. A second window, `MAX(month)` per employee, marks the latest month so it can be dropped.\n\n## Approach\n\n1. CTE `windowed`: for every row, partition by `id`, order by `month`, and sum `salary` over the value range of the two previous months through the current one as `Salary`. In the same pass, record `last_month`, the employee's largest month.\n2. Keep rows with `month < last_month`, which removes exactly one row (the latest) per employee.\n3. Order by `id` ascending, then `month` descending.\n\n## Example 1, step by step\n\n- Employee 1 worked months 1, 2, 3, 4, 7, 8. The windows give 20, 20+30 = 50, 20+30+40 = 90, 30+40+60 = 130, then 90 for month 7 (months 5 and 6 are empty) and 180 for month 8. `last_month = 8`, so month 8 is dropped.\n- Employee 2 worked months 1 and 2: sums 20 and 50; month 2 is the latest and is dropped.\n- Employee 3 worked months 2, 3, 4: sums 40, 100, 170; month 4 is dropped.\n\nSorted, this gives (1,7,90), (1,4,130), (1,3,90), (1,2,50), (1,1,20), (2,1,20), (3,3,100), (3,2,40).\n\n## Complexity\n\n- Time: O(n log n) for n rows to sort each partition; each window frame then covers at most 3 rows.\n- Space: O(n) for the windowed rows.\n\n## Pitfalls\n\n- `ROWS BETWEEN 2 PRECEDING` counts rows, not months: after a gap it reaches too far back. With rows only for months 1, 3 and 4, it would add month 1 into the month-4 sum.\n- Dropping the overall latest month in the table, instead of each employee's own latest, keeps or removes the wrong rows.\n- The order is mixed: `id` ascending but `month` descending.\n- The output column is `Salary` with a capital S.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `windowed` | every row with its 3-month `Salary` and the employee's `last_month` |\n| `Salary` | sum of the employee's salaries for months `month - 2` through `month` |\n| `last_month` | the employee's most recent paid month, excluded from the output |\n| `RANGE BETWEEN 2 PRECEDING AND CURRENT ROW` | frame by month value, so gaps contribute nothing |",
+  "narration": {
+    "1": "The windowed CTE computes both window values in a single pass over Employee.",
+    "5": "Sum salaries within each employee's own history.",
+    "6": "Each employee is a separate partition, so sums never mix people.",
+    "7": "Order the partition by month so the frame can look backwards in time.",
+    "8": "A RANGE frame uses month values: only months month-2 through month are added, and missing months add nothing.",
+    "10": "The largest month per employee marks the row that must be left out.",
+    "15": "Drop each employee's latest month; every earlier month stays.",
+    "16": "Sort by id ascending, then by month descending, as required."
+  }
+}

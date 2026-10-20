@@ -1,0 +1,49 @@
+{
+  "number": 569,
+  "title": "Median Employee Salary",
+  "spec": "recalled",
+  "statement": "One table lists employees and their pay:\n\n- `Employee(id, company, salary)`: one row per employee; `id` is unique. Each employee works for one `company`, and salaries within a company may repeat.\n\nFor each company, line up its employees by `salary` from low to high, breaking equal salaries by smaller `id` first, and number them 1 to n. The median rows are the middle one, position `(n + 1) / 2`, when n is odd, and the two middle ones, positions `n / 2` and `n / 2 + 1`, when n is even. Report those employees' rows with the columns `id`, `company` and `salary`. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Employee",
+    "company and salary are never null",
+    "salary is 0 or more"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["company","VARCHAR(255)"],["salary","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const ids = new Set();\n  for (const [id, company, salary] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Employee.`;\n    if (company === null) return `Employee ${id} needs a company.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    if (salary < 0) return `Employee ${id} has a negative salary.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    id,\n    company,\n    salary,\n    ROW_NUMBER() OVER (PARTITION BY company ORDER BY salary, id) AS pos,\n    COUNT(*) OVER (PARTITION BY company) AS total\n  FROM Employee\n)\nSELECT id, company, salary\nFROM ranked\nWHERE pos BETWEEN total / 2 AND total / 2 + 1;",
+  "brute": "SELECT e.id, e.company, e.salary\nFROM Employee AS e\nWHERE ABS(\n  (\n    SELECT COUNT(*)\n    FROM Employee AS smaller\n    WHERE smaller.company = e.company\n      AND (smaller.salary < e.salary OR (smaller.salary = e.salary AND smaller.id < e.id))\n  ) - (\n    SELECT COUNT(*)\n    FROM Employee AS larger\n    WHERE larger.company = e.company\n      AND (larger.salary > e.salary OR (larger.salary = e.salary AND larger.id > e.id))\n  )\n) <= 1",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Employee = [];\n  if (size === 'small') {\n    // Few companies and a small salary pool make even and odd sizes and tied middles common.\n    const companies = ['A', 'B', 'C'].slice(0, 1 + pick(3));\n    const salaries = [0, 15, 234, 451, 451, 1154, 2645];\n    const rows = pick(9);\n    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].sort(() => rand() - 0.5);\n    for (let i = 0; i < rows; i++) Employee.push([ids[i], companies[pick(companies.length)], salaries[pick(salaries.length)]]);\n  } else {\n    const companies = Array.from({ length: 60 }, (_, i) => `C${i + 1}`);\n    const ids = Array.from({ length: 2000 }, (_, i) => i + 1).sort(() => rand() - 0.5);\n    for (const id of ids) Employee.push([id, companies[pick(companies.length)], pick(200) * 100]);\n  }\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,"A",2341],[2,"A",341],[3,"A",15],[4,"A",15314],[5,"A",451],[6,"A",513],[7,"B",15],[8,"B",13],[9,"B",1154],[10,"B",1345],[11,"B",1221],[12,"B",234],[13,"C",2345],[14,"C",2645],[15,"C",2645],[16,"C",2652],[17,"C",65]]}],"expected":{"columns":["id","company","salary"],"rows":[[5,"A",451],[6,"A",513],[12,"B",234],[9,"B",1154],[14,"C",2645]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[]}]},
+    {"name":"Test 2","input":[{"Employee":[[4,"A",700]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,"A",900],[2,"A",100]]}]},
+    {"name":"Test 4","input":[{"Employee":[[3,"A",100],[1,"A",100],[2,"A",100]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,"A",10],[5,"A",20],[2,"A",20],[9,"A",20]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,"A",50],[2,"B",60],[3,"B",40],[4,"C",0],[5,"C",0],[6,"C",0]]}]},
+    {"name":"Test 7","input":[{"Employee":[[8,"X",300],[3,"X",500],[6,"X",100],[1,"X",400],[5,"X",200]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,"A",5],[2,"A",9],[3,"A",9],[4,"A",1],[5,"B",7],[6,"B",7],[7,"B",3],[8,"B",8],[9,"B",7],[10,"B",2]]}]},
+    {"name":"Test 9","input":[{"Employee":[[12,"B",451],[11,"B",451],[10,"B",15],[9,"B",2645],[7,"A",234],[8,"A",234]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA median is a position, not a value: once a company's employees are lined up by salary (and by `id` on equal salaries), the median rows are simply the ones in the middle of the line. Window functions give each row both facts it needs without collapsing anything: its position in the line (`ROW_NUMBER()`) and the length of the line (`COUNT(*) OVER`). Because the tie-break by `id` makes the order total, every position belongs to exactly one employee.\n\n## Approach\n\n1. `ranked`: for every employee, `pos` = `ROW_NUMBER() OVER (PARTITION BY company ORDER BY salary, id)` and `total` = `COUNT(*) OVER (PARTITION BY company)`.\n2. Keep rows with `pos BETWEEN total / 2 AND total / 2 + 1`. MySQL's `/` is exact division: for even `total` this is the two middle positions; for odd `total` the bounds are `x.5` values and only the single middle position fits.\n3. Output `id`, `company` and `salary` of those rows.\n\n## Example 1, step by step\n\n- Company A (total 6) in order: 15 (id 3), 341 (2), 451 (5), 513 (6), 2341 (1), 15314 (4). The window is 3 to 4, so ids 5 and 6.\n- Company B (total 6): 13 (8), 15 (7), 234 (12), 1154 (9), 1221 (11), 1345 (10). Positions 3 and 4 are ids 12 and 9.\n- Company C (total 5): 65 (17), 2345 (13), 2645 (14), 2645 (15), 2652 (16). The window is 2.5 to 3.5, so only position 3, id 14; id 15 has the same salary but comes after it.\n\n## Complexity\n\n- Time: O(n log n) for n employees, to sort each company's rows for the window.\n- Space: O(n) for `ranked`.\n\n## Pitfalls\n\n- `RANK()` or `DENSE_RANK()` gives tied salaries the same number, so a tied middle can return too many rows or none.\n- Leaving `id` out of the window's `ORDER BY` makes the order of equal salaries arbitrary, so the wrong employee can be reported.\n- Integer division (`total DIV 2`) turns the odd case into the window 2 to 3 for five rows and returns two employees.\n- `AVG(salary)` gives a number, not the employee rows the task asks for.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every employee with its position and its company's size |\n| `pos` | 1-based place in the company's (salary, id) order |\n| `total` | number of employees in the company |\n| `total / 2` ... `total / 2 + 1` | the window that holds exactly the median positions |",
+  "narration": {
+    "1": "The first stage tags every employee with a position and the size of their company.",
+    "6": "ROW_NUMBER numbers each company's employees by salary, using id to order equal salaries so positions are unique.",
+    "7": "COUNT(*) over the same partition gives every row its company's headcount without grouping rows away.",
+    "10": "The final stage reports the median employees' own rows.",
+    "12": "Exact division makes this window hold the two middle positions for an even count and the single middle one for an odd count."
+  }
+}

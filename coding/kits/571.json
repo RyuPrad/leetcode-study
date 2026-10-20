@@ -1,0 +1,51 @@
+{
+  "number": 571,
+  "title": "Find Median Given Frequency of Numbers",
+  "spec": "recalled",
+  "statement": "One table stores a list of integers in compressed form:\n\n- `Numbers(num, frequency)`: `num` is unique, and `frequency` (a positive integer) says how many copies of `num` the list contains.\n\nDecompress the table in your head: the list holds every `num` repeated `frequency` times. Report the **median** of that list. Sort the list; when its length is odd the median is the single middle value, and when it is even the median is the average of the two middle values. Round it to 1 decimal place and return it as one row with one column named `median`.",
+  "constraints": [
+    "num is unique in Numbers",
+    "frequency is a positive integer"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Numbers": [["num","INT"],["frequency","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Numbers = [] }] = input;\n  const seen = new Set();\n  for (const [num, frequency] of Numbers) {\n    if (num === null) return 'Every row needs a num.';\n    if (seen.has(num)) return `num ${num} appears twice in Numbers.`;\n    seen.add(num);\n    if (frequency === null || frequency < 1) return `num ${num} needs a positive frequency.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH running AS (\n  SELECT\n    num,\n    frequency,\n    SUM(frequency) OVER (ORDER BY num) AS cum_freq,\n    SUM(frequency) OVER () AS total\n  FROM Numbers\n)\nSELECT ROUND(AVG(num), 1) AS median\nFROM running\nWHERE cum_freq >= total / 2\n  AND cum_freq - frequency <= total / 2;",
+  "brute": "SELECT ROUND(AVG(n.num), 1) AS median\nFROM Numbers AS n\nWHERE n.frequency >= ABS(\n  (SELECT IFNULL(SUM(lo.frequency), 0) FROM Numbers AS lo WHERE lo.num < n.num)\n  - (SELECT IFNULL(SUM(hi.frequency), 0) FROM Numbers AS hi WHERE hi.num > n.num))",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Numbers = [];\n  if (size === 'small') {\n    // A few distinct values from a small range, including negatives, with small frequencies so middles often split.\n    const pool = [-2, -1, 0, 1, 2, 3, 4, 5, 6];\n    for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    const rows = pick(7);\n    for (let i = 0; i < rows; i++) Numbers.push([pool[i], 1 + pick(4)]);\n  } else {\n    const used = new Set();\n    while (Numbers.length < 1500) {\n      const num = pick(20000) - 5000;\n      if (used.has(num)) continue;\n      used.add(num);\n      Numbers.push([num, 1 + pick(rand() < 0.1 ? 500 : 20)]);\n    }\n  }\n  return [{ Numbers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Numbers":[[0,7],[1,1],[2,3],[3,1]]}],"expected":{"columns":["median"],"rows":[[0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Numbers":[[5,1]]}]},
+    {"name":"Test 2","input":[{"Numbers":[[5,4]]}]},
+    {"name":"Test 3","input":[{"Numbers":[[1,1],[2,1]]}]},
+    {"name":"Test 4","input":[{"Numbers":[[3,1],[1,1]]}]},
+    {"name":"Test 5","input":[{"Numbers":[[1,2],[10,2]]}]},
+    {"name":"Test 6","input":[{"Numbers":[[1,1],[2,5],[3,1]]}]},
+    {"name":"Test 7","input":[{"Numbers":[[4,1],[-1,1],[-3,2]]}]},
+    {"name":"Test 8","input":[{"Numbers":[[1,3],[2,3]]}]},
+    {"name":"Test 9","input":[{"Numbers":[[0,1],[1,1],[2,1],[100,10]]}]},
+    {"name":"Test 10","input":[{"Numbers":[[2,1],[1,1],[4,1],[3,1]]}]},
+    {"name":"Test 11","input":[{"Numbers":[[9,1],[8,999],[7,1000]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nExpanding every row into `frequency` copies would let us pick the middle directly, but the list can be far longer than the table. Instead, sort the distinct values and keep a **running total** of frequencies: a value's copies occupy positions `cum_freq - frequency + 1` through `cum_freq` of the sorted list. With `total` copies overall, the median positions sit at `total / 2` (the middle, or the boundary between the two middles). A value holds a median position exactly when its copies reach `total / 2` (`cum_freq >= total / 2`) and start no later than just past it (`cum_freq - frequency <= total / 2`). One or two values qualify, and averaging them gives the median.\n\n## Approach\n\n1. CTE `running`: for each row, `SUM(frequency) OVER (ORDER BY num)` gives `cum_freq`, the copies up to and including `num`; `SUM(frequency) OVER ()` gives `total` on every row.\n2. Keep the rows with `cum_freq >= total / 2` and `cum_freq - frequency <= total / 2`.\n3. `AVG(num)` over those rows: one row for an odd length or when both middles share a value, two rows when they differ.\n4. `ROUND(..., 1)` and name it `median`.\n\n## Example 1, step by step\n\n- Sorted by `num`: 0 (7 copies), 1 (1), 2 (3), 3 (1). `cum_freq` is 7, 8, 11, 12 and `total = 12`, so `total / 2 = 6`.\n- 0: `7 >= 6` and `7 - 7 = 0 <= 6`, kept. 1: `8 - 1 = 7 > 6`, dropped. 2: `11 - 3 = 8`, dropped. 3: `12 - 1 = 11`, dropped.\n- `AVG` of {0} is 0, so `median = 0.0` (the 6th and 7th copies are both 0).\n\n## Complexity\n\n- Time: O(n log n) to sort n rows for the window, then O(n) to filter and average.\n- Space: O(n) for the `running` rows.\n\n## Pitfalls\n\n- With an even length the two middles can be different values; reporting only one of them is wrong. `AVG` over the qualifying rows handles both cases.\n- Strict comparisons (`>` or `<`) miss the value whose copies end exactly at `total / 2`, as in `(1, 3), (2, 3)` where the median is 1.5.\n- Order the window by `num`, not by the table's row order; the input is not sorted.\n- Expanding rows with a recursive CTE builds `total` rows, which can be huge for large frequencies.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `running` | each `num` with its `frequency`, `cum_freq` and `total` |\n| `cum_freq` | copies of all values up to and including `num` |\n| `total` | length of the decompressed list |\n| `median` | average of the qualifying values, rounded to 1 decimal |",
+  "narration": {
+    "1": "Stage one, running, lays the sorted values end to end with running counts.",
+    "5": "The running sum ordered by num tells where each value's last copy lands in the sorted list.",
+    "6": "An empty OVER () sums the whole table, giving the list's length on every row.",
+    "9": "Average the values that hold a middle position and round to 1 decimal.",
+    "11": "A value qualifies only if its copies reach the halfway point of the list.",
+    "12": "Its copies must also start no later than one position past the halfway point."
+  }
+}

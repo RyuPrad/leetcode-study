@@ -1,0 +1,53 @@
+{
+  "number": 180,
+  "title": "Consecutive Numbers",
+  "spec": "leetcode",
+  "statement": "One table is a log of numbers, written one after another:\n\n- `Logs(id, num)`: one row per log entry. `id` is unique and auto-incremented from 1, so the ids are exactly `1, 2, ..., n` with no gaps; entry `id + 1` comes right after entry `id`. `num` is never `null`.\n\nFind every number that shows up in **at least three entries in a row** (three consecutive ids carrying the same `num`). Report each such number once, in a single column named `ConsecutiveNums`. A number that occurs three or more times but never three times back to back is not reported. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Logs",
+    "the ids are exactly 1, 2, ..., n (auto-increment, no gaps)",
+    "num is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Logs": [["id","INT"],["num","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Logs = [] }] = input;\n  const ids = new Set();\n  for (const [id, num] of Logs) {\n    if (id === null) return 'Every log entry needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Logs.`;\n    if (num === null) return `Entry ${id} needs a num.`;\n    ids.add(id);\n  }\n  for (let id = 1; id <= Logs.length; id++) if (!ids.has(id)) return `The ids must be 1 to ${Logs.length} with no gaps; ${id} is missing.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT cur.num AS ConsecutiveNums\nFROM Logs AS cur\nJOIN Logs AS next1\n  ON next1.id = cur.id + 1\n  AND next1.num = cur.num\nJOIN Logs AS next2\n  ON next2.id = cur.id + 2\n  AND next2.num = cur.num;",
+  "brute": "SELECT DISTINCT num AS ConsecutiveNums\nFROM (\n  SELECT\n    num,\n    LAG(num, 1) OVER (ORDER BY id) AS prev1,\n    LAG(num, 2) OVER (ORDER BY id) AS prev2\n  FROM Logs\n) AS windowed\nWHERE num = prev1\n  AND num = prev2",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // A small pool and a high chance of repeating the previous number make runs of every length common.\n  const pool = small ? [1, 2, 3, 0, -1] : Array.from({ length: 40 }, (_, i) => i - 5);\n  const rows = [];\n  let previous = null;\n  for (let id = 1; id <= count; id++) {\n    const num = previous !== null && rand() < 0.55 ? previous : pool[Math.floor(rand() * pool.length)];\n    rows.push([id, num]);\n    previous = num;\n  }\n  // Rows are stored in a shuffled order so that only the ids give the sequence.\n  for (let i = rows.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [rows[i], rows[j]] = [rows[j], rows[i]];\n  }\n  return [{ Logs: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Logs":[[1,1],[2,1],[3,1],[4,2],[5,1],[6,2],[7,2]]}],"expected":{"columns":["ConsecutiveNums"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Logs":[]}]},
+    {"name":"Test 2","input":[{"Logs":[[1,4]]}]},
+    {"name":"Test 3","input":[{"Logs":[[1,5],[2,5],[3,6],[4,5],[5,5]]}]},
+    {"name":"Test 4","input":[{"Logs":[[1,5],[2,5],[3,5]]}]},
+    {"name":"Test 5","input":[{"Logs":[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]]}]},
+    {"name":"Test 6","input":[{"Logs":[[1,1],[2,2],[3,1],[4,2],[5,1],[6,2]]}]},
+    {"name":"Test 7","input":[{"Logs":[[1,3],[2,3],[3,3],[4,4],[5,4],[6,4]]}]},
+    {"name":"Test 8","input":[{"Logs":[[1,2],[2,2],[3,2],[4,1],[5,2],[6,2],[7,2]]}]},
+    {"name":"Test 9","input":[{"Logs":[[3,8],[5,9],[1,8],[4,9],[2,8],[6,8]]}]},
+    {"name":"Test 10","input":[{"Logs":[[1,0],[2,0],[3,0],[4,-1],[5,-1],[6,-1],[7,0]]}]},
+    {"name":"Test 11","input":[{"Logs":[[1,1],[2,1],[3,2],[4,2],[5,2]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Three times in a row\" means three entries with ids `i`, `i + 1` and `i + 2` that carry the same number. Because the ids have no gaps, each of those neighbours can be found by joining `Logs` to itself on an id offset. Any row that finds both neighbours with an equal `num` starts a run of at least three, and its number belongs in the answer.\n\n## Approach\n\n1. Read `Logs` as `cur`, the candidate first entry of a run.\n2. Join a second copy, `next1`, at `id = cur.id + 1` and require the same `num`.\n3. Join a third copy, `next2`, at `id = cur.id + 2`, again with the same `num`.\n4. Every surviving row is the start of a run of three. A longer run starts several such triples, and one number may have several runs, so `SELECT DISTINCT` reports each number once as `ConsecutiveNums`.\n\n## Example 1, step by step\n\n- `cur.id = 1` (num 1): id 2 holds 1 and id 3 holds 1, so the triple survives with num 1.\n- `cur.id = 2`: id 3 holds 1 but id 4 holds 2, so it is dropped.\n- `cur.id = 3, 4, 5`: the very next entry already differs (2, 1, 2 after 1, 2, 1).\n- `cur.id = 6` (num 2): id 7 holds 2, but there is no id 8. `cur.id = 7` has no id 8 at all.\n\nOnly one triple survives, so the answer is the single row `1`.\n\n## Complexity\n\n- Time: O(n) for n entries, since each join is a lookup on the primary key `id`; without an index it could degrade to O(n²).\n- Space: O(n) at worst for the joined rows before `DISTINCT`.\n\n## Pitfalls\n\n- Forgetting `DISTINCT`: a run of five 7s starts three triples, and two separate runs of 2s each start one, so the number would be repeated.\n- Matching only on equal `num` without the id offsets counts any three equal numbers anywhere, such as 1, 2, 1, 2, 1.\n- Relying on the order rows are stored in instead of on `id`: rows can arrive shuffled, and only the ids define the sequence.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `cur` | the entry that may start a run |\n| `next1` | the entry right after `cur`, kept only if its `num` matches |\n| `next2` | the entry two after `cur`, kept only if its `num` matches |\n| `ConsecutiveNums` | each number that starts at least one run of three |",
+  "narration": {
+    "1": "Each surviving row starts a run of three; DISTINCT reports each number once even if it has several runs.",
+    "2": "cur is the candidate first entry of a run.",
+    "3": "Join a second copy of Logs for the entry right after cur.",
+    "4": "The ids have no gaps, so id + 1 is exactly the next entry.",
+    "5": "That next entry must carry the same number.",
+    "6": "Join a third copy for the entry two places after cur.",
+    "8": "It must also carry the same number, completing three in a row."
+  }
+}

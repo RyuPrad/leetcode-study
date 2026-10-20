@@ -1,0 +1,53 @@
+{
+  "number": 585,
+  "title": "Investments in 2016",
+  "spec": "leetcode",
+  "statement": "One table lists insurance policies:\n\n- `Insurance(pid, tiv_2015, tiv_2016, lat, lon)`: one row per policy; `pid` is unique. `tiv_2015` and `tiv_2016` are the policy's total investment value in 2015 and 2016, and `(lat, lon)` is the location of the holder's city. `lat` and `lon` are never null.\n\nA policy counts when **both** hold:\n\n- at least one *other* policy has the same `tiv_2015`, and\n- no other policy has the same `(lat, lon)` pair (both coordinates equal).\n\nReturn one row with one column, `tiv_2016`: the sum of `tiv_2016` over the counted policies, rounded to 2 decimal places (`null` when no policy counts).",
+  "constraints": [
+    "pid is unique in Insurance",
+    "lat and lon are never null",
+    "Two cities are the same only when lat and lon both match"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Insurance": [["pid","INT"],["tiv_2015","FLOAT"],["tiv_2016","FLOAT"],["lat","FLOAT"],["lon","FLOAT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Insurance = [] }] = input;\n  const seen = new Set();\n  for (const [pid, , , lat, lon] of Insurance) {\n    if (pid === null) return 'Every policy needs a pid.';\n    if (seen.has(pid)) return `pid ${pid} appears twice.`;\n    if (lat === null || lon === null) return `Policy ${pid} needs lat and lon.`;\n    seen.add(pid);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH shared_2015 AS (\n  SELECT tiv_2015\n  FROM Insurance\n  GROUP BY tiv_2015\n  HAVING COUNT(*) > 1\n),\nunique_city AS (\n  SELECT lat, lon\n  FROM Insurance\n  GROUP BY lat, lon\n  HAVING COUNT(*) = 1\n)\nSELECT ROUND(SUM(i.tiv_2016), 2) AS tiv_2016\nFROM Insurance AS i\nWHERE i.tiv_2015 IN (SELECT tiv_2015 FROM shared_2015)\n  AND (i.lat, i.lon) IN (SELECT lat, lon FROM unique_city);",
+  "brute": "SELECT ROUND(SUM(i.tiv_2016), 2) AS tiv_2016\nFROM Insurance AS i\nWHERE EXISTS (\n    SELECT 1 FROM Insurance AS twin\n    WHERE twin.pid <> i.pid AND twin.tiv_2015 = i.tiv_2015\n  )\n  AND NOT EXISTS (\n    SELECT 1 FROM Insurance AS neighbor\n    WHERE neighbor.pid <> i.pid AND neighbor.lat = i.lat AND neighbor.lon = i.lon\n  )",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Small pools make shared tiv_2015 values and shared cities common; values are multiples of 0.25 so they are exact.\n  const tivPool = small ? 4 : 600, coordPool = small ? 3 : 40;\n  const value = pool => Math.floor(rand() * pool) * 2.5 + (rand() < 0.3 ? 0.25 : 0);\n  const coord = () => Math.floor(rand() * coordPool) * 5 + (rand() < 0.2 ? 0.5 : 0);\n  const Insurance = [];\n  for (let pid = 1; pid <= count; pid++) {\n    Insurance.push([pid, value(tivPool), Math.round(rand() * 400) / 4, coord(), coord()]);\n  }\n  return [{ Insurance }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Insurance":[[1,10,5,10,10],[2,20,20,20,20],[3,10,30,20,20],[4,10,40,40,40]]}],"expected":{"columns":["tiv_2016"],"rows":[[45]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Insurance":[]}]},
+    {"name":"Test 2","input":[{"Insurance":[[1,10,50,1,1]]}]},
+    {"name":"Test 3","input":[{"Insurance":[[1,10,5,1,1],[2,10,6,2,2],[3,10,7,3,3]]}]},
+    {"name":"Test 4","input":[{"Insurance":[[1,10,5,7,7],[2,10,6,7,7],[3,20,7,7,7]]}]},
+    {"name":"Test 5","input":[{"Insurance":[[1,15,8,10,20],[2,15,9,10,30],[3,25,4,10,20],[4,15,3,50,20]]}]},
+    {"name":"Test 6","input":[{"Insurance":[[1,30,12.5,1,2],[2,30,12.5,2,1],[3,30,12.5,3,3]]}]},
+    {"name":"Test 7","input":[{"Insurance":[[1,1.5,12.25,40.5,70.5],[2,1.5,3.5,40.5,71],[3,2,100,41,70.5],[4,2.5,8,0,0]]}]},
+    {"name":"Test 8","input":[{"Insurance":[[1,10,1,1,1],[2,20,2,2,2],[3,30,3,3,3]]}]},
+    {"name":"Test 9","input":[{"Insurance":[[1,5,10,1,1],[2,5,20,1,1],[3,5,30,2,2],[4,6,40,3,3],[5,6,50,4,4],[6,7,60,2,2]]}]},
+    {"name":"Test 10","input":[{"Insurance":[[4,10,5,10,10],[3,20,20,20,20],[2,10,30,20,20],[1,10,40,40,40],[9,20,0.75,30,30]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach policy needs two facts about the *rest* of the table: is its `tiv_2015` shared, and is its location shared. Both are questions about group sizes. Grouping by `tiv_2015` and keeping groups with more than one row lists the shared values; grouping by the pair `(lat, lon)` and keeping groups of exactly one row lists the lonely cities. A policy counts when it belongs to both lists.\n\n## Approach\n\n1. CTE `shared_2015`: `GROUP BY tiv_2015 HAVING COUNT(*) > 1`, the 2015 values held by at least two policies.\n2. CTE `unique_city`: `GROUP BY lat, lon HAVING COUNT(*) = 1`, the locations held by exactly one policy.\n3. Scan `Insurance` (alias `i`) and keep rows whose `tiv_2015` is in `shared_2015` and whose `(lat, lon)` pair is in `unique_city`.\n4. Sum their `tiv_2016` and round to 2 decimals.\n\n## Example 1, step by step\n\n- `shared_2015`: value 10 appears in pids 1, 3, 4, so it is kept; 20 appears once (pid 2) and is dropped. Result: `{10}`.\n- `unique_city`: (10,10) and (40,40) each appear once; (20,20) appears twice (pids 2 and 3). Result: `{(10,10), (40,40)}`.\n- Pid 1 (10, at 10,10) passes both. Pid 2 fails both. Pid 3 has a shared value but a shared city, so it fails. Pid 4 (10, at 40,40) passes.\n- Sum of `tiv_2016`: 5 + 40 = 45, shown as 45.00.\n\n## Complexity\n\n- Time: O(n log n) for n policies to build both groupings (or O(n) with hashing), then O(n) membership checks.\n- Space: O(n) for the two lists.\n\n## Pitfalls\n\n- Checking `lat` and `lon` one at a time is wrong: policies at (10, 20) and (10, 30) share a latitude but sit in different cities. Group and compare on the pair.\n- `COUNT(*) >= 1` for the shared value counts the policy itself; the condition is about *another* policy.\n- `SUM(DISTINCT tiv_2016)` drops policies that happen to have equal 2016 values.\n- When no policy qualifies, the answer is a single row with `null`, not an empty table.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `shared_2015` | `tiv_2015` values held by two or more policies |\n| `unique_city` | `(lat, lon)` pairs held by exactly one policy |\n| `i` | `Insurance`, the policies being filtered and summed |\n| `ROUND(SUM(...), 2)` | total 2016 value of the qualifying policies |",
+  "narration": {
+    "1": "The first CTE collects every tiv_2015 value that more than one policy shares.",
+    "5": "More than one row in a value group means the value is shared with another policy.",
+    "7": "The second CTE collects locations that belong to a single policy.",
+    "10": "Group on the (lat, lon) pair, because a city is identified by both coordinates together.",
+    "11": "A group of exactly one row is a city no other policy is in.",
+    "13": "Add up the 2016 values of the surviving policies and round to two decimals.",
+    "15": "Keep policies whose 2015 value is in the shared list.",
+    "16": "Also require the policy's coordinate pair to be in the unique-city list."
+  }
+}

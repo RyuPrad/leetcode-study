@@ -1,0 +1,51 @@
+{
+  "number": 626,
+  "title": "Exchange Seats",
+  "spec": "leetcode",
+  "statement": "One table lists the students in a classroom and their seats:\n\n- `Seat(id, student)`: one row per seat; `id` is unique. The ids are exactly `1, 2, ..., n` with no gaps, where `n` is the number of rows.\n\nPair the seats up as (1, 2), (3, 4), (5, 6), ... and swap the two students of every pair, so the student in seat 1 moves to seat 2 and the student in seat 2 moves to seat 1. When `n` is odd, the last seat has no partner and its student stays put.\n\nReturn the columns `id` (the seat number) and `student` (who sits there after the swap), ordered by `id` ascending.",
+  "constraints": [
+    "id is unique in Seat",
+    "The ids are exactly 1 to n, where n is the number of rows",
+    "The output must be ordered by id ascending"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Seat": [["id","INT"],["student","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Seat = [] }] = input;\n  const ids = new Set();\n  for (const [id] of Seat) {\n    if (id === null) return 'Every seat needs an id.';\n    if (ids.has(id)) return `Seat id ${id} appears twice.`;\n    ids.add(id);\n  }\n  for (let id = 1; id <= Seat.length; id++) if (!ids.has(id)) return `Seat ids must be 1 to ${Seat.length}; ${id} is missing.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH seat_count AS (\n  SELECT COUNT(*) AS total\n  FROM Seat\n)\nSELECT\n  CASE\n    WHEN s.id % 2 = 0 THEN s.id - 1\n    WHEN s.id = c.total THEN s.id\n    ELSE s.id + 1\n  END AS id,\n  s.student\nFROM Seat AS s\nCROSS JOIN seat_count AS c\nORDER BY id;",
+  "brute": "SELECT id - 1 AS id, student\nFROM Seat\nWHERE id % 2 = 0\nUNION ALL\nSELECT id + 1, student\nFROM Seat\nWHERE id % 2 = 1 AND EXISTS (SELECT 1 FROM Seat AS nxt WHERE nxt.id = Seat.id + 1)\nUNION ALL\nSELECT id, student\nFROM Seat\nWHERE id % 2 = 1 AND NOT EXISTS (SELECT 1 FROM Seat AS nxt WHERE nxt.id = Seat.id + 1)\nORDER BY id",
+  "generator": "function generate(rand, size) {\n  const names = ['Abbot', 'Doris', 'Emerson', 'Green', 'Jeames', 'Ana', 'Lee', 'Kim'];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 1999 + Math.floor(rand() * 2);\n  const Seat = [];\n  for (let id = 1; id <= count; id++) Seat.push([id, size === 'small' ? names[Math.floor(rand() * names.length)] : `Student${id}`]);\n  // Store the rows in a shuffled order so the query cannot rely on the table's physical order.\n  for (let i = Seat.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Seat[i], Seat[j]] = [Seat[j], Seat[i]];\n  }\n  return [{ Seat }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Seat":[[1,"Abbot"],[2,"Doris"],[3,"Emerson"],[4,"Green"],[5,"Jeames"]]}],"expected":{"columns":["id","student"],"rows":[[1,"Doris"],[2,"Abbot"],[3,"Green"],[4,"Emerson"],[5,"Jeames"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Seat":[]}]},
+    {"name":"Test 2","input":[{"Seat":[[1,"Ana"]]}]},
+    {"name":"Test 3","input":[{"Seat":[[1,"Ana"],[2,"Lee"]]}]},
+    {"name":"Test 4","input":[{"Seat":[[1,"Ana"],[2,"Lee"],[3,"Kim"]]}]},
+    {"name":"Test 5","input":[{"Seat":[[1,"Abbot"],[2,"Doris"],[3,"Emerson"],[4,"Green"],[5,"Jeames"],[6,"Ana"]]}]},
+    {"name":"Test 6","input":[{"Seat":[[4,"Green"],[2,"Doris"],[7,"Kim"],[1,"Abbot"],[6,"Lee"],[3,"Emerson"],[5,"Jeames"]]}]},
+    {"name":"Test 7","input":[{"Seat":[[1,"Ana"],[2,"Ana"],[3,"Lee"],[4,"Lee"]]}]},
+    {"name":"Test 8","input":[{"Seat":[[2,"Doris"],[1,"Abbot"]]}]},
+    {"name":"Test 9","input":[{"Seat":[[1,"Abbot"],[2,"Doris"],[3,"Emerson"],[4,"Green"],[5,"Jeames"],[6,"Ana"],[7,"Lee"],[8,"Kim"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nNo student needs to move between rows: each row keeps its student and only gets a new seat number. An even seat `id` always moves down to `id - 1`, and an odd seat moves up to `id + 1`, except for the very last seat when the count is odd, because it has no partner. Since the ids run from 1 to `n` without gaps, \"the last seat\" is simply the seat whose `id` equals the row count. A `CASE` expression applies these three rules row by row, and sorting by the new `id` produces the swapped seating plan.\n\n## Approach\n\n1. `seat_count`: count the rows once, giving `total`, the number of the last seat.\n2. Cross join `Seat` (alias `s`) with that one-row table (alias `c`) so every row can see `total`.\n3. Compute the new `id` with `CASE`: even ids become `id - 1`; an odd id equal to `total` stays; any other odd id becomes `id + 1`.\n4. Keep `student` as it is and order by the new `id`.\n\n## Example 1, step by step\n\n- `seat_count` holds `total = 5`.\n- Abbot (1, odd, not last) gets id 2; Doris (2, even) gets id 1.\n- Emerson (3) gets 4; Green (4) gets 3.\n- Jeames (5) is odd and equals `total`, so he keeps id 5.\n- Sorting by the new id gives Doris, Abbot, Green, Emerson, Jeames, the expected output.\n\n## Complexity\n\n- Time: O(n) to count and relabel n rows, plus O(n log n) for the final sort.\n- Space: O(n) for the result.\n\n## Pitfalls\n\n- Forgetting the odd-count case moves the last student to seat `n + 1`, a seat that does not exist.\n- `ORDER BY` must sort by the **new** id; sorting by the original `s.id` lists the swapped students in their old order.\n- Swapping by self-joining each seat to its partner with an inner join loses the unpaired last student; that approach needs a left join and a fallback to the student's own name.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `seat_count` | one row with `total`, the number of seats |\n| `c` | alias for `seat_count` in the final query |\n| `s` | `Seat`, the rows being relabelled |\n| `CASE ... END AS id` | the seat number after the swap |",
+  "narration": {
+    "1": "The first stage counts the seats, which is also the id of the last seat because ids run from 1 to n.",
+    "7": "Even seats always move one place down, to the odd seat of their pair.",
+    "8": "An odd seat equal to the total is the unpaired last seat, so its id stays the same.",
+    "9": "Every other odd seat moves one place up, to the even seat of its pair.",
+    "12": "Seat is the table being relabelled; each row keeps its student.",
+    "13": "The one-row count is cross joined so every row can compare its id with the total.",
+    "14": "Order by the new seat number, as the problem requires."
+  }
+}

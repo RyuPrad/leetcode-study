@@ -1,0 +1,54 @@
+{
+  "number": 184,
+  "title": "Department Highest Salary",
+  "spec": "leetcode",
+  "statement": "Two tables describe staff and the departments they work in:\n\n- `Employee(id, name, salary, departmentId)`: one row per employee; `id` is unique, `salary` is never `null`, and `departmentId` always names a row of `Department`.\n- `Department(id, name)`: one row per department; `id` is unique and `name` is never `null`.\n\nFor each department, find the largest salary paid inside it and report **every** employee of that department who earns exactly that amount, so tied top earners all appear. Output the columns `Department` (the department's name), `Employee` (the employee's name) and `Salary`. Departments without employees produce no rows. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Employee and in Department",
+    "Employee.departmentId always exists in Department",
+    "salary is never null",
+    "Department.name is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["id","INT"],["name","VARCHAR(255)"],["salary","INT"],["departmentId","INT"]],
+    "Department": [["id","INT"],["name","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [], Department = [] }] = input;\n  const departments = new Set(), employees = new Set();\n  for (const [id, name] of Department) {\n    if (id === null) return 'Every department needs an id.';\n    if (departments.has(id)) return `Department id ${id} appears twice.`;\n    if (name === null) return `Department ${id} needs a name.`;\n    departments.add(id);\n  }\n  for (const [id, , salary, departmentId] of Employee) {\n    if (id === null) return 'Every employee needs an id.';\n    if (employees.has(id)) return `Employee id ${id} appears twice.`;\n    if (salary === null) return `Employee ${id} needs a salary.`;\n    if (!departments.has(departmentId)) return `Employee ${id} names department ${departmentId}, which is not in Department.`;\n    employees.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH top_pay AS (\n  SELECT departmentId, MAX(salary) AS max_salary\n  FROM Employee\n  GROUP BY departmentId\n)\nSELECT d.name AS Department, e.name AS Employee, e.salary AS Salary\nFROM Employee AS e\nJOIN top_pay AS t\n  ON t.departmentId = e.departmentId\n  AND t.max_salary = e.salary\nJOIN Department AS d\n  ON d.id = e.departmentId;",
+  "brute": "SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary\nFROM Employee AS e, Department AS d\nWHERE d.id = e.departmentId\n  AND NOT EXISTS (\n    SELECT 1\n    FROM Employee AS richer\n    WHERE richer.departmentId = e.departmentId\n      AND richer.salary > e.salary\n  )",
+  "generator": "function generate(rand, size) {\n  const deptNames = ['IT', 'Sales', 'HR', 'Ops'];\n  const names = ['Joe', 'Jim', 'Henry', 'Sam', 'Max', 'Ana', 'Lee', 'Kim'];\n  const small = size === 'small';\n  const deptCount = small ? Math.floor(rand() * 4) : 25;\n  const Department = [];\n  for (let id = 1; id <= deptCount; id++) Department.push([id, small ? deptNames[id - 1] : `Dept${id}`]);\n  const Employee = [];\n  if (deptCount > 0) {\n    const count = small ? Math.floor(rand() * 9) : 2000;\n    // Few salary levels make ties for the top common; departments share levels so equal salaries cross departments.\n    const levels = small ? [100, 200, 300, 400] : Array.from({ length: 30 }, (_, i) => 1000 * (i + 1));\n    for (let id = 1; id <= count; id++) {\n      const name = small ? names[Math.floor(rand() * names.length)] : `Emp${id}`;\n      Employee.push([id, name, levels[Math.floor(rand() * levels.length)], 1 + Math.floor(rand() * deptCount)]);\n    }\n  }\n  return [{ Employee, Department }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,"Joe",70000,1],[2,"Jim",90000,1],[3,"Henry",80000,2],[4,"Sam",60000,2],[5,"Max",90000,1]],"Department":[[1,"IT"],[2,"Sales"]]}],"expected":{"columns":["Department","Employee","Salary"],"rows":[["IT","Jim",90000],["Sales","Henry",80000],["IT","Max",90000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[],"Department":[[1,"IT"]]}]},
+    {"name":"Test 2","input":[{"Employee":[[1,"Ana",500,2]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,"Ana",300,1],[2,"Lee",300,1],[3,"Kim",300,1],[4,"Max",200,1]],"Department":[[1,"IT"]]}]},
+    {"name":"Test 4","input":[{"Employee":[[1,"Ana",500,1],[2,"Lee",400,1],[3,"Kim",300,2],[4,"Max",200,2]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,"Ana",500,1],[2,"Lee",400,1],[3,"Kim",500,2],[4,"Max",600,2]],"Department":[[1,"IT"],[2,"Sales"]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,"Joe",700,1],[2,"Joe",700,2],[3,"Joe",100,3]],"Department":[[1,"IT"],[2,"Sales"],[3,"HR"]]}]},
+    {"name":"Test 7","input":[{"Employee":[[1,"Ana",100,1],[2,"Lee",200,1],[3,"Kim",300,1],[4,"Max",400,3],[5,"Sam",400,3],[6,"Jim",50,3]],"Department":[[1,"IT"],[2,"Sales"],[3,"HR"]]}]},
+    {"name":"Test 8","input":[{"Employee":[[1,"Ana",900,1],[2,"Lee",800,2],[3,"Kim",800,2],[4,"Max",900,2],[5,"Sam",0,3]],"Department":[[1,"IT"],[2,"IT"],[3,"Ops"]]}]},
+    {"name":"Test 9","input":[{"Employee":[[3,"Henry",80000,2],[1,"Joe",70000,1],[5,"Max",70000,1],[4,"Sam",80000,2]],"Department":[[2,"Sales"],[1,"IT"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question has two halves: what is the top salary of each department, and who earns it. The first half is a plain `GROUP BY departmentId` with `MAX(salary)`. The second half is a join back to `Employee` that matches **both** the department and that maximum, which keeps every tied top earner. A last join turns the department id into its name.\n\n## Approach\n\n1. `top_pay`: group `Employee` by `departmentId` and keep `max_salary`, one row per department that has staff.\n2. Join every employee `e` to `top_pay` (alias `t`) on the same department **and** `e.salary = t.max_salary`; only the department's top earners survive.\n3. Join `Department` (alias `d`) on `d.id = e.departmentId` and output `Department`, `Employee` and `Salary`.\n\n## Example 1, step by step\n\n- `top_pay` has two rows: department 1 with `max_salary = 90000` and department 2 with `max_salary = 80000`.\n- Department 1: Joe (70000) misses the maximum; Jim and Max (both 90000) match it.\n- Department 2: Henry (80000) matches; Sam (60000) does not.\n- Joining the names gives (IT, Jim, 90000), (IT, Max, 90000) and (Sales, Henry, 80000).\n\n## Complexity\n\n- Time: O(E) for E employees to build `top_pay` with hash grouping, plus O(E + D) for the two joins with hash or index lookups on D departments.\n- Space: O(D) for `top_pay`.\n\n## Pitfalls\n\n- Selecting `name` next to `MAX(salary)` in one grouped query returns an arbitrary name (or fails under `ONLY_FULL_GROUP_BY`) and never lists ties.\n- Matching only `salary IN (SELECT MAX(salary) ... GROUP BY departmentId)` lets an employee in one department through because another department's maximum happens to equal their salary; match the department too.\n- `ORDER BY salary DESC LIMIT 1` per department keeps a single employee and drops tied top earners.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `top_pay` | one row per department: `departmentId` and its `max_salary` |\n| `e` | `Employee`, every candidate row |\n| `t` | the `top_pay` row of `e`'s department, joined only when `e` earns the maximum |\n| `d` | `Department`, supplying the department name |",
+  "narration": {
+    "1": "top_pay computes each department's highest salary.",
+    "2": "MAX(salary) per group is the top pay; departments without staff have no group.",
+    "4": "Group by department so each department gets its own maximum.",
+    "6": "Output the department name, the employee name and the salary.",
+    "7": "Start from every employee.",
+    "8": "Join the top pay of the employee's own department...",
+    "10": "...but only when the employee earns exactly that maximum, which keeps all tied top earners.",
+    "11": "Join Department to turn the id into its name."
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "number": 596,
+  "title": "Classes With at Least 5 Students",
+  "spec": "leetcode",
+  "statement": "One table records enrollments:\n\n- `Courses(student, class)`: the named student is enrolled in the named class. The pair `(student, class)` is unique, so a student is never listed twice in the same class, but may take several classes.\n\nReport every class with **five or more** enrolled students, as a single column `class`. Rows may come in any order.",
+  "constraints": [
+    "(student, class) is unique in Courses",
+    "A student may be enrolled in several classes"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Courses": [["student","VARCHAR(255)"],["class","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Courses = [] }] = input;\n  const seen = new Set();\n  for (const [student, cls] of Courses) {\n    if (student === null || cls === null) return 'Every row needs a student and a class.';\n    const key = JSON.stringify([String(student).toLowerCase(), String(cls).toLowerCase()]);\n    if (seen.has(key)) return `${student} is enrolled in ${cls} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT class\nFROM Courses\nGROUP BY class\nHAVING COUNT(*) >= 5;",
+  "brute": "SELECT DISTINCT c.class\nFROM Courses AS c\nWHERE (\n  SELECT COUNT(*)\n  FROM Courses AS classmate\n  WHERE classmate.class = c.class\n) >= 5",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const classes = small ? ['Math', 'Art', 'Biology'] : Array.from({ length: 250 }, (_, i) => `Class${i + 1}`);\n  const students = small ? ['A', 'B', 'C', 'D', 'E', 'F', 'G'] : Array.from({ length: 400 }, (_, i) => `S${i + 1}`);\n  const Courses = [];\n  for (const cls of classes) {\n    // Class sizes cluster around the threshold of 5.\n    const want = small ? Math.floor(rand() * 7) : Math.floor(rand() * 13);\n    const pool = students.slice();\n    for (let k = 0; k < want && pool.length; k++) {\n      if (small && Courses.length >= 8) break;\n      const [student] = pool.splice(Math.floor(rand() * pool.length), 1);\n      Courses.push([student, cls]);\n    }\n  }\n  // Interleave the classes so rows are not grouped by class.\n  for (let i = Courses.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Courses[i], Courses[j]] = [Courses[j], Courses[i]]; }\n  return [{ Courses }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Courses":[["A","Math"],["B","English"],["C","Math"],["D","Biology"],["E","Math"],["F","Computer"],["G","Math"],["H","Math"],["I","Math"]]}],"expected":{"columns":["class"],"rows":[["Math"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Courses":[]}]},
+    {"name":"Test 2","input":[{"Courses":[["A","Math"],["B","Math"],["C","Math"],["D","Math"],["E","Math"]]}]},
+    {"name":"Test 3","input":[{"Courses":[["A","Math"],["B","Math"],["C","Math"],["D","Math"]]}]},
+    {"name":"Test 4","input":[{"Courses":[["A","Art"],["B","Art"],["C","Art"],["D","Art"],["E","Art"],["F","Art"],["A","Math"],["B","Math"],["C","Math"],["D","Math"],["E","Math"],["F","Biology"]]}]},
+    {"name":"Test 5","input":[{"Courses":[["A","Math"],["A","Art"],["A","Biology"],["A","English"],["A","Computer"],["A","History"]]}]},
+    {"name":"Test 6","input":[{"Courses":[["A","Math"],["B","Art"],["C","Math"],["D","Art"],["E","Math"],["F","Art"],["G","Math"],["H","Art"],["I","Math"],["J","Biology"]]}]},
+    {"name":"Test 7","input":[{"Courses":[["A","Physics"],["B","Physics"],["C","Physics"],["D","Physics"],["E","Physics"],["F","Physics"],["G","Physics"],["A","Chemistry"],["B","Chemistry"],["C","Chemistry"],["D","Chemistry"]]}]},
+    {"name":"Test 8","input":[{"Courses":[["A","Math"]]}]},
+    {"name":"Test 9","input":[{"Courses":[["A","X"],["B","X"],["C","X"],["D","X"],["E","X"],["A","Y"],["B","Y"],["C","Y"],["D","Y"],["E","Y"],["A","Z"],["B","Z"],["C","Z"],["D","Z"],["E","Z"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about the size of each class, not about individual rows. Grouping the enrollments by `class` turns every class into one group whose row count is its number of students. A condition on that count must be written in `HAVING`, which filters groups after they are formed, rather than in `WHERE`, which filters single rows before any counting happens.\n\n## Approach\n\n1. Read every enrollment from `Courses`.\n2. `GROUP BY class` so each class becomes one group.\n3. `HAVING COUNT(*) >= 5` keeps only groups with at least five rows. Because `(student, class)` is unique, each row in a group is a different student.\n4. Select `class` from each surviving group.\n\n## Example 1, step by step\n\n- Grouping gives Math with 6 rows (A, C, E, G, H, I), and English, Biology and Computer with 1 row each.\n- `HAVING COUNT(*) >= 5` keeps Math (6) and drops the three classes with 1 student.\n- The result is the single row `Math`.\n\n## Complexity\n\n- Time: O(n) with hashing, or O(n log n) with sorting, to group n enrollments.\n- Space: O(c) for c distinct classes.\n\n## Pitfalls\n\n- `> 5` instead of `>= 5` drops classes with exactly five students.\n- Putting `COUNT(*) >= 5` in `WHERE` is an error: aggregates are not available before grouping.\n- Selecting from `Courses` without grouping or `DISTINCT` (for example a correlated count per row) lists a qualifying class once per student.\n- If enrollments could repeat, `COUNT(DISTINCT student)` would be needed; here the unique pair makes `COUNT(*)` exact.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `Courses` | the enrollment rows being counted |\n| `GROUP BY class` | one group per class |\n| `COUNT(*)` | number of students enrolled in that class |\n| `HAVING ... >= 5` | keeps classes with at least five students |",
+  "narration": {
+    "1": "Each output row is a class name, one per surviving group.",
+    "2": "Read the enrollment rows, one per student and class.",
+    "3": "Group by class so every class becomes a single group of its students.",
+    "4": "HAVING filters whole groups: keep classes whose row count, the number of students, is at least five."
+  }
+}

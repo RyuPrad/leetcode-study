@@ -1,0 +1,51 @@
+{
+  "number": 614,
+  "title": "Second Degree Follower",
+  "spec": "recalled",
+  "statement": "One table records who follows whom:\n\n- `Follow(followee, follower)`: a row means the user `follower` follows the user `followee`. The pair `(followee, follower)` is unique, and nobody follows themselves.\n\nA **second-degree follower** is a user who follows at least one user and is also followed by at least one user. Report every second-degree follower with two columns: `follower`, the user's name, and `num`, how many users follow that user. Order the rows by `follower` alphabetically.",
+  "constraints": [
+    "(followee, follower) is the primary key of Follow",
+    "followee and follower are never equal"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Follow": [["followee","VARCHAR(255)"],["follower","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Follow = [] }] = input;\n  const pairs = new Set();\n  for (const [followee, follower] of Follow) {\n    if (followee === null || follower === null) return 'Every row needs a followee and a follower.';\n    if (followee.toLowerCase() === follower.toLowerCase()) return `${follower} cannot follow themselves.`;\n    const key = `${followee.toLowerCase()}\\u0000${follower.toLowerCase()}`;\n    if (pairs.has(key)) return `(${followee}, ${follower}) appears twice.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH active_followers AS (\n  SELECT DISTINCT follower AS name\n  FROM Follow\n)\nSELECT f.followee AS follower, COUNT(*) AS num\nFROM Follow AS f\nJOIN active_followers AS a\n  ON a.name = f.followee\nGROUP BY f.followee\nORDER BY f.followee;",
+  "brute": "SELECT\n  u.name AS follower,\n  (SELECT COUNT(*) FROM Follow AS g WHERE g.followee = u.name) AS num\nFROM (SELECT DISTINCT follower AS name FROM Follow) AS u\nWHERE EXISTS (SELECT 1 FROM Follow AS h WHERE h.followee = u.name)\nORDER BY u.name",
+  "generator": "function generate(rand, size) {\n  let people;\n  if (size === 'small') {\n    const pool = ['Alice', 'Bob', 'Cena', 'Donald', 'Edward', 'Fay'];\n    people = pool.slice(0, 2 + Math.floor(rand() * (pool.length - 1)));\n  } else {\n    const base = ['Ana', 'Ben', 'Cleo', 'Dev', 'Eli', 'Finn', 'Gia', 'Hal', 'Ivy', 'Jon'];\n    people = [];\n    for (let i = 0; i < 150; i++) people.push(`${base[i % base.length]}${Math.floor(i / base.length)}`);\n  }\n  const target = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const pairs = new Set(), Follow = [];\n  let tries = 0;\n  while (Follow.length < target && tries++ < target * 20) {\n    const followee = people[Math.floor(rand() * people.length)];\n    const follower = people[Math.floor(rand() * people.length)];\n    const key = `${followee}|${follower}`;\n    if (followee === follower || pairs.has(key)) continue;\n    pairs.add(key);\n    Follow.push([followee, follower]);\n  }\n  return [{ Follow }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Follow":[["Alice","Bob"],["Bob","Cena"],["Bob","Donald"],["Donald","Edward"]]}],"expected":{"columns":["follower","num"],"rows":[["Bob",2],["Donald",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Follow":[]}]},
+    {"name":"Test 2","input":[{"Follow":[["Alice","Bob"]]}]},
+    {"name":"Test 3","input":[{"Follow":[["Alice","Bob"],["Bob","Alice"]]}]},
+    {"name":"Test 4","input":[{"Follow":[["Alice","Bob"],["Bob","Cena"],["Cena","Donald"]]}]},
+    {"name":"Test 5","input":[{"Follow":[["Bob","Cena"],["Bob","Donald"],["Bob","Edward"],["Alice","Bob"],["Fay","Bob"],["Gina","Bob"]]}]},
+    {"name":"Test 6","input":[{"Follow":[["Alice","Bob"],["Alice","Cena"],["Alice","Donald"],["Edward","Bob"],["Edward","Cena"]]}]},
+    {"name":"Test 7","input":[{"Follow":[["Zoe","Yan"],["Yan","Xia"],["Xia","Zoe"],["Yan","Zoe"],["Walt","Xia"]]}]},
+    {"name":"Test 8","input":[{"Follow":[["Donald","Edward"],["Cena","Donald"],["Bob","Cena"],["Alice","Bob"],["Alice","Cena"],["Bob","Edward"],["Cena","Edward"]]}]},
+    {"name":"Test 9","input":[{"Follow":[["Alice","Bob"],["Bob","Cena"],["Bob","Donald"],["Donald","Edward"],["Edward","Alice"],["Cena","Fay"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA user qualifies when they appear in **both** columns: as a `follower` somewhere (they follow someone) and as a `followee` somewhere (someone follows them). Their `num` is the number of rows where they are the `followee`. So start from the rows that point at a user, keep only users who also follow someone, and count rows per user.\n\n## Approach\n\n1. CTE `active_followers`: the distinct names that appear as `follower`, the users who follow at least one person. `DISTINCT` matters: a user who follows three people must appear once, or the join below would triple their count.\n2. Read `Follow` as `f`; each row is one fan of `f.followee`.\n3. Inner-join `active_followers` on `a.name = f.followee`, which drops users nobody follows and users who follow no one.\n4. `GROUP BY f.followee` and `COUNT(*)` the fans; report the name as `follower`.\n5. `ORDER BY f.followee` for alphabetical order.\n\n## Example 1, step by step\n\n- `active_followers` is `Bob`, `Cena`, `Donald`, `Edward`.\n- Rows of `f` by followee: Alice has fan Bob, Bob has fans Cena and Donald, Donald has fan Edward.\n- The join drops Alice (she follows nobody). Bob keeps 2 rows and Donald 1 row.\n- Grouping gives `(Bob, 2)` and `(Donald, 1)`, already in alphabetical order.\n\n## Complexity\n\n- Time: O(F log F) for F rows, for the `DISTINCT`, the join (with a hash or index) and the grouping.\n- Space: O(F) for the CTE and the groups.\n\n## Pitfalls\n\n- Joining `Follow` to itself directly (`f.followee = g.follower`) multiplies each fan by the number of people the user follows; Bob in Test 5 would count 9 instead of 3 unless you use `COUNT(DISTINCT ...)`.\n- The output column `follower` holds the **followee** of the counted rows; reporting `f.follower` lists the fans instead.\n- `num` counts who follows the user, not whom the user follows.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `active_followers` | each user who follows at least one person, once |\n| `f` | `Follow` rows, one per fan of `f.followee` |\n| `a` | the matching row of `active_followers`, present only when `f.followee` follows someone |\n| `num` | `COUNT(*)` of fans per user |",
+  "narration": {
+    "1": "The CTE collects the users who follow at least one person.",
+    "2": "DISTINCT keeps each such user once so the join cannot multiply rows.",
+    "5": "Each output row is a user (a followee) together with the number of its fans.",
+    "6": "Every Follow row is one fan of f.followee.",
+    "7": "The inner join keeps only followees who also appear as followers.",
+    "9": "Group the remaining rows by the followed user to count fans.",
+    "10": "The problem asks for the users in alphabetical order."
+  }
+}
