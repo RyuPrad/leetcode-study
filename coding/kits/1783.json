@@ -1,0 +1,52 @@
+{
+  "number": 1783,
+  "title": "Grand Slam Titles",
+  "spec": "recalled",
+  "statement": "Two tables record tennis players and the four Grand Slam tournaments:\n\n- `Players(player_id, player_name)`: one row per player; `player_id` is unique.\n- `Championships(year, Wimbledon, Fr_open, US_open, Au_open)`: one row per year; `year` is unique. Each of the other four columns holds the `player_id` of the player who won that tournament in that year. Every winner is listed in `Players`.\n\nFor every player who won at least one tournament, report `player_id`, `player_name` and `grand_slams_count`, the total number of tournaments that player won across all years and all four columns (winning two tournaments in the same year counts as two). Players with no titles are left out. Rows may come in any order.",
+  "constraints": [
+    "player_id is unique in Players",
+    "year is unique in Championships",
+    "Every winner id in Championships appears in Players"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Players": [["player_id","INT"],["player_name","VARCHAR(20)"]],
+    "Championships": [["year","INT"],["Wimbledon","INT"],["Fr_open","INT"],["US_open","INT"],["Au_open","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Players = [], Championships = [] }] = input;\n  const ids = new Set(), years = new Set();\n  for (const [id, name] of Players) {\n    if (id === null || name === null) return 'Every player needs an id and a name.';\n    if (ids.has(id)) return `player_id ${id} appears twice in Players.`;\n    ids.add(id);\n  }\n  for (const [year, ...winners] of Championships) {\n    if (year === null) return 'Every championship row needs a year.';\n    if (years.has(year)) return `year ${year} appears twice in Championships.`;\n    years.add(year);\n    for (const w of winners) if (!ids.has(w)) return `Winner ${w} in ${year} is not in Players.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH wins AS (\n  SELECT Wimbledon AS player_id FROM Championships\n  UNION ALL\n  SELECT Fr_open FROM Championships\n  UNION ALL\n  SELECT US_open FROM Championships\n  UNION ALL\n  SELECT Au_open FROM Championships\n)\nSELECT p.player_id, p.player_name, COUNT(*) AS grand_slams_count\nFROM Players AS p\nJOIN wins AS w\n  ON w.player_id = p.player_id\nGROUP BY p.player_id, p.player_name;",
+  "brute": "SELECT player_id, player_name, grand_slams_count\nFROM (\n  SELECT p.player_id, p.player_name,\n    (SELECT COUNT(*) FROM Championships AS c WHERE c.Wimbledon = p.player_id)\n    + (SELECT COUNT(*) FROM Championships AS c WHERE c.Fr_open = p.player_id)\n    + (SELECT COUNT(*) FROM Championships AS c WHERE c.US_open = p.player_id)\n    + (SELECT COUNT(*) FROM Championships AS c WHERE c.Au_open = p.player_id) AS grand_slams_count\n  FROM Players AS p\n) AS totals\nWHERE grand_slams_count > 0",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const names = ['Nadal', 'Federer', 'Novak', 'Serena', 'Andy', 'Iga', 'Carlos', 'Venus'];\n  const playerCount = small ? Math.floor(rand() * 6) : 300;\n  const Players = [];\n  let id = 0;\n  for (let i = 0; i < playerCount; i++) {\n    id += 1 + Math.floor(rand() * (small ? 3 : 2));\n    Players.push([id, names[Math.floor(rand() * names.length)]]);\n  }\n  const Championships = [];\n  if (Players.length) {\n    // Small cases favour a few players so that totals collide and some players win nothing.\n    const favourites = small ? Players.slice(0, 1 + Math.floor(rand() * Players.length)) : Players;\n    const winner = () => favourites[Math.floor(rand() * favourites.length)][0];\n    const years = small ? Math.floor(rand() * 6) : 1500;\n    let year = small ? 2015 : 500;\n    for (let i = 0; i < years; i++) {\n      year += 1 + Math.floor(rand() * 2);\n      Championships.push([year, winner(), winner(), winner(), winner()]);\n    }\n  }\n  return [{ Players, Championships }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Players":[[1,"Nadal"],[2,"Federer"],[3,"Novak"]],"Championships":[[2018,1,1,1,1],[2019,1,1,2,2],[2020,2,1,2,2]]}],"expected":{"columns":["player_id","player_name","grand_slams_count"],"rows":[[2,"Federer",5],[1,"Nadal",7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Players":[],"Championships":[]}]},
+    {"name":"Test 2","input":[{"Players":[[1,"Iga"],[2,"Andy"]],"Championships":[]}]},
+    {"name":"Test 3","input":[{"Players":[[7,"Serena"]],"Championships":[[2015,7,7,7,7]]}]},
+    {"name":"Test 4","input":[{"Players":[[1,"Nadal"],[2,"Federer"],[3,"Novak"]],"Championships":[[2010,1,2,3,1],[2011,3,3,3,2]]}]},
+    {"name":"Test 5","input":[{"Players":[[1,"Andy"],[2,"Andy"],[3,"Venus"]],"Championships":[[2001,1,2,1,2],[2002,2,1,2,1]]}]},
+    {"name":"Test 6","input":[{"Players":[[4,"Carlos"],[9,"Iga"],[12,"Venus"]],"Championships":[[2020,12,4,4,4]]}]},
+    {"name":"Test 7","input":[{"Players":[[1,"Novak"],[2,"Nadal"]],"Championships":[[1990,1,1,2,1],[1991,1,1,1,1],[1995,1,2,1,1],[2000,1,1,1,2]]}]},
+    {"name":"Test 8","input":[{"Players":[[3,"Serena"],[5,"Venus"],[6,"Iga"],[8,"Carlos"]],"Championships":[[2003,3,5,6,8],[2004,5,3,8,6],[2005,6,8,3,5]]}]},
+    {"name":"Test 9","input":[{"Players":[[1,"Federer"],[2,"Nadal"],[3,"Novak"],[4,"Andy"]],"Championships":[[2008,2,2,1,3],[2009,1,1,1,1],[2012,3,3,4,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA title is not a row of `Championships`: each row holds **four** titles, one per column, and one player can own several of them. So the count has to look at the four columns separately. The cleanest way is to unpivot them: stack the four winner columns into one long list with one row per title won, then count rows per player. An inner join with `Players` both supplies the names and naturally drops players who never appear in the list.\n\n## Approach\n\n1. CTE `wins`: four `SELECT`s, one per tournament column, glued with `UNION ALL`, each producing a `player_id` per title.\n2. `JOIN` `wins` (alias `w`) to `Players` (alias `p`) on `player_id` to attach the name.\n3. `GROUP BY p.player_id, p.player_name` and `COUNT(*)` the titles as `grand_slams_count`. Players without titles produce no joined rows, so no group.\n\n## Example 1, step by step\n\n- `wins` holds 12 rows: Wimbledon gives 1, 1, 2; French Open 1, 1, 1; US Open 1, 2, 2; Australian Open 1, 2, 2.\n- Player 1 (Nadal) appears 7 times and player 2 (Federer) 5 times; player 3 (Novak) never appears.\n- After the join and grouping: `(2, Federer, 5)` and `(1, Nadal, 7)`. Novak has no rows, so he is not reported.\n\n## Complexity\n\n- Time: O(Y) to build `wins` for Y years (4Y rows), then a hash join and grouping, roughly O(Y + P) for P players.\n- Space: O(Y) for `wins`.\n\n## Pitfalls\n\n- `UNION` instead of `UNION ALL` removes duplicate ids, so a player who won Wimbledon in two years (or two tournaments) is counted once.\n- Counting years with `WHERE p.player_id IN (Wimbledon, Fr_open, US_open, Au_open)` counts a sweep year as 1 instead of 4.\n- A `LEFT JOIN` from `Players` would report players with no titles (with a count of 1 if you use `COUNT(*)`); the task excludes them.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `wins` | one row per tournament won, holding the winner's `player_id` |\n| `p` | `Players`, supplying `player_name` |\n| `w` | the rows of `wins` joined to each player |\n| `grand_slams_count` | `COUNT(*)` of a player's joined titles |",
+  "narration": {
+    "1": "The wins CTE unpivots the four tournament columns into one list of winners.",
+    "2": "Each Wimbledon winner becomes one row; the column is renamed player_id for the whole union.",
+    "3": "UNION ALL keeps duplicates, because every repeated id is a separate title.",
+    "10": "Count the rows of each group: one row per title the player won.",
+    "12": "The inner join attaches the name and drops players who never appear in wins.",
+    "13": "A title row matches the player whose id it holds.",
+    "14": "One group per player, so the count is that player's total."
+  }
+}

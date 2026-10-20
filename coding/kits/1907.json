@@ -1,0 +1,53 @@
+{
+  "number": 1907,
+  "title": "Count Salary Categories",
+  "spec": "leetcode",
+  "statement": "One table lists bank accounts:\n\n- `Accounts(account_id, income)`: one row per account; `account_id` is unique and `income` is the account's monthly income.\n\nEach account falls into exactly one salary category by its `income`:\n\n- `'Low Salary'`: income below 20000;\n- `'Average Salary'`: income from 20000 to 50000, both ends included;\n- `'High Salary'`: income above 50000.\n\nReport how many accounts fall into each category, with the columns `category` and `accounts_count`. All three categories must appear, even when no account belongs to one (its count is then `0`). Rows may come in any order.",
+  "constraints": [
+    "account_id is unique in Accounts",
+    "income is never null and is at least 0",
+    "The output always has exactly three rows"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Accounts": [["account_id","INT"],["income","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Accounts = [] }] = input;\n  const ids = new Set();\n  for (const [id, income] of Accounts) {\n    if (id === null) return 'Every account needs an account_id.';\n    if (ids.has(id)) return `account_id ${id} appears twice in Accounts.`;\n    ids.add(id);\n    if (income === null || income < 0) return `Account ${id} needs a non-negative income.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH categories AS (\n  SELECT 'Low Salary' AS category\n  UNION ALL SELECT 'Average Salary'\n  UNION ALL SELECT 'High Salary'\n),\nlabeled AS (\n  SELECT account_id,\n         CASE\n           WHEN income < 20000 THEN 'Low Salary'\n           WHEN income <= 50000 THEN 'Average Salary'\n           ELSE 'High Salary'\n         END AS category\n  FROM Accounts\n)\nSELECT c.category,\n       COUNT(l.account_id) AS accounts_count\nFROM categories AS c\nLEFT JOIN labeled AS l\n  ON l.category = c.category\nGROUP BY c.category;",
+  "brute": "SELECT 'Low Salary' AS category,\n       (SELECT COUNT(*) FROM Accounts WHERE income < 20000) AS accounts_count\nUNION ALL\nSELECT 'Average Salary',\n       (SELECT COUNT(*) FROM Accounts WHERE income >= 20000 AND income <= 50000)\nUNION ALL\nSELECT 'High Salary',\n       (SELECT COUNT(*) FROM Accounts WHERE income > 50000)",
+  "generator": "function generate(rand, size) {\n  // Incomes right at the category edges, so < versus <= mistakes show up.\n  const edges = [0, 19999, 20000, 50000, 50001];\n  const small = size === 'small';\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  // Small sets sometimes stay inside one or two categories so some counts are 0.\n  const top = small ? [19999, 50000, 120000][Math.floor(rand() * 3)] : 120000;\n  const Accounts = [];\n  for (let i = 0; i < rows; i++) {\n    const income = rand() < 0.25 ? edges[Math.floor(rand() * edges.length)] : Math.floor(rand() * (top + 1));\n    Accounts.push([i + 1, Math.min(income, top)]);\n  }\n  // Shuffle the ids so they do not follow the row order.\n  for (let i = Accounts.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Accounts[i][0], Accounts[j][0]] = [Accounts[j][0], Accounts[i][0]];\n  }\n  return [{ Accounts }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Accounts":[[3,108939],[2,12747],[8,87709],[6,91796]]}],"expected":{"columns":["category","accounts_count"],"rows":[["Low Salary",1],["Average Salary",0],["High Salary",3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Accounts":[]}]},
+    {"name":"Test 2","input":[{"Accounts":[[1,20000]]}]},
+    {"name":"Test 3","input":[{"Accounts":[[1,19999],[2,20000],[3,50000],[4,50001]]}]},
+    {"name":"Test 4","input":[{"Accounts":[[5,100],[6,0],[7,15000]]}]},
+    {"name":"Test 5","input":[{"Accounts":[[10,60000],[11,50001],[12,250000]]}]},
+    {"name":"Test 6","input":[{"Accounts":[[1,35000],[2,35000],[3,49999],[4,20001]]}]},
+    {"name":"Test 7","input":[{"Accounts":[[1,50000]]}]},
+    {"name":"Test 8","input":[{"Accounts":[[9,19999]]}]},
+    {"name":"Test 9","input":[{"Accounts":[[3,108939],[2,12747],[8,87709],[6,91796],[4,20000],[5,50000],[7,12747],[1,45000]]}]},
+    {"name":"Test 10","input":[{"Accounts":[[1,0],[2,70000],[3,0],[4,51000]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCounting per category is a grouped `COUNT`, but grouping can only report categories that actually occur in the data: in Example 1 nobody earns an average salary, so a plain `GROUP BY` would return two rows instead of three. The fix is to start from a fixed list of the three categories and **left join** the labeled accounts onto it. A category with no accounts still keeps its row, and `COUNT` of the joined column turns its missing matches into `0`.\n\n## Approach\n\n1. `categories`: a three-row table holding the category names, built with `UNION ALL`.\n2. `labeled`: each account with its category, chosen by a `CASE` whose branches are tried in order (below 20000, then up to 50000, else high).\n3. `LEFT JOIN` `labeled` onto `categories` by category name, so every category survives.\n4. `GROUP BY c.category` and `COUNT(l.account_id)`: `COUNT` of a column skips nulls, so an unmatched category counts `0`.\n\n## Example 1, step by step\n\n`labeled` holds account 3 → High Salary (108939), 2 → Low Salary (12747), 8 → High Salary (87709) and 6 → High Salary (91796).\n\nAfter the left join, Low Salary matches account 2, Average Salary matches nothing (one row with `l.account_id = null`) and High Salary matches accounts 3, 8 and 6. Counting non-null ids per group gives Low Salary 1, Average Salary 0, High Salary 3.\n\n## Complexity\n\n- Time: O(A) for A accounts: one pass to label them and a join against a three-row table.\n- Space: O(A) for the labeled rows.\n\n## Pitfalls\n\n- `GROUP BY` on the `CASE` alone drops empty categories; the left join from the fixed list keeps them.\n- `COUNT(*)` after the left join counts the null-filled row of an empty category as 1; count `l.account_id` instead.\n- `SUM(income < 20000)` over an empty table is `null`, not `0`.\n- The edges belong to Average Salary: 20000 and 50000 are both inside it, so use `< 20000` and `<= 50000`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `categories` / `c` | the three category names, one row each |\n| `labeled` / `l` | every account with the category its income falls into |\n| `LEFT JOIN ... ON` | keeps categories that no account matches |\n| `accounts_count` | non-null matched accounts per category |",
+  "narration": {
+    "1": "categories lists the three names up front, so none of them can go missing later.",
+    "6": "labeled gives every account the category its income falls into.",
+    "8": "CASE tries its branches in order: below 20000 is low, otherwise up to 50000 is average, and anything else is high.",
+    "15": "Each output row is one category name from the fixed list.",
+    "16": "COUNT of the joined account_id skips nulls, so a category that matched no account counts 0.",
+    "17": "The fixed category list is the left side, so every category produces a row.",
+    "18": "A left join keeps a category with no accounts, filling the account columns with null.",
+    "20": "Grouping by category name collapses the matched accounts into one count per category."
+  }
+}

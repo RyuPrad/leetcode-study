@@ -1,0 +1,50 @@
+{
+  "number": 1875,
+  "title": "Group Employees of the Same Salary",
+  "spec": "recalled",
+  "statement": "A company stores its staff in one table:\n\n- `Employees(employee_id, name, salary)`: one row per employee; `employee_id` is unique.\n\nThe company splits employees into teams by these rules:\n\n- all members of a team earn the same salary, and everyone with that salary is on that one team;\n- a team has at least two members, so an employee whose salary nobody else shares joins no team and is left out;\n- teams are numbered by salary: the team with the lowest salary gets `team_id` 1, the next lowest 2, and so on with no gaps.\n\nReport every employee who is on a team with the columns `employee_id`, `name`, `salary` and `team_id`, ordered by `team_id` ascending and then by `employee_id` ascending.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "salary is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["name","VARCHAR(30)"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const ids = new Set();\n  for (const [id, name, salary] of Employees) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (ids.has(id)) return `employee_id ${id} appears twice.`;\n    ids.add(id);\n    if (name === null) return 'Every employee needs a name.';\n    if (salary === null) return 'Every employee needs a salary.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH shared AS (\n  SELECT employee_id, name, salary,\n         COUNT(*) OVER (PARTITION BY salary) AS same_salary\n  FROM Employees\n)\nSELECT employee_id, name, salary,\n       DENSE_RANK() OVER (ORDER BY salary) AS team_id\nFROM shared\nWHERE same_salary > 1\nORDER BY team_id, employee_id;",
+  "brute": "SELECT e.employee_id, e.name, e.salary, COUNT(lower_team.salary) AS team_id\nFROM Employees AS e\nJOIN (SELECT salary FROM Employees GROUP BY salary HAVING COUNT(*) >= 2) AS own_team\n  ON own_team.salary = e.salary\nJOIN (SELECT salary FROM Employees GROUP BY salary HAVING COUNT(*) >= 2) AS lower_team\n  ON lower_team.salary <= e.salary\nGROUP BY e.employee_id, e.name, e.salary\nORDER BY team_id, e.employee_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const names = ['Meir', 'Michael', 'Addilyn', 'Juan', 'Kannon', 'Ana', 'Ravi', 'Sofia', 'Lee', 'Kim'];\n  const count = size === 'small' ? pick(9) : 1800;\n  const salaries = size === 'small'\n    ? [3000, 4500, 6100, 7400, 9000].slice(0, 2 + pick(4))\n    : Array.from({ length: 1100 }, (_, i) => 1000 + 7 * i);\n  // Distinct ids drawn from a wider range and inserted in random order.\n  const ids = new Set();\n  while (ids.size < count) ids.add(1 + pick(count * 3 + 5));\n  const Employees = [...ids].map((id) => [id, names[pick(names.length)], salaries[pick(salaries.length)]]);\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[2,"Meir",3000],[3,"Michael",3000],[7,"Addilyn",7400],[8,"Juan",6100],[9,"Kannon",7400]]}],"expected":{"columns":["employee_id","name","salary","team_id"],"rows":[[2,"Meir",3000,1],[3,"Michael",3000,1],[7,"Addilyn",7400,2],[9,"Kannon",7400,2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Ana",5000]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"Ana",5000],[2,"Ravi",6000],[3,"Sofia",7000]]}]},
+    {"name":"Test 4","input":[{"Employees":[[9,"Lee",4000],[3,"Kim",4000],[5,"Ana",4000]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Ana",1000],[2,"Ravi",2000],[3,"Sofia",2000],[4,"Lee",3000],[5,"Kim",3000]]}]},
+    {"name":"Test 6","input":[{"Employees":[[1,"Ana",9000],[2,"Ravi",9000],[3,"Sofia",5000],[4,"Lee",5000]]}]},
+    {"name":"Test 7","input":[{"Employees":[[4,"Kim",2500],[1,"Ana",2500],[6,"Ana",2500],[2,"Ravi",4000],[8,"Lee",3100],[7,"Sofia",4000],[3,"Juan",8000]]}]},
+    {"name":"Test 8","input":[{"Employees":[[10,"Ana",7000],[11,"Ravi",6000],[12,"Sofia",7000],[13,"Lee",5000],[14,"Kim",6000],[15,"Juan",4000]]}]},
+    {"name":"Test 9","input":[{"Employees":[[1,"Meir",3000],[2,"Michael",3000],[3,"Juan",3000],[4,"Kannon",3000]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA team is just a salary value that at least two employees share. So two facts are needed per employee: how many people earn the same salary (to decide whether they are on a team at all) and where that salary sits among the **team** salaries (to number the team). Both are window computations: a count over a salary partition, then a dense rank by salary over the survivors.\n\n## Approach\n\n1. `shared`: attach `same_salary`, the number of employees in the employee's salary partition, with `COUNT(*) OVER (PARTITION BY salary)`.\n2. Keep only rows with `same_salary > 1`; lone salaries are dropped **before** ranking.\n3. Number the remaining salaries with `DENSE_RANK() OVER (ORDER BY salary)` as `team_id`: equal salaries share a number and there are no gaps.\n4. Sort by `team_id`, then `employee_id`.\n\n## Example 1, step by step\n\n`shared` gives `same_salary` 2 for Meir and Michael (3000), 2 for Addilyn and Kannon (7400) and 1 for Juan (6100).\n\nThe filter removes Juan. Dense ranking the remaining salaries gives 3000 rank 1 and 7400 rank 2. Juan's 6100 no longer sits between them, so the 7400 team is team 2, not 3. Sorting gives Meir (2), Michael (3), Addilyn (7), Kannon (9).\n\n## Complexity\n\n- Time: O(N log N) for N employees, dominated by the sorts behind the two windows and the final order.\n- Space: O(N) for the window results.\n\n## Pitfalls\n\n- Ranking all salaries first and filtering afterwards leaves gaps where lone salaries were (Example 1 would number the 7400 team as 3).\n- `RANK()` instead of `DENSE_RANK()` skips numbers after a team of several people.\n- The order has two keys: `team_id`, then `employee_id`. Sorting by `employee_id` alone breaks when a higher salary team has smaller ids.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `shared` | every employee with `same_salary`, the size of their salary group |\n| `same_salary` | `COUNT(*)` over the employee's salary partition |\n| `team_id` | `DENSE_RANK` of the salary among salaries shared by at least two people |",
+  "narration": {
+    "1": "The first stage keeps every employee and annotates how many people share their salary.",
+    "3": "Counting over a salary partition tells each row the size of its salary group without collapsing rows.",
+    "6": "The final select keeps the employee columns and numbers the teams.",
+    "7": "DENSE_RANK over salary gives equal salaries the same team_id and leaves no gaps.",
+    "9": "Lone salaries are removed here, before the rank in the select list is computed, so they never take a team number.",
+    "10": "Teams come out by number, and members within a team by employee_id."
+  }
+}

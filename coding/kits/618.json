@@ -1,0 +1,52 @@
+{
+  "number": 618,
+  "title": "Students Report By Geography",
+  "spec": "recalled",
+  "statement": "One table lists students and where they come from:\n\n- `Student(name, continent)`: one row per student. `continent` is one of `'America'`, `'Asia'` or `'Europe'`. The table has no key and may hold duplicate rows; each copy is a separate student. America has at least as many students as Asia and at least as many as Europe.\n\nPivot the table into three columns named `America`, `Asia` and `Europe`, in that order. Each column lists the names of that continent's students sorted alphabetically, one name per row: row 1 holds the alphabetically first name of every continent, row 2 the second, and so on. When a continent runs out of names, its cell is `null`. Return the rows in this position order (row 1 first); there are as many rows as America has students.",
+  "constraints": [
+    "continent is 'America', 'Asia' or 'Europe'",
+    "Student may contain duplicate rows",
+    "America has at least as many students as Asia and as Europe",
+    "Within a continent, no two names differ only in letter case"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Student": [["name","VARCHAR(50)"],["continent","VARCHAR(7)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Student = [] }] = input;\n  const counts = { America: 0, Asia: 0, Europe: 0 }, spelled = new Map();\n  for (const [name, continent] of Student) {\n    if (name === null) return 'Every student needs a name.';\n    if (!(continent in counts)) return `Unknown continent ${continent}.`;\n    counts[continent]++;\n    const key = `${continent}|${name.toLowerCase()}`;\n    if (spelled.has(key) && spelled.get(key) !== name) return `${spelled.get(key)} and ${name} differ only in case.`;\n    spelled.set(key, name);\n  }\n  if (counts.America < counts.Asia || counts.America < counts.Europe) return 'America must have the most students.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT name, continent,\n    ROW_NUMBER() OVER (PARTITION BY continent ORDER BY name) AS position\n  FROM Student\n)\nSELECT\n  MAX(CASE WHEN continent = 'America' THEN name END) AS America,\n  MAX(CASE WHEN continent = 'Asia' THEN name END) AS Asia,\n  MAX(CASE WHEN continent = 'Europe' THEN name END) AS Europe\nFROM ranked\nGROUP BY position\nORDER BY position;",
+  "brute": "WITH RECURSIVE america AS (\n  SELECT COUNT(*) AS n FROM Student WHERE continent = 'America'\n),\nslots (k) AS (\n  SELECT 1 FROM america WHERE n > 0\n  UNION ALL\n  SELECT s.k + 1 FROM slots AS s, america AS a WHERE s.k < a.n\n),\nreach AS (\n  SELECT DISTINCT s.continent, s.name,\n    (SELECT COUNT(*) FROM Student AS t WHERE t.continent = s.continent AND t.name <= s.name) AS upto\n  FROM Student AS s\n)\nSELECT\n  (SELECT MIN(r.name) FROM reach AS r WHERE r.continent = 'America' AND r.upto >= slots.k) AS America,\n  (SELECT MIN(r.name) FROM reach AS r WHERE r.continent = 'Asia' AND r.upto >= slots.k) AS Asia,\n  (SELECT MIN(r.name) FROM reach AS r WHERE r.continent = 'Europe' AND r.upto >= slots.k) AS Europe\nFROM slots\nORDER BY slots.k",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const pool = ['Jack', 'Jane', 'Xi', 'Pascal', 'Ana', 'bo', 'Mia', 'Li', 'Omar', 'Zoe'];\n  const syllables = ['ka', 'ro', 'li', 'ma', 'ne', 'to', 'su', 'vi', 'da', 'xe'];\n  const name = () => {\n    if (small) return pick(pool);\n    const text = pick(syllables) + pick(syllables) + pick(syllables);\n    return text[0].toUpperCase() + text.slice(1);\n  };\n  // Choose the three group sizes first, with America the largest (ties allowed).\n  let sizes;\n  if (small) {\n    sizes = [0, 1, 2].map(() => Math.floor(rand() * 4));\n    const most = Math.max(...sizes);\n    sizes[sizes.indexOf(most)] = sizes[0];\n    sizes[0] = most;\n  } else sizes = [650, 300 + Math.floor(rand() * 351), 300 + Math.floor(rand() * 351)];\n  const Student = [];\n  ['America', 'Asia', 'Europe'].forEach((continent, i) => {\n    for (let j = 0; j < sizes[i]; j++) Student.push([name(), continent]);\n  });\n  for (let i = Student.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Student[i], Student[j]] = [Student[j], Student[i]];\n  }\n  return [{ Student }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Student":[["Jane","America"],["Pascal","Europe"],["Xi","Asia"],["Jack","America"]]}],"expected":{"columns":["America","Asia","Europe"],"rows":[["Jack","Xi","Pascal"],["Jane",null,null]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Student":[]}]},
+    {"name":"Test 2","input":[{"Student":[["Bob","America"]]}]},
+    {"name":"Test 3","input":[{"Student":[["Yuri","Europe"],["Mia","America"],["Chen","Asia"],["Abe","America"],["Ola","Europe"],["Ann","Asia"]]}]},
+    {"name":"Test 4","input":[{"Student":[["Ana","America"],["Li","Asia"],["Ana","America"],["Li","Asia"],["Eva","Europe"]]}]},
+    {"name":"Test 5","input":[{"Student":[["Sam","America"],["Sam","Asia"],["Sam","Europe"],["Max","America"]]}]},
+    {"name":"Test 6","input":[{"Student":[["Zed","America"],["Amy","America"],["Kai","America"],["Ola","Europe"]]}]},
+    {"name":"Test 7","input":[{"Student":[["Bea","America"],["adam","America"],["Cy","Asia"],["bo","Asia"]]}]},
+    {"name":"Test 8","input":[{"Student":[["Alba","America"],["Al","America"],["Alan","America"],["Ito","Asia"],["Ito","Asia"],["Rui","Europe"],["Ben","Europe"]]}]},
+    {"name":"Test 9","input":[{"Student":[["Kim","America"],["Kim","America"],["Kim","America"],["Lee","Asia"],["Dan","Europe"],["Tom","Europe"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe output puts names from different rows of `Student` side by side, so each name needs a coordinate: its column is its continent, and its row is its position in the continent's alphabetical list. `ROW_NUMBER()` partitioned by continent and ordered by name gives exactly that position. Once every name has a (position, continent) coordinate, grouping by position and picking the one name per continent with conditional aggregation turns the long table into the wide one.\n\n## Approach\n\n1. CTE `ranked`: every student with `position = ROW_NUMBER() OVER (PARTITION BY continent ORDER BY name)`. Duplicates get consecutive positions, so each copy has its own row.\n2. `GROUP BY position`: one output row per position.\n3. In each group, `MAX(CASE WHEN continent = '...' THEN name END)` picks the single name of that continent, or `null` when the continent has fewer students. One such column per continent, named `America`, `Asia`, `Europe`.\n4. `ORDER BY position` lists the rows in alphabetical position order.\n\n## Example 1, step by step\n\n- `ranked`: America gets Jack → 1 and Jane → 2; Asia gets Xi → 1; Europe gets Pascal → 1.\n- Position 1 holds Jack, Xi and Pascal, one per continent, so the row is `(Jack, Xi, Pascal)`.\n- Position 2 holds only Jane; Asia and Europe have nothing there, so the row is `(Jane, null, null)`.\n\n## Complexity\n\n- Time: O(n log n) for n students to sort within each continent, then one pass to group by position.\n- Space: O(n) for `ranked`.\n\n## Pitfalls\n\n- `RANK()` or `DENSE_RANK()` gives duplicate names the same position, and `MAX` then folds them into one cell, losing a student; `ROW_NUMBER()` keeps them apart.\n- Forgetting `PARTITION BY continent` numbers all students together, so names of different continents never share a row.\n- `MAX` is only a way to pick the one non-null value in a group; it is not choosing the \"largest\" name. Without the `CASE`, it would mix continents.\n- Leaving out `ORDER BY position` returns the rows in whatever order the grouping produced.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | each student with its alphabetical `position` within its continent |\n| `position` | the output row a name belongs to |\n| `MAX(CASE ...)` | the name of one continent at this position, or `null` |\n| `America`, `Asia`, `Europe` | the three pivoted columns |",
+  "narration": {
+    "1": "The CTE gives every student a coordinate inside their continent.",
+    "3": "ROW_NUMBER restarts at 1 for each continent and counts names alphabetically, giving duplicates separate positions.",
+    "7": "In each position group, the CASE keeps only the America name and MAX picks it out (null if there is none).",
+    "8": "The same pattern fills the Asia column.",
+    "9": "And the Europe column.",
+    "11": "One output row per alphabetical position.",
+    "12": "Rows come out in position order, so each column reads alphabetically from top to bottom."
+  }
+}
