@@ -1,0 +1,58 @@
+{
+  "number": 1767,
+  "title": "Find the Subtasks That Did Not Execute",
+  "spec": "recalled",
+  "statement": "Two tables track a batch of jobs:\n\n- `Tasks(task_id, subtasks_count)`: one row per task; `task_id` is unique. A task is split into subtasks numbered `1`, `2`, ..., `subtasks_count`, and `subtasks_count` is between 2 and 20.\n- `Executed(task_id, subtask_id)`: one row per subtask that ran successfully; `(task_id, subtask_id)` is unique. Every `task_id` exists in `Tasks` and every `subtask_id` is between 1 and that task's `subtasks_count`.\n\nFind every subtask that never ran: report one row per missing pair with the columns `task_id` and `subtask_id`. A task whose subtasks all ran contributes no rows. Rows may come in any order.",
+  "constraints": [
+    "task_id is unique in Tasks",
+    "2 <= subtasks_count <= 20",
+    "(task_id, subtask_id) is unique in Executed",
+    "Executed.task_id exists in Tasks",
+    "1 <= subtask_id <= subtasks_count of its task"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tasks": [["task_id","INT"],["subtasks_count","INT"]],
+    "Executed": [["task_id","INT"],["subtask_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Tasks = [], Executed = [] }] = input;\n  const counts = new Map();\n  for (const [id, count] of Tasks) {\n    if (id === null) return 'Every task needs a task_id.';\n    if (counts.has(id)) return `task_id ${id} appears twice in Tasks.`;\n    if (!Number.isInteger(count) || count < 2 || count > 20) return `Task ${id} needs a subtasks_count from 2 to 20.`;\n    counts.set(id, count);\n  }\n  const seen = new Set();\n  for (const [id, sub] of Executed) {\n    if (!counts.has(id)) return `Executed names task ${id}, which is not in Tasks.`;\n    if (!Number.isInteger(sub) || sub < 1 || sub > counts.get(id)) return `Subtask ${sub} is out of range for task ${id}.`;\n    const key = `${id}:${sub}`;\n    if (seen.has(key)) return `Subtask ${sub} of task ${id} is listed twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE all_subtasks AS (\n  SELECT task_id, 1 AS subtask_id, subtasks_count\n  FROM Tasks\n  UNION ALL\n  SELECT task_id, subtask_id + 1, subtasks_count\n  FROM all_subtasks\n  WHERE subtask_id < subtasks_count\n)\nSELECT s.task_id, s.subtask_id\nFROM all_subtasks AS s\nLEFT JOIN Executed AS e\n  ON e.task_id = s.task_id\n AND e.subtask_id = s.subtask_id\nWHERE e.task_id IS NULL;",
+  "brute": "WITH RECURSIVE numbers AS (\n  SELECT 1 AS k\n  UNION ALL\n  SELECT k + 1 FROM numbers WHERE k < 20\n)\nSELECT t.task_id, n.k AS subtask_id\nFROM Tasks AS t, numbers AS n\nWHERE n.k <= t.subtasks_count\n  AND NOT EXISTS (\n    SELECT 1 FROM Executed AS x\n    WHERE x.task_id = t.task_id AND x.subtask_id = n.k\n  )",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const taskCount = small ? Math.floor(rand() * 5) : 300;\n  const ids = Array.from({ length: small ? 8 : 1000 }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Tasks = [], Executed = [];\n  for (const id of ids.slice(0, taskCount)) {\n    // Small cases keep counts low but sometimes hit the limit of 20.\n    const count = small ? (rand() < 0.1 ? 20 : 2 + Math.floor(rand() * 4)) : 2 + Math.floor(rand() * 19);\n    Tasks.push([id, count]);\n    // Each task ran completely, not at all, or partly.\n    const mode = rand();\n    for (let sub = 1; sub <= count; sub++) {\n      const ran = mode < 0.25 ? true : mode < 0.45 ? false : rand() < 0.5;\n      if (ran && Executed.length < 2000) Executed.push([id, sub]);\n    }\n  }\n  for (let i = Executed.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Executed[i], Executed[j]] = [Executed[j], Executed[i]]; }\n  return [{ Tasks, Executed }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tasks":[[1,3],[2,2],[3,4]],"Executed":[[1,2],[3,1],[3,2],[3,3],[3,4]]}],"expected":{"columns":["task_id","subtask_id"],"rows":[[1,1],[1,3],[2,1],[2,2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tasks":[],"Executed":[]}]},
+    {"name":"Test 2","input":[{"Tasks":[[1,2]],"Executed":[]}]},
+    {"name":"Test 3","input":[{"Tasks":[[1,2],[2,3]],"Executed":[[1,1],[1,2],[2,1],[2,2],[2,3]]}]},
+    {"name":"Test 4","input":[{"Tasks":[[5,20]],"Executed":[[5,1],[5,2],[5,3],[5,4],[5,5],[5,6],[5,7],[5,8],[5,9],[5,10],[5,11],[5,12],[5,13],[5,14],[5,15],[5,16],[5,17],[5,18],[5,19]]}]},
+    {"name":"Test 5","input":[{"Tasks":[[7,20],[8,2]],"Executed":[[8,2]]}]},
+    {"name":"Test 6","input":[{"Tasks":[[1,3],[2,3]],"Executed":[[1,1],[1,2],[1,3]]}]},
+    {"name":"Test 7","input":[{"Tasks":[[10,4],[42,2]],"Executed":[[42,1],[10,4],[10,2]]}]},
+    {"name":"Test 8","input":[{"Tasks":[[3,5]],"Executed":[[3,5]]}]},
+    {"name":"Test 9","input":[{"Tasks":[[1,2],[2,4],[3,3],[4,2]],"Executed":[[2,1],[2,3],[3,1],[3,2],[3,3],[4,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n`Executed` only lists what happened; the missing subtasks are rows that do not exist anywhere. To report them we first have to **create** the full list of subtasks every task should have, then subtract the ones that ran. A recursive CTE builds the list: start each task at subtask 1 and keep adding 1 until reaching its `subtasks_count`. An anti-join against `Executed` then leaves only the gaps.\n\n## Approach\n\n1. Anchor of `all_subtasks`: one row per task with `subtask_id = 1`.\n2. Recursive step: from each row, produce the next `subtask_id` while it is below `subtasks_count`. The CTE ends up with exactly `subtasks_count` rows per task.\n3. `LEFT JOIN Executed` on both `task_id` and `subtask_id`.\n4. `WHERE e.task_id IS NULL` keeps the subtasks with no matching execution row.\n\n## Example 1, step by step\n\n- `all_subtasks` holds (1,1), (1,2), (1,3), (2,1), (2,2), (3,1), (3,2), (3,3), (3,4): nine rows.\n- Matching against `Executed`: (1,2) and all four subtasks of task 3 find a partner.\n- The unmatched rows are (1,1), (1,3), (2,1) and (2,2), the expected answer. Task 3 ran completely and contributes nothing.\n\n## Complexity\n\n- Time: O(S + E) with hashing, where S is the total number of subtasks (at most 20 per task) and E the rows of `Executed`.\n- Space: O(S) for the generated subtask list.\n\n## Pitfalls\n\n- Joining on `subtask_id` alone matches a subtask of one task with an execution of another; both columns must match.\n- Testing `WHERE e.task_id IS NULL` is the anti-join; an inner join returns the opposite set.\n- The recursion needs a stop condition per task (`subtask_id < subtasks_count`); stopping at a fixed 20 for every task invents subtasks that do not exist.\n- `WITH RECURSIVE` is required in MySQL as soon as a CTE refers to itself.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `all_subtasks` | every (task, subtask) pair that should exist, with the task's count carried along |\n| `s` | a row of `all_subtasks` |\n| `e` | the matching row of `Executed`, or nulls when the subtask never ran |",
+  "narration": {
+    "1": "Start a recursive CTE that lists every subtask each task is supposed to have.",
+    "2": "Anchor: every task starts with subtask 1, which always exists because counts are at least 2.",
+    "4": "Glue the anchor and the recursive step together; UNION ALL keeps every generated row.",
+    "5": "Recursive step: add the next subtask number for the same task.",
+    "7": "Stop once a task reaches its own subtasks_count.",
+    "9": "Report the task and subtask of each generated row that survives the filter.",
+    "11": "A left join keeps every generated subtask, even when nothing in Executed matches it.",
+    "12": "Match executions on the task id.",
+    "13": "And on the subtask number, so different tasks never match each other.",
+    "14": "Keep only subtasks with no execution row: the ones that never ran."
+  }
+}

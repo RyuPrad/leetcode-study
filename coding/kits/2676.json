@@ -1,0 +1,72 @@
+{
+  "number": 2676,
+  "title": "Throttle",
+  "spec": "recalled",
+  "statement": "Write `throttle(fn, t)`, which returns a **throttled** version of the function `fn` with a waiting period of `t` milliseconds. The throttled function behaves like this:\n\n- If it is called while it is idle, `fn` runs immediately with that call's arguments, and a waiting period of `t` ms begins.\n- A call during a waiting period does not run `fn`. Its arguments are saved instead, replacing any arguments saved earlier in that period. A call made at the very moment a waiting period ends still belongs to that period.\n- When a waiting period ends and arguments are saved, `fn` runs with them at that moment, the saved arguments are cleared, and a new waiting period of `t` ms begins. When nothing is saved, the throttled function becomes idle again.\n\nSo `fn` runs at most once per `t` ms, the first call of a burst runs at once, and the latest arguments of the burst are not lost.\n\nEach case gives `t` and a list of `calls`, each `{ t, inputs }`: at time `t` (in ms from the start) the throttled function is called with the arguments `inputs`. The answer is the list of runs of `fn`, each `{ t, inputs }` with the time it ran and the arguments it received, in the order they happened.",
+  "constraints": [
+    "0 <= t <= 1000",
+    "1 <= calls.length <= 10",
+    "0 <= calls[i].t <= 1000",
+    "0 <= calls[i].inputs.length <= 10",
+    "calls is sorted by time"
+  ],
+  "signature": "List<Object> throttle(int t, List<Object> calls)",
+  "entry": "throttle",
+  "kind": "function",
+  "parameters": [
+    "t",
+    "calls"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [t, calls] = input;\n  if (!Number.isInteger(t) || t < 0 || t > 1000) return 't must be an integer from 0 to 1000.';\n  if (!Array.isArray(calls) || calls.length < 1 || calls.length > 10) return 'Give 1 to 10 calls.';\n  let previous = 0;\n  for (const call of calls) {\n    if (!call || typeof call !== 'object' || !Number.isInteger(call.t) || call.t < 0 || call.t > 1000) return 'Each call needs a time t from 0 to 1000.';\n    if (!Array.isArray(call.inputs) || call.inputs.length > 10 || !call.inputs.every(Number.isInteger)) return 'Each call needs inputs: a list of at most 10 integers.';\n    if (call.t < previous) return 'List the calls in time order.';\n    previous = call.t;\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [t, calls] = input, runs = [];\n  const fn = (...args) => { runs.push({ t: Date.now(), inputs: args }); kit.trace(`fn(${args.join(', ')}) runs`); };\n  const throttled = solve(fn, t);\n  if (typeof throttled !== 'function') throw new Error('throttle must return a function.');\n  for (const call of calls) setTimeout(() => { kit.trace(`throttled(${call.inputs.join(', ')}) is called`); throttled(...call.inputs); }, call.t);\n  // The last saved arguments run at most t ms after the last call, so every run is over by then.\n  return new Promise(resolve => setTimeout(() => resolve(runs), calls[calls.length - 1].t + t + 1));\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn\n * @param {number} t the waiting period in milliseconds\n * @return {Function}\n */\nfunction throttle(fn, t) {\n  // Write your code here.\n  return function (...args) {\n  };\n}\n",
+    "typescript": "type F = (...args: number[]) => void;\n\nfunction throttle(fn: F, t: number): F {\n  // Write your code here.\n  return function (...args) {\n  };\n}\n"
+  },
+  "api": "throttle(fn: (...args: number[]) => void, t: number): (...args: number[]) => void",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function throttle(fn, t) {\n  let timer = null;\n  let pendingArgs = null;\n  const endWait = () => {\n    if (pendingArgs === null) {\n      timer = null;\n      return;\n    }\n    fn(...pendingArgs);\n    pendingArgs = null;\n    timer = setTimeout(endWait, t);\n  };\n  return function (...args) {\n    if (timer !== null) {\n      pendingArgs = args;\n      return;\n    }\n    fn(...args);\n    timer = setTimeout(endWait, t);\n  };\n}",
+  "brute": "function throttle(fn, t) {\n  // Track when the current waiting period ends, and set a timer only once something is saved in it.\n  let periodEnd = -1;\n  let saved = null;\n  const release = () => {\n    const args = saved;\n    saved = null;\n    fn(...args);\n    periodEnd = Date.now() + t;\n  };\n  return function (...args) {\n    const now = Date.now();\n    if (now > periodEnd) {\n      fn(...args);\n      periodEnd = now + t;\n      return;\n    }\n    if (saved === null) setTimeout(release, periodEnd - now);\n    saved = args;\n  };\n}",
+  "generator": "function generate(rand, size) {\n  const t = Math.floor(rand() * (size === 'small' ? 120 : 1001));\n  const count = 1 + Math.floor(rand() * 10), calls = [];\n  let time = Math.floor(rand() * 100);\n  for (let i = 0; i < count && time <= 1000; i++) {\n    calls.push({ t: time, inputs: Array.from({ length: Math.floor(rand() * 4) }, () => Math.floor(rand() * 20) - 5) });\n    // Sometimes repeat a moment or step exactly t ahead, so calls land on the end of a waiting period.\n    const roll = rand();\n    time += roll < 0.1 ? 0 : roll < 0.25 ? t : Math.floor(rand() * (size === 'small' ? 150 : 250));\n  }\n  return [t, calls];\n}",
+  "examples": [
+    {"name":"Example 1","input":[100,[{"t":20,"inputs":[1]}]],"expected":[{"t":20,"inputs":[1]}]},
+    {"name":"Example 2","input":[50,[{"t":50,"inputs":[1]},{"t":75,"inputs":[2]}]],"expected":[{"t":50,"inputs":[1]},{"t":100,"inputs":[2]}]},
+    {"name":"Example 3","input":[70,[{"t":50,"inputs":[1]},{"t":75,"inputs":[2]},{"t":90,"inputs":[8]},{"t":140,"inputs":[5,7]},{"t":300,"inputs":[9,4]}]],"expected":[{"t":50,"inputs":[1]},{"t":120,"inputs":[8]},{"t":190,"inputs":[5,7]},{"t":300,"inputs":[9,4]}]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0,[{"t":0,"inputs":[]}]]},
+    {"name":"Test 2","input":[0,[{"t":0,"inputs":[1]},{"t":0,"inputs":[2]},{"t":0,"inputs":[3]}]]},
+    {"name":"Test 3","input":[50,[{"t":0,"inputs":[1]},{"t":50,"inputs":[2]}]]},
+    {"name":"Test 4","input":[50,[{"t":0,"inputs":[1]},{"t":30,"inputs":[2]},{"t":50,"inputs":[3]}]]},
+    {"name":"Test 5","input":[30,[{"t":0,"inputs":[1]},{"t":10,"inputs":[2]},{"t":20,"inputs":[3]},{"t":40,"inputs":[4]},{"t":50,"inputs":[5]}]]},
+    {"name":"Test 6","input":[1000,[{"t":0,"inputs":[1]},{"t":999,"inputs":[2]},{"t":1000,"inputs":[3]}]]},
+    {"name":"Test 7","input":[100,[{"t":10,"inputs":[7]},{"t":500,"inputs":[8]}]]},
+    {"name":"Test 8","input":[20,[{"t":100,"inputs":[1,2,3]},{"t":100,"inputs":[4]},{"t":100,"inputs":[]},{"t":119,"inputs":[5]},{"t":121,"inputs":[6]}]]},
+    {"name":"Test 9","input":[5,[{"t":0,"inputs":[1]},{"t":10,"inputs":[2]},{"t":20,"inputs":[3]},{"t":30,"inputs":[4]}]]},
+    {"name":"Test 10","input":[60,[{"t":0,"inputs":[0]},{"t":10,"inputs":[1]},{"t":20,"inputs":[2]},{"t":30,"inputs":[3]},{"t":40,"inputs":[4]},{"t":50,"inputs":[5]},{"t":60,"inputs":[6]},{"t":70,"inputs":[7]},{"t":80,"inputs":[8]},{"t":90,"inputs":[9]}]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nThrottling caps how often `fn` runs: at most once per `t` ms. Unlike debouncing, the first call of a burst runs **at once**, and later calls in the waiting period only leave their arguments behind, so the latest ones run when the period ends. That trailing run starts a new period of its own. All of this is state shared by every call, so it lives in the closure: a `timer` that marks \"a period is running\" and the `pendingArgs` waiting for its end. (The brute force tracks the end time of the period with `Date.now()` instead and sets a timer only once something is saved.)\n\n## Approach\n\n1. Keep `timer` (`null` while idle) and `pendingArgs` (`null` when nothing is saved).\n2. On a call: if `timer` is set, a period is running, so store `args` in `pendingArgs` and stop.\n3. Otherwise run `fn(...args)` now and start a period with `setTimeout(endWait, t)`.\n4. `endWait` runs when a period ends. With nothing saved it sets `timer = null`: idle again.\n5. With saved arguments it runs `fn` with them, clears `pendingArgs` and starts the next period.\n\n## Example 1, step by step\n\nWith `t = 100` and one call at 20 ms:\n\n- At 20 ms `timer` is `null`, so `fn(1)` runs at once and `endWait` is scheduled for 120 ms.\n- At 120 ms `endWait` finds `pendingArgs` empty and sets `timer = null`.\n- The answer is `[{ t: 20, inputs: [1] }]`.\n\nIn Example 3 (`t = 70`) the calls at 75 and 90 ms are saved in turn, so `fn(8)` runs at 120 ms; `(5, 7)` from 140 ms runs at 190 ms; at 260 ms the period ends empty, so the call at 300 ms runs at once.\n\n## Complexity\n\n- Time: O(1) per call and per period end.\n- Space: O(1) besides one saved argument list.\n\n## Pitfalls\n\n- Ignoring calls during the period instead of saving the latest ones loses Example 2's run at 100 ms.\n- Forgetting to start a new period after the trailing run lets the next call run less than `t` ms later.\n- Not clearing `pendingArgs` after using them runs the same arguments again at every period end.\n- Mixing a `Date.now()` check with a separate timer can run `fn` twice when a call lands exactly as a period with saved arguments ends; such a call belongs to the period (Test 4).\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `timer` | id of the timer that ends the current period, `null` while idle |\n| `pendingArgs` | latest arguments saved during the period, or `null` |\n| `endWait` | runs when a period ends: either goes idle or runs the saved arguments |\n| `args` | the arguments of the current call |",
+  "narration": {
+    "2": "timer is set while a waiting period runs and null while the throttled function is idle.",
+    "3": "pendingArgs keeps the latest arguments saved during the current period.",
+    "4": "endWait runs each time a waiting period ends.",
+    "5": "Nothing was saved during the period that just ended...",
+    "6": "...so the throttled function becomes idle again.",
+    "9": "Saved arguments run now, at the end of the period.",
+    "10": "Clear them so they do not run a second time.",
+    "11": "The trailing run starts a new waiting period.",
+    "14": "A period is running, so this call must not run fn.",
+    "15": "Save its arguments, replacing older saved ones.",
+    "18": "The function was idle: run fn immediately.",
+    "19": "Start a waiting period that ends in t ms."
+  }
+}
