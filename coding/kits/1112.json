@@ -1,0 +1,51 @@
+{
+  "number": 1112,
+  "title": "Highest Grade For Each Student",
+  "spec": "recalled",
+  "statement": "One table records students' course results:\n\n- `Enrollments(student_id, course_id, grade)`: one row per student per course; `(student_id, course_id)` is unique and `grade` is never `null`.\n\nFor every student, report their best course: the course where they got their highest grade. When the student has the same highest grade in several courses, choose the one with the **smallest** `course_id`. Each student appears exactly once.\n\nReturn the columns `student_id`, `course_id` and `grade`, ordered by `student_id` ascending.",
+  "constraints": [
+    "(student_id, course_id) is unique in Enrollments",
+    "grade is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Enrollments": [["student_id","INT"],["course_id","INT"],["grade","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Enrollments = [] }] = input;\n  const seen = new Set();\n  for (const [student, course, grade] of Enrollments) {\n    if (student === null || course === null) return 'Every enrollment needs a student_id and a course_id.';\n    if (grade === null) return 'grade is never null.';\n    const key = `${student}/${course}`;\n    if (seen.has(key)) return `Student ${student} is enrolled in course ${course} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    student_id,\n    course_id,\n    grade,\n    ROW_NUMBER() OVER (\n      PARTITION BY student_id\n      ORDER BY grade DESC, course_id ASC\n    ) AS place\n  FROM Enrollments\n)\nSELECT student_id, course_id, grade\nFROM ranked\nWHERE place = 1\nORDER BY student_id;",
+  "brute": "SELECT e.student_id, e.course_id, e.grade\nFROM Enrollments AS e\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Enrollments AS other\n  WHERE other.student_id = e.student_id\n    AND (other.grade > e.grade OR (other.grade = e.grade AND other.course_id < e.course_id))\n)\nORDER BY e.student_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const students = small ? 1 + Math.floor(rand() * 4) : 450;\n  const courses = small ? 4 : 6;\n  const grades = small ? [75, 80, 82, 90, 95, 95, 99] : null;\n  const pairs = [];\n  for (let s = 1; s <= students; s++) for (let c = 1; c <= courses; c++) pairs.push([s, c]);\n  // Shuffle so rows arrive in no particular order, then keep a prefix.\n  for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Enrollments = pairs.slice(0, count).map(([s, c]) => [s * 3 + 1, c * 2 + 1, grades ? grades[Math.floor(rand() * grades.length)] : 60 + Math.floor(rand() * 41)]);\n  return [{ Enrollments }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Enrollments":[[2,2,95],[2,3,95],[1,1,90],[1,2,99],[3,1,80],[3,2,75],[3,3,82]]}],"expected":{"columns":["student_id","course_id","grade"],"rows":[[1,2,99],[2,2,95],[3,3,82]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Enrollments":[]}]},
+    {"name":"Test 2","input":[{"Enrollments":[[7,4,61]]}]},
+    {"name":"Test 3","input":[{"Enrollments":[[1,3,88],[1,1,88],[1,2,88]]}]},
+    {"name":"Test 4","input":[{"Enrollments":[[5,9,70],[5,4,92],[5,6,92],[5,1,85]]}]},
+    {"name":"Test 5","input":[{"Enrollments":[[3,1,50],[1,1,60],[2,1,70],[3,2,55],[1,2,40]]}]},
+    {"name":"Test 6","input":[{"Enrollments":[[1,1,70],[1,2,80],[1,3,90],[2,1,100],[2,2,0]]}]},
+    {"name":"Test 7","input":[{"Enrollments":[[4,1,0],[4,2,0],[8,5,0]]}]},
+    {"name":"Test 8","input":[{"Enrollments":[[10,1,66],[10,2,98],[10,3,98],[20,1,77],[20,7,77],[20,3,76]]}]},
+    {"name":"Test 9","input":[{"Enrollments":[[2,2,95],[2,3,95],[1,1,90],[1,2,99],[3,1,80],[3,2,75],[3,3,82],[4,5,99],[4,2,82]]}]},
+    {"name":"Test 10","input":[{"Enrollments":[[100,3,85],[9,3,85],[100,1,84],[9,2,86],[55,8,90],[55,7,90]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is \"the top row in each group\" with a tie-break. Number each student's enrollments from best to worst, best meaning the highest grade and, among equal grades, the smallest course id. The row numbered 1 is the answer for that student. `ROW_NUMBER` (not `RANK`) guarantees exactly one row per student even when grades tie.\n\n## Approach\n\n1. CTE `ranked`: for every enrollment compute `place` with `ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY grade DESC, course_id ASC)`. The partition restarts the numbering for each student; the order puts the winning course first.\n2. Keep the rows with `place = 1`.\n3. `ORDER BY student_id`, as the output requires.\n\n## Example 1, step by step\n\n`ranked` numbers each student's courses:\n\n| student_id | course_id | grade | place |\n| --- | --- | --- | --- |\n| 1 | 2 | 99 | 1 |\n| 1 | 1 | 90 | 2 |\n| 2 | 2 | 95 | 1 |\n| 2 | 3 | 95 | 2 |\n| 3 | 3 | 82 | 1 |\n| 3 | 1 | 80 | 2 |\n| 3 | 2 | 75 | 3 |\n\nStudent 2 ties at 95, and course 2 beats course 3 on the smaller id. The `place = 1` rows give `(1, 2, 99)`, `(2, 2, 95)`, `(3, 3, 82)`.\n\n## Complexity\n\n- Time: O(E log E) to sort the E enrollments inside the window.\n- Space: O(E) for the numbered rows.\n\n## Pitfalls\n\n- `SELECT student_id, MIN(course_id), MAX(grade) ... GROUP BY student_id` mixes columns from different rows: the smallest course overall is not necessarily the one with the top grade.\n- `RANK()` or `DENSE_RANK()` with only `ORDER BY grade DESC` returns every tied course; the tie-break on `course_id` must be in the window's order.\n- The output must be sorted by `student_id`; the window's internal order does not sort the final result.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every enrollment with its position among the student's courses |\n| `place` | 1 for the best course, 2 for the next, and so on |\n| `PARTITION BY student_id` | numbering restarts for each student |",
+  "narration": {
+    "1": "The ranked stage numbers every enrollment within its student.",
+    "6": "ROW_NUMBER gives each of a student's courses a distinct position, so ties cannot produce two winners.",
+    "7": "Numbering restarts for every student.",
+    "8": "Highest grade first; among equal grades, the smaller course id comes first.",
+    "14": "Keep only each student's first-placed course.",
+    "15": "The result must list students in ascending order of id."
+  }
+}

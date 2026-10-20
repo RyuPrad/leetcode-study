@@ -1,0 +1,61 @@
+{
+  "number": 982,
+  "title": "Triples with Bitwise AND Equal To Zero",
+  "spec": "leetcode",
+  "statement": "You get an integer array `nums`. Count the ordered index triples `(i, j, k)`, where each of `i`, `j` and `k` may be any index from `0` to `nums.length - 1` (the same index may be used more than once), for which `nums[i] & nums[j] & nums[k]` is `0`, with `&` meaning bitwise AND. Return that count.",
+  "constraints": [
+    "1 <= nums.length <= 1000",
+    "0 <= nums[i] < 2^16"
+  ],
+  "signature": "int countTriplets(int[] nums)",
+  "entry": "countTriplets",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 1000) return 'nums needs 1 to 1000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v > 65535)) return 'Each value is an integer from 0 to 65535 (below 2^16).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countTriplets(nums) {\n  let full = 0;\n  for (const value of nums) full |= value;\n  const pairs = new Array(full + 1).fill(0);\n  for (const first of nums) {\n    for (const second of nums) {\n      pairs[first & second]++;\n    }\n  }\n\n  let count = 0;\n  for (const third of nums) {\n    const free = full & ~third;\n    for (let mask = free; ; mask = (mask - 1) & free) {\n      count += pairs[mask];\n      if (mask === 0) break;\n    }\n  }\n  return count;\n}",
+  "brute": "function countTriplets(nums) {\n  let total = 0;\n  for (const a of nums)\n    for (const b of nums)\n      for (const c of nums)\n        if ((a & b & c) === 0) total++;\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 900 + Math.floor(rand() * 101) : 1 + Math.floor(rand() * 8);\n  const style = rand();\n  if (style < 0.25) {\n    // Values over a few low bits, so ANDs often collide and counts are large.\n    const width = 1 + Math.floor(rand() * 4);\n    return [Array.from({ length: n }, () => Math.floor(rand() * (1 << width)))];\n  }\n  if (style < 0.4) {\n    // One value repeated, sometimes with a zero or a full mask mixed in.\n    const value = Math.floor(rand() * 65536);\n    return [Array.from({ length: n }, () => (rand() < 0.15 ? (rand() < 0.5 ? 0 : 65535) : value))];\n  }\n  // Each bit set with probability p: sparse values give many zero ANDs, dense ones few.\n  const p = 0.1 + rand() * 0.8;\n  return [Array.from({ length: n }, () => {\n    let value = 0;\n    for (let bit = 0; bit < 16; bit++) if (rand() < p) value |= 1 << bit;\n    return value;\n  })];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,1,3]],"expected":12},
+    {"name":"Example 2","input":[[0,0,0]],"expected":27}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0]]},
+    {"name":"Test 2","input":[[1]]},
+    {"name":"Test 3","input":[[65535,65535]]},
+    {"name":"Test 4","input":[[1,2]]},
+    {"name":"Test 5","input":[[0,65535]]},
+    {"name":"Test 6","input":[[1,2,4,8]]},
+    {"name":"Test 7","input":[[3,5,6]]},
+    {"name":"Test 8","input":[[7,7,7,7]]},
+    {"name":"Test 9","input":[[12345,54321,0,1,32768,21845,43690]]},
+    {"name":"Test 10","input":[[1,1,1,2,2,2,4,4]]},
+    {"name":"Test 11","input":[[32768,16384,49152,65535,32767]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every triple is O(n³), about 10⁹ steps for 1000 numbers. The values have only 16 bits, though, so `nums[i] & nums[j]` has at most 2^16 possible results. Count how many index pairs produce each result once, in O(n²). Then a triple works exactly when the pair's AND shares no bit with the third number, so for each third number only the pair results that fit inside its complement matter.\n\n## Approach\n\n1. OR all numbers into `full`. Every AND of the numbers uses only bits of `full`, so a table of `full + 1` slots is enough (at most 2^16).\n2. Fill `pairs`, where `pairs[v]` is the number of ordered pairs `(i, j)` with `nums[i] & nums[j] === v`.\n3. For each `third` number, take `free = full & ~third`, the bits of `full` that `third` lacks. A pair result works when all of its bits lie inside `free`, that is, when it is a submask of `free`.\n4. Walk through every submask of `free` with `mask = (mask - 1) & free`, starting at `free` and finishing at `0`, and add `pairs[mask]` to `count`.\n5. Return `count`.\n\n## Example 1, step by step\n\n`nums = [2, 1, 3]`, so `full = 3` and `pairs` has 4 slots. The nine ordered pairs give `pairs[0] = 2` (2&1, 1&2), `pairs[1] = 3`, `pairs[2] = 3` and `pairs[3] = 1`.\n\n- `third = 2`: `free = 1`, whose submasks are 1 and 0: `3 + 2 = 5`.\n- `third = 1`: `free = 2`, submasks 2 and 0: `3 + 2 = 5`.\n- `third = 3`: `free = 0`, only 0: `2`.\n\nThe total is `5 + 5 + 2 = 12`.\n\n## Complexity\n\n- Time: O(n² + n·2^16) in the worst case: the pair table takes n² steps, and a `free` with f bits has 2^f submasks to visit.\n- Space: O(2^16) for `pairs`, less when the values use fewer bits.\n\n## Pitfalls\n\n- Indices may repeat and order matters, so loop over all n² pairs, not only `i < j`.\n- `~third` alone is negative in JavaScript; masking it with `full` keeps only meaningful bits and a valid table index.\n- The submask loop must still visit `0`, so add `pairs[mask]` before checking whether `mask` is `0`.\n- The answer can reach 10⁹ = 1000³, which still fits in a 32-bit signed integer.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `full` | OR of all values: every bit any value uses |\n| `pairs` | `pairs[v]`: ordered pairs whose AND equals `v` |\n| `first`, `second` | the two values of a pair |\n| `third` | the value that completes the triple |\n| `free` | the bits of `full` that `third` does not have |\n| `mask` | the current submask of `free` |\n| `count` | triples found so far |",
+  "narration": {
+    "2": "Start the OR of all values at zero.",
+    "3": "Collect every bit that any value uses; no AND of the values can have a bit outside full.",
+    "4": "One counter per possible pair result, from 0 up to full.",
+    "5": "Pick the first value of an ordered pair...",
+    "6": "...and the second; the same index may be used twice.",
+    "7": "Count this pair under its AND result.",
+    "12": "Now try every value as the third member of the triple.",
+    "13": "The bits third lacks; a pair result works only if all of its bits are among these.",
+    "14": "Visit every submask of free, from free itself down to 0.",
+    "15": "Every pair whose AND equals this submask completes a zero triple with third.",
+    "16": "Zero is the last submask, so stop after counting it.",
+    "19": "Return the number of ordered triples whose AND is zero."
+  }
+}

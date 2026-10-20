@@ -1,0 +1,55 @@
+{
+  "number": 1174,
+  "title": "Immediate Food Delivery II",
+  "spec": "leetcode",
+  "statement": "One table records food orders:\n\n- `Delivery(delivery_id, customer_id, order_date, customer_pref_delivery_date)`: one row per order; `delivery_id` is unique. `customer_pref_delivery_date` is the day the customer wants the food, never earlier than `order_date`.\n\nAn order is **immediate** when its preferred delivery date equals its order date, and **scheduled** otherwise. A customer's **first order** is their order with the earliest `order_date`; each customer has exactly one order on that earliest date.\n\nLook only at the first orders of all customers and compute the percentage of them that are immediate. Return a single row with one column, `immediate_percentage`, rounded to 2 decimal places (for example `50.00`). When `Delivery` is empty, that one value is `null`.",
+  "constraints": [
+    "delivery_id is unique in Delivery",
+    "customer_pref_delivery_date >= order_date",
+    "Each customer has exactly one order on their earliest order_date",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Delivery": [["delivery_id","INT"],["customer_id","INT"],["order_date","DATE"],["customer_pref_delivery_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Delivery = [] }] = input;\n  const ids = new Set(), earliest = new Map();\n  for (const row of Delivery) {\n    if (row.some((v) => v === null)) return 'Delivery rows may not contain null.';\n    const [id, customer, ordered, preferred] = row;\n    if (ids.has(id)) return `delivery_id ${id} appears twice in Delivery.`;\n    ids.add(id);\n    if (preferred < ordered) return `Delivery ${id} prefers a date before its order date.`;\n    const seen = earliest.get(customer);\n    if (!seen || ordered < seen.date) earliest.set(customer, { date: ordered, count: 1 });\n    else if (ordered === seen.date) seen.count++;\n  }\n  for (const [customer, { count }] of earliest) if (count > 1) return `Customer ${customer} has two first orders.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_dates AS (\n  SELECT customer_id, MIN(order_date) AS first_date\n  FROM Delivery\n  GROUP BY customer_id\n),\nfirst_orders AS (\n  SELECT d.delivery_id,\n         d.customer_id,\n         CASE WHEN d.customer_pref_delivery_date = d.order_date THEN 1 ELSE 0 END AS is_immediate\n  FROM Delivery AS d\n  JOIN first_dates AS f\n    ON f.customer_id = d.customer_id\n   AND f.first_date = d.order_date\n)\nSELECT ROUND(100 * AVG(is_immediate), 2) AS immediate_percentage\nFROM first_orders;",
+  "brute": "SELECT ROUND(\n  100 * SUM(IF(d.order_date = d.customer_pref_delivery_date, 1, 0)) / COUNT(*),\n  2\n) AS immediate_percentage\nFROM Delivery AS d\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Delivery AS earlier\n  WHERE earlier.customer_id = d.customer_id\n    AND earlier.order_date < d.order_date\n)",
+  "generator": "function generate(rand, size) {\n  const day = (n) => new Date(Date.UTC(2019, 7, 1 + n)).toISOString().slice(0, 10);\n  const small = size === 'small';\n  const customers = small ? Math.floor(rand() * 5) : 500;\n  const limit = small ? 8 : 2000;\n  const orders = [];\n  for (let customer = 1; customer <= customers && orders.length < limit; customer++) {\n    // The first order sits alone on the customer's earliest date; later orders may share dates.\n    const first = Math.floor(rand() * (small ? 5 : 60));\n    const lag = () => (rand() < 0.5 ? 0 : 1 + Math.floor(rand() * 3));\n    orders.push([customer, day(first), day(first + lag())]);\n    const extra = Math.floor(rand() * (small ? 3 : 7));\n    for (let k = 0; k < extra && orders.length < limit; k++) {\n      const date = first + 1 + Math.floor(rand() * (small ? 3 : 30));\n      orders.push([customer, day(date), day(date + lag())]);\n    }\n  }\n  // Shuffle so that delivery_id order says nothing about which order came first.\n  for (let i = orders.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [orders[i], orders[j]] = [orders[j], orders[i]];\n  }\n  const Delivery = orders.map(([customer, ordered, preferred], i) => [i + 1, customer, ordered, preferred]);\n  return [{ Delivery }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-02"],[2,2,"2019-08-02","2019-08-02"],[3,1,"2019-08-11","2019-08-12"],[4,3,"2019-08-24","2019-08-24"],[5,3,"2019-08-21","2019-08-22"],[6,2,"2019-08-11","2019-08-13"],[7,4,"2019-08-09","2019-08-09"]]}],"expected":{"columns":["immediate_percentage"],"rows":[[50]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Delivery":[]}]},
+    {"name":"Test 2","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"]]}]},
+    {"name":"Test 3","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-03"]]}]},
+    {"name":"Test 4","input":[{"Delivery":[[1,7,"2019-08-01","2019-08-02"],[2,7,"2019-08-05","2019-08-05"],[3,7,"2019-08-09","2019-08-09"]]}]},
+    {"name":"Test 5","input":[{"Delivery":[[1,1,"2019-08-10","2019-08-10"],[2,1,"2019-08-03","2019-08-04"],[3,2,"2019-08-08","2019-08-08"],[4,2,"2019-08-02","2019-08-05"]]}]},
+    {"name":"Test 6","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"],[2,2,"2019-08-01","2019-08-02"],[3,3,"2019-08-01","2019-08-04"]]}]},
+    {"name":"Test 7","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"],[2,2,"2019-08-02","2019-08-02"],[3,3,"2019-08-03","2019-08-04"],[4,3,"2019-08-04","2019-08-04"],[5,3,"2019-08-04","2019-08-04"]]}]},
+    {"name":"Test 8","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"],[2,1,"2019-08-02","2019-08-03"],[3,2,"2019-08-05","2019-08-05"],[4,2,"2019-08-06","2019-08-09"],[5,2,"2019-08-06","2019-08-07"]]}]},
+    {"name":"Test 9","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"],[2,2,"2019-08-01","2019-08-02"],[3,3,"2019-08-01","2019-08-02"],[4,4,"2019-08-01","2019-08-02"],[5,5,"2019-08-01","2019-08-02"],[6,6,"2019-08-01","2019-08-02"],[7,7,"2019-08-01","2019-08-02"],[8,2,"2019-08-03","2019-08-03"]]}]},
+    {"name":"Test 10","input":[{"Delivery":[[9,4,"2019-12-31","2020-01-01"],[3,4,"2020-01-01","2020-01-01"],[5,8,"2020-02-28","2020-02-28"],[1,8,"2020-03-01","2020-03-02"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo questions are mixed together: *which* order is each customer's first, and *what share* of those orders are immediate. The first is a per-customer aggregate (`MIN(order_date)`), so it gets its own stage. Once each customer is reduced to exactly one order, the percentage is just the average of a 0/1 flag times 100.\n\n## Approach\n\n1. `first_dates`: group `Delivery` by `customer_id` and keep `MIN(order_date)` as `first_date`.\n2. `first_orders`: join each delivery `d` to its customer's row `f` on both the customer and `first_date`, so only first orders survive; flag each with `is_immediate` = 1 when the preferred date equals the order date, else 0.\n3. Average `is_immediate` over `first_orders`, multiply by 100 and round to 2 decimals.\n\n## Example 1, step by step\n\n- `first_dates`: customer 1 → 2019-08-01, 2 → 2019-08-02, 3 → 2019-08-21, 4 → 2019-08-09.\n- `first_orders` keeps deliveries 1 (wants 08-02, so 0), 2 (same day, 1), 5 (wants 08-22, 0) and 7 (same day, 1). Delivery 4 of customer 3 is immediate but was placed later (08-24), so it does not count.\n- `AVG(is_immediate)` = 2 / 4 = 0.5, and 100 × 0.5 rounds to `50.00`.\n\n## Complexity\n\n- Time: O(D) with hashing for D deliveries: one grouping pass, one hash join, one aggregate.\n- Space: O(C) for the C customers in `first_dates`.\n\n## Pitfalls\n\n- Averaging over **all** orders instead of first orders: a customer's later immediate orders must not count.\n- Taking the smallest `delivery_id` as the first order: ids are not in date order (customer 3 in the example).\n- Integer division: `SUM(...) / COUNT(*)` truncates in some databases; MySQL's `/` is exact, but `DIV` is not, and multiplying by 100 after rounding loses digits.\n- `SELECT customer_id, MIN(order_date), customer_pref_delivery_date ... GROUP BY customer_id` pairs the minimum date with an arbitrary row's preferred date.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_dates` | one row per customer: their earliest `order_date` as `first_date` |\n| `d` | `Delivery`, one row per order |\n| `f` | the `first_dates` row of the order's customer |\n| `first_orders` | each customer's first order with its `is_immediate` flag |\n| `immediate_percentage` | 100 × the average flag, rounded to 2 decimals |",
+  "narration": {
+    "1": "The first stage finds each customer's earliest order date.",
+    "2": "MIN(order_date) per customer is the date of their first order.",
+    "4": "One group per customer, so first_dates has one row per customer.",
+    "6": "The second stage keeps only first orders and flags whether each is immediate.",
+    "9": "An order is immediate exactly when the preferred date equals the order date.",
+    "11": "Join each order to its customer's first date.",
+    "13": "Requiring the order date to equal first_date drops every later order.",
+    "15": "The average of a 0/1 flag is the immediate share; times 100 and rounded gives the percentage."
+  }
+}

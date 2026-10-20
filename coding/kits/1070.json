@@ -1,0 +1,51 @@
+{
+  "number": 1070,
+  "title": "Product Sales Analysis III",
+  "spec": "leetcode",
+  "statement": "One table records sales:\n\n- `Sales(sale_id, product_id, year, quantity, price)`: each row is one sale of `product_id` in `year`, of `quantity` units at the per-unit `price`. The pair `(sale_id, year)` is unique. A product can have several sales in the same year, even identical-looking ones with different `sale_id`s.\n\nFor each product, its **first year** is the smallest `year` in which it has any sale. Report every sale that a product made in its first year, one output row per such sale (keep repeated rows; do not merge them). Output the columns `product_id`, `first_year` (that sale's year), `quantity` and `price`. Sales from later years are not reported. Rows may come in any order.",
+  "constraints": [
+    "(sale_id, year) is unique in Sales",
+    "A product may have several sales in the same year",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sales": [["sale_id","INT"],["product_id","INT"],["year","INT"],["quantity","INT"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Sales = [] }] = input;\n  const keys = new Set();\n  for (const row of Sales) {\n    if (row.some((v) => v === null)) return 'Sales rows may not contain null.';\n    const key = `${row[0]}|${row[2]}`;\n    if (keys.has(key)) return `(sale_id ${row[0]}, year ${row[2]}) appears twice in Sales.`;\n    keys.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_years AS (\n  SELECT product_id, MIN(year) AS first_year\n  FROM Sales\n  GROUP BY product_id\n)\nSELECT s.product_id, f.first_year, s.quantity, s.price\nFROM Sales AS s\nJOIN first_years AS f\n  ON f.product_id = s.product_id\n AND f.first_year = s.year;",
+  "brute": "SELECT s.product_id, s.year AS first_year, s.quantity, s.price\nFROM Sales AS s\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Sales AS earlier\n  WHERE earlier.product_id = s.product_id\n    AND earlier.year < s.year\n)",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const Sales = [];\n  const used = new Set();\n  if (size === 'small') {\n    // Few products, years and prices so first-year ties and identical rows show up.\n    const rows = Math.floor(rand() * 9);\n    for (let i = 0; i < rows; i++) {\n      const saleId = 1 + Math.floor(rand() * 5);\n      const year = pick([2008, 2009, 2010, 2011]);\n      if (used.has(`${saleId}|${year}`)) continue;\n      used.add(`${saleId}|${year}`);\n      Sales.push([saleId, pick([100, 200, 300]), year, pick([1, 10, 12, 15]), pick([5000, 9000, 100])]);\n    }\n  } else {\n    for (let saleId = 1; saleId <= 2000; saleId++) {\n      Sales.push([saleId, 1 + Math.floor(rand() * 300), 2000 + Math.floor(rand() * 20), 1 + Math.floor(rand() * 50), 10 * (1 + Math.floor(rand() * 900))]);\n    }\n  }\n  return [{ Sales }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sales":[[1,100,2008,10,5000],[2,100,2009,12,5000],[7,200,2011,15,9000]]}],"expected":{"columns":["product_id","first_year","quantity","price"],"rows":[[100,2008,10,5000],[200,2011,15,9000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sales":[]}]},
+    {"name":"Test 2","input":[{"Sales":[[1,100,2015,3,40]]}]},
+    {"name":"Test 3","input":[{"Sales":[[1,100,2010,5,100],[2,100,2010,8,120],[3,100,2011,9,130]]}]},
+    {"name":"Test 4","input":[{"Sales":[[1,200,2012,4,50],[2,200,2012,4,50],[3,200,2013,4,50]]}]},
+    {"name":"Test 5","input":[{"Sales":[[1,100,2009,10,500],[1,200,2008,7,900],[1,100,2010,2,500]]}]},
+    {"name":"Test 6","input":[{"Sales":[[5,300,2020,1,10],[4,300,2019,2,20],[3,300,2018,3,30]]}]},
+    {"name":"Test 7","input":[{"Sales":[[1,100,2008,1,10],[2,200,2009,2,20],[3,300,2010,3,30]]}]},
+    {"name":"Test 8","input":[{"Sales":[[1,100,2011,2,70],[2,100,2015,99,999],[3,200,2015,6,60],[4,200,2015,6,61],[5,100,2011,2,75]]}]},
+    {"name":"Test 9","input":[{"Sales":[[10,400,2001,1,5],[11,400,2021,1,5],[12,500,2021,8,3],[13,500,2001,8,3],[14,500,2001,1,9]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo facts are needed for each sale: which product it belongs to and whether its year is that product's earliest. The earliest year is a per-product aggregate, `MIN(year)` grouped by `product_id`, so it has to be computed first in its own stage. Joining it back to `Sales` on both the product and the year then keeps exactly the first-year sales, all of them, including repeats.\n\n## Approach\n\n1. `first_years`: group `Sales` by `product_id` and take `MIN(year)` as `first_year`.\n2. Join every sale `s` to its product's row `f` in `first_years`, requiring `s.year = f.first_year` as part of the join condition.\n3. Select `product_id`, `first_year`, `quantity` and `price` for each surviving sale.\n\n## Example 1, step by step\n\n- `first_years` holds `(100, 2008)` and `(200, 2011)`.\n- Sale 1 (product 100, 2008) matches `(100, 2008)` and is kept as `100, 2008, 10, 5000`.\n- Sale 2 (product 100, 2009) has the right product but year 2009 ≠ 2008, so it is dropped.\n- Sale 7 (product 200, 2011) matches `(200, 2011)` and is kept as `200, 2011, 15, 9000`.\n\n## Complexity\n\n- Time: O(S) with hashing for S sales: one grouping pass to build `first_years` and one hash join back to `Sales`.\n- Space: O(P) for the P rows of `first_years`, plus the output.\n\n## Pitfalls\n\n- `SELECT product_id, MIN(year), quantity, price ... GROUP BY product_id` returns one row per product with `quantity` and `price` from an arbitrary row (or is rejected under `ONLY_FULL_GROUP_BY`), and loses extra first-year sales.\n- Matching on the year alone (`WHERE year IN (SELECT MIN(year) ...)`) mixes products up; the match must use the product and the year together.\n- `ROW_NUMBER()` per product keeps one sale even when the first year has several; `RANK()` or the join keeps them all. `DISTINCT` likewise wrongly merges identical sales.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_years` | one row per product: its earliest sale year as `first_year` |\n| `s` | `Sales`, one row per sale |\n| `f` | the `first_years` row of the sale's product |\n| `ON ... AND f.first_year = s.year` | keeps only sales made in that first year |",
+  "narration": {
+    "1": "The first stage computes each product's earliest sale year.",
+    "2": "MIN(year) per product is that product's first year.",
+    "4": "One group per product, so first_years has one row per product.",
+    "6": "Report the product, its first year and the quantity and price of each kept sale.",
+    "7": "Start from every sale, since several sales can belong to the first year.",
+    "8": "Join each sale to its product's first-year row.",
+    "10": "Keep the sale only when its year equals the product's first year."
+  }
+}

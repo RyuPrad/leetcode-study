@@ -1,0 +1,50 @@
+{
+  "number": 1322,
+  "title": "Ads Performance",
+  "spec": "recalled",
+  "statement": "One table logs how users reacted to ads:\n\n- `Ads(ad_id, user_id, action)`: user `user_id` reacted to ad `ad_id` with `action`, which is `'Clicked'`, `'Viewed'` or `'Ignored'`. `(ad_id, user_id)` is unique.\n\nFor every ad that appears in the table, compute its click-through rate `ctr`: with `clicks` the number of `'Clicked'` rows and `views` the number of `'Viewed'` rows of that ad, `ctr = 100 * clicks / (clicks + views)`, or `0` when `clicks + views = 0`. `'Ignored'` rows count toward neither. Round `ctr` to 2 decimal places.\n\nReturn the columns `ad_id` and `ctr`, ordered by `ctr` descending; ads with the same rounded `ctr` are ordered by `ad_id` ascending.",
+  "constraints": [
+    "(ad_id, user_id) is unique in Ads",
+    "action is one of 'Clicked', 'Viewed', 'Ignored'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Ads": [["ad_id","INT"],["user_id","INT"],["action","ENUM('Clicked', 'Viewed', 'Ignored')"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Ads = [] }] = input;\n  const seen = new Set(), actions = new Set(['Clicked', 'Viewed', 'Ignored']);\n  for (const [ad, user, action] of Ads) {\n    if (ad === null || user === null) return 'Every row needs an ad_id and a user_id.';\n    if (!actions.has(action)) return \"action must be 'Clicked', 'Viewed' or 'Ignored'.\";\n    const key = `${ad}/${user}`;\n    if (seen.has(key)) return `User ${user} reacted to ad ${ad} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH tallies AS (\n  SELECT\n    ad_id,\n    SUM(action = 'Clicked') AS clicks,\n    SUM(action = 'Viewed') AS views\n  FROM Ads\n  GROUP BY ad_id\n)\nSELECT\n  ad_id,\n  CASE\n    WHEN clicks + views = 0 THEN 0\n    ELSE ROUND(100 * clicks / (clicks + views), 2)\n  END AS ctr\nFROM tallies\nORDER BY ctr DESC, ad_id ASC;",
+  "brute": "SELECT\n  a.ad_id,\n  ROUND(IFNULL(\n    100 * (SELECT COUNT(*) FROM Ads AS c WHERE c.ad_id = a.ad_id AND c.action = 'Clicked')\n      / NULLIF((SELECT COUNT(*) FROM Ads AS s WHERE s.ad_id = a.ad_id AND s.action IN ('Clicked', 'Viewed')), 0),\n    0), 2) AS ctr\nFROM (SELECT DISTINCT ad_id FROM Ads) AS a\nORDER BY ctr DESC, a.ad_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  // Ignored is common so that some ads have no clicks or views at all.\n  const actions = ['Clicked', 'Viewed', 'Ignored', 'Ignored', 'Clicked', 'Viewed', 'Ignored'];\n  const adCount = small ? 1 + Math.floor(rand() * 4) : 250;\n  const userCount = small ? 5 : 40;\n  const pairs = [];\n  for (let ad = 1; ad <= adCount; ad++) for (let user = 1; user <= userCount; user++) pairs.push([ad, user]);\n  for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Ads = pairs.slice(0, count).map(([ad, user]) => [ad * 2 + 1, user, pick(actions)]);\n  return [{ Ads }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Ads":[[1,1,"Clicked"],[2,2,"Clicked"],[3,3,"Viewed"],[5,5,"Ignored"],[1,7,"Ignored"],[2,7,"Viewed"],[3,5,"Clicked"],[1,4,"Viewed"],[2,11,"Viewed"],[1,2,"Clicked"]]}],"expected":{"columns":["ad_id","ctr"],"rows":[[1,66.67],[3,50],[2,33.33],[5,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Ads":[]}]},
+    {"name":"Test 2","input":[{"Ads":[[7,1,"Ignored"]]}]},
+    {"name":"Test 3","input":[{"Ads":[[4,1,"Ignored"],[2,1,"Ignored"],[3,2,"Viewed"],[3,1,"Viewed"]]}]},
+    {"name":"Test 4","input":[{"Ads":[[9,1,"Clicked"],[9,2,"Viewed"],[3,1,"Viewed"],[3,2,"Clicked"],[6,1,"Clicked"]]}]},
+    {"name":"Test 5","input":[{"Ads":[[1,1,"Clicked"],[1,2,"Ignored"],[1,3,"Ignored"],[2,1,"Viewed"],[2,2,"Clicked"],[2,3,"Ignored"]]}]},
+    {"name":"Test 6","input":[{"Ads":[[1,1,"Clicked"],[1,2,"Viewed"],[1,3,"Viewed"],[2,1,"Clicked"],[2,2,"Clicked"],[2,3,"Viewed"],[3,1,"Clicked"],[3,2,"Viewed"],[3,3,"Viewed"],[3,4,"Viewed"],[3,5,"Viewed"],[3,6,"Viewed"]]}]},
+    {"name":"Test 7","input":[{"Ads":[[1,1,"Clicked"],[1,2,"Viewed"],[1,3,"Viewed"],[1,4,"Viewed"],[1,5,"Viewed"],[1,6,"Viewed"],[1,7,"Viewed"],[1,8,"Viewed"],[5,1,"Viewed"]]}]},
+    {"name":"Test 8","input":[{"Ads":[[10,1,"Clicked"],[10,2,"Viewed"],[10,3,"Viewed"],[4,1,"Clicked"],[4,2,"Clicked"],[4,3,"Viewed"],[4,4,"Viewed"],[4,5,"Viewed"],[4,6,"Viewed"],[8,9,"Ignored"]]}]},
+    {"name":"Test 9","input":[{"Ads":[[1,1,"Clicked"],[2,1,"Clicked"],[3,1,"Clicked"],[3,2,"Clicked"],[2,2,"Ignored"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach ad needs two counts, its clicks and its views, and then one formula. Grouping by `ad_id` gives one row per ad; inside the group a comparison like `action = 'Clicked'` is 1 or 0, so summing it counts the matching rows. The only special case is an ad with neither clicks nor views, whose rate is defined as 0 instead of a division by zero.\n\n## Approach\n\n1. CTE `tallies`: group `Ads` by `ad_id` and sum `action = 'Clicked'` into `clicks` and `action = 'Viewed'` into `views`. `'Ignored'` rows add 0 to both but still make the ad appear.\n2. `ctr` is 0 when `clicks + views = 0`; otherwise `100 * clicks / (clicks + views)` rounded to 2 decimals.\n3. `ORDER BY ctr DESC, ad_id ASC` puts the best rates first and breaks ties by id.\n\n## Example 1, step by step\n\n`tallies` holds:\n\n- ad 1: users 1 and 2 clicked, user 4 viewed, user 7 ignored → clicks 2, views 1.\n- ad 2: user 2 clicked, users 7 and 11 viewed → clicks 1, views 2.\n- ad 3: user 5 clicked, user 3 viewed → clicks 1, views 1.\n- ad 5: only an ignore → clicks 0, views 0.\n\nThe rates are 200 / 3 ≈ 66.67, 100 / 3 ≈ 33.33, 50.00 and 0.00 (the zero case). Sorted by rate: ad 1, ad 3, ad 2, ad 5.\n\n## Complexity\n\n- Time: O(n) to group n rows, plus O(a log a) to sort the a ads.\n- Space: O(a) for the per-ad tallies.\n\n## Pitfalls\n\n- Dividing by `COUNT(*)` counts `'Ignored'` rows in the denominator; only clicks and views belong there.\n- Without the zero case MySQL returns `null` for `0 / 0`, but the expected value is `0`.\n- Filtering with `WHERE action <> 'Ignored'` drops ads that were only ignored, which must still be reported with 0.\n- Forgetting the `ad_id` tie-break leaves ads with equal rates in an arbitrary order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `tallies` | one row per ad: `ad_id`, `clicks`, `views` |\n| `clicks` / `views` | counts of `'Clicked'` and `'Viewed'` rows for the ad |\n| `ctr` | the click-through rate in percent, rounded to 2 decimals, or 0 |",
+  "narration": {
+    "1": "The tallies stage counts clicks and views for every ad.",
+    "4": "A comparison is 1 when true and 0 when false, so summing it counts the ad's clicks.",
+    "5": "The same trick counts views; ignored rows add to neither total.",
+    "7": "One group per ad, so even an ad that was only ignored gets a row.",
+    "12": "With no clicks and no views the rate is defined as 0 instead of a division by zero.",
+    "13": "Otherwise the rate is the percentage of clicks among clicks plus views, rounded to 2 decimals.",
+    "16": "Highest rates come first, and equal rates are ordered by ad_id."
+  }
+}

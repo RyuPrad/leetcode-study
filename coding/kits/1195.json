@@ -1,0 +1,74 @@
+{
+  "number": 1195,
+  "title": "Fizz Buzz Multithreaded",
+  "spec": "leetcode",
+  "statement": "On LeetCode this is a multithreading problem. Here each thread is an asynchronous task, and you coordinate the tasks with promises.\n\nWrite a class `FizzBuzz` whose constructor takes `n`. One shared instance is handed to four threads, which call `fizz(printFizz)`, `buzz(printBuzz)`, `fizzbuzz(printFizzBuzz)` and `number(printNumber)`, one method each. `printFizz()`, `printBuzz()` and `printFizzBuzz()` print the words `\"fizz\"`, `\"buzz\"` and `\"fizzbuzz\"`, and `printNumber(x)` prints the integer `x`. Between them the threads must print one token for each `i` from 1 to `n`, in increasing order of `i`:\n\n- `\"fizzbuzz\"` when `i` is divisible by both 3 and 5,\n- `\"fizz\"` when `i` is divisible by 3 but not by 5,\n- `\"buzz\"` when `i` is divisible by 5 but not by 3,\n- the number `i` itself when it is divisible by neither.\n\nEach method prints only its own kind of token (`number` prints exactly the plain integers) and keeps going until all of its tokens are out, so make the methods `async` and `await` promises between prints.\n\nEach case gives `n`, `threads` and `starts`: thread `i` starts at `starts[i]` ms and calls the method named `threads[i]`. Threads with the same start time start in index order. The answer is `{ output, times }`: the printed tokens in order (words as strings, numbers as numbers) and the time in ms of each print. A token must be printed as soon as it is allowed, that is, once its thread has started and the token before it has been printed, so wait on promises rather than on timers.",
+  "constraints": [
+    "1 <= n <= 50",
+    "threads is a permutation of [\"fizz\", \"buzz\", \"fizzbuzz\", \"number\"]",
+    "starts.length == 4",
+    "0 <= starts[i] <= 1000"
+  ],
+  "signature": "Object FizzBuzz(int n, String[] threads, int[] starts)",
+  "entry": "FizzBuzz",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "threads",
+    "starts"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [n, threads, starts] = input;\n  if (!Number.isInteger(n) || n < 1 || n > 50) return 'n must be an integer from 1 to 50.';\n  if (threads.length !== 4 || [...threads].sort().join() !== 'buzz,fizz,fizzbuzz,number') return 'threads must list \"fizz\", \"buzz\", \"fizzbuzz\" and \"number\" once each.';\n  if (starts.length !== 4) return 'starts needs 4 start times, one per thread.';\n  if (!starts.every((t) => Number.isInteger(t) && t >= 0 && t <= 1000)) return 'Each start time is an integer from 0 to 1000 ms.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [n, threads, starts] = input, start = Date.now(), prints = [];\n  const fizzBuzz = new solve(n);\n  for (const name of threads) if (!fizzBuzz || typeof fizzBuzz[name] !== 'function') throw new Error(`FizzBuzz needs a method ${name}.`);\n  let failure = null;\n  threads.forEach((name, i) => {\n    const record = (token) => {\n      prints.push({ token, t: Date.now() - start });\n      kit.trace(`${name}() prints ${token}`);\n    };\n    const callback = name === 'number'\n      ? (x) => {\n        if (!Number.isInteger(x) || x < 1 || x > n || x % 3 === 0 || x % 5 === 0) failure = failure ?? `number() may not print ${x}.`;\n        record(x);\n      }\n      : () => record(name);\n    setTimeout(() => {\n      kit.trace(`The ${name} thread starts and calls ${name}()`);\n      const result = fizzBuzz[name](callback);\n      if (result && typeof result.then === 'function') result.then(null, (error) => { failure = failure ?? `${name}() failed: ${error && error.message || error}`; });\n    }, starts[i]);\n  });\n  // A correct solution has printed everything by the last start; the extra time shows late prints.\n  return new Promise((resolve, reject) => setTimeout(() => {\n    if (failure) reject(new Error(failure));\n    else resolve({ output: prints.map((p) => p.token), times: prints.map((p) => p.t) });\n  }, Math.max(...starts) + 50));\n}",
+  "starters": {
+    "javascript": "class FizzBuzz {\n  /** @param {number} n */\n  constructor(n) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  /** Prints every \"fizz\". @param {() => void} printFizz */\n  async fizz(printFizz) {\n  }\n\n  /** Prints every \"buzz\". @param {() => void} printBuzz */\n  async buzz(printBuzz) {\n  }\n\n  /** Prints every \"fizzbuzz\". @param {() => void} printFizzBuzz */\n  async fizzbuzz(printFizzBuzz) {\n  }\n\n  /** Prints the plain numbers. @param {(x: number) => void} printNumber */\n  async number(printNumber) {\n  }\n}\n",
+    "typescript": "class FizzBuzz {\n  n: number;\n\n  constructor(n: number) {\n    this.n = n;\n    // Write your code here.\n  }\n\n  async fizz(printFizz: () => void): Promise<void> {\n  }\n\n  async buzz(printBuzz: () => void): Promise<void> {\n  }\n\n  async fizzbuzz(printFizzBuzz: () => void): Promise<void> {\n  }\n\n  async number(printNumber: (x: number) => void): Promise<void> {\n  }\n}\n"
+  },
+  "api": "class FizzBuzz { constructor(n: number); fizz(printFizz: () => void): void | Promise<void>; buzz(printBuzz: () => void): void | Promise<void>; fizzbuzz(printFizzBuzz: () => void): void | Promise<void>; number(printNumber: (x: number) => void): void | Promise<void> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "class FizzBuzz {\n  constructor(n) {\n    this.n = n;\n    this.current = 1;\n    this.waiting = new Map();\n  }\n\n  waitFor(i) {\n    if (this.current === i) return Promise.resolve();\n    return new Promise((resolve) => {\n      this.waiting.set(i, resolve);\n    });\n  }\n\n  advance() {\n    this.current += 1;\n    const wake = this.waiting.get(this.current);\n    this.waiting.delete(this.current);\n    if (wake) wake();\n  }\n\n  async fizz(printFizz) {\n    for (let i = 3; i <= this.n; i += 3) {\n      if (i % 5 === 0) continue;\n      await this.waitFor(i);\n      printFizz();\n      this.advance();\n    }\n  }\n\n  async buzz(printBuzz) {\n    for (let i = 5; i <= this.n; i += 5) {\n      if (i % 3 === 0) continue;\n      await this.waitFor(i);\n      printBuzz();\n      this.advance();\n    }\n  }\n\n  async fizzbuzz(printFizzBuzz) {\n    for (let i = 15; i <= this.n; i += 15) {\n      await this.waitFor(i);\n      printFizzBuzz();\n      this.advance();\n    }\n  }\n\n  async number(printNumber) {\n    for (let i = 1; i <= this.n; i++) {\n      if (i % 3 === 0 || i % 5 === 0) continue;\n      await this.waitFor(i);\n      printNumber(i);\n      this.advance();\n    }\n  }\n}",
+  "brute": "class FizzBuzz {\n  constructor(n) {\n    this.n = n;\n    this.next = 1;\n    this.printers = {};\n  }\n\n  owner(i) {\n    if (i % 15 === 0) return 'fizzbuzz';\n    if (i % 3 === 0) return 'fizz';\n    if (i % 5 === 0) return 'buzz';\n    return 'number';\n  }\n\n  // Record the arriving printer, then print every token whose owner has arrived.\n  arrive(name, print) {\n    this.printers[name] = print;\n    while (this.next <= this.n && this.printers[this.owner(this.next)]) {\n      const i = this.next++;\n      if (this.owner(i) === 'number') this.printers.number(i);\n      else this.printers[this.owner(i)]();\n    }\n  }\n\n  fizz(printFizz) { this.arrive('fizz', printFizz); }\n  buzz(printBuzz) { this.arrive('buzz', printBuzz); }\n  fizzbuzz(printFizzBuzz) { this.arrive('fizzbuzz', printFizzBuzz); }\n  number(printNumber) { this.arrive('number', printNumber); }\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'small' ? 1 + Math.floor(rand() * 20) : 40 + Math.floor(rand() * 11);\n  const threads = ['fizz', 'buzz', 'fizzbuzz', 'number'];\n  for (let i = 3; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [threads[i], threads[j]] = [threads[j], threads[i]];\n  }\n  const top = size === 'small' ? 30 : 1000, roll = rand();\n  const same = Math.floor(rand() * (top + 1));\n  const starts = threads.map(() => (roll < 0.25 ? 0 : roll < 0.4 ? same : Math.floor(rand() * (top + 1))));\n  return [n, threads, starts];\n}",
+  "examples": [
+    {"name":"Example 1","input":[15,["fizz","buzz","fizzbuzz","number"],[0,0,0,0]],"expected":{"output":[1,2,"fizz",4,"buzz","fizz",7,8,"fizz","buzz",11,"fizz",13,14,"fizzbuzz"],"times":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},
+    {"name":"Example 2","input":[5,["fizz","buzz","fizzbuzz","number"],[0,0,0,0]],"expected":{"output":[1,2,"fizz",4,"buzz"],"times":[0,0,0,0,0]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,["fizz","buzz","fizzbuzz","number"],[0,0,0,0]]},
+    {"name":"Test 2","input":[3,["number","fizz","buzz","fizzbuzz"],[0,0,0,0]]},
+    {"name":"Test 3","input":[15,["fizzbuzz","buzz","fizz","number"],[0,0,0,0]]},
+    {"name":"Test 4","input":[15,["number","fizz","buzz","fizzbuzz"],[0,10,20,30]]},
+    {"name":"Test 5","input":[5,["fizz","number","buzz","fizzbuzz"],[100,0,50,1000]]},
+    {"name":"Test 6","input":[30,["buzz","fizzbuzz","number","fizz"],[7,7,3,3]]},
+    {"name":"Test 7","input":[50,["number","buzz","fizz","fizzbuzz"],[0,0,0,0]]},
+    {"name":"Test 8","input":[16,["fizzbuzz","number","fizz","buzz"],[0,500,200,300]]},
+    {"name":"Test 9","input":[2,["fizz","buzz","fizzbuzz","number"],[1000,1000,1000,1000]]},
+    {"name":"Test 10","input":[45,["number","fizz","buzz","fizzbuzz"],[0,0,0,999]]},
+    {"name":"Test 11","input":[10,["buzz","number","fizzbuzz","fizz"],[40,30,20,10]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAt every moment exactly one number `i` is due, and exactly one thread owns it: the `fizzbuzz` thread for multiples of 15, `fizz` for other multiples of 3, `buzz` for other multiples of 5 and `number` for the rest. Each thread can list its own numbers in advance, so it only needs to know when its next number becomes due. Keep a shared counter `current`; a thread whose number is not due yet parks a resolve function under that number, and whoever prints `current` moves the counter on and wakes the owner of the new value. (The brute force instead lets whichever thread arrives print every token whose owner has already arrived.)\n\n## Approach\n\n1. Start with `current = 1` and an empty map `waiting` from a number to the resolve function of the thread waiting for it.\n2. `waitFor(i)` returns a resolved promise if `i` is already due; otherwise it parks with `waiting.set(i, resolve)`.\n3. `advance()` adds 1 to `current` and wakes the thread parked under the new `current`, if any.\n4. Each method loops over its own numbers (`fizz`: multiples of 3 that are not multiples of 5, and so on). For each `i` it awaits `waitFor(i)`, prints, then calls `advance()`.\n\nWith real threads the usual design is a lock with a condition variable: each thread waits while `current` is not its next number, prints, increments `current` and calls `notifyAll`. Another uses four semaphores, one per thread: after printing `i`, the printer releases the semaphore of the owner of `i + 1`. Parking a resolve function plays the part of waiting, and calling it the part of the signal.\n\n## Example 1, step by step\n\n`n = 15`, threads start in the order fizz, buzz, fizzbuzz, number at 0 ms.\n\n- `fizz` waits for 3, `buzz` for 5 and `fizzbuzz` for 15; all three park.\n- `number` finds 1 due: it prints 1, advances to 2 and prints 2, advances to 3 and wakes `fizz`, then parks waiting for 4.\n- `fizz` prints `\"fizz\"` and advances to 4, waking `number`; the hand-offs continue the same way up to `\"fizzbuzz\"` for 15.\n- The answer is `[1, 2, \"fizz\", 4, \"buzz\", ..., 14, \"fizzbuzz\"]`, every token at 0 ms.\n\n## Complexity\n\n- Time: O(n): each number is printed once, with O(1) work to park and wake.\n- Space: O(1) besides the map, which holds at most one entry per thread (four).\n\n## Pitfalls\n\n- Checking divisibility by 3 before 15: 15, 30 and 45 must go to `fizzbuzz`, not `fizz`.\n- A thread that loops until `current > n` must also be woken at the end, or it never finishes; looping over the thread's own numbers avoids that.\n- Waking only after a delay (`setTimeout`) prints late; wait on the promise itself.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `current` | the number whose token must be printed next |\n| `waiting` | map from a number to the resolve function of the thread waiting for it |\n| `wake` | the resolve function of the owner of the new `current`, if it is waiting |\n| `i` | in each method, the next number this thread owns |",
+  "narration": {
+    "4": "current is the number whose token is due; the sequence starts at 1.",
+    "5": "waiting maps a number to the resolve function of the thread parked for it.",
+    "9": "If this number is already due, the thread may go on at once.",
+    "11": "Otherwise park under number i until the thread before it hands over.",
+    "16": "One more token is out, so the next number is due.",
+    "17": "Look up the thread waiting for that number, if it has arrived.",
+    "19": "Wake it: its await resumes and it prints.",
+    "23": "fizz owns the multiples of 3 ...",
+    "24": "... except those also divisible by 5, which belong to fizzbuzz.",
+    "25": "Wait until this number is due.",
+    "27": "Hand the turn on to the owner of the next number.",
+    "41": "fizzbuzz owns exactly the multiples of 15.",
+    "49": "number walks through every i from 1 to n ...",
+    "50": "... skipping each one that another thread owns.",
+    "52": "Plain numbers are printed with their value."
+  }
+}

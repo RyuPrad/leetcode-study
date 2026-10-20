@@ -1,0 +1,48 @@
+{
+  "number": 1308,
+  "title": "Running Total for Different Genders",
+  "spec": "recalled",
+  "statement": "One table records the points scored in a competition:\n\n- `Scores(player_name, gender, day, score_points)`: on `day`, the player `player_name` of gender `gender` (`'F'` or `'M'`) scored `score_points` points. `(gender, day)` is unique: each gender has at most one row per day.\n\nFor every gender and every day on which that gender has a row, report the running total: the sum of `score_points` over all of that gender's rows dated on or before that day.\n\nReturn the columns `gender`, `day` and `total`, ordered by `gender` ascending, then by `day` ascending.",
+  "constraints": [
+    "(gender, day) is unique in Scores",
+    "gender is 'F' or 'M'",
+    "score_points is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Scores": [["player_name","VARCHAR(20)"],["gender","VARCHAR(1)"],["day","DATE"],["score_points","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Scores = [] }] = input;\n  const seen = new Set();\n  for (const [, gender, day, points] of Scores) {\n    if (gender !== 'F' && gender !== 'M') return \"gender must be 'F' or 'M'.\";\n    if (day === null) return 'Every row needs a day.';\n    if (points === null) return 'score_points is never null.';\n    const key = `${gender}/${day}`;\n    if (seen.has(key)) return `Gender ${gender} has two rows on ${day}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  gender,\n  day,\n  SUM(score_points) OVER (\n    PARTITION BY gender\n    ORDER BY day\n  ) AS total\nFROM Scores\nORDER BY gender, day;",
+  "brute": "SELECT s.gender, s.day, SUM(earlier.score_points) AS total\nFROM Scores AS s\nJOIN Scores AS earlier\n  ON earlier.gender = s.gender\n AND earlier.day <= s.day\nGROUP BY s.gender, s.day\nORDER BY s.gender, s.day",
+  "generator": "function generate(rand, size) {\n  const names = ['Aron', 'Alice', 'Bajrang', 'Khali', 'Slaman', 'Joe', 'Jose', 'Priya'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const dayText = offset => new Date(Date.UTC(2019, 11, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const rows = [];\n  for (const gender of ['F', 'M']) {\n    if (size === 'small') {\n      // Few days near the turn of the year, shared between the genders so their days interleave.\n      const days = [17, 24, 29, 30, 31, 37].filter(() => rand() < 0.4);\n      for (const d of days) rows.push([pick(names), gender, dayText(d), Math.floor(rand() * 25)]);\n    } else {\n      let d = 0;\n      for (let i = 0; i < 1000; i++) {\n        d += 1 + Math.floor(rand() * 3);\n        rows.push([`${pick(names)}${Math.floor(rand() * 50)}`, gender, dayText(d), Math.floor(rand() * 100)]);\n      }\n    }\n  }\n  // Shuffle so the input order says nothing about the answer's order.\n  for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ Scores: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Scores":[["Aron","F","2020-01-01",17],["Alice","F","2020-01-07",23],["Bajrang","M","2020-01-07",7],["Khali","M","2019-12-25",11],["Slaman","M","2019-12-30",13],["Joe","M","2019-12-31",3],["Jose","M","2019-12-18",2],["Priya","F","2019-12-31",23],["Priyanka","F","2019-12-30",17]]}],"expected":{"columns":["gender","day","total"],"rows":[["F","2019-12-30",17],["F","2019-12-31",40],["F","2020-01-01",57],["F","2020-01-07",80],["M","2019-12-18",2],["M","2019-12-25",13],["M","2019-12-30",26],["M","2019-12-31",29],["M","2020-01-07",36]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Scores":[]}]},
+    {"name":"Test 2","input":[{"Scores":[["Joe","M","2020-03-01",9]]}]},
+    {"name":"Test 3","input":[{"Scores":[["Ana","F","2020-01-03",5],["Ana","F","2020-01-01",4],["Ana","F","2020-01-02",3]]}]},
+    {"name":"Test 4","input":[{"Scores":[["Ana","F","2020-01-01",10],["Joe","M","2020-01-01",20],["Ana","F","2020-01-02",1],["Joe","M","2020-01-02",2]]}]},
+    {"name":"Test 5","input":[{"Scores":[["Joe","M","2019-12-31",7],["Ana","F","2020-01-01",6],["Joe","M","2020-01-01",0],["Kim","M","2020-01-02",5]]}]},
+    {"name":"Test 6","input":[{"Scores":[["Ana","F","2020-02-10",0],["Ana","F","2020-02-09",0],["Bo","M","2020-02-08",0]]}]},
+    {"name":"Test 7","input":[{"Scores":[["Zed","M","2020-05-01",4],["Amy","F","2020-05-04",8],["Zed","M","2020-05-03",6],["Amy","F","2020-04-30",1],["Liz","F","2020-05-02",2]]}]},
+    {"name":"Test 8","input":[{"Scores":[["Ana","F","2019-12-09",3],["Ana","F","2019-12-10",4],["Ana","F","2019-12-11",5],["Bo","M","2019-12-10",1]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA running total is a sum whose window grows by one row at a time. Each gender keeps its own tally, so the rows are split by `gender`, sorted by `day`, and every row adds its points to everything before it. A window function does exactly this without collapsing rows: `SUM(...) OVER (PARTITION BY gender ORDER BY day)`.\n\n## Approach\n\n1. Read every row of `Scores`; each one becomes one output row.\n2. `SUM(score_points) OVER (PARTITION BY gender ORDER BY day)` adds up the points of the same gender on that day and every earlier day, named `total`.\n3. `ORDER BY gender, day` gives the required order.\n\n## Example 1, step by step\n\nWomen, sorted by day: 2019-12-30 (17), 2019-12-31 (23), 2020-01-01 (17), 2020-01-07 (23). The running sums are 17, 17 + 23 = 40, 40 + 17 = 57 and 57 + 23 = 80.\n\nMen, sorted by day: 2019-12-18 (2), 2019-12-25 (11), 2019-12-30 (13), 2019-12-31 (3), 2020-01-07 (7). The running sums are 2, 13, 26, 29 and 36.\n\nThe final `ORDER BY` lists all `F` rows first, each gender by date.\n\n## Complexity\n\n- Time: O(n log n) for n rows, dominated by sorting within each gender.\n- Space: O(n) for the sorted partitions and the result.\n\n## Pitfalls\n\n- Leaving out `PARTITION BY gender` makes one running total across both genders.\n- Leaving out the window's `ORDER BY day` turns the running total into each gender's grand total on every row.\n- The window's order does not fix the output order; the query still needs its own `ORDER BY gender, day`.\n- Rows arrive in no particular order, so a total built from the input order instead of `day` is wrong.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `PARTITION BY gender` | a separate tally for `F` and for `M` |\n| `ORDER BY day` (in `OVER`) | each row sums its own day and every earlier day of that gender |\n| `total` | the running sum of `score_points` |",
+  "narration": {
+    "4": "SUM as a window function adds points without merging the rows into groups.",
+    "5": "Each gender gets its own running tally.",
+    "6": "Sorting the window by day makes the sum cover the current day and every earlier one.",
+    "8": "Scores is read once; each row yields one output row.",
+    "9": "The output lists women first and each gender in date order."
+  }
+}

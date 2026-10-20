@@ -1,0 +1,54 @@
+{
+  "number": 965,
+  "title": "Univalued Binary Tree",
+  "spec": "leetcode",
+  "statement": "You get the `root` of a non-empty binary tree. Call the tree uni-valued when all of its nodes carry one and the same value. Return `true` if the tree is uni-valued and `false` if at least two of its nodes hold different values.",
+  "constraints": [
+    "The tree has between 1 and 100 nodes",
+    "0 <= Node.val < 100"
+  ],
+  "signature": "boolean isUnivalTree(TreeNode root)",
+  "entry": "isUnivalTree",
+  "kind": "function",
+  "parameters": [
+    "root"
+  ],
+  "validator": "function validate([root]) {\n  if (root.length === 0 || root[0] === null) return 'The tree needs at least one node.';\n  const values = root.filter(v => v !== null);\n  if (values.length > 100) return 'The tree has at most 100 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < 0 || v > 99)) return 'Each node value is an integer from 0 to 99.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isUnivalTree(root) {\n  const value = root.val;\n\n  function matches(node) {\n    if (node === null) return true;\n    if (node.val !== value) return false;\n    return matches(node.left) && matches(node.right);\n  }\n\n  return matches(root);\n}",
+  "brute": "function isUnivalTree(root) {\n  // Collect every value with a level-order walk and count the distinct ones.\n  const seen = new Set();\n  const queue = [root];\n  for (let i = 0; i < queue.length; i++) {\n    const node = queue[i];\n    if (!node) continue;\n    seen.add(node.val);\n    queue.push(node.left, node.right);\n  }\n  return seen.size === 1;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 80 + Math.floor(rand() * 21) : 1 + Math.floor(rand() * 10);\n  // Attach each new node to a free child slot; a high bias favours the newest slots and grows long branches.\n  const bias = rand();\n  const nodes = [{ val: 0, left: null, right: null }], slots = [[0, 'left'], [0, 'right']];\n  for (let i = 1; i < n; i++) {\n    const k = rand() < bias ? slots.length - 1 - Math.floor(rand() * Math.min(2, slots.length)) : Math.floor(rand() * slots.length);\n    const [parent, side] = slots[k];\n    slots[k] = slots[slots.length - 1];\n    slots.pop();\n    nodes[parent][side] = i;\n    nodes.push({ val: 0, left: null, right: null });\n    slots.push([i, 'left'], [i, 'right']);\n  }\n  const base = rand() < 0.2 ? (rand() < 0.5 ? 0 : 99) : Math.floor(rand() * 100);\n  const other = () => (base + 1 + Math.floor(rand() * 99)) % 100;\n  for (const node of nodes) node.val = base;\n  const mode = rand();\n  if (mode < 0.4) {\n    // Leave the tree uni-valued.\n  } else if (mode < 0.8) {\n    // Exactly one node differs; prefer late (deep) nodes so a lazy check misses it.\n    const index = rand() < 0.5 ? n - 1 - Math.floor(rand() * Math.min(3, n)) : Math.floor(rand() * n);\n    nodes[index].val = other();\n  } else {\n    const alt = other();\n    for (const node of nodes) if (rand() < 0.3) node.val = alt;\n  }\n  // Level-order serialisation with null for missing children, trailing nulls removed.\n  const out = [], queue = [0];\n  for (let q = 0; q < queue.length; q++) {\n    if (queue[q] === null) { out.push(null); continue; }\n    const node = nodes[queue[q]];\n    out.push(node.val);\n    queue.push(node.left, node.right);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  return [out];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,1,1,1,1,null,1]],"expected":true},
+    {"name":"Example 2","input":[[2,2,2,5,2]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7]]},
+    {"name":"Test 2","input":[[0,0]]},
+    {"name":"Test 3","input":[[0,null,1]]},
+    {"name":"Test 4","input":[[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4]]},
+    {"name":"Test 5","input":[[4,4,4,4,4,4,4,4,4,4,4,4,4,4,5]]},
+    {"name":"Test 6","input":[[9,null,9,null,9,null,9,null,9,null,9,null,9,null,8]]},
+    {"name":"Test 7","input":[[99,99,99,null,null,99,null,99,99]]},
+    {"name":"Test 8","input":[[1,2,1]]},
+    {"name":"Test 9","input":[[5,5,null,5,null,5,null,6,null]]},
+    {"name":"Test 10","input":[[3,3,3,null,3,3,null,null,null,null,3]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery node must match one value, and the root is always present, so the root's value is the natural yardstick. A depth-first walk compares each node against it and gives up the moment one node disagrees. The brute-force idea of gathering all values into a set and checking that it has one element also works, but it always visits the whole tree and needs extra memory for the set.\n\n## Approach\n\n1. Remember the root's value as `value`.\n2. Define `matches(node)`: a missing child (`null`) cannot break the rule, so it returns `true`.\n3. If `node.val` differs from `value`, return `false` at once.\n4. Otherwise the node is fine; the subtree is uni-valued only if both `matches(node.left)` and `matches(node.right)` hold. The `&&` skips the right side once the left fails.\n5. Return `matches(root)`.\n\n## Example 1, step by step\n\n`root = [1,1,1,1,1,null,1]`, so `value = 1`. The walk checks the root (1), its left child (1), that child's two children (1 and 1), then the root's right child (1) and its right child (1). Every comparison with `value` succeeds and every `null` child returns `true`, so the answer is `true`. In Example 2 the walk reaches the node holding 5 and stops with `false`.\n\n## Complexity\n\n- Time: O(n): each node is compared once, and the walk may stop early.\n- Space: O(h): the recursion stack is as deep as the tree's height h (up to n for a chain).\n\n## Pitfalls\n\n- Comparing each node only with its parent works too, but comparing with one fixed `value` is simpler and avoids special cases at the root.\n- Treat a `null` child as a success, not a failure; leaves have two `null` children.\n- Do not stop after checking the root's direct children; a differing value can sit at the deepest leaf.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `value` | the root's value, which every node must equal |\n| `matches` | the recursive check of one subtree |\n| `node` | the subtree root being checked |",
+  "narration": {
+    "2": "The root always exists, so its value is the one every node must share.",
+    "4": "A helper checks whether a whole subtree uses only that value.",
+    "5": "An empty child adds no values, so it cannot break the rule.",
+    "6": "A node with another value proves the tree is not uni-valued.",
+    "7": "This node is fine; both of its subtrees must pass too, and the right one is skipped if the left fails.",
+    "10": "Run the check on the whole tree and return its verdict."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "number": 1164,
+  "title": "Product Price at a Given Date",
+  "spec": "leetcode",
+  "statement": "One table logs price changes:\n\n- `Products(product_id, new_price, change_date)`: each row says the product's price became `new_price` on `change_date`. The pair `(product_id, change_date)` is unique, so a product changes price at most once per day.\n\nBefore its first change, every product costs **10**. A change takes effect on its own `change_date`.\n\nFor every product that appears in the table, report its price on **2019-08-16**: the `new_price` of its latest change dated on or before 2019-08-16, or 10 if all of its changes come later. Output the columns `product_id` and `price`, one row per product, in any order.",
+  "constraints": [
+    "(product_id, change_date) is unique in Products",
+    "Every product costs 10 before its first change",
+    "change_date may be before, on or after 2019-08-16"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Products": [["product_id","INT"],["new_price","INT"],["change_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Products = [] }] = input;\n  const seen = new Set();\n  for (const [product, price, date] of Products) {\n    if (product === null || price === null || date === null) return 'Every column of Products is required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `change_date ${date} is not YYYY-MM-DD.`;\n    const key = `${product}|${date}`;\n    if (seen.has(key)) return `Product ${product} changes price twice on ${date}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH latest AS (\n  SELECT product_id, MAX(change_date) AS last_date\n  FROM Products\n  WHERE change_date <= '2019-08-16'\n  GROUP BY product_id\n),\nknown_prices AS (\n  SELECT p.product_id, p.new_price\n  FROM Products AS p\n  JOIN latest AS l\n    ON l.product_id = p.product_id\n    AND l.last_date = p.change_date\n),\nall_products AS (\n  SELECT DISTINCT product_id\n  FROM Products\n)\nSELECT ap.product_id, IFNULL(kp.new_price, 10) AS price\nFROM all_products AS ap\nLEFT JOIN known_prices AS kp\n  ON kp.product_id = ap.product_id;",
+  "brute": "SELECT p.product_id, p.new_price AS price\nFROM Products AS p\nWHERE p.change_date = (\n  SELECT MAX(q.change_date)\n  FROM Products AS q\n  WHERE q.product_id = p.product_id\n    AND q.change_date <= '2019-08-16')\nUNION ALL\nSELECT product_id, 10 AS price\nFROM Products\nGROUP BY product_id\nHAVING MIN(change_date) > '2019-08-16'",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  // offset 0 is 2019-08-16; negative offsets are earlier days.\n  const day = offset => new Date(Date.UTC(2019, 7, 16 + offset)).toISOString().slice(0, 10);\n  const Products = [];\n  const used = new Set();\n  const add = (product, price, offset) => {\n    const date = day(offset);\n    if (used.has(`${product}|${date}`)) return;\n    used.add(`${product}|${date}`);\n    Products.push([product, price, date]);\n  };\n  if (size === 'small') {\n    const offsets = [-200, -2, -1, 0, 1, 2];\n    const prices = [5, 10, 20, 30, 35, 50, 65];\n    const products = 1 + pick(4), rows = pick(9);\n    for (let i = 0; i < rows; i++) add(1 + pick(products), prices[pick(prices.length)], offsets[pick(offsets.length)]);\n  } else {\n    for (let i = 0; i < 2000; i++) add(1 + pick(400), 1 + pick(200), pick(60) - 40);\n  }\n  return [{ Products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Products":[[1,20,"2019-08-14"],[2,50,"2019-08-14"],[1,30,"2019-08-15"],[1,35,"2019-08-16"],[2,65,"2019-08-17"],[3,20,"2019-08-18"]]}],"expected":{"columns":["product_id","price"],"rows":[[2,50],[1,35],[3,10]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Products":[]}]},
+    {"name":"Test 2","input":[{"Products":[[1,42,"2019-08-16"]]}]},
+    {"name":"Test 3","input":[{"Products":[[1,42,"2019-08-17"],[1,7,"2019-09-01"]]}]},
+    {"name":"Test 4","input":[{"Products":[[1,90,"2019-08-01"],[1,15,"2019-08-10"],[1,60,"2019-08-05"]]}]},
+    {"name":"Test 5","input":[{"Products":[[4,25,"2019-08-15"],[4,99,"2019-08-17"],[5,3,"2019-08-16"],[5,80,"2019-08-20"]]}]},
+    {"name":"Test 6","input":[{"Products":[[1,30,"2019-08-20"],[2,30,"2019-08-20"],[3,30,"2019-08-16"],[3,5,"2019-07-01"]]}]},
+    {"name":"Test 7","input":[{"Products":[[7,12,"2019-08-16"],[7,11,"2019-08-15"],[7,13,"2019-08-14"],[8,40,"2019-08-14"],[8,50,"2019-08-16"],[9,1,"2019-08-17"]]}]},
+    {"name":"Test 8","input":[{"Products":[[1,5,"2018-12-31"],[2,10,"2019-01-01"],[3,75,"2019-08-16"],[3,20,"2019-08-17"],[4,8,"2019-08-15"]]}]},
+    {"name":"Test 9","input":[{"Products":[[10,100,"2019-08-18"],[11,200,"2019-08-19"],[12,300,"2019-08-17"]]}]},
+    {"name":"Test 10","input":[{"Products":[[1,20,"2019-08-14"],[1,30,"2019-08-15"],[2,50,"2019-08-14"],[2,65,"2019-08-17"],[3,20,"2019-08-18"],[3,25,"2019-08-15"],[4,1,"2019-08-16"],[4,2,"2019-08-17"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA product's price on a date is set by its most recent change on or before that date. So for each product find the **latest** `change_date` that is not after 2019-08-16, then look up the price recorded on that row. Products whose every change is later never get such a date, yet they must still be reported at the default price 10, so the final step starts from the full list of product ids and left joins the known prices.\n\n## Approach\n\n1. CTE `latest`: keep rows with `change_date <= '2019-08-16'`, group by `product_id`, and take `MAX(change_date)` as `last_date`.\n2. CTE `known_prices`: join `latest` back to `Products` on the same product and `change_date = last_date` to fetch that row's `new_price`. The pair is unique, so each product gets one price.\n3. CTE `all_products`: every distinct `product_id` in the table.\n4. Left join `all_products` to `known_prices` and output `IFNULL(kp.new_price, 10)` as `price`, so products with no earlier change fall back to 10.\n\n## Example 1, step by step\n\n- `latest`: product 1 has changes on 08-14, 08-15 and 08-16, so `last_date = 2019-08-16`; product 2 has 08-14 (its 08-17 change is later); product 3 has no row on or before 08-16.\n- `known_prices`: `(1, 35)` and `(2, 50)`.\n- `all_products`: 1, 2, 3.\n- Final: `(1, 35)`, `(2, 50)`, and product 3 has no match, so `(3, 10)`.\n\n## Complexity\n\n- Time: O(n) to group the n rows, plus a hash join of `latest` back to `Products`; O(n log n) if the database sorts instead.\n- Space: O(p) for the p distinct products.\n\n## Pitfalls\n\n- `MAX(new_price)` is not the latest price; prices can go down (Test 4).\n- Using `<` instead of `<=` ignores a change made on 2019-08-16 itself, which already applies that day.\n- Inner joining to `known_prices` drops products whose changes all come later, instead of reporting 10.\n- Picking the `new_price` in the same `GROUP BY` as `MAX(change_date)` is not allowed in MySQL and is not guaranteed to come from the latest row; it must be fetched by joining back.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `latest` | each product's last change date on or before 2019-08-16 (`last_date`) |\n| `known_prices` | the `new_price` recorded on that last change |\n| `all_products` | every product id, so none is lost |\n| `p`, `l`, `ap`, `kp` | aliases for `Products`, `latest`, `all_products`, `known_prices` |",
+  "narration": {
+    "1": "Stage one finds, per product, the date of its most recent change.",
+    "4": "Only changes on or before 2019-08-16 can affect the price on that day.",
+    "7": "Stage two fetches the price that was set on that most recent change date.",
+    "10": "Join each product's rows to its latest date from stage one.",
+    "12": "Matching the date as well pins down exactly one row, since (product_id, change_date) is unique.",
+    "14": "Stage three lists every product id, including products whose changes all come later.",
+    "18": "Products with no change by 2019-08-16 have no known price, so IFNULL gives them the default 10.",
+    "20": "A left join keeps every product even when known_prices has no row for it."
+  }
+}

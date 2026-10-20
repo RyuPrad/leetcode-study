@@ -1,0 +1,49 @@
+{
+  "number": 1285,
+  "title": "Find the Start and End Number of Continuous Ranges",
+  "spec": "recalled",
+  "statement": "One table lists ids that appeared in a log:\n\n- `Logs(log_id)`: one row per id; `log_id` is unique. Some ids are missing, so the ids form several stretches of consecutive integers.\n\nSplit the ids into maximal ranges of consecutive integers (each id one more than the previous) and report one row per range with the columns `start_id` (its smallest id) and `end_id` (its largest id). A lone id is a range whose start and end are equal. Order the rows by `start_id`.",
+  "constraints": [
+    "log_id is unique in Logs and never null",
+    "log_id values are non-negative integers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Logs": [["log_id","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Logs = [] }] = input;\n  const seen = new Set();\n  for (const [id] of Logs) {\n    if (id === null) return 'Every row needs a log_id.';\n    if (id < 0) return 'log_id may not be negative.';\n    if (seen.has(id)) return `log_id ${id} appears twice.`;\n    seen.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH numbered AS (\n  SELECT log_id,\n         log_id - ROW_NUMBER() OVER (ORDER BY log_id) AS range_key\n  FROM Logs\n)\nSELECT MIN(log_id) AS start_id, MAX(log_id) AS end_id\nFROM numbered\nGROUP BY range_key\nORDER BY start_id;",
+  "brute": "WITH starts AS (\n  SELECT s.log_id\n  FROM Logs AS s\n  LEFT JOIN Logs AS prev ON prev.log_id = s.log_id - 1\n  WHERE prev.log_id IS NULL\n),\nends AS (\n  SELECT e.log_id\n  FROM Logs AS e\n  LEFT JOIN Logs AS nxt ON nxt.log_id = e.log_id + 1\n  WHERE nxt.log_id IS NULL\n)\nSELECT starts.log_id AS start_id, MIN(ends.log_id) AS end_id\nFROM starts\nJOIN ends ON ends.log_id >= starts.log_id\nGROUP BY starts.log_id\nORDER BY start_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const small = size === 'small';\n  const count = small ? pick(9) : 2000;\n  const Logs = [];\n  // Walk upward: usually the next id is consecutive, sometimes a gap opens.\n  let id = small ? pick(4) : pick(50);\n  for (let i = 0; i < count; i++) {\n    Logs.push([id]);\n    id += rand() < (small ? 0.6 : 0.75) ? 1 : 2 + pick(small ? 3 : 8);\n  }\n  for (let i = Logs.length - 1; i > 0; i--) { const j = pick(i + 1); [Logs[i], Logs[j]] = [Logs[j], Logs[i]]; }\n  return [{ Logs }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Logs":[[1],[2],[3],[7],[8],[10]]}],"expected":{"columns":["start_id","end_id"],"rows":[[1,3],[7,8],[10,10]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Logs":[]}]},
+    {"name":"Test 2","input":[{"Logs":[[5]]}]},
+    {"name":"Test 3","input":[{"Logs":[[1],[2],[3],[4],[5],[6]]}]},
+    {"name":"Test 4","input":[{"Logs":[[1],[3],[5],[7]]}]},
+    {"name":"Test 5","input":[{"Logs":[[10],[8],[2],[1],[7],[3]]}]},
+    {"name":"Test 6","input":[{"Logs":[[0],[1],[2],[100]]}]},
+    {"name":"Test 7","input":[{"Logs":[[10],[11],[13],[14],[15],[20]]}]},
+    {"name":"Test 8","input":[{"Logs":[[999],[1000],[1001],[1003],[1004],[5000]]}]},
+    {"name":"Test 9","input":[{"Logs":[[4],[9],[5],[6],[10],[12],[11]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is the classic gaps-and-islands trick. Sort the ids and number them 1, 2, 3, ... with `ROW_NUMBER()`. Inside a run of consecutive ids, the id and its row number both grow by exactly one per row, so **id minus row number stays the same**. When an id is skipped, the id jumps by more than one while the row number still grows by one, and the difference changes. That difference therefore labels each range, and grouping by it collapses every range into one row.\n\n## Approach\n\n1. `numbered`: attach `range_key = log_id - ROW_NUMBER() OVER (ORDER BY log_id)` to every id.\n2. `GROUP BY range_key`: each group is one maximal range.\n3. `MIN(log_id)` and `MAX(log_id)` are the range's `start_id` and `end_id`.\n4. Order by `start_id`.\n\n## Example 1, step by step\n\n| log_id | row number | range_key |\n| --- | --- | --- |\n| 1 | 1 | 0 |\n| 2 | 2 | 0 |\n| 3 | 3 | 0 |\n| 7 | 4 | 3 |\n| 8 | 5 | 3 |\n| 10 | 6 | 4 |\n\nKey 0 covers 1 to 3, key 3 covers 7 to 8, and key 4 is the lone id 10, giving (1, 3), (7, 8) and (10, 10).\n\n## Complexity\n\n- Time: O(n log n) for n ids, to sort them for `ROW_NUMBER`; the grouping is linear after that.\n- Space: O(n) for the numbered rows.\n\n## Pitfalls\n\n- The key only works when the row numbers follow ascending `log_id`; numbering in any other order mixes ranges.\n- `range_key` itself is not a range bound; report `MIN` and `MAX` of `log_id`, not the key.\n- A lone id must still be reported, with equal `start_id` and `end_id`; methods that pair \"starts\" with the *next* row's id can lose the last range.\n- The keys grow with the ranges here, but ordering by `start_id` states the required order directly instead of relying on the grouping.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `numbered` | every id with its `range_key` |\n| `range_key` | `log_id` minus its position in sorted order; constant inside a range |\n| `start_id`, `end_id` | the smallest and largest id of each range |",
+  "narration": {
+    "1": "The only stage labels each id with the range it belongs to.",
+    "3": "Subtracting the position from the id gives a value that stays fixed while ids are consecutive.",
+    "6": "The smallest and largest id of each group are the range's bounds.",
+    "8": "One group per label is one maximal range.",
+    "9": "Ranges are listed from the lowest id upward, as required."
+  }
+}

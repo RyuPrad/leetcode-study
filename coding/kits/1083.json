@@ -1,0 +1,52 @@
+{
+  "number": 1083,
+  "title": "Sales Analysis II",
+  "spec": "recalled",
+  "statement": "A shop records its products and every sale:\n\n- `Product(product_id, product_name, unit_price)`: one row per product; `product_id` is unique. A product named `'S8'` and a product named `'iPhone'` always exist.\n- `Sales(seller_id, product_id, buyer_id, sale_date, quantity, price)`: one row per sale. The table has no key, so identical rows can repeat; `product_id` always names a product in `Product`.\n\nReport the buyers who bought the product `'S8'` at least once but have never bought the product `'iPhone'`. Return a single column `buyer_id`, each qualifying buyer once, in any order.",
+  "constraints": [
+    "product_id is unique in Product",
+    "Product contains a product named 'S8' and a product named 'iPhone'",
+    "Sales has no key and may contain repeated rows",
+    "Every Sales.product_id appears in Product; buyer_id is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Product": [["product_id","INT"],["product_name","VARCHAR(10)"],["unit_price","INT"]],
+    "Sales": [["seller_id","INT"],["product_id","INT"],["buyer_id","INT"],["sale_date","DATE"],["quantity","INT"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Product = [], Sales = [] }] = input;\n  const products = new Set(), names = new Set();\n  for (const [id, name] of Product) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    products.add(id);\n    names.add(name);\n  }\n  if (!names.has('S8') || !names.has('iPhone')) return \"Product must contain products named 'S8' and 'iPhone'.\";\n  for (const [seller, product, buyer, date] of Sales) {\n    if (!products.has(product)) return `A sale names unknown product ${product}.`;\n    if (seller === null || buyer === null) return 'Every sale needs a seller_id and a buyer_id.';\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `sale_date ${date} must be a YYYY-MM-DD date.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.buyer_id\nFROM Sales AS s\nJOIN Product AS p\n  ON p.product_id = s.product_id\nGROUP BY s.buyer_id\nHAVING SUM(p.product_name = 'S8') > 0\n  AND SUM(p.product_name = 'iPhone') = 0;",
+  "brute": "SELECT DISTINCT s.buyer_id\nFROM Sales AS s\nWHERE s.product_id IN (SELECT product_id FROM Product WHERE product_name = 'S8')\n  AND NOT EXISTS (\n    SELECT 1\n    FROM Sales AS t\n    WHERE t.buyer_id = s.buyer_id\n      AND t.product_id IN (SELECT product_id FROM Product WHERE product_name = 'iPhone')\n  )",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const catalog = [['S8', 1000], ['iPhone', 1400], ['G4', 800], ['Pixel', 900], ['Note', 1100]];\n  // Shuffle product ids so S8 and iPhone do not always have ids 1 and 3.\n  const ids = [1, 2, 3, 4, 5, 6, 7];\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const kept = small ? 2 + Math.floor(rand() * 2) : catalog.length;\n  const Product = catalog.slice(0, kept).map(([name, unit], i) => [ids[i], name, unit]);\n  const Sales = [];\n  const buyers = small ? 4 : 600, count = small ? Math.floor(rand() * 9) : 2000;\n  for (let i = 0; i < count; i++) {\n    // Repeat an earlier sale now and then, since Sales has no key.\n    if (Sales.length && rand() < 0.1) { Sales.push([...Sales[Math.floor(rand() * Sales.length)]]); continue; }\n    const [product, , unit] = Product[Math.floor(rand() * Product.length)];\n    const quantity = 1 + Math.floor(rand() * 3);\n    const day = String(1 + Math.floor(rand() * 28)).padStart(2, '0'), month = String(1 + Math.floor(rand() * 6)).padStart(2, '0');\n    Sales.push([1 + Math.floor(rand() * 3), product, 1 + Math.floor(rand() * buyers), `2019-${month}-${day}`, quantity, quantity * unit]);\n  }\n  return [{ Product, Sales }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Product":[[1,"S8",1000],[2,"G4",800],[3,"iPhone",1400]],"Sales":[[1,1,1,"2019-01-21",2,2000],[1,2,2,"2019-02-17",1,800],[2,1,3,"2019-06-02",1,800],[3,3,3,"2019-05-13",2,2800]]}],"expected":{"columns":["buyer_id"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[]}]},
+    {"name":"Test 2","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[[1,1,5,"2019-03-01",1,1000]]}]},
+    {"name":"Test 3","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[[1,1,5,"2019-03-01",1,1000],[2,2,5,"2019-03-02",1,1400]]}]},
+    {"name":"Test 4","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400],[3,"G4",800]],"Sales":[[1,2,7,"2019-04-10",1,1400],[1,3,8,"2019-04-11",2,1600]]}]},
+    {"name":"Test 5","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[[1,1,4,"2019-01-05",1,1000],[1,1,4,"2019-01-05",1,1000],[2,1,4,"2019-02-09",3,3000]]}]},
+    {"name":"Test 6","input":[{"Product":[[7,"iPhone",1400],[9,"S8",1000],[1,"G4",800]],"Sales":[[1,9,2,"2019-01-21",1,1000],[1,1,3,"2019-01-22",1,800],[2,7,1,"2019-02-01",1,1400],[2,1,1,"2019-02-02",1,800]]}]},
+    {"name":"Test 7","input":[{"Product":[[1,"S8",1000],[2,"G4",800],[3,"iPhone",1400]],"Sales":[[1,1,1,"2019-01-21",2,2000],[1,2,1,"2019-02-17",1,800],[2,1,2,"2019-06-02",1,1000],[3,2,3,"2019-05-13",2,1600],[3,1,4,"2019-05-14",1,1000],[3,3,4,"2019-05-15",1,1400]]}]},
+    {"name":"Test 8","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[[1,2,6,"2019-01-01",1,1400],[2,1,6,"2019-06-30",1,1000],[6,1,9,"2019-03-03",1,1000]]}]},
+    {"name":"Test 9","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400],[3,"G4",800]],"Sales":[[1,1,1,"2019-01-01",1,1000],[2,1,2,"2019-01-02",1,1000],[3,1,3,"2019-01-03",1,1000],[3,3,3,"2019-01-04",1,800]]}]},
+    {"name":"Test 10","input":[{"Product":[[1,"S8",1000],[2,"iPhone",1400]],"Sales":[[5,1,2,"2019-02-01",1,1000],[2,2,5,"2019-02-02",1,1400],[5,2,3,"2019-02-03",1,1400]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe condition is about a buyer's whole purchase history, not a single sale: one sale shows an S8, and *no* sale shows an iPhone. A row-by-row `WHERE` cannot see both at once, so group the sales **by buyer** and test the group. Inside a group, `SUM(p.product_name = 'S8')` counts that buyer's S8 sales (a true comparison counts as 1), and the same trick counts iPhone sales.\n\n## Approach\n\n1. Read `Sales` (alias `s`) and `JOIN Product` (alias `p`) on `product_id`, so each sale carries its `product_name`.\n2. `GROUP BY s.buyer_id`: one group per buyer holding all their sales.\n3. `HAVING SUM(p.product_name = 'S8') > 0` keeps buyers with at least one S8 sale.\n4. `AND SUM(p.product_name = 'iPhone') = 0` drops anyone with an iPhone sale. Grouping also reports each buyer once.\n\n## Example 1, step by step\n\nAfter the join, the groups are:\n\n- Buyer 1: S8. S8 count 1, iPhone count 0, so kept.\n- Buyer 2: G4. S8 count 0, so dropped.\n- Buyer 3: S8 and iPhone. iPhone count 1, so dropped.\n\nThe answer is buyer 1.\n\n## Complexity\n\n- Time: O(S + P) for the join of S sales with P products, plus O(S) to group.\n- Space: O(B) for the B buyer groups.\n\n## Pitfalls\n\n- `WHERE product_name = 'S8' AND product_name <> 'iPhone'` tests a single row, so it never excludes anyone; the exclusion must look at all of a buyer's sales.\n- Without grouping or `DISTINCT`, a buyer who bought S8 twice is listed twice.\n- Hard-coding `product_id = 1` for S8 breaks when the ids differ; match on `product_name`.\n- Filtering out iPhone rows in `WHERE` before grouping hides the iPhone purchase instead of disqualifying the buyer.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Sales`, one row per sale |\n| `p` | `Product`, giving each sale its `product_name` |\n| `GROUP BY s.buyer_id` | one group per buyer |\n| `SUM(p.product_name = 'S8')` | the buyer's number of S8 sales |\n| `SUM(p.product_name = 'iPhone')` | the buyer's number of iPhone sales |",
+  "narration": {
+    "1": "Report buyer ids; grouping below lists each buyer once.",
+    "3": "Join Product so that each sale carries the name of the product sold.",
+    "5": "Gather all of a buyer's sales into one group, since the rule is about their whole history.",
+    "6": "Keep buyers with at least one S8 sale: each true comparison adds 1 to the sum.",
+    "7": "Drop buyers with any iPhone sale: their iPhone count must be zero."
+  }
+}

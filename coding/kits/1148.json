@@ -1,0 +1,48 @@
+{
+  "number": 1148,
+  "title": "Article Views I",
+  "spec": "leetcode",
+  "statement": "One table records article views:\n\n- `Views(article_id, author_id, viewer_id, view_date)`: each row says that `viewer_id` looked at article `article_id`, written by `author_id`, on `view_date`. There is no primary key, so identical rows can repeat. Author ids and viewer ids share one id space: the same number is the same person.\n\nFind every author who viewed at least one article they wrote themselves, that is, who appears in some row with `viewer_id` equal to `author_id`. Report each such person once in a single column named `id`, sorted by `id` in ascending order.",
+  "constraints": [
+    "Views has no primary key and may contain duplicate rows",
+    "author_id and viewer_id refer to the same set of people",
+    "Rows must be ordered by id ascending"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Views": [["article_id","INT"],["author_id","INT"],["viewer_id","INT"],["view_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Views = [] }] = input;\n  for (const [article, author, viewer, date] of Views) {\n    if (article === null || author === null || viewer === null || date === null) return 'Every column of Views is required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `view_date ${date} is not YYYY-MM-DD.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT author_id AS id\nFROM Views\nWHERE author_id = viewer_id\nORDER BY id;",
+  "brute": "SELECT authors.author_id AS id\nFROM (SELECT author_id FROM Views GROUP BY author_id) AS authors\nWHERE EXISTS (\n  SELECT 1 FROM Views AS v\n  WHERE v.author_id = authors.author_id\n    AND v.viewer_id = authors.author_id)\nORDER BY authors.author_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const dates = ['2019-07-21', '2019-07-22', '2019-08-01', '2019-08-02'];\n  const Views = [];\n  const articles = size === 'small' ? 1 + pick(5) : 400;\n  const people = size === 'small' ? 5 : 300;\n  // Each article keeps one author, as on a real site.\n  const authorOf = [];\n  for (let a = 1; a <= articles; a++) authorOf[a] = 1 + pick(size === 'small' ? 4 : 200);\n  const rows = size === 'small' ? pick(9) : 2000;\n  for (let i = 0; i < rows; i++) {\n    if (Views.length && rand() < 0.12) { Views.push([...Views[pick(Views.length)]]); continue; }\n    const article = 1 + pick(articles);\n    const author = authorOf[article];\n    const viewer = rand() < (size === 'small' ? 0.3 : 0.08) ? author : 1 + pick(people);\n    Views.push([article, author, viewer, dates[pick(dates.length)]]);\n  }\n  return [{ Views }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Views":[[1,3,5,"2019-08-01"],[1,3,6,"2019-08-02"],[2,7,7,"2019-08-01"],[2,7,6,"2019-08-02"],[4,7,1,"2019-07-22"],[3,4,4,"2019-07-21"],[3,4,4,"2019-07-21"]]}],"expected":{"columns":["id"],"rows":[[4],[7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Views":[]}]},
+    {"name":"Test 2","input":[{"Views":[[1,2,2,"2019-08-01"]]}]},
+    {"name":"Test 3","input":[{"Views":[[1,2,3,"2019-08-01"],[2,3,2,"2019-08-01"],[3,4,5,"2019-08-02"]]}]},
+    {"name":"Test 4","input":[{"Views":[[1,5,5,"2019-08-01"],[1,5,5,"2019-08-01"],[2,5,5,"2019-08-02"],[3,5,1,"2019-08-02"]]}]},
+    {"name":"Test 5","input":[{"Views":[[9,9,9,"2019-07-01"],[3,3,3,"2019-07-02"],[7,7,7,"2019-07-03"],[1,1,1,"2019-07-04"]]}]},
+    {"name":"Test 6","input":[{"Views":[[1,10,20,"2019-08-01"],[2,20,10,"2019-08-01"],[3,20,20,"2019-08-03"],[4,30,10,"2019-08-04"]]}]},
+    {"name":"Test 7","input":[{"Views":[[1,1,1,"2019-08-01"],[2,2,1,"2019-08-01"],[3,3,2,"2019-08-02"],[4,4,3,"2019-08-02"],[5,4,4,"2019-08-05"]]}]},
+    {"name":"Test 8","input":[{"Views":[[1,12,12,"2019-08-01"],[2,8,8,"2019-08-01"],[2,8,8,"2019-08-01"],[3,15,2,"2019-08-01"],[4,2,2,"2019-08-02"],[5,100,100,"2019-08-02"]]}]},
+    {"name":"Test 9","input":[{"Views":[[1,6,7,"2019-07-30"],[2,7,8,"2019-07-30"],[3,8,6,"2019-07-31"],[3,8,6,"2019-07-31"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWhether an author read their own work is visible inside a single row: the row's `viewer_id` equals its `author_id`. No join is needed, only a row filter. Because duplicate rows exist and an author can read several of their own articles, the same id can pass the filter many times, so the result must be deduplicated before it is sorted.\n\n## Approach\n\n1. Read `Views` and keep only rows where `author_id = viewer_id`.\n2. `SELECT DISTINCT author_id AS id` so each qualifying person appears once, under the required column name.\n3. `ORDER BY id` ascending, as the problem requires.\n\n## Example 1, step by step\n\n- Rows with `author_id = viewer_id`: `(2, 7, 7)` and the two identical rows `(3, 4, 4)`.\n- Their author ids are 7, 4, 4; `DISTINCT` leaves 7 and 4.\n- Author 3 is only read by viewers 5 and 6, so they never pass the filter.\n- Sorting gives 4, then 7.\n\n## Complexity\n\n- Time: O(n) to scan the n rows of `Views`, plus O(k log k) to deduplicate and sort the k matching ids.\n- Space: O(k) for the distinct ids.\n\n## Pitfalls\n\n- Leaving out `DISTINCT` reports author 4 twice in Example 1 because of the duplicated row.\n- Checking whether an author ever appears as a viewer of *anything* (`author_id IN (SELECT viewer_id ...)`) is wrong: the match must be in the same row, on that author's own article.\n- The output column must be named `id`, and the rows must be sorted; ids in insertion order are not accepted.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `id` | an author who viewed one of their own articles |\n| `WHERE author_id = viewer_id` | keeps self-views only |\n| `DISTINCT` | removes repeats from duplicate rows and multiple self-viewed articles |",
+  "narration": {
+    "1": "Return each qualifying author once, renamed to the required column id.",
+    "2": "Everything needed is in the Views table; no join is required.",
+    "3": "A self-view is a row whose viewer is the article's own author.",
+    "4": "Sort the ids in ascending order, as the problem demands."
+  }
+}

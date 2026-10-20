@@ -1,0 +1,50 @@
+{
+  "number": 1141,
+  "title": "User Activity for the Past 30 Days I",
+  "spec": "leetcode",
+  "statement": "One table logs what users do on a social media site:\n\n- `Activity(user_id, session_id, activity_date, activity_type)`: each row is one action a user took in a session on `activity_date`. `activity_type` is one of `'open_session'`, `'end_session'`, `'scroll_down'`, `'send_message'`. There is no primary key, so identical rows can repeat. A session always belongs to a single user.\n\nA user counts as active on a day when they have at least one row of any type on that day.\n\nLook at the 30 days that end on **2019-07-27**, both ends included (2019-06-28 through 2019-07-27). For each day in that window with at least one active user, report the date as `day` and the number of distinct active users as `active_users`. Days with no activity are left out. Rows may come in any order.",
+  "constraints": [
+    "Activity has no primary key and may contain duplicate rows",
+    "activity_type is one of 'open_session', 'end_session', 'scroll_down', 'send_message'",
+    "Each session_id belongs to exactly one user_id",
+    "activity_date may fall outside the 30-day window on either side"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["user_id","INT"],["session_id","INT"],["activity_date","DATE"],["activity_type","ENUM('open_session', 'end_session', 'scroll_down', 'send_message')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const kinds = ['open_session', 'end_session', 'scroll_down', 'send_message'];\n  const owner = new Map();\n  for (const [user, session, date, type] of Activity) {\n    if (user === null || session === null || date === null || type === null) return 'Every column of Activity is required.';\n    if (!kinds.includes(type)) return `Unknown activity_type ${type}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `activity_date ${date} is not YYYY-MM-DD.`;\n    if (owner.has(session) && owner.get(session) !== user) return `Session ${session} belongs to two users.`;\n    owner.set(session, user);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT activity_date AS day, COUNT(DISTINCT user_id) AS active_users\nFROM Activity\nWHERE activity_date BETWEEN DATE_SUB('2019-07-27', INTERVAL 29 DAY) AND '2019-07-27'\nGROUP BY activity_date;",
+  "brute": "SELECT pairs.day, COUNT(*) AS active_users\nFROM (\n  SELECT DISTINCT activity_date AS day, user_id\n  FROM Activity\n  WHERE DATEDIFF('2019-07-27', activity_date) >= 0\n    AND DATEDIFF('2019-07-27', activity_date) < 30\n) AS pairs\nGROUP BY pairs.day",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const kinds = ['open_session', 'end_session', 'scroll_down', 'send_message'];\n  // offset 0 is 2019-07-27; positive offsets go back in time, negative ones go past the window's end.\n  const day = offset => new Date(Date.UTC(2019, 6, 27 - offset)).toISOString().slice(0, 10);\n  const Activity = [];\n  if (size === 'small') {\n    const offsets = [-1, 0, 0, 6, 7, 29, 29, 30, 32];\n    const users = 1 + pick(4);\n    const sessions = [];\n    for (let s = 1; s <= 1 + pick(5); s++) sessions.push([s, 1 + pick(users)]);\n    const rows = pick(9);\n    for (let i = 0; i < rows; i++) {\n      if (Activity.length && rand() < 0.15) { Activity.push([...Activity[pick(Activity.length)]]); continue; }\n      const [session, user] = sessions[pick(sessions.length)];\n      Activity.push([user, session, day(offsets[pick(offsets.length)]), kinds[pick(kinds.length)]]);\n    }\n  } else {\n    const sessions = [];\n    for (let s = 1; s <= 700; s++) sessions.push([s, 1 + pick(300)]);\n    for (let i = 0; i < 2000; i++) {\n      const [session, user] = sessions[pick(sessions.length)];\n      Activity.push([user, session, day(pick(50) - 10), kinds[pick(kinds.length)]]);\n    }\n  }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,1,"2019-07-20","open_session"],[1,1,"2019-07-20","scroll_down"],[1,1,"2019-07-20","end_session"],[2,4,"2019-07-20","open_session"],[2,4,"2019-07-21","send_message"],[2,4,"2019-07-21","end_session"],[3,2,"2019-07-21","open_session"],[3,2,"2019-07-21","send_message"],[3,2,"2019-07-21","end_session"],[4,3,"2019-06-25","open_session"],[4,3,"2019-06-25","end_session"]]}],"expected":{"columns":["day","active_users"],"rows":[["2019-07-20",2],["2019-07-21",2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[1,1,"2019-07-27","open_session"]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-06-27","open_session"],[2,2,"2019-06-28","open_session"],[3,3,"2019-07-27","scroll_down"],[4,4,"2019-07-28","send_message"]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2019-07-10","open_session"],[1,1,"2019-07-10","open_session"],[1,1,"2019-07-10","scroll_down"],[1,1,"2019-07-10","end_session"],[2,2,"2019-07-10","open_session"]]}]},
+    {"name":"Test 5","input":[{"Activity":[[1,1,"2019-07-01","open_session"],[1,1,"2019-07-02","end_session"],[1,5,"2019-07-03","send_message"],[2,2,"2019-07-02","scroll_down"]]}]},
+    {"name":"Test 6","input":[{"Activity":[[1,1,"2019-06-01","open_session"],[2,2,"2019-06-27","end_session"],[3,3,"2019-07-28","scroll_down"],[4,4,"2019-08-15","send_message"]]}]},
+    {"name":"Test 7","input":[{"Activity":[[1,1,"2019-07-15","open_session"],[1,2,"2019-07-15","open_session"],[1,3,"2019-07-15","end_session"],[2,4,"2019-07-15","scroll_down"],[2,5,"2019-07-16","open_session"]]}]},
+    {"name":"Test 8","input":[{"Activity":[[5,9,"2019-07-26","open_session"],[5,9,"2019-07-27","end_session"],[5,9,"2019-07-28","scroll_down"],[6,7,"2019-07-27","send_message"],[7,8,"2019-06-29","open_session"],[7,8,"2019-06-26","end_session"],[8,6,"2019-07-29","open_session"]]}]},
+    {"name":"Test 9","input":[{"Activity":[[1,1,"2019-07-05","open_session"],[2,2,"2019-07-05","open_session"],[3,3,"2019-07-05","send_message"],[4,4,"2019-07-05","scroll_down"],[5,5,"2019-07-05","end_session"],[6,6,"2019-07-06","open_session"],[6,6,"2019-07-05","open_session"]]}]},
+    {"name":"Test 10","input":[{"Activity":[[1,1,"2019-06-28","open_session"],[1,1,"2019-06-28","end_session"],[2,3,"2019-06-28","open_session"],[2,3,"2019-06-27","open_session"],[3,2,"2019-07-27","scroll_down"],[3,2,"2019-07-27","scroll_down"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is one row per calendar day, so the day is the grouping key. Inside a day, a user may have many rows (several actions, several sessions, or exact duplicates), yet they are one active user. Counting **distinct** `user_id` values per day collapses all of that. The only other job is to throw away rows outside the 30-day window before grouping.\n\n## Approach\n\n1. Read `Activity` and keep rows whose `activity_date` lies `BETWEEN DATE_SUB('2019-07-27', INTERVAL 29 DAY) AND '2019-07-27'`, that is 2019-06-28 through 2019-07-27. Both ends are inclusive, and the window has exactly 30 days.\n2. `GROUP BY activity_date` so each surviving day becomes one group.\n3. Output the date as `day` and `COUNT(DISTINCT user_id)` as `active_users`. Days without rows never form a group, so they are omitted automatically.\n\n## Example 1, step by step\n\n- User 4's two rows on 2019-06-25 fall before 2019-06-28 and are dropped.\n- 2019-07-20 has four rows: three from user 1 and one from user 2. Distinct users: {1, 2}, so 2.\n- 2019-07-21 has five rows: two from user 2 and three from user 3. Distinct users: {2, 3}, so 2.\n\nThe result is `(2019-07-20, 2)` and `(2019-07-21, 2)`.\n\n## Complexity\n\n- Time: O(n) for the n rows of `Activity` to filter and hash-group them.\n- Space: O(d · u) in the worst case to track distinct users per day, d days in the window and u users.\n\n## Pitfalls\n\n- `COUNT(user_id)` or `COUNT(*)` counts actions, not users; one user with three actions would count three times.\n- `COUNT(DISTINCT session_id)` is also wrong: a user who opens two sessions on one day is still one user.\n- Subtracting 30 days instead of 29 makes a 31-day window that wrongly includes 2019-06-27.\n- Forgetting the upper bound lets activity after 2019-07-27 into the answer.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `day` | the `activity_date` that identifies each group |\n| `active_users` | number of different users with at least one row on that day |\n| `BETWEEN ... AND ...` | the inclusive 30-day window 2019-06-28 .. 2019-07-27 |",
+  "narration": {
+    "1": "Each output row is a day, paired with how many different users acted on it; DISTINCT collapses repeated actions by one user.",
+    "2": "All facts come from the single Activity table.",
+    "3": "Keep only the 30 days ending 2019-07-27: subtracting 29 days gives 2019-06-28, and BETWEEN includes both ends.",
+    "4": "Group the remaining rows by date so the count is taken per day; days with no rows never appear."
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "number": 956,
+  "title": "Tallest Billboard",
+  "spec": "leetcode",
+  "statement": "A billboard stands on two supports that must be exactly the same height. Each support is built by welding together some of the rods whose lengths are listed in `rods`; a rod can go into at most one support, and rods may be left unused. Return the greatest height the two supports can share, or `0` if no non-empty pair of equal supports can be built.",
+  "constraints": [
+    "1 <= rods.length <= 20",
+    "1 <= rods[i] <= 1000",
+    "sum(rods) <= 5000"
+  ],
+  "signature": "int tallestBillboard(int[] rods)",
+  "entry": "tallestBillboard",
+  "kind": "function",
+  "parameters": [
+    "rods"
+  ],
+  "validator": "function validate([rods]) {\n  if (!Array.isArray(rods) || rods.length < 1 || rods.length > 20) return 'rods needs 1 to 20 lengths.';\n  if (rods.some(v => !Number.isInteger(v) || v < 1 || v > 1000)) return 'Each rod is a whole number from 1 to 1000.';\n  if (rods.reduce((a, b) => a + b, 0) > 5000) return 'The rods add up to at most 5000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function tallestBillboard(rods) {\n  const total = rods.reduce((sum, rod) => sum + rod, 0);\n  let dp = new Array(total + 1).fill(-1);\n  dp[0] = 0;\n  for (const rod of rods) {\n    const next = dp.slice();\n    for (let diff = 0; diff <= total; diff++) {\n      if (dp[diff] < 0) {\n        continue;\n      }\n      const taller = diff + rod;\n      next[taller] = Math.max(next[taller], dp[diff]);\n      const gap = Math.abs(diff - rod);\n      next[gap] = Math.max(next[gap], dp[diff] + Math.min(diff, rod));\n    }\n    dp = next;\n  }\n  return dp[0];\n}",
+  "brute": "function tallestBillboard(rods) {\n  // Meet in the middle: try all 3^(n/2) ways to send each rod of a half left, right, or nowhere.\n  const collect = (list) => {\n    const best = new Map();\n    const place = (i, left, right) => {\n      if (i === list.length) {\n        const key = left - right;\n        if (!best.has(key) || best.get(key) < left) best.set(key, left);\n        return;\n      }\n      place(i + 1, left, right);\n      place(i + 1, left + list[i], right);\n      place(i + 1, left, right + list[i]);\n    };\n    place(0, 0, 0);\n    return best;\n  };\n  const half = rods.length >> 1;\n  const front = collect(rods.slice(0, half));\n  const back = collect(rods.slice(half));\n  // Halves whose left-minus-right differences cancel give two equal supports.\n  let answer = 0;\n  for (const [key, left] of front) {\n    if (back.has(-key)) answer = Math.max(answer, left + back.get(-key));\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const n = large ? 16 + pick(5) : 1 + pick(9);\n  const caps = large ? [60, 250, 600, 1000] : [3, 8, 20, 1000];\n  const cap = caps[pick(caps.length)];\n  const rods = Array.from({ length: n }, () => 1 + pick(cap));\n  // Shrink random rods until the total fits the limit of 5000.\n  let total = rods.reduce((a, b) => a + b, 0);\n  while (total > 5000) {\n    const i = pick(n);\n    const smaller = 1 + Math.floor(rods[i] / 2);\n    total -= rods[i] - smaller;\n    rods[i] = smaller;\n  }\n  return [rods];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,6]],"expected":6},
+    {"name":"Example 2","input":[[1,2,3,4,5,6]],"expected":10},
+    {"name":"Example 3","input":[[1,2]],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[5,5]]},
+    {"name":"Test 3","input":[[1000,1000,1000,1000,1000]]},
+    {"name":"Test 4","input":[[1,2,4,8,16]]},
+    {"name":"Test 5","input":[[3,4,3,3,2]]},
+    {"name":"Test 6","input":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 7","input":[[250,250,250,250,250,250,250,250,250,250,250,250,250,250,250,250,250,250,250,250]]},
+    {"name":"Test 8","input":[[999,1,1000]]},
+    {"name":"Test 9","input":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]]},
+    {"name":"Test 10","input":[[2,4,8,16,32,64,128,256,512,1000]]},
+    {"name":"Test 11","input":[[7,11,13,17,19,23,29,31,37,997]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach rod goes to the left support, the right support, or nowhere, so trying every choice costs 3^n. What really matters about a partial choice is only the **difference** between the two supports and how tall the shorter one is. Two choices with the same difference behave identically from then on, so we only need to remember the tallest shorter support for each difference. The total length is at most 5000, which bounds the number of differences.\n\n## Approach\n\n1. Let `total` be the sum of all rods. `dp[diff]` is the tallest shorter support among choices whose supports differ by `diff`, or `-1` if no choice gives that difference. Start with `dp[0] = 0` (both supports empty).\n2. For each `rod`, copy `dp` into `next` (the \"skip this rod\" option), then for each reachable `diff`:\n   - put the rod on the taller support: the difference becomes `diff + rod` and the shorter support keeps its height;\n   - put it on the shorter support: the difference becomes `|diff - rod|` and the shorter support grows by `min(diff, rod)`.\n3. Keep the larger height in each slot of `next`, then replace `dp` with it.\n4. `dp[0]` is the tallest height where both supports are equal.\n\n## Example 1, step by step\n\n`rods = [1,2,3,6]`. After rod 1: `dp[0] = 0`, `dp[1] = 0`. After rod 2: also `dp[2] = 0`, `dp[3] = 0`, and `dp[1] = 1` (supports 2 and 1). After rod 3, `dp[0] = 3` (supports 1+2 and 3) and `dp[6] = 0` (supports 1+2+3 and nothing). Rod 6 placed on the shorter side of `dp[6]` gives difference 0 with shorter height `0 + min(6, 6) = 6`, so the answer is `dp[0] = 6`.\n\n## Complexity\n\n- Time: O(n · S), where S is the sum of the rods: each rod scans every difference once.\n- Space: O(S) for two arrays of differences.\n\n## Pitfalls\n\n- Update a copy (`next`), not `dp` itself, or one rod may be used twice in the same round.\n- Unreachable differences must be marked (here with `-1`) so they are not extended as if they had height 0.\n- When the rod is longer than the gap, the shorter support becomes the taller one: it grows by `diff`, not by `rod`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | sum of all rod lengths, the largest possible difference |\n| `dp` | for each difference, the tallest shorter support so far (`-1` if impossible) |\n| `next` | the table after deciding the current rod |\n| `rod` | the rod being placed |\n| `diff` | the difference between the supports before placing `rod` |\n| `taller`, `gap` | the new difference after placing `rod` on the taller or the shorter support |",
+  "narration": {
+    "2": "The supports can never differ by more than the sum of all rods.",
+    "3": "dp[diff] holds the tallest shorter support for that difference; -1 marks differences not reached yet.",
+    "4": "With no rods placed, both supports have height 0 and differ by 0.",
+    "5": "Decide where each rod goes, one rod at a time.",
+    "6": "Start from a copy, which already covers leaving this rod unused.",
+    "7": "Try extending every difference reached so far.",
+    "8": "Skip differences no choice of earlier rods can produce.",
+    "11": "Welding the rod onto the taller support widens the difference by rod.",
+    "12": "The shorter support is unchanged, so keep the best height for the new difference.",
+    "13": "Welding the rod onto the shorter support leaves a difference of |diff - rod|.",
+    "14": "The shorter support grows by the smaller of diff and rod, whichever side ends up lower.",
+    "16": "The table after this rod becomes the current one.",
+    "18": "A difference of 0 means equal supports; its value is the tallest such height."
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "number": 1126,
+  "title": "Active Businesses",
+  "spec": "recalled",
+  "statement": "One table counts how often different kinds of events happened at each business:\n\n- `Events(business_id, event_type, occurrences)`: one row per business and event type (for example `'reviews'`, `'ads'`, `'page views'`); `(business_id, event_type)` is unique and `occurrences` is never `null`.\n\nFor each event type, its **average activity** is the average of `occurrences` over all the businesses that have a row for that type. A business is **active** when, in more than one event type (at least two), its `occurrences` is strictly greater than that type's average activity.\n\nReport the active businesses in a single column `business_id`, in any order.",
+  "constraints": [
+    "(business_id, event_type) is unique in Events",
+    "occurrences is never null",
+    "Averages are exact (not rounded), and the comparison is strictly greater"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Events": [["business_id","INT"],["event_type","VARCHAR(10)"],["occurrences","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Events = [] }] = input;\n  const seen = new Set();\n  for (const [business, type, occurrences] of Events) {\n    if (business === null || type === null) return 'Every event row needs a business_id and an event_type.';\n    if (occurrences === null) return 'occurrences is never null.';\n    const key = `${business}/${String(type).toLowerCase()}`;\n    if (seen.has(key)) return `Business ${business} has event type '${type}' twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH type_average AS (\n  SELECT event_type, AVG(occurrences) AS average_activity\n  FROM Events\n  GROUP BY event_type\n)\nSELECT e.business_id\nFROM Events AS e\nJOIN type_average AS t\n  ON t.event_type = e.event_type\nWHERE e.occurrences > t.average_activity\nGROUP BY e.business_id\nHAVING COUNT(*) > 1;",
+  "brute": "SELECT scored.business_id\nFROM (\n  SELECT\n    business_id,\n    CASE WHEN occurrences > AVG(occurrences) OVER (PARTITION BY event_type) THEN 1 ELSE 0 END AS above\n  FROM Events\n) AS scored\nGROUP BY scored.business_id\nHAVING SUM(scored.above) >= 2",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const types = small ? ['reviews', 'ads', 'page views', 'clicks'] : ['reviews', 'ads', 'page views', 'clicks', 'shares'];\n  const businesses = small ? 1 + Math.floor(rand() * 4) : 500;\n  const pairs = [];\n  for (let b = 1; b <= businesses; b++) for (const type of types) pairs.push([b, type]);\n  // Shuffle the (business, type) pairs and keep a prefix, so the key stays unique.\n  for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Each type gets its own scale, so the per-type average differs from the overall one; small values make ties with the average likely.\n  const scale = Object.fromEntries(types.map((type, i) => [type, small ? 1 + i * 3 : 1 + i * 10]));\n  const Events = pairs.slice(0, count).map(([b, type]) => [b * 2 + 1, type, scale[type] + Math.floor(rand() * (small ? 4 : 30))]);\n  return [{ Events }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Events":[[1,"reviews",7],[3,"reviews",3],[1,"ads",11],[2,"ads",7],[3,"ads",6],[1,"page views",3],[2,"page views",12]]}],"expected":{"columns":["business_id"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Events":[]}]},
+    {"name":"Test 2","input":[{"Events":[[1,"reviews",9],[1,"ads",4],[1,"page views",20]]}]},
+    {"name":"Test 3","input":[{"Events":[[1,"reviews",8],[2,"reviews",2],[1,"ads",9],[2,"ads",1],[3,"ads",5]]}]},
+    {"name":"Test 4","input":[{"Events":[[1,"reviews",8],[2,"reviews",2],[1,"ads",5],[2,"ads",1],[3,"ads",9]]}]},
+    {"name":"Test 5","input":[{"Events":[[1,"reviews",5],[2,"reviews",5],[1,"ads",3],[2,"ads",3]]}]},
+    {"name":"Test 6","input":[{"Events":[[1,"reviews",6],[2,"reviews",4],[3,"reviews",5],[1,"ads",10],[2,"ads",9],[3,"ads",11],[1,"clicks",2],[2,"clicks",2]]}]},
+    {"name":"Test 7","input":[{"Events":[[1,"ads",100],[2,"ads",90],[1,"reviews",3],[2,"reviews",1],[2,"clicks",60],[3,"clicks",40]]}]},
+    {"name":"Test 8","input":[{"Events":[[4,"reviews",10],[5,"reviews",2],[6,"reviews",3],[4,"ads",12],[5,"ads",20],[6,"ads",1],[4,"page views",7],[5,"page views",9],[6,"page views",8]]}]},
+    {"name":"Test 9","input":[{"Events":[[1,"reviews",7],[2,"reviews",8],[1,"ads",8],[2,"ads",7],[1,"page views",8],[2,"page views",7]]}]},
+    {"name":"Test 10","input":[{"Events":[[1,"reviews",7],[3,"reviews",3],[1,"ads",11],[2,"ads",7],[3,"ads",6],[1,"page views",3],[2,"page views",12],[2,"reviews",6],[3,"page views",9]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe test has two stages. First, each event type needs a single benchmark: the average of its `occurrences`. Then every row can be judged on its own (is this business above its type's benchmark?) and the business is active when at least two of its rows pass. Computing the averages once in a CTE and joining them back to the rows turns the comparison into a plain `WHERE`.\n\n## Approach\n\n1. CTE `type_average`: `GROUP BY event_type` and take `AVG(occurrences)` as `average_activity`.\n2. Join each row of `Events` (alias `e`) to its type's average (alias `t`).\n3. `WHERE e.occurrences > t.average_activity` keeps only the rows where the business beats the benchmark.\n4. `GROUP BY e.business_id` and `HAVING COUNT(*) > 1`: at least two winning event types.\n\n## Example 1, step by step\n\n`type_average`:\n\n| event_type | average_activity |\n| --- | --- |\n| reviews | (7 + 3) / 2 = 5 |\n| ads | (11 + 7 + 6) / 3 = 8 |\n| page views | (3 + 12) / 2 = 7.5 |\n\nRows that pass the `WHERE`: business 1 reviews (7 > 5), business 1 ads (11 > 8), business 2 page views (12 > 7.5). Business 1 has two, business 2 one and business 3 none, so only business `1` is reported.\n\n## Complexity\n\n- Time: O(N) to build the averages and O(N) to join and group the N rows, using hashing.\n- Space: O(T + B) for T event types and B businesses.\n\n## Pitfalls\n\n- The average is per event type, not across all rows; mixing scales (thousands of page views, a handful of reviews) changes the answer.\n- \"Greater than the average\" is strict: a value equal to the average does not count.\n- \"More than one event type\" means `COUNT(*) > 1`, not `>= 1`.\n- Filtering rows before computing the average (for example in the same query's `WHERE`) changes the benchmark; compute it over all rows first.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `type_average` | one row per event type with its average activity |\n| `e` | `Events`, one row per business and type |\n| `t` | the matching row of `type_average` |\n| `COUNT(*)` | event types in which the business beats the average |",
+  "narration": {
+    "1": "The type_average stage computes one benchmark per event type.",
+    "2": "AVG gives the exact mean of occurrences across the businesses that have this type.",
+    "4": "Grouping by event_type makes one average per type.",
+    "6": "The answer lists business ids only.",
+    "8": "Each event row is paired with the average of its own type.",
+    "10": "Keep rows where the business is strictly above that average.",
+    "11": "Collect the surviving rows of each business.",
+    "12": "A business is active when it beats the average in at least two event types."
+  }
+}

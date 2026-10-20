@@ -1,0 +1,52 @@
+{
+  "number": 1158,
+  "title": "Market Analysis I",
+  "spec": "leetcode",
+  "statement": "An online marketplace lets users both buy and sell items:\n\n- `Users(user_id, join_date, favorite_brand)`: one row per user; `user_id` is unique.\n- `Orders(order_id, order_date, item_id, buyer_id, seller_id)`: one row per order; `order_id` is unique. `item_id` refers to `Items`, and `buyer_id` and `seller_id` both refer to `Users`.\n- `Items(item_id, item_brand)`: one row per item; `item_id` is unique.\n\nFor **every** user, report how many orders they placed as the **buyer** with an `order_date` in the year 2019. Output the columns `buyer_id` (the user's `user_id`), `join_date` and `orders_in_2019`. A user with no such orders still appears, with `orders_in_2019 = 0`; orders they sold do not count. Rows may come in any order.",
+  "constraints": [
+    "user_id is unique in Users",
+    "order_id is unique in Orders",
+    "item_id is unique in Items",
+    "Orders.item_id exists in Items; Orders.buyer_id and Orders.seller_id exist in Users"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["join_date","DATE"],["favorite_brand","VARCHAR(10)"]],
+    "Orders": [["order_id","INT"],["order_date","DATE"],["item_id","INT"],["buyer_id","INT"],["seller_id","INT"]],
+    "Items": [["item_id","INT"],["item_brand","VARCHAR(10)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Users = [], Orders = [], Items = [] }] = input;\n  const isDate = d => typeof d === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\n  const users = new Set(), items = new Set(), orders = new Set();\n  for (const [id, joined] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (users.has(id)) return `user_id ${id} appears twice in Users.`;\n    if (!isDate(joined)) return `join_date ${joined} is not YYYY-MM-DD.`;\n    users.add(id);\n  }\n  for (const [id] of Items) {\n    if (id === null) return 'Every item needs an item_id.';\n    if (items.has(id)) return `item_id ${id} appears twice in Items.`;\n    items.add(id);\n  }\n  for (const [id, date, item, buyer, seller] of Orders) {\n    if (id === null) return 'Every order needs an order_id.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (!isDate(date)) return `order_date ${date} is not YYYY-MM-DD.`;\n    if (!items.has(item)) return `Order ${id} names unknown item ${item}.`;\n    if (!users.has(buyer) || !users.has(seller)) return `Order ${id} names an unknown user.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT u.user_id AS buyer_id, u.join_date, COUNT(o.order_id) AS orders_in_2019\nFROM Users AS u\nLEFT JOIN Orders AS o\n  ON o.buyer_id = u.user_id\n  AND o.order_date BETWEEN '2019-01-01' AND '2019-12-31'\nGROUP BY u.user_id, u.join_date;",
+  "brute": "SELECT u.user_id AS buyer_id, u.join_date,\n  (SELECT COUNT(*)\n   FROM Orders AS o\n   WHERE o.buyer_id = u.user_id\n     AND YEAR(o.order_date) = 2019) AS orders_in_2019\nFROM Users AS u",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const brands = ['Lenovo', 'Samsung', 'LG', 'HP', 'Apple'];\n  const day = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);\n  const Users = [], Orders = [], Items = [];\n  const userCount = size === 'small' ? pick(6) : 600;\n  const itemCount = size === 'small' ? 1 + pick(4) : 200;\n  const orderCount = userCount === 0 ? 0 : size === 'small' ? pick(9) : 2000;\n  for (let id = 1; id <= userCount; id++) Users.push([id, day(2018, 1 + pick(12), 1 + pick(28)), brands[pick(brands.length)]]);\n  for (let id = 1; id <= itemCount; id++) Items.push([id, brands[pick(brands.length)]]);\n  // Small cases cluster dates at the year boundaries; large cases spread over 2018-2020.\n  const edges = ['2018-08-04', '2018-12-31', '2019-01-01', '2019-06-15', '2019-12-31', '2020-01-01'];\n  for (let id = 1; id <= orderCount; id++) {\n    const date = size === 'small' ? edges[pick(edges.length)] : day(2018 + pick(3), 1 + pick(12), 1 + pick(28));\n    Orders.push([id, date, 1 + pick(itemCount), 1 + pick(userCount), 1 + pick(userCount)]);\n  }\n  return [{ Users, Orders, Items }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"2018-01-01","Lenovo"],[2,"2018-02-09","Samsung"],[3,"2018-01-19","LG"],[4,"2018-05-21","HP"]],"Orders":[[1,"2019-08-01",4,1,2],[2,"2018-08-02",2,1,3],[3,"2019-08-03",3,2,3],[4,"2018-08-04",1,4,2],[5,"2018-08-04",1,3,4],[6,"2019-08-05",2,2,4]],"Items":[[1,"Samsung"],[2,"Lenovo"],[3,"LG"],[4,"HP"]]}],"expected":{"columns":["buyer_id","join_date","orders_in_2019"],"rows":[[1,"2018-01-01",1],[2,"2018-02-09",2],[3,"2018-01-19",0],[4,"2018-05-21",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[],"Orders":[],"Items":[[1,"HP"]]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"2018-03-01","HP"],[2,"2018-04-01","LG"]],"Orders":[],"Items":[]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"2018-01-01","HP"],[2,"2018-01-02","LG"],[3,"2018-01-03","Lenovo"],[4,"2018-01-04","Samsung"]],"Orders":[[1,"2018-12-31",1,1,2],[2,"2019-01-01",1,2,1],[3,"2019-12-31",1,3,1],[4,"2020-01-01",1,4,1]],"Items":[[1,"HP"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"2018-05-05","HP"],[2,"2018-06-06","LG"]],"Orders":[[1,"2019-03-01",1,1,2],[2,"2019-04-01",1,1,2],[3,"2019-05-01",1,1,2]],"Items":[[1,"LG"]]}]},
+    {"name":"Test 5","input":[{"Users":[[7,"2017-12-12","Apple"]],"Orders":[[1,"2018-07-07",1,7,7],[2,"2020-02-02",1,7,7]],"Items":[[1,"Apple"]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"2018-01-01","HP"],[2,"2018-02-02","HP"],[3,"2018-03-03","LG"]],"Orders":[[1,"2019-02-01",1,1,3],[2,"2019-02-02",2,2,3],[3,"2019-02-03",2,3,1],[4,"2019-11-11",1,1,2]],"Items":[[1,"HP"],[2,"LG"]]}]},
+    {"name":"Test 7","input":[{"Users":[[5,"2019-01-15","Samsung"]],"Orders":[[10,"2019-07-07",3,5,5]],"Items":[[3,"Samsung"]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"2018-01-01","HP"],[2,"2018-01-01","HP"],[3,"2018-09-09","LG"]],"Orders":[[1,"2019-06-01",1,2,1],[2,"2018-06-01",1,1,2],[3,"2019-06-02",1,2,3],[4,"2019-06-03",1,3,2],[5,"2020-06-03",1,3,2],[6,"2019-06-04",1,2,3]],"Items":[[1,"HP"]]}]},
+    {"name":"Test 9","input":[{"Users":[[3,"2018-02-02","LG"],[8,"2018-03-03","HP"],[9,"2018-04-04","Lenovo"]],"Orders":[[1,"2019-01-01",2,8,3],[2,"2019-01-01",2,8,9],[3,"2019-12-31",1,9,8],[4,"2018-12-31",1,3,8]],"Items":[[1,"HP"],[2,"LG"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery user must appear, including users who bought nothing in 2019, so the query starts from `Users` and **left joins** their orders. The 2019 restriction belongs to the join condition, not to `WHERE`: a `WHERE` on the order date would discard the null-filled rows of users with no 2019 purchases and make them vanish. After the join each user has zero or more matching order rows, and counting a column of `Orders` turns that into the number of purchases.\n\n## Approach\n\n1. Start from `Users` (alias `u`), the table whose rows must all survive.\n2. `LEFT JOIN Orders` (alias `o`) on `o.buyer_id = u.user_id` **and** `o.order_date` between 2019-01-01 and 2019-12-31. Users with no such order keep one row with `o` all null.\n3. `GROUP BY u.user_id, u.join_date` to get one group per user.\n4. `COUNT(o.order_id)` counts only non-null order ids, so an unmatched user gets 0. Rename `u.user_id` to `buyer_id`.\n\n## Example 1, step by step\n\n- User 1 matches order 1 (2019-08-01); order 2 is from 2018 and fails the `ON` condition. Count 1.\n- User 2 matches orders 3 and 6, both in 2019. Count 2.\n- User 3 bought only order 5 (2018), so the join leaves one null row. Count 0.\n- User 4 bought only order 4 (2018); also a null row and count 0. That user sold orders 5 and 6, but selling is not buying.\n\n## Complexity\n\n- Time: O(U + O) with hashing on `buyer_id` for U users and O orders; a database without an index may need O(U · O).\n- Space: O(U) for the groups.\n\n## Pitfalls\n\n- `WHERE YEAR(o.order_date) = 2019` after the left join removes users 3 and 4 from Example 1 instead of reporting 0.\n- `COUNT(*)` counts the null-filled row as 1, so users without orders would show 1.\n- Joining on `seller_id` (or on either id) counts sales as purchases.\n- `Items` is irrelevant here; joining it with an inner join adds nothing and only risks dropping rows.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `u` | `Users`, one output row per user |\n| `o` | `Orders` the user bought in 2019, or nulls when there are none |\n| `buyer_id` | the user's `user_id` under the required name |\n| `orders_in_2019` | `COUNT(o.order_id)`, the number of matched purchases |",
+  "narration": {
+    "1": "Output each user id as buyer_id with the join date, and count only real (non-null) matched orders.",
+    "2": "Users is the left table, so every user appears even without purchases.",
+    "3": "A left join attaches orders where the user is the buyer; unmatched users get a null-filled row.",
+    "5": "The 2019 filter sits in ON, so it limits which orders match without removing users who have none.",
+    "6": "One group per user turns their matched orders into a single count."
+  }
+}

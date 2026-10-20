@@ -1,0 +1,49 @@
+{
+  "number": 1303,
+  "title": "Find the Team Size",
+  "spec": "recalled",
+  "statement": "One table assigns employees to teams:\n\n- `Employee(employee_id, team_id)`: one row per employee; `employee_id` is unique and `team_id` is never null. Each employee belongs to exactly one team.\n\nThe size of a team is the number of employees whose `team_id` is that team. For **every** employee, report the size of the team they are on. Return the columns `employee_id` and `team_size`, one row per employee, in any order.",
+  "constraints": [
+    "employee_id is unique in Employee",
+    "team_id is never null",
+    "Each employee belongs to exactly one team"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["employee_id","INT"],["team_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const ids = new Set();\n  for (const [id, team] of Employee) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (ids.has(id)) return `employee_id ${id} appears twice in Employee.`;\n    if (team === null) return `Employee ${id} needs a team_id.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT employee_id,\n  COUNT(*) OVER (\n    PARTITION BY team_id\n  ) AS team_size\nFROM Employee;",
+  "brute": "SELECT e.employee_id,\n  (SELECT COUNT(*) FROM Employee AS mate WHERE mate.team_id = e.team_id) AS team_size\nFROM Employee AS e",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const teams = small ? 1 + Math.floor(rand() * 4) : 150;\n  // Shuffle the ids so the table is not ordered by employee_id.\n  const ids = Array.from({ length: count }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Employee = ids.map(id => [id, 1 + Math.floor(rand() * teams)]);\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,8],[2,8],[3,8],[4,7],[5,9],[6,9]]}],"expected":{"columns":["employee_id","team_size"],"rows":[[1,3],[2,3],[3,3],[4,1],[5,2],[6,2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[]}]},
+    {"name":"Test 2","input":[{"Employee":[[7,3]]}]},
+    {"name":"Test 3","input":[{"Employee":[[1,5],[2,5],[3,5],[4,5]]}]},
+    {"name":"Test 4","input":[{"Employee":[[1,1],[2,2],[3,3],[4,4]]}]},
+    {"name":"Test 5","input":[{"Employee":[[10,2],[3,1],[8,2],[1,1],[5,2]]}]},
+    {"name":"Test 6","input":[{"Employee":[[1,0],[2,100],[3,0],[4,100],[5,100],[6,7]]}]},
+    {"name":"Test 7","input":[{"Employee":[[1,4],[2,1],[3,4],[4,2],[5,4],[6,1],[7,3],[8,4]]}]},
+    {"name":"Test 8","input":[{"Employee":[[100,9],[200,8],[300,9]]}]},
+    {"name":"Test 9","input":[{"Employee":[[1,8],[2,8],[3,8],[4,7],[5,9],[6,9],[7,7],[8,6]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row is an employee, but the value on it is a fact about the whole team. `GROUP BY team_id` would compute the sizes yet collapse each team to one row, losing the employees. A window function computes the same count over each team's rows while keeping every row: `COUNT(*) OVER (PARTITION BY team_id)` attaches the size of an employee's team to that employee.\n\n## Approach\n\n1. Read every row of `Employee`; each one becomes exactly one output row.\n2. Compute `COUNT(*) OVER (PARTITION BY team_id)`: the partition is the employee's team, so the count is the team's size. Name it `team_size`.\n3. Select `employee_id` next to it. No filter and no ordering are needed.\n\n## Example 1, step by step\n\nThe partitions are team 8 = {1, 2, 3}, team 7 = {4} and team 9 = {5, 6}.\n\n- Employees 1, 2 and 3 sit in a partition of 3 rows, so each gets `team_size = 3`.\n- Employee 4 is alone in team 7 and gets 1.\n- Employees 5 and 6 share team 9 and get 2.\n\nThe result is (1, 3), (2, 3), (3, 3), (4, 1), (5, 2), (6, 2).\n\n## Complexity\n\n- Time: O(E log E) for E employees, to sort or hash the rows into partitions.\n- Space: O(E) for the partitioned rows and the result.\n\n## Pitfalls\n\n- `SELECT team_id, COUNT(*) ... GROUP BY team_id` returns one row per team, not per employee.\n- Selecting `employee_id` together with `GROUP BY team_id` is rejected by MySQL's `ONLY_FULL_GROUP_BY`, or reports one arbitrary employee per team.\n- `COUNT(*) OVER ()` without a partition counts the whole table, giving every employee the company's headcount.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `PARTITION BY team_id` | groups the rows by team without merging them |\n| `team_size` | number of rows in the employee's partition, the team's size |",
+  "narration": {
+    "1": "Select employee_id from every row, so the result has one row per employee.",
+    "2": "COUNT(*) as a window function counts rows without collapsing them into groups.",
+    "3": "The window is the set of rows sharing this employee's team_id, so the count is the team's size.",
+    "4": "Name the count team_size, as the output requires.",
+    "5": "Employee is the only table; no join or filter is needed."
+  }
+}

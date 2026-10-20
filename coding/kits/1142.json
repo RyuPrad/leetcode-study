@@ -1,0 +1,50 @@
+{
+  "number": 1142,
+  "title": "User Activity for the Past 30 Days II",
+  "spec": "recalled",
+  "statement": "One table logs what users do on a social site:\n\n- `Activity(user_id, session_id, activity_date, activity_type)`: each row is one action a user took during session `session_id` on `activity_date`. `activity_type` is one of `'open_session'`, `'end_session'`, `'scroll_down'`, `'send_message'`. Every session belongs to exactly one user. There is no primary key, so identical rows can repeat.\n\nConsider the 30 days that end on **2019-07-27**, both ends included (2019-06-28 through 2019-07-27). A user is active in that window if they have at least one row dated inside it, and a session counts for its user if it has at least one row dated inside it. Report the average number of counted sessions per active user, rounded to 2 decimal places, as one row with the column `average_sessions_per_user`. If nobody is active in the window, report `0`.",
+  "constraints": [
+    "Activity has no primary key and may contain duplicate rows",
+    "activity_type is one of 'open_session', 'end_session', 'scroll_down', 'send_message'",
+    "each session_id belongs to exactly one user_id"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["user_id","INT"],["session_id","INT"],["activity_date","DATE"],["activity_type","ENUM('open_session', 'end_session', 'scroll_down', 'send_message')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const kinds = ['open_session', 'end_session', 'scroll_down', 'send_message'];\n  const owner = new Map();\n  for (const [user, session, date, type] of Activity) {\n    if (user === null || session === null || date === null || type === null) return 'Every column of Activity is required.';\n    if (!kinds.includes(type)) return `Unknown activity_type ${type}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `activity_date ${date} is not YYYY-MM-DD.`;\n    if (owner.has(session) && owner.get(session) !== user) return `Session ${session} belongs to two users.`;\n    owner.set(session, user);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH user_sessions AS (\n  SELECT user_id, COUNT(DISTINCT session_id) AS sessions\n  FROM Activity\n  WHERE activity_date BETWEEN DATE_SUB('2019-07-27', INTERVAL 29 DAY) AND '2019-07-27'\n  GROUP BY user_id\n)\nSELECT IFNULL(ROUND(AVG(sessions), 2), 0) AS average_sessions_per_user\nFROM user_sessions;",
+  "brute": "SELECT IFNULL(ROUND(COUNT(DISTINCT session_id) / COUNT(DISTINCT user_id), 2), 0) AS average_sessions_per_user\nFROM Activity\nWHERE DATEDIFF('2019-07-27', activity_date) BETWEEN 0 AND 29",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const kinds = ['open_session', 'end_session', 'scroll_down', 'send_message'];\n  const day = offset => new Date(Date.UTC(2019, 5, 20 + offset)).toISOString().slice(0, 10);\n  // Small dates sit on both edges of the window; large ones spread from 2019-06-20 to 2019-08-08.\n  const edges = ['2019-06-26', '2019-06-27', '2019-06-28', '2019-07-05', '2019-07-26', '2019-07-27', '2019-07-28', '2019-08-02'];\n  const users = small ? 4 : 300, sessions = small ? 6 : 700, rows = small ? pick(9) : 2000;\n  const owner = [];\n  for (let s = 1; s <= sessions; s++) owner[s] = 1 + pick(users);\n  const Activity = [];\n  for (let i = 0; i < rows; i++) {\n    if (Activity.length && rand() < 0.15) { Activity.push([...Activity[pick(Activity.length)]]); continue; }\n    const session = 1 + pick(sessions);\n    Activity.push([owner[session], session, small ? edges[pick(edges.length)] : day(pick(50)), kinds[pick(kinds.length)]]);\n  }\n  // Keep the answer clear of a rounding tie at the third decimal, where float and MySQL decimal arithmetic could\n  // disagree: each extra active user with one session changes the average.\n  for (let extra = 1; extra < 20; extra++) {\n    const active = Activity.filter(([, , date]) => date >= '2019-06-28' && date <= '2019-07-27');\n    const people = new Set(active.map(row => row[0])).size, visits = new Set(active.map(row => row[1])).size;\n    if (!people || Math.abs((visits / people * 100) % 1 - 0.5) > 0.01) break;\n    Activity.push([users + extra, sessions + extra, '2019-07-15', 'open_session']);\n  }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,1,"2019-07-20","open_session"],[1,1,"2019-07-20","scroll_down"],[1,1,"2019-07-20","end_session"],[2,4,"2019-07-20","open_session"],[2,4,"2019-07-21","send_message"],[2,4,"2019-07-21","end_session"],[3,2,"2019-07-21","open_session"],[3,2,"2019-07-21","send_message"],[3,2,"2019-07-21","end_session"],[3,5,"2019-07-21","open_session"],[3,5,"2019-07-21","scroll_down"],[3,5,"2019-07-21","end_session"],[4,3,"2019-06-25","open_session"],[4,3,"2019-06-25","end_session"]]}],"expected":{"columns":["average_sessions_per_user"],"rows":[[1.33]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[1,1,"2019-06-27","open_session"],[2,2,"2019-07-28","open_session"],[2,2,"2019-07-28","end_session"]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2019-06-28","open_session"],[1,2,"2019-06-27","open_session"]]}]},
+    {"name":"Test 4","input":[{"Activity":[[5,9,"2019-07-27","send_message"],[5,8,"2019-07-27","scroll_down"],[5,7,"2019-07-28","open_session"]]}]},
+    {"name":"Test 5","input":[{"Activity":[[1,1,"2019-07-10","open_session"],[1,1,"2019-07-10","scroll_down"],[1,1,"2019-07-10","scroll_down"],[1,1,"2019-07-10","send_message"],[1,1,"2019-07-11","end_session"]]}]},
+    {"name":"Test 6","input":[{"Activity":[[1,1,"2019-06-27","open_session"],[1,1,"2019-06-28","end_session"],[2,2,"2019-06-27","open_session"],[2,2,"2019-06-27","end_session"],[1,3,"2019-07-01","open_session"]]}]},
+    {"name":"Test 7","input":[{"Activity":[[1,1,"2019-07-01","open_session"],[2,2,"2019-07-02","open_session"],[2,3,"2019-07-03","open_session"],[3,4,"2019-07-04","open_session"],[3,5,"2019-07-05","open_session"],[3,6,"2019-07-06","open_session"],[3,7,"2019-07-07","open_session"]]}]},
+    {"name":"Test 8","input":[{"Activity":[[1,1,"2019-07-20","open_session"],[1,2,"2019-07-28","open_session"],[2,3,"2019-07-01","send_message"],[2,4,"2019-07-02","send_message"],[2,5,"2019-07-03","send_message"]]}]},
+    {"name":"Test 9","input":[{"Activity":[[1,10,"2019-07-15","open_session"],[1,11,"2019-07-16","open_session"],[2,12,"2019-07-15","open_session"],[3,13,"2019-07-15","scroll_down"],[3,14,"2019-07-15","scroll_down"],[3,13,"2019-07-15","scroll_down"]]}]},
+    {"name":"Test 10","input":[{"Activity":[[1,1,"2019-07-27","open_session"],[1,2,"2019-07-26","open_session"],[2,3,"2019-08-01","open_session"],[3,4,"2019-06-01","end_session"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo filters decide what counts, and both come from the date window: only rows dated 2019-06-28 through 2019-07-27 matter. After that, the question is \"sessions per user\": group the surviving rows by user, count each user's different sessions, and average those counts. Rows repeat (a session has many actions, and identical rows may appear), so the count must be of **distinct** sessions.\n\n## Approach\n\n1. `user_sessions`: keep rows with `activity_date BETWEEN DATE_SUB('2019-07-27', INTERVAL 29 DAY) AND '2019-07-27'`, which is the 30-day window 2019-06-28 to 2019-07-27.\n2. `GROUP BY user_id` gives one row per active user, and `COUNT(DISTINCT session_id)` is that user's `sessions`.\n3. The outer query takes `AVG(sessions)` and rounds it to 2 decimals.\n4. With no active user the CTE is empty, `AVG` is null, and `IFNULL(..., 0)` turns that into 0 as `average_sessions_per_user`.\n\n## Example 1, step by step\n\n- User 4's only session (3) is dated 2019-06-25, before the window, so user 4 drops out.\n- `user_sessions`: user 1 has session 1, so `sessions = 1`; user 2 has session 4 (its rows span 07-20 and 07-21 but it is one session), `sessions = 1`; user 3 has sessions 2 and 5, `sessions = 2`.\n- Average: (1 + 1 + 2) / 3 = 1.333..., rounded to 1.33.\n\n## Complexity\n\n- Time: O(n) to scan the n rows of `Activity`, plus hashing the distinct (user, session) pairs in the window.\n- Space: O(k) for the k distinct pairs kept by `COUNT(DISTINCT ...)`.\n\n## Pitfalls\n\n- An off-by-one window: 30 days ending 2019-07-27 start on 2019-06-28, not 2019-06-27.\n- `DATEDIFF('2019-07-27', activity_date) < 30` alone also lets in rows dated after 2019-07-27.\n- `COUNT(session_id)` counts actions, not sessions.\n- Forgetting `IFNULL`: an empty window gives null instead of 0.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `user_sessions` | one row per user active in the window |\n| `sessions` | distinct sessions of that user with a row in the window |\n| `average_sessions_per_user` | rounded average of `sessions`, or 0 when nobody is active |",
+  "narration": {
+    "1": "The user_sessions CTE builds one row per user who was active in the window.",
+    "2": "Counting distinct session ids ignores the many action rows each session has.",
+    "4": "Keep only rows from the 30 days ending 2019-07-27, both ends included.",
+    "5": "Group by user so each active user gets a session count.",
+    "7": "Average the per-user counts, round to 2 decimals, and turn an empty window into 0."
+  }
+}

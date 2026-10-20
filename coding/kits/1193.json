@@ -1,0 +1,51 @@
+{
+  "number": 1193,
+  "title": "Monthly Transactions I",
+  "spec": "leetcode",
+  "statement": "One table records incoming transactions:\n\n- `Transactions(id, country, state, amount, trans_date)`: one row per transaction; `id` is unique. `state` is either `'approved'` or `'declined'`. `country` may be `null`; the other columns never are.\n\nGroup the transactions by calendar month (`trans_date` written as `YYYY-MM`) and country; a `null` country forms its own group. For every group that has at least one transaction, report:\n\n- `month`: the month as text, for example `2018-12`;\n- `country`;\n- `trans_count`: the number of transactions;\n- `approved_count`: the number of approved transactions (`0` if none);\n- `trans_total_amount`: the sum of all amounts;\n- `approved_total_amount`: the sum of the approved amounts (`0` if none, never `null`).\n\nRows may come in any order.",
+  "constraints": [
+    "id is unique in Transactions",
+    "state is 'approved' or 'declined'",
+    "country may be null; id, state, amount and trans_date are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Transactions": [["id","INT"],["country","VARCHAR(4)"],["state","ENUM('approved', 'declined')"],["amount","INT"],["trans_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Transactions = [] }] = input;\n  const ids = new Set();\n  for (const [id, , state, amount, date] of Transactions) {\n    if (id === null || state === null || amount === null || date === null) return 'Only country may be null in Transactions.';\n    if (ids.has(id)) return `id ${id} appears twice in Transactions.`;\n    ids.add(id);\n    if (state !== 'approved' && state !== 'declined') return `state must be 'approved' or 'declined', not '${state}'.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DATE_FORMAT(trans_date, '%Y-%m') AS month,\n       country,\n       COUNT(*) AS trans_count,\n       SUM(CASE WHEN state = 'approved' THEN 1 ELSE 0 END) AS approved_count,\n       SUM(amount) AS trans_total_amount,\n       SUM(CASE WHEN state = 'approved' THEN amount ELSE 0 END) AS approved_total_amount\nFROM Transactions\nGROUP BY DATE_FORMAT(trans_date, '%Y-%m'), country;",
+  "brute": "SELECT a.month,\n       a.country,\n       a.trans_count,\n       IFNULL(p.approved_count, 0) AS approved_count,\n       a.trans_total_amount,\n       IFNULL(p.approved_total_amount, 0) AS approved_total_amount\nFROM (\n  SELECT LEFT(trans_date, 7) AS month, country, COUNT(*) AS trans_count, SUM(amount) AS trans_total_amount\n  FROM Transactions\n  GROUP BY LEFT(trans_date, 7), country\n) AS a\nLEFT JOIN (\n  SELECT LEFT(trans_date, 7) AS month, country, COUNT(*) AS approved_count, SUM(amount) AS approved_total_amount\n  FROM Transactions\n  WHERE state = 'approved'\n  GROUP BY LEFT(trans_date, 7), country\n) AS p\n  ON p.month = a.month\n AND p.country <=> a.country",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const day = (n) => new Date(Date.UTC(2018, 10, 20 + n)).toISOString().slice(0, 10);\n  const small = size === 'small';\n  const countries = small ? ['US', 'DE', 'FR', null] : ['US', 'DE', 'FR', 'IN', 'BR', 'JP', 'CN', 'MX', null];\n  const amounts = [0, 500, 1000, 2000, 3000];\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const Transactions = [];\n  for (let i = 0; i < rows; i++) {\n    // Small cases span about three months around a new year so groups collide and split.\n    const date = day(Math.floor(rand() * (small ? 90 : 730)));\n    const amount = small ? pick(amounts) : Math.floor(rand() * 5000);\n    Transactions.push([100 + i, pick(countries), rand() < 0.6 ? 'approved' : 'declined', amount, date]);\n  }\n  return [{ Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Transactions":[[121,"US","approved",1000,"2018-12-18"],[122,"US","declined",2000,"2018-12-19"],[123,"US","approved",2000,"2019-01-01"],[124,"DE","approved",2000,"2019-01-07"]]}],"expected":{"columns":["month","country","trans_count","approved_count","trans_total_amount","approved_total_amount"],"rows":[["2018-12","US",2,1,3000,1000],["2019-01","US",1,1,2000,2000],["2019-01","DE",1,1,2000,2000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Transactions":[[1,"US","declined",700,"2019-03-05"]]}]},
+    {"name":"Test 3","input":[{"Transactions":[[1,"FR","approved",450,"2020-02-29"]]}]},
+    {"name":"Test 4","input":[{"Transactions":[[1,"US","approved",100,"2019-01-31"],[2,"US","approved",200,"2019-02-01"],[3,"US","declined",300,"2019-02-28"]]}]},
+    {"name":"Test 5","input":[{"Transactions":[[1,"US","approved",100,"2019-05-10"],[2,"DE","declined",200,"2019-05-11"],[3,"DE","declined",300,"2019-05-12"],[4,"FR","approved",400,"2019-05-13"]]}]},
+    {"name":"Test 6","input":[{"Transactions":[[1,null,"approved",500,"2019-06-01"],[2,null,"declined",600,"2019-06-02"],[3,"US","approved",700,"2019-06-03"],[4,null,"approved",800,"2019-07-01"]]}]},
+    {"name":"Test 7","input":[{"Transactions":[[1,"DE","approved",1000,"2018-12-01"],[2,"DE","approved",1000,"2019-12-01"],[3,"DE","declined",5000,"2019-12-31"]]}]},
+    {"name":"Test 8","input":[{"Transactions":[[1,"US","declined",0,"2019-08-01"],[2,"US","approved",0,"2019-08-02"],[3,"IN","declined",900,"2019-08-03"],[4,"IN","declined",100,"2019-08-04"]]}]},
+    {"name":"Test 9","input":[{"Transactions":[[10,"US","approved",1000,"2018-12-18"],[11,"US","approved",2000,"2018-12-19"],[12,"US","approved",3000,"2018-12-20"],[13,"DE","approved",4000,"2018-12-21"]]}]},
+    {"name":"Test 10","input":[{"Transactions":[[5,"BR","declined",300,"2021-01-15"],[6,null,"declined",400,"2021-01-15"],[7,"BR","approved",250,"2021-02-15"],[8,"BR","declined",50,"2021-01-20"],[9,null,"approved",75,"2021-01-21"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery output row is one (month, country) bucket, so this is a single `GROUP BY` on two keys. The month key is not a column: it is derived from `trans_date` with `DATE_FORMAT(..., '%Y-%m')`. The four numbers are aggregates over the bucket; the two \"approved\" ones are **conditional aggregates**: a `CASE` turns each row into 1 or 0 (for counting) or into its amount or 0 (for summing), and `SUM` adds them up.\n\n## Approach\n\n1. Derive `month` from `trans_date` and group `Transactions` by `month` and `country`.\n2. `COUNT(*)` gives `trans_count` and `SUM(amount)` gives `trans_total_amount`.\n3. `SUM(CASE WHEN state = 'approved' THEN 1 ELSE 0 END)` counts approved rows as `approved_count`.\n4. `SUM(CASE WHEN state = 'approved' THEN amount ELSE 0 END)` adds approved amounts as `approved_total_amount`.\n\n## Example 1, step by step\n\n- Transactions 121 and 122 both fall in `2018-12` for US: 2 rows, 1000 + 2000 = 3000 in total; only 121 is approved, so 1 and 1000.\n- Transaction 123 is the only US row of `2019-01`: 1, 1, 2000, 2000.\n- Transaction 124 is the only DE row of `2019-01`: 1, 1, 2000, 2000.\n\n## Complexity\n\n- Time: O(T) with hash grouping for T transactions (a sort-based plan is O(T log T)).\n- Space: O(G) for the G month-country groups.\n\n## Pitfalls\n\n- `CASE WHEN state = 'approved' THEN amount END` without `ELSE 0` makes `approved_total_amount` `null` for a group with no approved transaction; it must be `0`.\n- Grouping by `MONTH(trans_date)` alone merges December 2018 with December 2019; the key needs the year too.\n- `COUNT(state = 'approved')` counts every row, because `COUNT` counts non-null values and `0` is not null; use `SUM` of a 0/1 flag.\n- A `null` country is its own group; a join on `country = country` (as in a two-aggregate join) silently loses it unless you compare with `<=>`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `month` | `trans_date` formatted as `YYYY-MM`, the first grouping key |\n| `country` | the second grouping key; `null` forms its own group |\n| `trans_count`, `trans_total_amount` | plain `COUNT(*)` and `SUM(amount)` of the group |\n| `approved_count`, `approved_total_amount` | conditional sums that count only approved rows |",
+  "narration": {
+    "1": "Format each transaction date as YYYY-MM, which becomes the month key.",
+    "3": "COUNT(*) counts every transaction in the month-country group.",
+    "4": "A CASE turns approved rows into 1 and others into 0, so the sum counts approved transactions.",
+    "5": "The plain sum of amount is the total over all transactions in the group.",
+    "6": "Only approved rows contribute their amount; ELSE 0 keeps the total at 0 instead of null.",
+    "8": "Group by the formatted month and the country, so each bucket is one output row."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "number": 1194,
+  "title": "Tournament Winners",
+  "spec": "recalled",
+  "statement": "Two tables describe a tournament played in groups:\n\n- `Players(player_id, group_id)`: one row per player; `player_id` is unique. Each player belongs to exactly one group.\n- `Matches(match_id, first_player, second_player, first_score, second_score)`: one row per match; `match_id` is unique. `first_player` scored `first_score` points and `second_player` scored `second_score` points. Both players exist in `Players`, are different, and belong to the same group. Two players may meet several times.\n\nA player's **total** is the sum of the points they scored in every match they played, whether listed as the first or the second player; a player with no matches has a total of 0. The winner of a group is its player with the largest total; when several players share that total, the one with the smallest `player_id` wins. Report the winner of every group that has at least one player, with the columns `group_id` and `player_id`. Rows may come in any order.",
+  "constraints": [
+    "player_id is unique in Players",
+    "match_id is unique in Matches",
+    "Both players of a match exist in Players, differ, and share a group_id",
+    "Scores are non-negative integers; no column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Players": [["player_id","INT"],["group_id","INT"]],
+    "Matches": [["match_id","INT"],["first_player","INT"],["second_player","INT"],["first_score","INT"],["second_score","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Players = [], Matches = [] }] = input;\n  const group = new Map();\n  for (const row of Players) {\n    if (row.some((v) => v === null)) return 'Players rows may not contain null.';\n    if (group.has(row[0])) return `player_id ${row[0]} appears twice in Players.`;\n    group.set(row[0], row[1]);\n  }\n  const ids = new Set();\n  for (const row of Matches) {\n    if (row.some((v) => v === null)) return 'Matches rows may not contain null.';\n    const [id, a, b, sa, sb] = row;\n    if (ids.has(id)) return `match_id ${id} appears twice in Matches.`;\n    ids.add(id);\n    if (!group.has(a) || !group.has(b)) return `Match ${id} names a player missing from Players.`;\n    if (a === b) return `Match ${id} pits player ${a} against themselves.`;\n    if (group.get(a) !== group.get(b)) return `Match ${id} pairs players from different groups.`;\n    if (sa < 0 || sb < 0) return `Match ${id} has a negative score.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH scores AS (\n  SELECT first_player AS player_id, first_score AS score\n  FROM Matches\n  UNION ALL\n  SELECT second_player, second_score\n  FROM Matches\n),\ntotals AS (\n  SELECT p.group_id, p.player_id, COALESCE(SUM(s.score), 0) AS total_points\n  FROM Players AS p\n  LEFT JOIN scores AS s\n    ON s.player_id = p.player_id\n  GROUP BY p.group_id, p.player_id\n),\nranked AS (\n  SELECT group_id, player_id,\n         ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY total_points DESC, player_id) AS place\n  FROM totals\n)\nSELECT group_id, player_id\nFROM ranked\nWHERE place = 1;",
+  "brute": "WITH points AS (\n  SELECT pl.group_id, pl.player_id,\n         (SELECT COALESCE(SUM(m.first_score), 0) FROM Matches AS m WHERE m.first_player = pl.player_id)\n         + (SELECT COALESCE(SUM(m.second_score), 0) FROM Matches AS m WHERE m.second_player = pl.player_id) AS pts\n  FROM Players AS pl\n)\nSELECT me.group_id, me.player_id\nFROM points AS me\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM points AS rival\n  WHERE rival.group_id = me.group_id\n    AND (rival.pts > me.pts OR (rival.pts = me.pts AND rival.player_id < me.player_id))\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const Players = [], Matches = [];\n  if (small) {\n    const pool = [10, 15, 20, 25, 30, 35, 40, 45];\n    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    const count = Math.floor(rand() * 9), groups = 1 + Math.floor(rand() * 3);\n    for (const id of pool.slice(0, count)) Players.push([id, 1 + Math.floor(rand() * groups)]);\n  } else {\n    const ids = Array.from({ length: 1000 }, (_, i) => i + 1);\n    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n    for (const id of ids) Players.push([id, 1 + Math.floor(rand() * 60)]);\n  }\n  // Matches only pair players of the same group; small scores make tied totals common.\n  const members = new Map();\n  for (const [id, g] of Players) { if (!members.has(g)) members.set(g, []); members.get(g).push(id); }\n  const playable = [...members.values()].filter((list) => list.length >= 2);\n  const matches = playable.length === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  for (let id = 1; id <= matches; id++) {\n    const list = pick(playable);\n    const a = pick(list);\n    let b = pick(list);\n    while (b === a) b = pick(list);\n    const top = small ? 4 : 11;\n    Matches.push([id, a, b, Math.floor(rand() * top), Math.floor(rand() * top)]);\n  }\n  return [{ Players, Matches }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Players":[[10,2],[15,1],[20,3],[25,1],[30,1],[35,2],[40,3],[45,1],[50,2]],"Matches":[[1,15,45,3,0],[2,30,25,1,2],[3,30,15,2,0],[4,40,20,5,2],[5,35,50,1,1]]}],"expected":{"columns":["group_id","player_id"],"rows":[[1,15],[2,35],[3,40]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Players":[],"Matches":[]}]},
+    {"name":"Test 2","input":[{"Players":[[7,4]],"Matches":[]}]},
+    {"name":"Test 3","input":[{"Players":[[30,1],[10,1],[20,1]],"Matches":[]}]},
+    {"name":"Test 4","input":[{"Players":[[5,1],[7,1],[9,1]],"Matches":[[1,7,9,0,0]]}]},
+    {"name":"Test 5","input":[{"Players":[[1,1],[2,1],[3,1]],"Matches":[[1,1,3,2,0],[2,3,1,1,3],[3,2,3,4,0]]}]},
+    {"name":"Test 6","input":[{"Players":[[1,1],[2,1],[3,1],[4,1]],"Matches":[[1,1,3,1,0],[2,1,3,1,0],[3,2,4,4,5]]}]},
+    {"name":"Test 7","input":[{"Players":[[11,1],[12,1],[13,1]],"Matches":[[1,11,12,5,0],[2,12,13,3,0],[3,13,12,0,3]]}]},
+    {"name":"Test 8","input":[{"Players":[[40,2],[20,2],[30,2],[8,1],[6,1]],"Matches":[[1,40,20,3,1],[2,30,20,3,2],[3,8,6,2,2]]}]},
+    {"name":"Test 9","input":[{"Players":[[1,9],[2,9],[3,5],[4,5],[5,7]],"Matches":[[1,2,1,6,6],[2,1,2,0,1],[3,4,3,2,0]]}]},
+    {"name":"Test 10","input":[{"Players":[[10,2],[15,1],[20,3],[25,1],[30,1],[35,2],[40,3],[45,1],[50,2]],"Matches":[[1,15,45,3,0],[2,30,25,1,2],[3,30,15,2,0],[4,40,20,5,2],[5,35,50,0,0]]}]},
+    {"name":"Test 11","input":[{"Players":[[100,3],[200,3]],"Matches":[[1,200,100,0,1],[2,200,100,0,1],[3,100,200,0,3]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA player's points are spread over two columns: sometimes they are `first_player`, sometimes `second_player`. Stacking both sides into one list of (player, score) pairs with `UNION ALL` makes the total a plain `SUM`. Players who never played still need a total of 0, so the totals start from `Players` with a **left join**. Picking one winner per group with a tie-break is a ranking job: `ROW_NUMBER()` per group, ordered by total descending and then by `player_id` ascending, puts exactly one player at place 1.\n\n## Approach\n\n1. `scores`: `UNION ALL` of (`first_player`, `first_score`) and (`second_player`, `second_score`), one row per player per match.\n2. `totals`: `Players` left joined to `scores`, grouped by player; `COALESCE(SUM(score), 0)` gives `total_points`, 0 for players without matches.\n3. `ranked`: `ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY total_points DESC, player_id)` as `place`.\n4. Keep the rows with `place = 1`.\n\n## Example 1, step by step\n\n- `scores` (first sides, then second sides): (15, 3), (30, 1), (30, 2), (40, 5), (35, 1), (45, 0), (25, 2), (15, 0), (20, 2), (50, 1).\n- `totals`: group 1: 15 → 3, 25 → 2, 30 → 3, 45 → 0; group 2: 10 → 0 (no matches), 35 → 1, 50 → 1; group 3: 20 → 2, 40 → 5.\n- `ranked`: group 1 ties 15 and 30 at 3, and 15 has the smaller id, so it takes place 1; group 2 ties 35 and 50 at 1, so 35 wins; group 3's winner is 40.\n- Result: (1, 15), (2, 35), (3, 40).\n\n## Complexity\n\n- Time: O(M + P log P) for M matches and P players: the union and join are linear with hashing, the window sorts players within groups.\n- Space: O(M + P) for `scores` and `totals`.\n\n## Pitfalls\n\n- Summing only `first_score` (or joining on `first_player` only) misses every point a player scored as the second player.\n- An inner join from `Players` to the scores drops players with no matches; in Test 4 the matchless player 5 must still win with 0 points.\n- `RANK()` or ordering by total alone keeps two winners when totals tie; the `player_id` tie-break inside `ROW_NUMBER` keeps one.\n- Counting wins or taking each player's best single match measures the wrong thing; the rule is total points.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `scores` | one (player_id, score) row per player per match |\n| `totals` | every player with `total_points`, 0 when they never played |\n| `p`, `s` | `Players` and `scores` inside `totals` |\n| `ranked` | totals with `place` within each group |\n| `place` | 1 for the highest total, ties going to the smaller `player_id` |",
+  "narration": {
+    "1": "The first stage lists every score a player earned, one row per player per match.",
+    "2": "Points earned as the first player of a match.",
+    "4": "UNION ALL appends the second players' points; ALL keeps identical rows from repeated matches.",
+    "8": "The second stage totals each player's points.",
+    "9": "COALESCE turns the empty sum of a player without matches into 0.",
+    "11": "A left join keeps players who never played, so every group gets a winner.",
+    "13": "One group per player; group_id comes along because each player has exactly one.",
+    "17": "ROW_NUMBER ranks players within their group: higher total first, then smaller player_id, so exactly one row gets place 1.",
+    "22": "Keep only the winner of each group."
+  }
+}

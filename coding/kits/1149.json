@@ -1,0 +1,50 @@
+{
+  "number": 1149,
+  "title": "Article Views II",
+  "spec": "recalled",
+  "statement": "One table logs article views:\n\n- `Views(article_id, author_id, viewer_id, view_date)`: each row says `viewer_id` looked at article `article_id`, written by `author_id`, on `view_date`. When `author_id = viewer_id`, an author viewed their own article. Each article has one author. There is no primary key, so identical rows can repeat.\n\nFind every person who viewed **at least two different articles on the same date**. Output one column, `id` (the viewer's id), listing each such person once, sorted by `id` in ascending order.",
+  "constraints": [
+    "Views has no primary key and may contain duplicate rows",
+    "each article_id has a single author_id",
+    "view_date is a date written YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Views": [["article_id","INT"],["author_id","INT"],["viewer_id","INT"],["view_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Views = [] }] = input;\n  const author = new Map();\n  for (const [article, writer, viewer, date] of Views) {\n    if (article === null || writer === null || viewer === null || date === null) return 'Every column of Views is required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `view_date ${date} is not YYYY-MM-DD.`;\n    if (author.has(article) && author.get(article) !== writer) return `Article ${article} has two authors.`;\n    author.set(article, writer);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH busy_days AS (\n  SELECT viewer_id, view_date, COUNT(DISTINCT article_id) AS articles\n  FROM Views\n  GROUP BY viewer_id, view_date\n  HAVING COUNT(DISTINCT article_id) > 1\n)\nSELECT DISTINCT viewer_id AS id\nFROM busy_days\nORDER BY id;",
+  "brute": "SELECT DISTINCT v1.viewer_id AS id\nFROM Views AS v1\nJOIN Views AS v2\n  ON v2.viewer_id = v1.viewer_id\n  AND v2.view_date = v1.view_date\n  AND v2.article_id <> v1.article_id\nORDER BY id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const articles = small ? 4 : 500, people = small ? 5 : 300, rows = small ? pick(9) : 2000;\n  // Authors come from the same pool of people as viewers, so authors sometimes read their own articles.\n  const author = [];\n  for (let a = 1; a <= articles; a++) author[a] = 1 + pick(small ? people : 200);\n  const dates = small ? ['2019-07-21', '2019-08-01', '2019-08-02'] : Array.from({ length: 60 }, (_, i) => new Date(Date.UTC(2019, 6, 1 + i)).toISOString().slice(0, 10));\n  const Views = [];\n  for (let i = 0; i < rows; i++) {\n    if (Views.length && rand() < 0.2) { Views.push([...Views[pick(Views.length)]]); continue; }\n    const article = 1 + pick(articles);\n    Views.push([article, author[article], 1 + pick(people), dates[pick(dates.length)]]);\n  }\n  return [{ Views }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Views":[[1,3,5,"2019-08-01"],[3,4,5,"2019-08-01"],[1,3,6,"2019-08-02"],[2,7,7,"2019-08-01"],[2,7,6,"2019-08-02"],[4,7,1,"2019-07-22"],[3,4,4,"2019-07-21"],[3,4,4,"2019-07-21"]]}],"expected":{"columns":["id"],"rows":[[5],[6]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Views":[]}]},
+    {"name":"Test 2","input":[{"Views":[[1,2,3,"2019-08-01"]]}]},
+    {"name":"Test 3","input":[{"Views":[[1,2,3,"2019-08-01"],[1,2,3,"2019-08-01"],[1,2,3,"2019-08-01"]]}]},
+    {"name":"Test 4","input":[{"Views":[[1,2,3,"2019-08-01"],[4,5,3,"2019-08-02"],[6,5,3,"2019-08-03"]]}]},
+    {"name":"Test 5","input":[{"Views":[[1,2,3,"2019-08-01"],[4,5,3,"2019-08-01"]]}]},
+    {"name":"Test 6","input":[{"Views":[[1,7,7,"2019-07-10"],[2,7,7,"2019-07-10"],[1,7,8,"2019-07-10"],[3,9,8,"2019-07-11"]]}]},
+    {"name":"Test 7","input":[{"Views":[[1,1,12,"2019-08-01"],[2,1,12,"2019-08-01"],[1,1,9,"2019-08-02"],[3,2,9,"2019-08-02"],[1,1,3,"2019-08-01"],[2,1,3,"2019-08-01"],[1,1,3,"2019-08-05"],[3,2,3,"2019-08-05"],[3,2,4,"2019-08-05"]]}]},
+    {"name":"Test 8","input":[{"Views":[[10,4,1,"2019-08-01"],[11,5,1,"2019-08-01"],[10,4,2,"2019-08-01"],[10,4,2,"2019-08-02"]]}]},
+    {"name":"Test 9","input":[{"Views":[[1,3,6,"2019-09-01"],[2,3,6,"2019-09-01"],[5,8,6,"2019-09-01"],[1,3,2,"2019-09-01"],[1,3,2,"2019-09-01"],[2,3,2,"2019-09-02"],[5,8,5,"2019-09-03"],[2,3,5,"2019-09-03"],[2,3,5,"2019-09-03"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about a (viewer, date) pair: did that person open two or more different articles that day? So group the views by viewer and date, and count the different articles in each group. Any viewer with at least one such busy day is in the answer, once. Duplicate rows and repeat views of one article must not inflate the count, so the count is of **distinct** article ids.\n\n## Approach\n\n1. `busy_days`: `GROUP BY viewer_id, view_date` makes one group per person per day.\n2. `COUNT(DISTINCT article_id)` is the number of different articles in the group, stored as `articles`; `HAVING ... > 1` keeps only busy days.\n3. The outer query selects `viewer_id AS id` with `DISTINCT`, since a person can have several busy days.\n4. `ORDER BY id` sorts the ids in ascending order.\n\n## Example 1, step by step\n\n- Groups: (5, 08-01) has articles 1 and 3; (6, 08-02) has articles 1 and 2; (7, 08-01) has article 2; (1, 07-22) has article 4; (4, 07-21) has article 3 twice, which is one distinct article.\n- `busy_days`: (5, 2019-08-01, 2) and (6, 2019-08-02, 2).\n- Result: ids 5 and 6, in that order. Viewer 4 is out because both of their rows show the same article.\n\n## Complexity\n\n- Time: O(n) to group the n rows of `Views` with hashing (O(n log n) with sorting), plus sorting the output ids.\n- Space: O(g) for the g (viewer, date) groups and their distinct articles.\n\n## Pitfalls\n\n- `COUNT(*)` counts viewer 4 in the example, who saw one article twice.\n- Grouping by `viewer_id` alone counts articles viewed on different days.\n- Leaving out `DISTINCT` in the outer query repeats a person who had two busy days.\n- Reporting `author_id` instead of `viewer_id`: the question is about who viewed.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `busy_days` | (viewer, date) pairs with at least two different articles |\n| `articles` | distinct articles that viewer saw on that date |\n| `id` | a viewer with at least one busy day, listed once |",
+  "narration": {
+    "1": "The busy_days CTE finds each person-and-date pair with two or more different articles.",
+    "2": "Distinct article ids are counted, so repeated views of one article count once.",
+    "4": "One group per viewer per date: the articles must share a date.",
+    "5": "Keep only the groups with more than one distinct article.",
+    "7": "A person with several busy days still appears once, renamed to id.",
+    "9": "The ids come out in ascending order."
+  }
+}

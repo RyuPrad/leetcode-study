@@ -1,0 +1,57 @@
+{
+  "number": 1225,
+  "title": "Report Contiguous Dates",
+  "spec": "recalled",
+  "statement": "A system runs one task per day, and each task either fails or succeeds. Two tables record the outcomes:\n\n- `Failed(fail_date)`: one row per day whose task failed; `fail_date` is unique.\n- `Succeeded(success_date)`: one row per day whose task succeeded; `success_date` is unique.\n\nNo date appears in both tables. A day may be missing from both (nothing was recorded), and dates may fall outside 2019.\n\nLook only at days from `2019-01-01` to `2019-12-31` inclusive and split them into maximal runs of consecutive calendar days with the same outcome; a missing day or a day with the other outcome ends a run. Report one row per run with the columns `period_state` (`'failed'` or `'succeeded'`), `start_date` (the run's first day) and `end_date` (its last day). Order the rows by `start_date`.",
+  "constraints": [
+    "fail_date is unique in Failed",
+    "success_date is unique in Succeeded",
+    "No date appears in both Failed and Succeeded",
+    "Dates may lie outside 2019; only 2019-01-01 to 2019-12-31 is reported"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Failed": [["fail_date","DATE"]],
+    "Succeeded": [["success_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Failed = [], Succeeded = [] }] = input;\n  const seen = new Map();\n  for (const [table, rows] of [['Failed', Failed], ['Succeeded', Succeeded]]) {\n    for (const [d] of rows) {\n      if (d === null) return `Every ${table} row needs a date.`;\n      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d)) return `${d} is not a YYYY-MM-DD date.`;\n      if (seen.get(d) === table) return `${d} appears twice in ${table}.`;\n      if (seen.has(d)) return `${d} is both a failed and a succeeded day.`;\n      seen.set(d, table);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH days AS (\n  SELECT 'failed' AS period_state, fail_date AS task_date\n  FROM Failed\n  WHERE fail_date BETWEEN '2019-01-01' AND '2019-12-31'\n  UNION ALL\n  SELECT 'succeeded', success_date\n  FROM Succeeded\n  WHERE success_date BETWEEN '2019-01-01' AND '2019-12-31'\n),\nnumbered AS (\n  SELECT period_state, task_date,\n         DATEDIFF(task_date, '2019-01-01') AS day_no,\n         ROW_NUMBER() OVER (PARTITION BY period_state ORDER BY task_date) AS rn\n  FROM days\n)\nSELECT period_state, MIN(task_date) AS start_date, MAX(task_date) AS end_date\nFROM numbered\nGROUP BY period_state, day_no - rn\nORDER BY start_date;",
+  "brute": "WITH days AS (\n  SELECT 'failed' AS period_state, fail_date AS task_date FROM Failed\n  WHERE fail_date >= '2019-01-01' AND fail_date <= '2019-12-31'\n  UNION\n  SELECT 'succeeded', success_date FROM Succeeded\n  WHERE success_date >= '2019-01-01' AND success_date <= '2019-12-31'\n),\nstarts AS (\n  SELECT d.period_state, d.task_date\n  FROM days AS d\n  LEFT JOIN days AS prev\n    ON prev.period_state = d.period_state AND prev.task_date = DATE_SUB(d.task_date, INTERVAL 1 DAY)\n  WHERE prev.task_date IS NULL\n),\nends AS (\n  SELECT d.period_state, d.task_date\n  FROM days AS d\n  LEFT JOIN days AS nxt\n    ON nxt.period_state = d.period_state AND nxt.task_date = DATE_ADD(d.task_date, INTERVAL 1 DAY)\n  WHERE nxt.task_date IS NULL\n)\nSELECT s.period_state, s.task_date AS start_date, MIN(e.task_date) AS end_date\nFROM starts AS s\nJOIN ends AS e\n  ON e.period_state = s.period_state AND e.task_date >= s.task_date\nGROUP BY s.period_state, s.task_date\nORDER BY start_date",
+  "generator": "function generate(rand, size) {\n  const iso = (base, k) => new Date(base + k * 86400000).toISOString().slice(0, 10);\n  const Failed = [], Succeeded = [];\n  let base, span, cap;\n  if (size === 'small') {\n    const anchors = [Date.UTC(2018, 11, 27), Date.UTC(2019, 1, 24), Date.UTC(2019, 6, 1), Date.UTC(2019, 11, 25)];\n    base = anchors[Math.floor(rand() * anchors.length)];\n    span = Math.floor(rand() * 12);\n    cap = 8;\n  } else {\n    base = Date.UTC(2018, 10, 1);\n    span = 520;\n    cap = 2000;\n  }\n  // A run-based walk: each day usually keeps the previous outcome, sometimes switches or is left unrecorded.\n  let state = rand() < 0.5 ? 'F' : 'S';\n  for (let k = 0; k < span; k++) {\n    const r = rand();\n    if (r < 0.15) continue;\n    if (r < 0.45) state = state === 'F' ? 'S' : 'F';\n    const day = iso(base, k);\n    if (state === 'F' && Failed.length < cap) Failed.push([day]);\n    else if (state === 'S' && Succeeded.length < cap) Succeeded.push([day]);\n  }\n  return [{ Failed, Succeeded }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Failed":[["2018-12-28"],["2018-12-29"],["2019-01-04"],["2019-01-05"]],"Succeeded":[["2018-12-30"],["2018-12-31"],["2019-01-01"],["2019-01-02"],["2019-01-03"],["2019-01-06"]]}],"expected":{"columns":["period_state","start_date","end_date"],"rows":[["succeeded","2019-01-01","2019-01-03"],["failed","2019-01-04","2019-01-05"],["succeeded","2019-01-06","2019-01-06"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Failed":[],"Succeeded":[]}]},
+    {"name":"Test 2","input":[{"Failed":[["2018-12-31"]],"Succeeded":[["2020-01-01"]]}]},
+    {"name":"Test 3","input":[{"Failed":[["2019-07-04"]],"Succeeded":[]}]},
+    {"name":"Test 4","input":[{"Failed":[["2019-12-30"],["2019-12-31"],["2020-01-01"]],"Succeeded":[["2018-12-30"],["2018-12-31"],["2019-01-01"],["2019-01-02"]]}]},
+    {"name":"Test 5","input":[{"Failed":[],"Succeeded":[["2019-03-01"],["2019-03-03"]]}]},
+    {"name":"Test 6","input":[{"Failed":[["2019-05-01"],["2019-05-03"],["2019-05-05"]],"Succeeded":[["2019-05-02"],["2019-05-04"],["2019-05-06"]]}]},
+    {"name":"Test 7","input":[{"Failed":[["2019-01-31"],["2019-02-01"]],"Succeeded":[["2019-02-27"],["2019-02-28"],["2019-03-01"]]}]},
+    {"name":"Test 8","input":[{"Failed":[["2019-04-04"]],"Succeeded":[["2019-04-06"],["2019-04-02"],["2019-04-05"],["2019-04-01"],["2019-04-03"]]}]},
+    {"name":"Test 9","input":[{"Failed":[["2019-06-01"],["2019-06-02"],["2019-06-04"]],"Succeeded":[["2019-06-03"],["2019-06-05"],["2019-06-07"]]}]},
+    {"name":"Test 10","input":[{"Failed":[["2019-12-25"],["2019-12-26"],["2019-12-27"],["2019-12-28"],["2019-12-29"],["2019-12-30"],["2019-12-31"],["2020-01-01"]],"Succeeded":[["2019-12-24"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a gaps-and-islands problem. Inside one outcome, list the days in date order and number them 1, 2, 3, ... with `ROW_NUMBER()`. While the days are consecutive, the date and the row number both grow by exactly one per row, so **day number minus row number stays constant**. As soon as a day is skipped (missing, or taken by the other outcome) the date jumps further than the row number and the difference changes. That difference is therefore a label for the run, and grouping by it turns each run into one row.\n\n## Approach\n\n1. `days`: stack both tables into one list of `(period_state, task_date)`, keeping only 2019 dates. Filtering first matters: a run that starts in 2018 must be cut at `2019-01-01`.\n2. `numbered`: give each day `day_no` (days since `2019-01-01`) and `rn`, its position among days with the same outcome.\n3. Group by `period_state` and `day_no - rn`; `MIN` and `MAX` of the dates are the run's bounds.\n4. Order by `start_date`.\n\n## Example 1, step by step\n\nAfter filtering, `days` holds failed 01-04 and 01-05, and succeeded 01-01, 01-02, 01-03 and 01-06 (the four 2018 rows are gone).\n\n| period_state | task_date | day_no | rn | day_no - rn |\n| --- | --- | --- | --- | --- |\n| succeeded | 2019-01-01 | 0 | 1 | -1 |\n| succeeded | 2019-01-02 | 1 | 2 | -1 |\n| succeeded | 2019-01-03 | 2 | 3 | -1 |\n| failed | 2019-01-04 | 3 | 1 | 2 |\n| failed | 2019-01-05 | 4 | 2 | 2 |\n| succeeded | 2019-01-06 | 5 | 4 | 1 |\n\nThe groups are (succeeded, -1) from 01-01 to 01-03, (failed, 2) from 01-04 to 01-05 and (succeeded, 1) for 01-06 alone.\n\n## Complexity\n\n- Time: O(n log n) for n rows dated in 2019, dominated by sorting each outcome for `ROW_NUMBER`.\n- Space: O(n) for the numbered rows and the groups.\n\n## Pitfalls\n\n- Filtering after grouping reports a run like 2018-12-30 to 2019-01-03 with a 2018 start; filter the dates first.\n- Numbering all days together and subtracting the per-outcome number ignores missing days, so two runs separated by an unrecorded day merge.\n- Grouping by `day_no - rn` alone, without `period_state`, can merge a failed run and a succeeded run that happen to get the same label.\n- Subtract days, not text: `'2019-03-01'` minus a number is not a date, and month ends must roll over correctly (`DATEDIFF` handles it).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `days` | every 2019 day with its outcome, from both tables |\n| `task_date` | the day of one task |\n| `numbered` | `days` plus `day_no` and the per-outcome position `rn` |\n| `day_no - rn` | constant inside a run of consecutive days, so it labels the run |\n| `start_date`, `end_date` | the first and last day of each run |",
+  "narration": {
+    "1": "The first stage collects every recorded day into one list.",
+    "2": "Failed days are tagged with the text failed and renamed to a shared column task_date.",
+    "4": "Only 2019 dates are kept, so runs that cross the year boundary are cut before they are measured.",
+    "5": "UNION ALL appends the succeeded days; no date is in both tables, so nothing is lost or duplicated.",
+    "10": "The second stage numbers the days so runs can be recognised.",
+    "12": "day_no turns each date into a plain day count, which grows by one per calendar day.",
+    "13": "rn counts the days of the same outcome in date order, growing by one per row.",
+    "18": "Inside a run day_no and rn rise together, so their difference labels the run; each group is one run.",
+    "19": "The runs are listed in calendar order of their first day."
+  }
+}

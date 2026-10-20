@@ -1,0 +1,62 @@
+{
+  "number": 2629,
+  "title": "Function Composition",
+  "spec": "leetcode",
+  "statement": "Write `compose(functions)`. It receives an array of one-argument functions and returns a single function `fn` that chains them together, starting from the **last** one. For `functions = [f, g, h]`, `fn(x)` must equal `f(g(h(x)))`: the rightmost function gets `x`, and every other function gets the output of its right neighbour. When `functions` is empty, `fn` is the identity and returns `x` as it is. Every function takes one integer and returns one integer.\n\nA case is JSON, so each function is written as a short expression `a op b`, where `op` is `+`, `-` or `*` and each of `a` and `b` is either `x` or an integer, for example `\"x + 1\"`, `\"2 * x\"` or `\"x * x\"`. The judge turns each expression into a real function, calls `compose(functions)` once, then answers with `fn(x)`.",
+  "constraints": [
+    "0 <= functions.length <= 1000",
+    "-1000 <= x <= 1000",
+    "Each function is \"a op b\" with op one of +, - and *, and a, b each x or an integer from -1000 to 1000",
+    "Every intermediate result stays within -10^15 and 10^15"
+  ],
+  "signature": "int compose(List<String> functions, int x)",
+  "entry": "compose",
+  "kind": "function",
+  "parameters": [
+    "functions",
+    "x"
+  ],
+  "validator": "function validate(input) {\n  const [functions, x] = input;\n  if (!Array.isArray(functions) || functions.length > 1000) return 'Give a list of at most 1000 functions.';\n  if (!Number.isInteger(x) || x < -1000 || x > 1000) return 'x must be an integer from -1000 to 1000.';\n  const pattern = /^(x|-?\\d+) ([-+*]) (x|-?\\d+)$/;\n  for (const text of functions) {\n    const match = typeof text === 'string' ? text.match(pattern) : null;\n    if (!match) return 'Write each function as \"a op b\", for example \"x + 1\" or \"2 * x\".';\n    for (const token of [match[1], match[3]]) {\n      if (token !== 'x' && Math.abs(Number(token)) > 1000) return 'Constants must be from -1000 to 1000.';\n    }\n  }\n  let value = x;\n  for (let i = functions.length - 1; i >= 0; i--) {\n    const [a, op, b] = functions[i].split(' ');\n    const left = a === 'x' ? value : Number(a), right = b === 'x' ? value : Number(b);\n    value = op === '+' ? left + right : op === '-' ? left - right : left * right;\n    if (Math.abs(value) > 1e15) return 'The values grow too large: keep every intermediate result within 10^15.';\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [functions, x] = input;\n  const term = (token, value) => (token === 'x' ? value : Number(token));\n  const real = functions.map((text, i) => {\n    const [a, op, b] = text.split(' ');\n    return (value) => {\n      const left = term(a, value), right = term(b, value);\n      let result = op === '+' ? left + right : op === '-' ? left - right : left * right;\n      if (result === 0) result = 0; // no -0\n      kit.trace(`functions[${i}] = ${text} turns ${value} into ${result}`);\n      return result;\n    };\n  });\n  const fn = solve(real);\n  if (typeof fn !== 'function') throw new Error('compose must return a function.');\n  kit.trace(`fn(${x}) is called`);\n  const answer = fn(x);\n  kit.trace(`fn(${x}) returns ${answer}`);\n  return answer;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function[]} functions each one maps a number to a number\n * @return {Function}\n */\nfunction compose(functions) {\n  // Write your code here.\n  return function (x) {\n  };\n}\n",
+    "typescript": "type Fn = (x: number) => number;\n\nfunction compose(functions: Fn[]): Fn {\n  // Write your code here.\n  return function (x) {\n  };\n}\n"
+  },
+  "api": "compose(functions: ((x: number) => number)[]): (x: number) => number",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function compose(functions) {\n  return function (x) {\n    let result = x;\n    for (let i = functions.length - 1; i >= 0; i--) {\n      result = functions[i](result);\n    }\n    return result;\n  };\n}",
+  "brute": "function compose(functions) {\n  if (functions.length === 0) return (x) => x;\n  const outer = functions[0];\n  const inner = compose(functions.slice(1));\n  return (x) => outer(inner(x));\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 6) : 1000;\n  const range = small ? 10 : 1000;\n  const x = Math.floor(rand() * (2 * range + 1)) - range;\n  const bound = small ? 1e6 : 1e12;\n  const evaluate = (text, value) => {\n    const [a, op, b] = text.split(' ');\n    const left = a === 'x' ? value : Number(a), right = b === 'x' ? value : Number(b);\n    return op === '+' ? left + right : op === '-' ? left - right : left * right;\n  };\n  // Build the functions in the order they are applied (rightmost first), keeping values bounded.\n  const applied = [];\n  let value = x;\n  for (let i = 0; i < count; i++) {\n    const constant = Math.floor(rand() * (range + 1));\n    const factor = [-2, -1, 2, 3][Math.floor(rand() * 4)];\n    const options = [`x + ${constant}`, `x - ${constant}`, `${constant} - x`, `${factor} * x`, `x * ${factor}`, 'x * x'];\n    let text = options[Math.floor(rand() * options.length)];\n    if (Math.abs(evaluate(text, value)) > bound) text = value > 0 ? `x - ${constant}` : `x + ${constant}`;\n    value = evaluate(text, value);\n    applied.push(text);\n  }\n  return [applied.reverse(), x];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["x + 1","x * x","2 * x"],4],"expected":65},
+    {"name":"Example 2","input":[["10 * x","10 * x","10 * x"],1],"expected":1000},
+    {"name":"Example 3","input":[[],42],"expected":42}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],-1000]},
+    {"name":"Test 2","input":[["x + 1"],1000]},
+    {"name":"Test 3","input":[["x * x"],-7]},
+    {"name":"Test 4","input":[["x + 1","2 * x"],4]},
+    {"name":"Test 5","input":[["2 * x","x + 1"],4]},
+    {"name":"Test 6","input":[["x - 3","x * x","5 - x"],0]},
+    {"name":"Test 7","input":[["x * 0","x + 1000"],1000]},
+    {"name":"Test 8","input":[["-1 * x","x - 1000","x * x"],-1000]},
+    {"name":"Test 9","input":[["x * x","x * x","x * x","x * x"],-3]},
+    {"name":"Test 10","input":[["x - 1","x * 2","x + 3","x * x","0 - x"],5]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\n`fn` is called later, with an `x` that `compose` never sees, so `compose` cannot compute anything itself: it returns a function that **closes over** `functions` and does the work when `x` arrives. In `f(g(h(x)))` the innermost call runs first, so the array is used from its last element to its first, each output feeding the next function. An empty array then needs no special case: the loop never runs and `x` comes back unchanged. (The brute force builds the same thing recursively: compose the tail of the array, then wrap the result in the head.)\n\n## Approach\n\n1. `compose` returns a new function of `x`; the closure keeps `functions` alive.\n2. When that function runs, start `result` at `x`.\n3. Walk `i` from `functions.length - 1` down to `0`, replacing `result` with `functions[i](result)`.\n4. Return `result`. (The same idea in one line: `functions.reduceRight((acc, f) => f(acc), x)`.)\n\n## Example 1, step by step\n\n`functions = [\"x + 1\", \"x * x\", \"2 * x\"]`, `x = 4`:\n\n- `result = 4`.\n- `i = 2`: `2 * x` turns 4 into 8.\n- `i = 1`: `x * x` turns 8 into 64.\n- `i = 0`: `x + 1` turns 64 into 65. The loop ends and `fn(4)` returns 65.\n\n## Complexity\n\n- Time: O(1) for `compose`, then O(n) per call of `fn`: each of the n functions runs once.\n- Space: O(1) extra; the closure only holds a reference to the array.\n\n## Pitfalls\n\n- Walking left to right computes `h(g(f(x)))`: with `[\"x + 1\", \"2 * x\"]` and `x = 4` it gives 10 instead of 9. `reduce` has the same bug; `reduceRight` does not.\n- Starting `result` at `0` (or at `functions[0]`'s output) instead of `x` breaks the empty case and every other one.\n- Computing a value inside `compose` instead of returning a function: the judge calls `compose` first and passes `x` only to the function it gets back.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `functions` | the functions to chain, kept by the closure |\n| `x` | the argument of the composed function |\n| `result` | the value so far, after the functions from the right end down to index `i + 1` |\n| `i` | index of the function applied next, moving from right to left |",
+  "narration": {
+    "1": "compose only stores functions in a closure; the real work waits until x is known.",
+    "2": "The returned function is fn; it will be called later with x.",
+    "3": "Before any function runs, the value is x itself, which is also the answer for an empty list.",
+    "4": "Walk the array from its last function to its first, because the innermost call happens first.",
+    "5": "Feed the current value to functions[i] and keep its output for the next one.",
+    "7": "After the leftmost function has run, result is f(g(...(x)))."
+  }
+}

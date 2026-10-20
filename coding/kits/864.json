@@ -1,0 +1,71 @@
+{
+  "number": 864,
+  "title": "Shortest Path to Get All Keys",
+  "spec": "leetcode",
+  "statement": "`grid` is a rectangular map given as an array of equal-length strings. Each cell is one of:\n\n- `'.'`: open floor;\n- `'#'`: a wall that can never be entered;\n- `'@'`: your starting cell (there is exactly one);\n- a lowercase letter: a key, which you collect the moment you step onto its cell;\n- an uppercase letter: a lock, which you may step onto only while you already hold the key with the same letter in lowercase.\n\nFor some `k` between 1 and 6, the keys are exactly the first `k` letters of the alphabet, each appearing once, and each has exactly one lock of the matching uppercase letter. A move takes you one cell up, down, left or right, never off the grid. Return the smallest number of moves after which you hold all `k` keys (locks do not have to be opened), or `-1` if that can never happen.",
+  "constraints": [
+    "m == grid.length",
+    "n == grid[i].length",
+    "1 <= m, n <= 30",
+    "grid[i][j] is an English letter, '.', '#' or '@'",
+    "grid contains exactly one '@'",
+    "The grid holds between 1 and 6 keys",
+    "Every key appears once and has a matching lock"
+  ],
+  "signature": "int shortestPathAllKeys(String[] grid)",
+  "entry": "shortestPathAllKeys",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 30) return 'grid needs 1 to 30 rows.';\n  const cols = grid[0].length;\n  if (cols < 1 || cols > 30) return 'Each row needs 1 to 30 cells.';\n  let starts = 0;\n  const keys = new Map();\n  const locks = new Map();\n  for (const row of grid) {\n    if (typeof row !== 'string' || row.length !== cols) return 'All rows must have the same length.';\n    for (const ch of row) {\n      if (ch === '@') starts++;\n      else if (ch >= 'a' && ch <= 'z') keys.set(ch, (keys.get(ch) || 0) + 1);\n      else if (ch >= 'A' && ch <= 'Z') locks.set(ch, (locks.get(ch) || 0) + 1);\n      else if (ch !== '.' && ch !== '#') return 'Cells are letters, \".\", \"#\" or \"@\".';\n    }\n  }\n  if (starts !== 1) return 'The grid needs exactly one \"@\".';\n  const k = keys.size;\n  if (k < 1 || k > 6) return 'The grid needs 1 to 6 keys.';\n  if (locks.size !== k) return 'Every key needs exactly one matching lock.';\n  for (let i = 0; i < k; i++) {\n    const key = String.fromCharCode(97 + i);\n    const lock = String.fromCharCode(65 + i);\n    if (keys.get(key) !== 1 || locks.get(lock) !== 1) return 'Keys and locks must be the first k letters, each appearing once.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function shortestPathAllKeys(grid) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  let startRow = 0;\n  let startCol = 0;\n  let keyCount = 0;\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      const cell = grid[r][c];\n      if (cell === '@') {\n        startRow = r;\n        startCol = c;\n      } else if (cell >= 'a' && cell <= 'z') {\n        keyCount++;\n      }\n    }\n  }\n  const allKeys = (1 << keyCount) - 1;\n  const visited = new Uint8Array(rows * cols * 64);\n  visited[(startRow * cols + startCol) * 64] = 1;\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  let queue = [[startRow, startCol, 0]];\n  let steps = 0;\n\n  while (queue.length > 0) {\n    const next = [];\n    for (const [row, col, keys] of queue) {\n      if (keys === allKeys) return steps;\n      for (const [dr, dc] of directions) {\n        const r = row + dr;\n        const c = col + dc;\n        if (r < 0 || r >= rows || c < 0 || c >= cols) continue;\n        const cell = grid[r][c];\n        if (cell === '#') continue;\n        if (cell >= 'A' && cell <= 'Z' && !(keys & (1 << (cell.charCodeAt(0) - 65)))) continue;\n        let newKeys = keys;\n        if (cell >= 'a' && cell <= 'z') newKeys |= 1 << (cell.charCodeAt(0) - 97);\n        const id = (r * cols + c) * 64 + newKeys;\n        if (visited[id]) continue;\n        visited[id] = 1;\n        next.push([r, c, newKeys]);\n      }\n    }\n    queue = next;\n    steps++;\n  }\n  return -1;\n}",
+  "brute": "function shortestPathAllKeys(grid) {\n  // Try every order of first visits; each leg is a plain BFS using only the keys already held.\n  const rows = grid.length, cols = grid[0].length;\n  const where = {};\n  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {\n    const ch = grid[r][c];\n    if (ch === '@' || (ch >= 'a' && ch <= 'z')) where[ch] = [r, c];\n  }\n  const keys = Object.keys(where).filter(ch => ch !== '@');\n  const leg = (from, to, held) => {\n    const dist = Array.from({ length: rows }, () => new Array(cols).fill(-1));\n    dist[from[0]][from[1]] = 0;\n    const q = [from];\n    for (let h = 0; h < q.length; h++) {\n      const [r, c] = q[h];\n      if (r === to[0] && c === to[1]) return dist[r][c];\n      for (const [nr, nc] of [[r + 1, c], [r - 1, c], [r, c + 1], [r, c - 1]]) {\n        if (nr < 0 || nc < 0 || nr >= rows || nc >= cols || dist[nr][nc] !== -1) continue;\n        const ch = grid[nr][nc];\n        if (ch === '#') continue;\n        if (ch >= 'A' && ch <= 'Z' && !held.has(ch.toLowerCase())) continue;\n        dist[nr][nc] = dist[r][c] + 1;\n        q.push([nr, nc]);\n      }\n    }\n    return -1;\n  };\n  let best = -1;\n  const order = [];\n  const used = new Set();\n  const walk = (cur, total) => {\n    if (order.length === keys.length) {\n      if (best === -1 || total < best) best = total;\n      return;\n    }\n    for (const k of keys) {\n      if (used.has(k)) continue;\n      const d = leg(cur, where[k], used);\n      if (d === -1) continue;\n      used.add(k); order.push(k);\n      walk(where[k], total + d);\n      used.delete(k); order.pop();\n    }\n  };\n  walk(where['@'], 0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  for (;;) {\n    const rows = large ? 30 : 1 + Math.floor(rand() * 5);\n    const cols = large ? 30 : 1 + Math.floor(rand() * 5);\n    const cells = rows * cols;\n    if (cells < 3) continue;\n    const k = large ? 6 : 1 + Math.floor(rand() * Math.min(4, Math.floor((cells - 1) / 2)));\n    const wallRate = large ? 0.15 + rand() * 0.15 : rand() * 0.35;\n    const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (rand() < wallRate ? '#' : '.')));\n    const order = Array.from({ length: cells }, (_, i) => i);\n    for (let i = cells - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }\n    const put = (idx, ch) => { grid[Math.floor(order[idx] / cols)][order[idx] % cols] = ch; };\n    put(0, '@');\n    for (let i = 0; i < k; i++) {\n      put(1 + 2 * i, String.fromCharCode(97 + i));\n      put(2 + 2 * i, String.fromCharCode(65 + i));\n    }\n    return [grid.map(row => row.join(''))];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[["@.a..","###.#","b.A.B"]],"expected":8},
+    {"name":"Example 2","input":[["@..aA","..B#.","....b"]],"expected":6},
+    {"name":"Example 3","input":[["@Aa"]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["@aA"]]},
+    {"name":"Test 2","input":[["a@A"]]},
+    {"name":"Test 3","input":[["@#aA"]]},
+    {"name":"Test 4","input":[["a.@.b","#####","A...B"]]},
+    {"name":"Test 5","input":[["@abcdef","ABCDEF."]]},
+    {"name":"Test 6","input":[["@","a","A","b","B","c","C","d","D","e","E","f","F"]]},
+    {"name":"Test 7","input":[["b..@..a","B.....A"]]},
+    {"name":"Test 8","input":[["@...#b","###.#B","a..A#.","####.."]]},
+    {"name":"Test 9","input":[["@.#.c","..#Bb","aA#..","..#C.","....."]]},
+    {"name":"Test 10","input":[["@bB.#a",".####.","......","A#####"]]},
+    {"name":"Test 11","input":[["Cc..@..aA","#########","b......B."]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA plain BFS over cells is not enough: the same cell can be worth revisiting once you carry more keys, because new locks open. So the real state is the cell together with the set of keys held. With at most 6 keys that set fits in a 6-bit mask, giving at most `30 · 30 · 64` states, and BFS over those states finds the fewest moves. A slower check tries every order of collecting the keys and adds up shortest legs between them.\n\n## Approach\n\n1. Scan the grid for `'@'` (`startRow`, `startCol`) and count the keys; `allKeys` is the mask with all `keyCount` bits set.\n2. Mark state `(start, mask 0)` in `visited` and put it in `queue`; `steps` counts BFS levels.\n3. For each state in the current level, if `keys === allKeys` return `steps`.\n4. Otherwise try the four neighbours: skip cells off the grid, walls, and locks whose bit is not in `keys`.\n5. Stepping on a key sets its bit in `newKeys`. Skip the state if already visited, else mark it and add it to `next`.\n6. After each level move to `next` and add one to `steps`. If the queue empties, return `-1`.\n\n## Example 1, step by step\n\n`grid = [\"@.a..\",\"###.#\",\"b.A.B\"]`, `allKeys = 0b11`. From `(0,0)` the BFS reaches key `a` at `(0,2)` after 2 moves (mask `01`). With `a` held it goes right to `(0,3)`, down through `(1,3)` to `(2,3)`, left through lock `A` at `(2,2)` and `(2,1)` to key `b` at `(2,0)`: 6 more moves. The state `((2,0), 0b11)` is popped at level 8, so the answer is `8`. Lock `B` is never opened.\n\n## Complexity\n\n- Time: O(m · n · 2^k): each (cell, mask) state is queued at most once and has 4 neighbours.\n- Space: O(m · n · 2^k) for `visited` and the queue.\n\n## Pitfalls\n\n- Marking only cells as visited (ignoring the mask) blocks the routes that need a key picked up elsewhere.\n- The goal is holding every key, not opening every lock or reaching any particular cell.\n- A lock is a wall until you hold its key, even if the key lies just beyond it.\n- Count keys from the grid; `k` can be less than 6.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `startRow`, `startCol` | the `'@'` cell |\n| `keyCount`, `allKeys` | number of keys, and the mask with all of them |\n| `visited` | seen flags for each (cell, mask) state |\n| `queue`, `next` | the current and the next BFS level |\n| `steps` | moves made to reach the current level |\n| `row`, `col`, `keys` | the state being expanded |\n| `r`, `c`, `cell` | the neighbour being tried |\n| `newKeys` | the key mask after stepping onto `cell` |",
+  "narration": {
+    "7": "Scan every cell once to find the start and count the keys.",
+    "10": "Remember where the '@' is; the search starts there.",
+    "13": "A lowercase letter is a key; count it.",
+    "18": "The goal mask has one bit set for each key in the grid.",
+    "19": "One seen flag per (cell, key mask) pair: the same cell can be worth visiting again with more keys.",
+    "22": "The search starts at '@' holding no keys.",
+    "25": "Process the BFS one level at a time, so steps equals the moves made.",
+    "28": "Holding every key at this level means steps is the fewest moves possible.",
+    "32": "Ignore neighbours that fall off the grid.",
+    "34": "Walls can never be entered.",
+    "35": "A lock acts as a wall unless its key's bit is already in the mask.",
+    "37": "Stepping on a key adds its bit to the mask.",
+    "39": "This cell with this exact key set was reached before at no greater cost; skip it.",
+    "41": "New state: explore it at the next level.",
+    "45": "Every state on the next level is one move further away.",
+    "47": "The reachable states ran out without ever holding every key."
+  }
+}

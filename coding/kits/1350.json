@@ -1,0 +1,50 @@
+{
+  "number": 1350,
+  "title": "Students With Invalid Departments",
+  "spec": "recalled",
+  "statement": "A university keeps two tables:\n\n- `Departments(id, name)`: one row per department that still exists; `id` is unique.\n- `Students(id, name, department_id)`: one row per student; `id` is unique. `department_id` is the department the student enrolled in, and it may name a department that has since been closed and no longer appears in `Departments`.\n\nReport every student whose `department_id` does not match any `id` in `Departments`. Return the columns `id` and `name` of those students. Students in existing departments are not reported. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Departments",
+    "id is unique in Students",
+    "Students.department_id is never null but may be missing from Departments"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Departments": [["id","INT"],["name","VARCHAR(30)"]],
+    "Students": [["id","INT"],["name","VARCHAR(30)"],["department_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Departments = [], Students = [] }] = input;\n  const departments = new Set(), students = new Set();\n  for (const [id] of Departments) {\n    if (id === null) return 'Every department needs an id.';\n    if (departments.has(id)) return `Department id ${id} appears twice.`;\n    departments.add(id);\n  }\n  for (const [id, , department] of Students) {\n    if (id === null) return 'Every student needs an id.';\n    if (students.has(id)) return `Student id ${id} appears twice.`;\n    if (department === null) return `Student ${id} needs a department_id.`;\n    students.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.id, s.name\nFROM Students AS s\nLEFT JOIN Departments AS d\n  ON d.id = s.department_id\nWHERE d.id IS NULL;",
+  "brute": "SELECT id, name\nFROM Students\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Departments\n  WHERE Departments.id = Students.department_id\n)",
+  "generator": "function generate(rand, size) {\n  const names = ['Alice', 'Bob', 'Jennifer', 'John', 'Jasmine', 'Steve', 'Luis', 'Daiana', 'Madelynn', 'Jonathan'];\n  const subjects = ['Electrical Engineering', 'Computer Engineering', 'Business Administration', 'Mathematics', 'Physics', 'History'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const pool = small ? 8 : 800;\n  const Departments = [];\n  for (let id = 1; id <= pool; id++) if (rand() < 0.5) Departments.push([id, pick(subjects)]);\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const ids = [];\n  for (let id = 1; ids.length < count; id++) if (rand() < 0.7) ids.push(id);\n  // Shuffle the student ids so rows do not come in id order.\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  // Department ids reach a little past the pool, so some students point at departments that never existed.\n  const Students = ids.map(id => [id, pick(names), 1 + Math.floor(rand() * (pool + (small ? 3 : 200)))]);\n  return [{ Departments, Students }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Departments":[[1,"Electrical Engineering"],[7,"Computer Engineering"],[13,"Bussiness Administration"]],"Students":[[23,"Alice",1],[1,"Bob",7],[5,"Jennifer",13],[2,"John",14],[4,"Jasmine",77],[3,"Steve",74],[6,"Luis",1],[8,"Jonathan",7],[7,"Daiana",33],[11,"Madelynn",1]]}],"expected":{"columns":["id","name"],"rows":[[2,"John"],[7,"Daiana"],[4,"Jasmine"],[3,"Steve"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Departments":[[1,"Physics"]],"Students":[]}]},
+    {"name":"Test 2","input":[{"Departments":[],"Students":[[1,"Alice",1],[2,"Bob",2]]}]},
+    {"name":"Test 3","input":[{"Departments":[[1,"Physics"],[2,"History"]],"Students":[[1,"Alice",1],[2,"Bob",2],[3,"Luis",1]]}]},
+    {"name":"Test 4","input":[{"Departments":[[1,"Physics"],[2,"History"]],"Students":[[5,"Steve",3]]}]},
+    {"name":"Test 5","input":[{"Departments":[[4,"Physics"]],"Students":[[4,"Alice",1],[1,"Bob",4]]}]},
+    {"name":"Test 6","input":[{"Departments":[[1,"Physics"],[2,"Physics"]],"Students":[[1,"John",3],[2,"John",3],[3,"John",2]]}]},
+    {"name":"Test 7","input":[{"Departments":[[10,"Mathematics"],[20,"History"],[30,"Physics"]],"Students":[[7,"Daiana",11],[8,"Jonathan",20],[9,"Jasmine",31],[10,"Luis",10]]}]},
+    {"name":"Test 8","input":[{"Departments":[[1,"Electrical Engineering"],[7,"Computer Engineering"]],"Students":[[1,"Bob",7],[2,"John",8],[3,"Steve",6],[4,"Alice",0]]}]},
+    {"name":"Test 9","input":[{"Departments":[[3,"History"]],"Students":[[1,"Madelynn",3],[2,"Madelynn",5]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA student is \"invalid\" exactly when the lookup of their `department_id` in `Departments` finds nothing. A **left join** from `Students` to `Departments` performs that lookup for every student and leaves the department columns `null` when it fails, so keeping only the rows where the joined `d.id` is `null` (an *anti-join*) leaves precisely the students to report.\n\n## Approach\n\n1. Start from `Students` (alias `s`), since every reported row is a student.\n2. `LEFT JOIN Departments` (alias `d`) on `d.id = s.department_id`; a student whose department is gone keeps one row with `d.id = null`.\n3. `WHERE d.id IS NULL` keeps only those unmatched students.\n4. Select `s.id` and `s.name`.\n\n## Example 1, step by step\n\n- `Departments` holds the ids 1, 7 and 13.\n- Alice, Luis and Madelynn (department 1), Bob and Jonathan (7) and Jennifer (13) each find their department, so `d.id` is filled and they are dropped.\n- John (14), Jasmine (77), Steve (74) and Daiana (33) find nothing; their `d.id` is `null`.\n- The filter keeps those four: `(2, John)`, `(4, Jasmine)`, `(3, Steve)`, `(7, Daiana)`.\n\n## Complexity\n\n- Time: O(S + D) for S students and D departments with a hash or index on `Departments.id` (its primary key); O(S · D) without one.\n- Space: O(S) for the result.\n\n## Pitfalls\n\n- An inner `JOIN` keeps only the students whose department exists, the exact opposite of what is asked.\n- Testing a column that can be `null` on its own, such as `d.name`, would be wrong if names could be missing; test the join key `d.id`, which is `null` only when no row matched.\n- `department_id NOT IN (SELECT id FROM Departments)` works here, but `NOT IN` returns nothing at all if the subquery ever yields a `null`; `NOT EXISTS` or the left join avoid that trap.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Students`, the table every output row comes from |\n| `d` | `Departments`, joined when `d.id = s.department_id` |\n| `WHERE d.id IS NULL` | keeps the students whose department was not found |",
+  "narration": {
+    "1": "Report the id and name of each student who survives the filter.",
+    "2": "Students is the left table, so every student is looked up once.",
+    "3": "A left join keeps students even when no department matches, filling the Departments columns with null.",
+    "4": "A student matches the department whose id equals their department_id.",
+    "5": "Only students whose lookup failed have a null department id, and those are the invalid ones."
+  }
+}

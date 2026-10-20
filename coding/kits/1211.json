@@ -1,0 +1,51 @@
+{
+  "number": 1211,
+  "title": "Queries Quality and Percentage",
+  "spec": "leetcode",
+  "statement": "One table records the results returned for search queries:\n\n- `Queries(query_name, result, position, rating)`: one row per returned result of the query `query_name`, shown at `position` (1 to 500) and rated `rating` (1 to 5). The table has no key and may contain identical rows; each row counts separately. A row with `rating < 3` is a **poor** result.\n\nFor every distinct `query_name`, report:\n\n- `query_name`;\n- `quality`: the average, over that query's rows, of `rating / position` (exact division, not integer division), rounded to 2 decimal places;\n- `poor_query_percentage`: 100 × (number of the query's rows with `rating < 3`) / (number of its rows), rounded to 2 decimal places.\n\nRows may come in any order.",
+  "constraints": [
+    "Queries has no primary key and may contain duplicate rows",
+    "1 <= position <= 500",
+    "1 <= rating <= 5",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Queries": [["query_name","VARCHAR(30)"],["result","VARCHAR(50)"],["position","INT"],["rating","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Queries = [] }] = input;\n  for (const row of Queries) {\n    if (row.some((v) => v === null)) return 'Queries rows may not contain null.';\n    const [, , position, rating] = row;\n    if (position < 1 || position > 500) return `position must be between 1 and 500, not ${position}.`;\n    if (rating < 1 || rating > 5) return `rating must be between 1 and 5, not ${rating}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT query_name,\n       ROUND(AVG(rating / position), 2) AS quality,\n       ROUND(100 * SUM(IF(rating < 3, 1, 0)) / COUNT(*), 2) AS poor_query_percentage\nFROM Queries\nGROUP BY query_name;",
+  "brute": "SELECT names.query_name,\n       ROUND(\n         (SELECT SUM(q.rating / q.position) FROM Queries AS q WHERE q.query_name = names.query_name)\n         / (SELECT COUNT(*) FROM Queries AS q WHERE q.query_name = names.query_name),\n         2\n       ) AS quality,\n       ROUND(\n         100 * (SELECT COUNT(*) FROM Queries AS q WHERE q.query_name = names.query_name AND q.rating < 3)\n         / (SELECT COUNT(*) FROM Queries AS q WHERE q.query_name = names.query_name),\n         2\n       ) AS poor_query_percentage\nFROM (SELECT DISTINCT query_name FROM Queries) AS names",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const results = ['Golden Retriever', 'German Shepherd', 'Mule', 'Shirazi', 'Siamese', 'Sphynx', 'Poodle'];\n  const Queries = [];\n  if (size === 'small') {\n    // Power-of-two positions keep every rating / position exact, so rounding never depends on summation order.\n    const rows = Math.floor(rand() * 9);\n    for (let i = 0; i < rows; i++) {\n      Queries.push([pick(['Dog', 'Cat', 'Bird']), pick(results), pick([1, 2, 4, 8, 16, 32, 128, 256]), 1 + Math.floor(rand() * 5)]);\n    }\n  } else {\n    // Group sizes of 150..400 never put the percentage exactly on a rounding half.\n    const sizes = [150, 200, 250, 300, 400];\n    for (let name = 1, total = 0; ; name++) {\n      const count = pick(sizes);\n      if (total + count > 2000) break;\n      total += count;\n      for (let i = 0; i < count; i++) Queries.push([`Q${name}`, pick(results), 1 + Math.floor(rand() * 500), 1 + Math.floor(rand() * 5)]);\n    }\n    for (let i = Queries.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [Queries[i], Queries[j]] = [Queries[j], Queries[i]];\n    }\n  }\n  return [{ Queries }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Queries":[["Dog","Golden Retriever",1,5],["Dog","German Shepherd",2,5],["Dog","Mule",200,1],["Cat","Shirazi",5,2],["Cat","Siamese",3,3],["Cat","Sphynx",7,4]]}],"expected":{"columns":["query_name","quality","poor_query_percentage"],"rows":[["Dog",2.5,33.33],["Cat",0.66,33.33]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Queries":[]}]},
+    {"name":"Test 2","input":[{"Queries":[["Dog","Poodle",1,3]]}]},
+    {"name":"Test 3","input":[{"Queries":[["Cat","Sphynx",4,2]]}]},
+    {"name":"Test 4","input":[{"Queries":[["Dog","Mule",3,1],["Dog","Poodle",3,3],["Dog","Mule",6,4]]}]},
+    {"name":"Test 5","input":[{"Queries":[["Bird","Parrot",2,1],["Bird","Parrot",2,1],["Bird","Crow",1,5]]}]},
+    {"name":"Test 6","input":[{"Queries":[["Dog","Mule",500,1],["Cat","Siamese",1,5],["Cat","Shirazi",2,5]]}]},
+    {"name":"Test 7","input":[{"Queries":[["Fish","Tuna",7,2],["Fish","Cod",9,2],["Fish","Eel",11,1],["Fish","Carp",5,3]]}]},
+    {"name":"Test 8","input":[{"Queries":[["Dog","Golden Retriever",1,5],["Dog","German Shepherd",2,4],["Cat","Shirazi",3,2],["Cat","Siamese",6,1],["Bird","Crow",9,3]]}]},
+    {"name":"Test 9","input":[{"Queries":[["Dog","Mule",3,2],["Dog","Mule",3,2],["Dog","Poodle",1,4]]}]},
+    {"name":"Test 10","input":[{"Queries":[["big cat","Lion",10,5],["big cat","Tiger",20,4],["big cat","Puma",40,2],["big cat","Lynx",80,1],["Cat","Lion",1,1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row summarizes one `query_name`, so the whole problem is one `GROUP BY` with two aggregates. Quality is a plain average of a per-row expression, `rating / position`. The poor percentage is a **conditional count** divided by the group size: `IF(rating < 3, 1, 0)` marks poor rows, `SUM` counts them, and `COUNT(*)` counts all rows.\n\n## Approach\n\n1. Group `Queries` by `query_name`.\n2. `quality`: `AVG(rating / position)`, rounded to 2 decimals.\n3. `poor_query_percentage`: `100 * SUM(IF(rating < 3, 1, 0)) / COUNT(*)`, rounded to 2 decimals.\n\n## Example 1, step by step\n\n- Dog: the ratios are 5/1 = 5, 5/2 = 2.5 and 1/200 = 0.005; their average is 7.505 / 3 ≈ 2.5017, which rounds to `2.50`. One of three rows (Mule, rating 1) is poor: 100 × 1 / 3 ≈ `33.33`.\n- Cat: the ratios are 2/5 = 0.4, 3/3 = 1 and 4/7 ≈ 0.5714; their average is ≈ 0.6571, which rounds to `0.66`. Only Shirazi (rating 2) is poor: `33.33`.\n\n## Complexity\n\n- Time: O(Q) with hash grouping for Q rows (O(Q log Q) with a sort-based plan).\n- Space: O(N) for the N distinct query names.\n\n## Pitfalls\n\n- Averaging the ratings and the positions separately (`AVG(rating) / AVG(position)`) is not the average of the ratios.\n- Poor means `rating < 3`; `<= 3` also counts rating 3.\n- Integer division (`rating DIV position`, or `/` in databases that truncate integers) turns 1/3 into 0.\n- `COUNT(DISTINCT ...)` or `SELECT DISTINCT` on the input drops duplicate rows, but every row counts.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY query_name` | one group, and one output row, per query name |\n| `quality` | average of `rating / position` over the group, rounded |\n| `IF(rating < 3, 1, 0)` | 1 for a poor row, 0 otherwise |\n| `poor_query_percentage` | poor rows as a percentage of all the group's rows, rounded |",
+  "narration": {
+    "1": "Every output row belongs to one query name.",
+    "2": "Average the per-row ratio rating / position and round it to 2 decimals.",
+    "3": "Count poor rows with a conditional sum, divide by the group size, and scale to a percentage.",
+    "4": "Read all the result rows; duplicates count individually.",
+    "5": "Group by query name so each name produces one row."
+  }
+}

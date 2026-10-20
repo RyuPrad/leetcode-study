@@ -1,0 +1,65 @@
+{
+  "number": 936,
+  "title": "Stamping The Sequence",
+  "spec": "leetcode",
+  "statement": "You have a stamp with the letters `stamp` and a strip `s` that starts as `target.length` copies of `'?'`. One turn chooses a start index `p` with `0 <= p <= target.length - stamp.length` (the stamp must lie entirely on the strip) and overwrites `s[p..p + stamp.length - 1]` with the letters of `stamp`, whatever was there before.\n\nFind a sequence of at most `10 * target.length` turns after which `s` equals `target`, and return the start indices of those turns in the order they are made. If no such sequence exists, return an empty array. When several sequences work, any one of them is accepted.",
+  "constraints": [
+    "1 <= stamp.length <= target.length <= 1000",
+    "stamp and target contain only lowercase English letters"
+  ],
+  "signature": "int[] movesToStamp(String stamp, String target)",
+  "entry": "movesToStamp",
+  "kind": "function",
+  "parameters": [
+    "stamp",
+    "target"
+  ],
+  "compare": "checker",
+  "checker": "function check([stamp, target], actual, expected) {\n  if (!Array.isArray(actual)) return false;\n  // An empty answer claims that target cannot be made, which is right only when the reference agrees.\n  if (actual.length === 0) return Array.isArray(expected) && expected.length === 0;\n  const n = target.length, m = stamp.length;\n  if (actual.length > 10 * n) return false;\n  if (actual.some(p => !Number.isInteger(p) || p < 0 || p > n - m)) return false;\n  // Replay the turns backwards: each position keeps the letter of the last turn that covers it.\n  // next[j] skips to the first position at or after j that no later turn has fixed yet.\n  const next = Array.from({ length: n + 1 }, (_, j) => j);\n  const find = j => {\n    while (next[j] !== j) { next[j] = next[next[j]]; j = next[j]; }\n    return j;\n  };\n  let fixed = 0;\n  for (let t = actual.length - 1; t >= 0; t--) {\n    const p = actual[t];\n    for (let j = find(p); j < p + m; j = find(j)) {\n      if (stamp[j - p] !== target[j]) return false;\n      next[j] = j + 1;\n      fixed++;\n    }\n  }\n  return fixed === n;\n}",
+  "validator": "function validate([stamp, target]) {\n  if (typeof stamp !== 'string' || typeof target !== 'string') return 'stamp and target must be strings.';\n  if (stamp.length < 1 || target.length > 1000) return 'Lengths must satisfy 1 <= stamp.length <= target.length <= 1000.';\n  if (stamp.length > target.length) return 'stamp cannot be longer than target.';\n  if (!/^[a-z]+$/.test(stamp) || !/^[a-z]+$/.test(target)) return 'Use only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function movesToStamp(stamp, target) {\n  const m = stamp.length;\n  const n = target.length;\n  const windows = n - m + 1;\n  const missing = new Array(windows).fill(0);\n  const queue = [];\n  for (let i = 0; i < windows; i++) {\n    for (let k = 0; k < m; k++) {\n      if (target[i + k] !== stamp[k]) {\n        missing[i]++;\n      }\n    }\n    if (missing[i] === 0) {\n      queue.push(i);\n    }\n  }\n\n  const done = new Array(n).fill(false);\n  let covered = 0;\n  for (let head = 0; head < queue.length; head++) {\n    const start = queue[head];\n    for (let j = start; j < start + m; j++) {\n      if (done[j]) {\n        continue;\n      }\n      done[j] = true;\n      covered++;\n      const first = Math.max(0, j - m + 1);\n      const last = Math.min(windows - 1, j);\n      for (let w = first; w <= last; w++) {\n        if (target[j] !== stamp[j - w]) {\n          missing[w]--;\n          if (missing[w] === 0) {\n            queue.push(w);\n          }\n        }\n      }\n    }\n  }\n  return covered === n ? queue.reverse() : [];\n}",
+  "brute": "function movesToStamp(stamp, target) {\n  // Undo stamps on a copy of target until no window can be undone, rescanning from the left each pass.\n  const chars = target.split('');\n  const m = stamp.length;\n  const undone = [];\n  let changed = true;\n  while (changed) {\n    changed = false;\n    for (let i = 0; i + m <= chars.length; i++) {\n      let fits = true, useful = false;\n      for (let k = 0; k < m && fits; k++) {\n        if (chars[i + k] === '?') continue;\n        if (chars[i + k] !== stamp[k]) fits = false;\n        else useful = true;\n      }\n      if (fits && useful) {\n        for (let k = 0; k < m; k++) chars[i + k] = '?';\n        undone.push(i);\n        changed = true;\n      }\n    }\n  }\n  return chars.every(c => c === '?') ? undone.reverse() : [];\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const alphabet = rand() < 0.5 ? 'ab' : 'abc';\n  const letter = () => alphabet[Math.floor(rand() * alphabet.length)];\n  let m, n;\n  if (large) {\n    const shape = rand();\n    m = shape < 0.3 ? 1 + Math.floor(rand() * 5) : shape < 0.7 ? 10 + Math.floor(rand() * 40) : 150 + Math.floor(rand() * 250);\n    n = 1000;\n  } else {\n    m = 1 + Math.floor(rand() * 3);\n    n = m + Math.floor(rand() * (9 - m));\n  }\n  const stamp = Array.from({ length: m }, letter).join('');\n  if (!large && rand() < 0.35) return [stamp, Array.from({ length: n }, letter).join('')];\n  // Build a reachable target by really stamping, then stamping over every position still left as '?'.\n  const chars = new Array(n).fill('?');\n  const press = p => { for (let k = 0; k < m; k++) chars[p + k] = stamp[k]; };\n  const turns = large ? 5 + Math.floor(rand() * 60) : Math.floor(rand() * 4);\n  for (let t = 0; t < turns; t++) press(Math.floor(rand() * (n - m + 1)));\n  for (let j = 0; j < n; j++) if (chars[j] === '?') press(Math.min(j, n - m));\n  // Sometimes change one letter, which usually makes the target unreachable.\n  if (rand() < (large ? 0.25 : 0.3)) chars[Math.floor(rand() * n)] = letter();\n  return [stamp, chars.join('')];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abc","ababc"],"expected":[0,2]},
+    {"name":"Example 2","input":["abca","aabcaca"],"expected":[3,0,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a","a"]},
+    {"name":"Test 2","input":["a","aaaa"]},
+    {"name":"Test 3","input":["ab","ba"]},
+    {"name":"Test 4","input":["abc","abc"]},
+    {"name":"Test 5","input":["abc","acb"]},
+    {"name":"Test 6","input":["aye","eyeye"]},
+    {"name":"Test 7","input":["abab","abababab"]},
+    {"name":"Test 8","input":["zz","zzzzzzz"]},
+    {"name":"Test 9","input":["abc","abcabcabc"]},
+    {"name":"Test 10","input":["abc","ababcbc"]},
+    {"name":"Test 11","input":["abcd","aabcdbcdcd"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThinking forwards is hard because later turns overwrite earlier ones. Think **backwards** instead: the last turn left a window that reads exactly `stamp` in `target`. Undo it by turning those letters into wildcards. Now any window whose letters all match `stamp` or are wildcards could have been the turn before. Keep undoing such windows; undoing one never blocks another, because a wildcard matches anything. If every position becomes a wildcard, the undone windows in reverse order are a valid answer; otherwise there is none.\n\nRescanning every window after each undo works but is slow. Instead, count for each window how many of its letters still disagree with `stamp`, and lower that count as positions become wildcards.\n\n## Approach\n\n1. For each window `i`, set `missing[i]` to the number of positions where `target` differs from `stamp`. Windows with `missing[i] === 0` go into `queue`.\n2. Take windows from `queue` in order. Each one turns its positions into wildcards; mark each new one in `done` and count it in `covered`.\n3. For a newly freed position `j`, visit every window `w` that covers it. If `target[j]` disagreed with `stamp[j - w]`, lower `missing[w]`; when it reaches 0, push `w`.\n4. If `covered === n`, return `queue` reversed; otherwise return `[]`.\n\n## Example 1, step by step\n\n`stamp = \"abc\"`, `target = \"ababc\"`. The counts are `missing = [1, 3, 0]`, so `queue = [2]`. Undoing window 2 frees positions 2, 3, 4. Freeing position 2 drops window 0 to 0 (push it) and window 1 to 2; position 3 drops window 1 to 1. Undoing window 0 frees positions 0 and 1, and position 1 drops window 1 to 0 (push it). All 5 positions are covered, so the answer is `[2, 0, 1]` reversed: `[1, 0, 2]`.\n\n## Complexity\n\n- Time: O(n·m): the counts take O(n·m), and each position is freed once and touches at most `m` windows.\n- Space: O(n) for `missing`, `done` and `queue`.\n\n## Pitfalls\n\n- Return the windows in **reverse** order of undoing; the first window undone is the last turn.\n- Lower `missing[w]` only for positions that really disagreed, or a window is pushed twice.\n- Each window is used at most once, so the answer has at most `n - m + 1` turns, well within `10 * n`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `m`, `n` | lengths of `stamp` and `target` |\n| `windows` | number of legal start positions, `n - m + 1` |\n| `missing[i]` | letters of window `i` that disagree with `stamp` and are not yet wildcards |\n| `queue` | windows ready to undo, in the order they were found |\n| `done[j]`, `covered` | whether position `j` is a wildcard, and how many are |\n| `start`, `j`, `w` | the window being undone, a position in it, a window covering `j` |",
+  "narration": {
+    "4": "There are n - m + 1 legal start positions for the stamp.",
+    "7": "Look at every window of target once.",
+    "9": "Count the letters of this window that disagree with the stamp.",
+    "13": "A window that already reads exactly like the stamp could be the last turn.",
+    "14": "Queue it to be undone first.",
+    "20": "Process windows in the order they became ready; the queue grows as we go.",
+    "22": "Undoing this window turns each of its positions into a wildcard.",
+    "23": "A position that is already a wildcard changes nothing.",
+    "26": "Mark the position as a wildcard...",
+    "27": "...and count it.",
+    "30": "Visit every window that covers position j.",
+    "31": "Did this letter disagree with the stamp in window w?",
+    "32": "It no longer counts against w, since a wildcard matches anything.",
+    "33": "Once nothing disagrees, window w can be undone too.",
+    "40": "If every position became a wildcard, the reversed undo order is the stamping order; otherwise target is unreachable."
+  }
+}

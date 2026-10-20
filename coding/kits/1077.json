@@ -1,0 +1,52 @@
+{
+  "number": 1077,
+  "title": "Project Employees III",
+  "spec": "recalled",
+  "statement": "Two tables track who works on which project:\n\n- `Project(project_id, employee_id)`: a row means that employee works on that project. The pair `(project_id, employee_id)` is unique, and every `employee_id` exists in `Employee`.\n- `Employee(employee_id, name, experience_years)`: one row per employee; `employee_id` is unique and `experience_years` is never null.\n\nFor each project, find its most experienced employees: those whose `experience_years` equals the largest `experience_years` among that project's members. When several members share that largest value, report all of them. Return the columns `project_id` and `employee_id`, one row per (project, top employee) pair, in any order.",
+  "constraints": [
+    "(project_id, employee_id) is unique in Project",
+    "employee_id is unique in Employee",
+    "Every Project.employee_id appears in Employee",
+    "experience_years is a non-negative integer, never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Project": [["project_id","INT"],["employee_id","INT"]],
+    "Employee": [["employee_id","INT"],["name","VARCHAR(10)"],["experience_years","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Project = [], Employee = [] }] = input;\n  const employees = new Set(), pairs = new Set();\n  for (const [id, , years] of Employee) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (employees.has(id)) return `employee_id ${id} appears twice in Employee.`;\n    if (years === null || years < 0) return `Employee ${id} needs a non-negative experience_years.`;\n    employees.add(id);\n  }\n  for (const [project, employee] of Project) {\n    if (project === null || employee === null) return 'Project rows need both ids.';\n    const key = `${project}:${employee}`;\n    if (pairs.has(key)) return `(${project}, ${employee}) appears twice in Project.`;\n    if (!employees.has(employee)) return `Project ${project} names unknown employee ${employee}.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT p.project_id, p.employee_id,\n    RANK() OVER (PARTITION BY p.project_id ORDER BY e.experience_years DESC) AS experience_rank\n  FROM Project AS p\n  JOIN Employee AS e\n    ON e.employee_id = p.employee_id\n)\nSELECT project_id, employee_id\nFROM ranked\nWHERE experience_rank = 1;",
+  "brute": "SELECT p.project_id, p.employee_id\nFROM Project AS p, Employee AS e\nWHERE e.employee_id = p.employee_id\n  AND NOT EXISTS (\n    SELECT 1\n    FROM Project AS q, Employee AS f\n    WHERE q.project_id = p.project_id\n      AND f.employee_id = q.employee_id\n      AND f.experience_years > e.experience_years\n  )",
+  "generator": "function generate(rand, size) {\n  const names = ['Khaled', 'Ali', 'John', 'Doe', 'Ana', 'Lee', 'Kim', 'Ravi'];\n  const small = size === 'small';\n  const employeeCount = small ? Math.floor(rand() * 9) : 1000;\n  const Employee = [], Project = [];\n  // Few distinct experience values, so ties for the top are common.\n  for (let id = 1; id <= employeeCount; id++) {\n    Employee.push([id, names[Math.floor(rand() * names.length)], small ? Math.floor(rand() * 4) : Math.floor(rand() * 31)]);\n  }\n  if (employeeCount === 0) return [{ Project, Employee }];\n  const projectCount = small ? 1 + Math.floor(rand() * 3) : 300;\n  const target = small ? Math.floor(rand() * 9) : 2000;\n  const seen = new Set();\n  for (let tries = 0; Project.length < target && tries < target * 4; tries++) {\n    const project = 1 + Math.floor(rand() * projectCount), employee = 1 + Math.floor(rand() * employeeCount);\n    if (seen.has(`${project}:${employee}`)) continue;\n    seen.add(`${project}:${employee}`);\n    Project.push([project, employee]);\n  }\n  return [{ Project, Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Project":[[1,1],[1,2],[1,3],[2,1],[2,4]],"Employee":[[1,"Khaled",3],[2,"Ali",2],[3,"John",3],[4,"Doe",2]]}],"expected":{"columns":["project_id","employee_id"],"rows":[[1,1],[1,3],[2,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Project":[],"Employee":[[1,"Ana",5]]}]},
+    {"name":"Test 2","input":[{"Project":[[4,2]],"Employee":[[1,"Ana",9],[2,"Lee",1]]}]},
+    {"name":"Test 3","input":[{"Project":[[1,1],[1,2],[1,3]],"Employee":[[1,"Ana",4],[2,"Lee",4],[3,"Kim",4]]}]},
+    {"name":"Test 4","input":[{"Project":[[1,1],[1,2],[2,3],[2,4]],"Employee":[[1,"Ana",3],[2,"Lee",5],[3,"Kim",3],[4,"Ravi",1]]}]},
+    {"name":"Test 5","input":[{"Project":[[1,1],[1,2],[2,2],[2,3]],"Employee":[[1,"Khaled",7],[2,"Ali",4],[3,"John",2],[4,"Doe",20]]}]},
+    {"name":"Test 6","input":[{"Project":[[5,1],[5,2],[6,1],[6,2],[6,3]],"Employee":[[1,"Ana",0],[2,"Lee",0],[3,"Kim",1]]}]},
+    {"name":"Test 7","input":[{"Project":[[1,1],[1,2],[1,3],[1,4]],"Employee":[[1,"Ana",2],[2,"Lee",6],[3,"Kim",6],[4,"Ravi",5]]}]},
+    {"name":"Test 8","input":[{"Project":[[10,1],[20,1],[30,1]],"Employee":[[1,"Doe",12]]}]},
+    {"name":"Test 9","input":[{"Project":[[1,1],[1,2],[1,3],[2,1],[2,4],[3,4],[3,5]],"Employee":[[1,"Khaled",3],[2,"Ali",2],[3,"John",3],[4,"Doe",2],[5,"Ana",2]]}]},
+    {"name":"Test 10","input":[{"Project":[[2,3],[2,1],[7,2],[7,4],[7,5]],"Employee":[[1,"Ana",10],[2,"Lee",8],[3,"Kim",9],[4,"Ravi",10],[5,"John",3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The largest value within each group, keeping ties\" is what `RANK()` with a partition answers. Partition the memberships by project, order each partition by experience from most to least, and every member that shares the top value gets rank 1. Keeping the rows ranked 1 gives every top employee of every project, tied ones included.\n\n## Approach\n\n1. In `ranked`, join `Project` (alias `p`) to `Employee` (alias `e`) on `employee_id` so each membership carries `experience_years`.\n2. In the same CTE, compute `RANK() OVER (PARTITION BY p.project_id ORDER BY e.experience_years DESC)` as `experience_rank`.\n3. From `ranked`, keep the rows with `experience_rank = 1` and select `project_id` and `employee_id`.\n\n## Example 1, step by step\n\n`ranked` holds:\n\n- Project 1: Khaled (3) rank 1, John (3) rank 1, Ali (2) rank 3.\n- Project 2: Khaled (3) rank 1, Doe (2) rank 2.\n\nKeeping rank 1 gives (1, 1), (1, 3) and (2, 1). Khaled and John tie on project 1, so both are reported.\n\n## Complexity\n\n- Time: O(P + E) for the join of P memberships with E employees, plus O(P log P) to sort each partition for the window.\n- Space: O(P) for `ranked`.\n\n## Pitfalls\n\n- `ROW_NUMBER()` gives tied employees different numbers and keeps only one of them.\n- `WHERE experience_years IN (SELECT MAX(...) ... GROUP BY project_id)` compares against every project's maximum, so an employee can match another project's top value; match on `(project_id, max)` pairs instead.\n- Taking one maximum over the whole table finds the company's most experienced people, not each project's.\n- Employees on no project must not appear, which the inner join guarantees.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every membership with its experience rank inside its project |\n| `p` | `Project`, one row per membership |\n| `e` | `Employee`, the member's `experience_years` |\n| `experience_rank` | 1 for every member sharing the project's top experience |",
+  "narration": {
+    "1": "The ranked stage gives every project membership its experience rank within the project.",
+    "3": "RANK restarts for each project and orders members from most to least experienced; ties share rank 1.",
+    "5": "Join Employee so that each membership carries experience_years.",
+    "6": "Memberships are matched to employees by employee_id.",
+    "10": "Keep only the rank-1 rows: every member tied for the project's highest experience."
+  }
+}

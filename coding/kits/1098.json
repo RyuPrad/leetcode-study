@@ -1,0 +1,55 @@
+{
+  "number": 1098,
+  "title": "Unpopular Books",
+  "spec": "recalled",
+  "statement": "A bookshop keeps its catalogue and its orders in two tables. Take **today** to be `2019-06-23`.\n\n- `Books(book_id, name, available_from)`: one row per book; `book_id` is unique. `available_from` is the day the book went on sale.\n- `Orders(order_id, book_id, quantity, dispatch_date)`: one row per order of `quantity` copies of one book; `order_id` is unique, every `book_id` exists in `Books`, and no order is dispatched after today.\n\nA book is **unpopular** when fewer than 10 copies of it were dispatched in the last year, that is, by orders with `dispatch_date` from `2018-06-23` to `2019-06-23` inclusive. A book with no such orders sold 0 copies and counts as unpopular. Ignore books that are too new to judge: only books with `available_from` earlier than `2019-05-23` (one month before today) are considered.\n\nReport the unpopular books with the columns `book_id` and `name`, in any order.",
+  "constraints": [
+    "book_id is unique in Books",
+    "order_id is unique in Orders",
+    "Every Orders.book_id exists in Books",
+    "quantity >= 1",
+    "No dispatch_date is later than 2019-06-23"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Books": [["book_id","INT"],["name","VARCHAR(50)"],["available_from","DATE"]],
+    "Orders": [["order_id","INT"],["book_id","INT"],["quantity","INT"],["dispatch_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Books = [], Orders = [] }] = input;\n  const books = new Set(), orders = new Set();\n  for (const [id, , from] of Books) {\n    if (id === null) return 'Every book needs a book_id.';\n    if (books.has(id)) return `book_id ${id} appears twice in Books.`;\n    if (from === null) return 'Every book needs an available_from date.';\n    books.add(id);\n  }\n  for (const [id, bookId, quantity, date] of Orders) {\n    if (id === null) return 'Every order needs an order_id.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (!books.has(bookId)) return `Order ${id} names book_id ${bookId}, which is not in Books.`;\n    if (quantity === null || quantity < 1) return `Order ${id} needs a quantity of at least 1.`;\n    if (date === null || date > '2019-06-23') return `Order ${id} must be dispatched on or before 2019-06-23.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT b.book_id, b.name\nFROM Books AS b\nLEFT JOIN Orders AS o\n  ON o.book_id = b.book_id\n  AND o.dispatch_date BETWEEN '2018-06-23' AND '2019-06-23'\nWHERE b.available_from < '2019-05-23'\nGROUP BY b.book_id, b.name\nHAVING IFNULL(SUM(o.quantity), 0) < 10;",
+  "brute": "SELECT b.book_id, b.name\nFROM Books AS b\nWHERE b.available_from < '2019-05-23'\n  AND (\n    SELECT COALESCE(SUM(o.quantity), 0)\n    FROM Orders AS o\n    WHERE o.book_id = b.book_id\n      AND o.dispatch_date >= '2018-06-23'\n      AND o.dispatch_date <= '2019-06-23'\n  ) < 10",
+  "generator": "function generate(rand, size) {\n  const titles = ['Kalila And Demna', '28 Letters', 'The Hobbit', '13 Reasons Why', 'The Hunger Games', 'Dune', 'Emma', 'Dune'];\n  const releases = ['2008-09-21', '2010-01-01', '2015-03-01', '2018-07-01', '2019-05-22', '2019-05-23', '2019-06-01', '2019-06-10'];\n  const dispatches = ['2017-12-01', '2018-06-22', '2018-06-23', '2018-07-26', '2018-11-05', '2019-02-14', '2019-06-05', '2019-06-23'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const bookCount = small ? Math.floor(rand() * 7) : 1000;\n  const orderCount = bookCount === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  const Books = [], Orders = [];\n  for (let id = 1; id <= bookCount; id++) Books.push([id, pick(titles), pick(releases)]);\n  // Quantities cluster around the threshold of 10 so books land on both sides of it, and exactly on it.\n  const quantities = small ? [1, 2, 3, 4, 5, 6, 9, 10] : [1, 2, 3, 4, 5, 6];\n  for (let id = 1; id <= orderCount; id++) {\n    const bookId = small && id > 1 && rand() < 0.3 ? Orders[id - 2][1] : 1 + Math.floor(rand() * bookCount);\n    Orders.push([id, bookId, pick(quantities), pick(dispatches)]);\n  }\n  return [{ Books, Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Books":[[1,"Kalila And Demna","2010-01-01"],[2,"28 Letters","2012-05-12"],[3,"The Hobbit","2019-06-10"],[4,"13 Reasons Why","2019-06-01"],[5,"The Hunger Games","2008-09-21"]],"Orders":[[1,1,2,"2018-07-26"],[2,1,1,"2018-11-05"],[3,3,8,"2019-06-11"],[4,4,6,"2019-06-05"],[5,4,5,"2019-06-20"],[6,5,9,"2009-02-02"],[7,5,8,"2010-04-13"]]}],"expected":{"columns":["book_id","name"],"rows":[[1,"Kalila And Demna"],[2,"28 Letters"],[5,"The Hunger Games"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Books":[],"Orders":[]}]},
+    {"name":"Test 2","input":[{"Books":[[1,"Dune","2015-03-01"]],"Orders":[]}]},
+    {"name":"Test 3","input":[{"Books":[[1,"Dune","2019-05-22"],[2,"Emma","2019-05-23"]],"Orders":[]}]},
+    {"name":"Test 4","input":[{"Books":[[1,"Dune","2015-03-01"],[2,"Emma","2015-03-01"]],"Orders":[[1,1,10,"2019-01-10"],[2,2,9,"2019-01-10"]]}]},
+    {"name":"Test 5","input":[{"Books":[[1,"Dune","2010-01-01"],[2,"Emma","2010-01-01"]],"Orders":[[1,1,20,"2018-06-22"],[2,1,5,"2018-06-23"],[3,2,10,"2018-06-23"]]}]},
+    {"name":"Test 6","input":[{"Books":[[3,"The Hobbit","2012-01-01"]],"Orders":[[1,3,4,"2018-08-01"],[2,3,3,"2018-12-24"],[3,3,3,"2019-04-02"]]}]},
+    {"name":"Test 7","input":[{"Books":[[5,"The Hunger Games","2008-09-21"]],"Orders":[[1,5,50,"2009-02-02"],[2,5,40,"2017-12-01"]]}]},
+    {"name":"Test 8","input":[{"Books":[[1,"Dune","2019-06-01"],[2,"Emma","2019-06-10"]],"Orders":[[1,1,1,"2019-06-05"]]}]},
+    {"name":"Test 9","input":[{"Books":[[1,"Dune","2016-01-01"],[2,"Emma","2016-01-01"]],"Orders":[[1,1,12,"2019-06-23"],[2,2,3,"2019-06-23"],[3,2,3,"2019-06-22"]]}]},
+    {"name":"Test 10","input":[{"Books":[[1,"Dune","2010-01-01"],[2,"Dune","2011-01-01"],[3,"Emma","2019-06-01"],[4,"28 Letters","2018-07-01"]],"Orders":[[1,1,6,"2018-07-26"],[2,1,6,"2019-02-14"],[3,2,9,"2019-03-01"],[4,3,1,"2019-06-05"],[5,4,2,"2018-07-02"],[6,2,30,"2018-01-01"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach eligible book needs one number: copies dispatched in the last year. Books with no recent orders must still be counted (as 0), so the orders are attached with a **left join**, and only the orders inside the one-year window are allowed to attach. Summing per book then gives the yearly sales, and the books under 10 are the answer.\n\n## Approach\n\n1. Start from `Books` (alias `b`) and `LEFT JOIN Orders` (alias `o`) on `book_id`, putting the date window `2018-06-23` to `2019-06-23` in the `ON` clause, so out-of-window orders simply do not attach.\n2. `WHERE b.available_from < '2019-05-23'` drops books on sale for less than a month.\n3. `GROUP BY` the book, so each book becomes one row.\n4. `HAVING IFNULL(SUM(o.quantity), 0) < 10`: a book with no attached orders sums to `null`, which `IFNULL` turns into 0.\n\n## Example 1, step by step\n\n| book | available_from | orders in window | copies | reported |\n| --- | --- | --- | --- | --- |\n| 1 Kalila And Demna | 2010-01-01 | 2 + 1 | 3 | yes |\n| 2 28 Letters | 2012-05-12 | none | 0 | yes |\n| 3 The Hobbit | 2019-06-10 | (too new) | - | no |\n| 4 13 Reasons Why | 2019-06-01 | (too new) | - | no |\n| 5 The Hunger Games | 2008-09-21 | none (2009, 2010 are too old) | 0 | yes |\n\n## Complexity\n\n- Time: O(B + R) to join and group B books with R orders using hashing.\n- Space: O(B) for one group per book.\n\n## Pitfalls\n\n- An inner join drops books that sold nothing, yet they are the most unpopular of all.\n- Putting the date window in `WHERE` instead of `ON` removes books whose orders are all old (book 5 above), because their joined rows are filtered away.\n- `SUM` over no rows is `null`, and `null < 10` is not true; wrap it in `IFNULL`.\n- Exactly 10 copies is not unpopular; the comparison is strict.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `b` | `Books`, one output candidate per row |\n| `o` | `Orders` dispatched in the last year, or nulls when none |\n| `IFNULL(SUM(o.quantity), 0)` | copies of the book sold in the last year |",
+  "narration": {
+    "1": "Report each unpopular book's id and name.",
+    "3": "A left join keeps books that have no qualifying orders at all.",
+    "5": "Only orders from the last year attach; older ones are left out without dropping their book.",
+    "6": "Books released less than a month before today are not judged.",
+    "7": "Each book becomes one group holding its recent orders.",
+    "8": "Keep books whose recent copies, treating no orders as 0, total fewer than 10."
+  }
+}

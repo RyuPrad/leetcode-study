@@ -1,0 +1,52 @@
+{
+  "number": 1369,
+  "title": "Get the Second Most Recent Activity",
+  "spec": "recalled",
+  "statement": "One table logs what each user did and when:\n\n- `UserActivity(username, activity, startDate, endDate)`: each row says that `username` did `activity` from `startDate` through `endDate` (dates, with `startDate <= endDate`). The table has no primary key. A user never does two activities at the same time, so one user's periods never overlap and their start dates all differ.\n\nFor every user, report the row of their **second most recent** activity, the one with the second latest `startDate`. A user who has only one activity is reported with that single activity instead. Return one row per user with the columns `username`, `activity`, `startDate` and `endDate`. Rows may come in any order.",
+  "constraints": [
+    "UserActivity has no primary key",
+    "startDate <= endDate in every row",
+    "One user's periods never overlap, so their start dates are distinct",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "UserActivity": [["username","VARCHAR(30)"],["activity","VARCHAR(30)"],["startDate","DATE"],["endDate","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ UserActivity = [] }] = input;\n  const byUser = new Map();\n  for (const row of UserActivity) {\n    if (row.some((v) => v === null)) return 'UserActivity rows may not contain null.';\n    const [user, , start, end] = row;\n    if (start > end) return `${user} has an activity that ends before it starts.`;\n    const key = user.toLowerCase();\n    if (!byUser.has(key)) byUser.set(key, []);\n    byUser.get(key).push([start, end]);\n  }\n  for (const [user, periods] of byUser) {\n    periods.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));\n    for (let i = 1; i < periods.length; i++) if (periods[i][0] <= periods[i - 1][1]) return `${user} has two activities at the same time.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT username, activity, startDate, endDate,\n    ROW_NUMBER() OVER (PARTITION BY username ORDER BY startDate DESC) AS recency,\n    COUNT(*) OVER (PARTITION BY username) AS activity_count\n  FROM UserActivity\n)\nSELECT username, activity, startDate, endDate\nFROM ranked\nWHERE recency = 2\n  OR activity_count = 1;",
+  "brute": "SELECT u.username, u.activity, u.startDate, u.endDate\nFROM UserActivity AS u\nWHERE (SELECT COUNT(*) FROM UserActivity AS v WHERE v.username = u.username AND v.startDate > u.startDate) = 1\n  OR NOT EXISTS (SELECT 1 FROM UserActivity AS v WHERE v.username = u.username AND v.startDate <> u.startDate)",
+  "generator": "function generate(rand, size) {\n  const users = ['Alice', 'Bob', 'Carol', 'Dan', 'Eve'];\n  const activities = ['Travel', 'Dancing', 'Reading', 'Hiking', 'Cooking'];\n  const small = size === 'small';\n  const day = (n) => new Date(Date.UTC(2019, 11, 20) + n * 86400000).toISOString().slice(0, 10);\n  const UserActivity = [];\n  const userCount = small ? users.length : 400;\n  for (let u = 0; u < userCount && UserActivity.length < (small ? 8 : 2000); u++) {\n    const name = small ? users[u] : `user${u + 1}`;\n    const count = small ? Math.floor(rand() * 4) : rand() < 0.15 ? 1 : 2 + Math.floor(rand() * 9);\n    let t = Math.floor(rand() * (small ? 20 : 300));\n    for (let k = 0; k < count && UserActivity.length < (small ? 8 : 2000); k++) {\n      const length = Math.floor(rand() * 5);\n      UserActivity.push([name, activities[Math.floor(rand() * activities.length)], day(t), day(t + length)]);\n      t += length + 1 + Math.floor(rand() * 4);\n    }\n  }\n  for (let i = UserActivity.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [UserActivity[i], UserActivity[j]] = [UserActivity[j], UserActivity[i]]; }\n  return [{ UserActivity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"UserActivity":[["Alice","Travel","2020-02-12","2020-02-20"],["Alice","Dancing","2020-02-21","2020-02-23"],["Alice","Travel","2020-02-24","2020-02-28"],["Bob","Travel","2020-02-11","2020-02-18"]]}],"expected":{"columns":["username","activity","startDate","endDate"],"rows":[["Alice","Dancing","2020-02-21","2020-02-23"],["Bob","Travel","2020-02-11","2020-02-18"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"UserActivity":[]}]},
+    {"name":"Test 2","input":[{"UserActivity":[["Bob","Reading","2020-03-01","2020-03-01"]]}]},
+    {"name":"Test 3","input":[{"UserActivity":[["Bob","Reading","2020-03-01","2020-03-04"],["Bob","Hiking","2020-03-05","2020-03-09"]]}]},
+    {"name":"Test 4","input":[{"UserActivity":[["Eve","Cooking","2020-05-20","2020-05-21"],["Eve","Travel","2020-05-01","2020-05-10"],["Eve","Dancing","2020-05-11","2020-05-12"]]}]},
+    {"name":"Test 5","input":[{"UserActivity":[["Alice","Travel","2020-01-01","2020-01-05"],["Alice","Reading","2020-01-06","2020-01-06"],["Alice","Hiking","2020-01-10","2020-01-12"],["Alice","Dancing","2020-01-15","2020-01-20"],["Bob","Cooking","2020-01-02","2020-01-03"],["Carol","Travel","2020-01-04","2020-01-08"],["Carol","Reading","2020-01-01","2020-01-02"]]}]},
+    {"name":"Test 6","input":[{"UserActivity":[["Dan","Travel","2020-04-01","2020-04-03"],["Dan","Travel","2020-04-10","2020-04-12"],["Dan","Dancing","2020-04-20","2020-04-22"]]}]},
+    {"name":"Test 7","input":[{"UserActivity":[["Carol","Hiking","2020-01-02","2020-01-09"],["Carol","Reading","2019-12-25","2019-12-31"],["Carol","Cooking","2019-12-01","2019-12-02"],["Dan","Travel","2019-12-30","2020-01-03"]]}]},
+    {"name":"Test 8","input":[{"UserActivity":[["Alice","Reading","2020-02-09","2020-02-09"],["Alice","Hiking","2020-02-10","2020-02-29"],["Bob","Reading","2020-02-10","2020-02-10"],["Bob","Hiking","2020-02-09","2020-02-09"]]}]},
+    {"name":"Test 9","input":[{"UserActivity":[["Eve","Dancing","2020-06-30","2020-07-02"],["Eve","Travel","2020-06-01","2020-06-29"],["Eve","Cooking","2020-05-01","2020-05-31"],["Eve","Reading","2020-04-01","2020-04-30"],["Eve","Hiking","2020-03-01","2020-03-31"]]}]},
+    {"name":"Test 10","input":[{"UserActivity":[["Alice","Travel","2021-03-01","2021-03-02"],["Bob","Travel","2021-03-01","2021-03-02"],["Carol","Travel","2021-03-01","2021-03-02"],["Carol","Dancing","2021-02-01","2021-02-02"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Second most recent\" is a position inside each user's own timeline, which is exactly what a window function provides: number each user's rows from the latest `startDate` down, and the wanted row is number 2. The twist is the user with a single activity, who has no row number 2 and must still appear with their only row. A second window, `COUNT(*) OVER (PARTITION BY username)`, tells each row how many activities its user has, so both cases can be kept with one `WHERE`. Because one user's periods never overlap, ordering by `startDate` and by `endDate` give the same timeline and there are no ties.\n\n## Approach\n\n1. `ranked`: keep every column and add `recency`, the row's position when the user's activities are sorted by `startDate` from newest to oldest, and `activity_count`, the number of rows the user has.\n2. From `ranked`, keep the rows with `recency = 2`, plus the rows of users whose `activity_count = 1`.\n3. Return the four original columns.\n\n## Example 1, step by step\n\n- Alice's rows get `recency` 1 (Travel, 2020-02-24), 2 (Dancing, 2020-02-21) and 3 (Travel, 2020-02-12), each with `activity_count = 3`.\n- Bob's only row (Travel, 2020-02-11) gets `recency = 1` and `activity_count = 1`.\n- The filter keeps Alice's Dancing row (position 2) and Bob's Travel row (his only one).\n\n## Complexity\n\n- Time: O(N log N) for N rows, to sort each user's rows inside the window.\n- Space: O(N) for `ranked`.\n\n## Pitfalls\n\n- Forgetting users with a single activity: `WHERE recency = 2` alone drops Bob.\n- Sorting ascending finds the second **oldest** activity, which differs as soon as a user has four or more.\n- `GROUP BY username` with `MAX(startDate)` finds the latest row, not the second; nesting a second `MAX` below it is easy to get wrong for single-activity users.\n- The same activity name can appear twice for one user, so identify rows by their dates, not by `activity`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every row with its position and its user's row count |\n| `recency` | 1 for the user's latest activity, 2 for the one before it, and so on |\n| `activity_count` | how many activities the row's user has |",
+  "narration": {
+    "1": "The only stage annotates every activity with two window values.",
+    "3": "Number each user's activities from the newest start date down; the second most recent gets 2.",
+    "4": "Count each user's activities on every row so single-activity users can be recognised.",
+    "7": "The answer keeps the four original columns and drops the helper values.",
+    "9": "Keep the activity that sits second in its user's newest-first order.",
+    "10": "Also keep the row of any user who has only one activity, since that user has no second one."
+  }
+}

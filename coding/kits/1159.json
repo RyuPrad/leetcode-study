@@ -1,0 +1,54 @@
+{
+  "number": 1159,
+  "title": "Market Analysis II",
+  "spec": "recalled",
+  "statement": "Three tables describe an online market:\n\n- `Users(user_id, join_date, favorite_brand)`: `user_id` is unique. Every user can both buy and sell.\n- `Orders(order_id, order_date, item_id, buyer_id, seller_id)`: `order_id` is unique. `item_id` is in `Items`, and `buyer_id` and `seller_id` are in `Users`. No seller sells more than one item on the same date.\n- `Items(item_id, item_brand)`: `item_id` is unique.\n\nFor **every** user, list the items they sold in order of `order_date` and look at the second one. Answer `'yes'` if that item's brand equals the user's `favorite_brand`, and `'no'` otherwise; a user who sold fewer than two items gets `'no'`. Return the columns `seller_id` (the user's id) and `2nd_item_fav_brand`; the second name starts with a digit, so quote it with backticks in MySQL. Rows may come in any order.",
+  "constraints": [
+    "user_id is unique in Users; order_id is unique in Orders; item_id is unique in Items",
+    "Orders.item_id is in Items; Orders.buyer_id and Orders.seller_id are in Users",
+    "(seller_id, order_date) is unique in Orders"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["join_date","DATE"],["favorite_brand","VARCHAR(10)"]],
+    "Orders": [["order_id","INT"],["order_date","DATE"],["item_id","INT"],["buyer_id","INT"],["seller_id","INT"]],
+    "Items": [["item_id","INT"],["item_brand","VARCHAR(10)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Users = [], Orders = [], Items = [] }] = input;\n  const isDate = d => /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\n  const users = new Set(), items = new Set(), orders = new Set(), sellerDays = new Set();\n  for (const [id, joined] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (users.has(id)) return `user_id ${id} appears twice in Users.`;\n    if (joined !== null && !isDate(joined)) return `join_date ${joined} is not YYYY-MM-DD.`;\n    users.add(id);\n  }\n  for (const [id] of Items) {\n    if (id === null) return 'Every item needs an item_id.';\n    if (items.has(id)) return `item_id ${id} appears twice in Items.`;\n    items.add(id);\n  }\n  for (const [id, date, item, buyer, seller] of Orders) {\n    if (id === null || date === null || item === null || buyer === null || seller === null) return 'Every column of Orders is required.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (!isDate(date)) return `order_date ${date} is not YYYY-MM-DD.`;\n    if (!items.has(item)) return `Order ${id} sells item ${item}, which is not in Items.`;\n    if (!users.has(buyer) || !users.has(seller)) return `Order ${id} names a user who is not in Users.`;\n    const key = `${seller}|${date}`;\n    if (sellerDays.has(key)) return `Seller ${seller} sold twice on ${date}.`;\n    sellerDays.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked_sales AS (\n  SELECT\n    o.seller_id,\n    o.item_id,\n    ROW_NUMBER() OVER (PARTITION BY o.seller_id ORDER BY o.order_date) AS sale_rank\n  FROM Orders AS o\n),\nsecond_sale AS (\n  SELECT r.seller_id, i.item_brand\n  FROM ranked_sales AS r\n  JOIN Items AS i\n    ON i.item_id = r.item_id\n  WHERE r.sale_rank = 2\n)\nSELECT\n  u.user_id AS seller_id,\n  CASE WHEN s.item_brand = u.favorite_brand THEN 'yes' ELSE 'no' END AS `2nd_item_fav_brand`\nFROM Users AS u\nLEFT JOIN second_sale AS s\n  ON s.seller_id = u.user_id;",
+  "brute": "SELECT\n  u.user_id AS seller_id,\n  CASE WHEN EXISTS (\n    SELECT 1\n    FROM Orders AS o, Items AS i\n    WHERE o.seller_id = u.user_id\n      AND i.item_id = o.item_id\n      AND i.item_brand = u.favorite_brand\n      AND (SELECT COUNT(*) FROM Orders AS e WHERE e.seller_id = u.user_id AND e.order_date < o.order_date) = 1\n  ) THEN 'yes' ELSE 'no' END AS `2nd_item_fav_brand`\nFROM Users AS u",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  // A small brand pool makes favorite brands match often; dates cross a year boundary.\n  const brands = small ? ['Samsung', 'Lenovo', 'LG'] : ['Samsung', 'Lenovo', 'LG', 'HP', 'Apple'];\n  const day = offset => new Date(Date.UTC(2019, 0, 1 + offset)).toISOString().slice(0, 10);\n  const userCount = small ? pick(5) : 300, itemCount = small ? 1 + pick(4) : 200, orderCount = small ? pick(9) : 1500;\n  const Users = [], Items = [], Orders = [];\n  for (let u = 1; u <= userCount; u++) Users.push([u, day(pick(200)), brands[pick(brands.length)]]);\n  for (let i = 1; i <= itemCount; i++) Items.push([i, brands[pick(brands.length)]]);\n  // Order ids follow creation, while dates are random, so id order and date order disagree.\n  const used = new Set(), span = small ? 6 : 400, start = small ? 362 : 200;\n  for (let tries = 0; userCount && Orders.length < orderCount && tries < orderCount * 5; tries++) {\n    const seller = 1 + pick(userCount), date = day(start + pick(span));\n    if (used.has(`${seller}|${date}`)) continue;\n    used.add(`${seller}|${date}`);\n    Orders.push([Orders.length + 1, date, 1 + pick(itemCount), 1 + pick(userCount), seller]);\n  }\n  return [{ Users, Orders, Items }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"2019-01-01","Lenovo"],[2,"2019-02-09","Samsung"],[3,"2019-01-19","LG"],[4,"2019-05-21","HP"]],"Orders":[[1,"2019-08-01",4,1,2],[2,"2019-08-02",2,1,3],[3,"2019-08-03",3,2,3],[4,"2019-08-04",1,4,2],[5,"2019-08-04",1,3,4],[6,"2019-08-05",2,2,4]],"Items":[[1,"Samsung"],[2,"Lenovo"],[3,"LG"],[4,"HP"]]}],"expected":{"columns":["seller_id","2nd_item_fav_brand"],"rows":[[1,"no"],[2,"yes"],[3,"yes"],[4,"no"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[[1,"2019-01-01","HP"]],"Orders":[],"Items":[[1,"HP"]]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"2019-01-01","HP"],[2,"2019-01-02","LG"]],"Orders":[[1,"2019-08-01",1,2,1]],"Items":[[1,"HP"]]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"2019-01-01","HP"],[2,"2019-01-01","LG"]],"Orders":[[1,"2019-08-01",1,2,1],[2,"2019-08-02",2,2,1]],"Items":[[1,"HP"],[2,"LG"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"2019-01-01","HP"],[2,"2019-01-01","LG"]],"Orders":[[1,"2019-08-05",1,2,1],[2,"2019-08-01",2,2,1]],"Items":[[1,"HP"],[2,"LG"]]}]},
+    {"name":"Test 5","input":[{"Users":[[1,"2019-01-01","HP"],[2,"2019-01-01","LG"]],"Orders":[[1,"2019-08-01",3,2,1],[2,"2019-08-02",1,2,1],[3,"2019-08-03",3,2,1],[4,"2019-08-01",3,1,2],[5,"2019-08-02",3,1,2],[6,"2019-08-03",2,1,2]],"Items":[[1,"HP"],[2,"LG"],[3,"Apple"]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"2019-01-01","LG"],[2,"2019-01-01","HP"]],"Orders":[[1,"2019-08-01",1,1,2],[2,"2019-08-02",2,1,2]],"Items":[[1,"LG"],[2,"LG"]]}]},
+    {"name":"Test 7","input":[{"Users":[[3,"2019-02-01","Lenovo"],[5,"2019-03-01","Samsung"],[8,"2019-04-01","Lenovo"]],"Orders":[[1,"2019-08-10",1,5,3],[2,"2019-08-11",2,5,3],[3,"2019-08-10",3,3,5],[4,"2019-08-12",3,3,5],[5,"2019-08-01",2,3,8]],"Items":[[1,"Lenovo"],[2,"Lenovo"],[3,"Samsung"]]}]},
+    {"name":"Test 8","input":[{"Users":[],"Orders":[],"Items":[[1,"HP"]]}]},
+    {"name":"Test 9","input":[{"Users":[[1,"2018-01-01","Apple"],[2,"2018-01-01","HP"]],"Orders":[[1,"2020-01-02",2,2,1],[2,"2019-12-31",2,2,1],[3,"2020-01-01",1,2,1],[4,"2019-12-30",2,1,2],[5,"2019-12-31",1,1,2]],"Items":[[1,"Apple"],[2,"HP"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The second item a seller sold\" is a position inside each seller's own sales history, which is exactly what a window function gives: number each seller's orders by date and keep number 2. The other half of the problem is that **every** user must be reported, including people who sold nothing or only once, so the second sales are attached to `Users` with a left join and a missing match becomes `'no'`.\n\n## Approach\n\n1. `ranked_sales`: `ROW_NUMBER() OVER (PARTITION BY o.seller_id ORDER BY o.order_date)` numbers each seller's orders 1, 2, 3... by date as `sale_rank`. Dates never tie within a seller, so the numbering is well defined.\n2. `second_sale`: keep `sale_rank = 2` and join `Items` (alias `i`) to get the brand of that item.\n3. Start from `Users` (alias `u`) and `LEFT JOIN second_sale` (alias `s`) on the seller id.\n4. `CASE WHEN s.item_brand = u.favorite_brand THEN 'yes' ELSE 'no' END`: a user with no second sale has a null brand, the comparison is not true, and the answer is `'no'`.\n\n## Example 1, step by step\n\n- `ranked_sales`: seller 2 has order 1 (item 4) as rank 1 and order 4 (item 1) as rank 2; seller 3 has orders 2 and 3 (items 2, 3); seller 4 has orders 5 and 6 (items 1, 2).\n- `second_sale`: (2, Samsung), (3, LG), (4, Lenovo).\n- Joined to `Users`: user 1 sold nothing, `'no'`; user 2 likes Samsung, `'yes'`; user 3 likes LG, `'yes'`; user 4 likes HP but sold Lenovo second, `'no'`.\n\n## Complexity\n\n- Time: O(m log m) to sort the m orders inside their seller partitions, plus O(u + m) hash joins with u users.\n- Space: O(m) for the numbered orders.\n\n## Pitfalls\n\n- An inner join drops users with fewer than two sales; they must appear with `'no'`.\n- Ordering by `order_id` instead of `order_date`: ids need not follow dates.\n- Partitioning by `buyer_id`: the question is about what a user **sold**.\n- Writing the alias as `2nd_item_fav_brand` without backticks: a name that starts with a digit needs quoting.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `o` | `Orders`, numbered within each seller |\n| `ranked_sales` | each order with its `sale_rank` among the seller's sales |\n| `r` | `ranked_sales`, filtered to rank 2 |\n| `i` | `Items`, giving the brand of the second item |\n| `second_sale` | one row per seller with at least two sales: the brand of the second |\n| `u` | `Users`, every one of whom is reported |\n| `s` | the user's second sale, or null when there is none |",
+  "narration": {
+    "1": "The ranked_sales CTE numbers every order within its seller.",
+    "5": "ROW_NUMBER restarts for each seller and counts sales in date order.",
+    "8": "The second_sale CTE keeps one row per seller: the brand of their second sale.",
+    "11": "Joining Items turns the sold item into its brand.",
+    "13": "Only the sale numbered 2 matters.",
+    "17": "Compare the brand with the favorite; a missing second sale gives null, which falls to no.",
+    "18": "Users is the left table, so every user is reported.",
+    "19": "A left join keeps users with fewer than two sales."
+  }
+}

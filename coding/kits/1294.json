@@ -1,0 +1,55 @@
+{
+  "number": 1294,
+  "title": "Weather Type in Each Country",
+  "spec": "recalled",
+  "statement": "Two tables describe countries and their daily temperatures:\n\n- `Countries(country_id, country_name)`: one row per country; `country_id` is unique.\n- `Weather(country_id, weather_state, day)`: the temperature `weather_state` (an integer in degrees Celsius) measured in a country on a `day`; `(country_id, day)` is unique and every `country_id` exists in `Countries`.\n\nClassify each country's weather in **November 2019** using the average `weather_state` of its readings from that month:\n\n- `'Cold'` when the average is at most 15,\n- `'Hot'` when the average is at least 25,\n- `'Warm'` otherwise.\n\nReport the columns `country_name` and `weather_type`. Countries with no reading in November 2019 are left out. Rows may come in any order.",
+  "constraints": [
+    "country_id is unique in Countries",
+    "(country_id, day) is unique in Weather",
+    "Every Weather.country_id exists in Countries",
+    "weather_state is an integer (degrees Celsius) and may be negative"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Countries": [["country_id","INT"],["country_name","VARCHAR(20)"]],
+    "Weather": [["country_id","INT"],["weather_state","INT"],["day","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Countries = [], Weather = [] }] = input;\n  const countries = new Set(), readings = new Set();\n  for (const [id] of Countries) {\n    if (id === null) return 'Every country needs a country_id.';\n    if (countries.has(id)) return `country_id ${id} appears twice in Countries.`;\n    countries.add(id);\n  }\n  for (const [id, state, day] of Weather) {\n    if (id === null || day === null || state === null) return 'Every reading needs a country_id, a weather_state and a day.';\n    if (!countries.has(id)) return `Weather names country_id ${id}, which is not in Countries.`;\n    const key = `${id}/${day}`;\n    if (readings.has(key)) return `Country ${id} has two readings on ${day}.`;\n    readings.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH november AS (\n  SELECT country_id, AVG(weather_state) AS avg_state\n  FROM Weather\n  WHERE day BETWEEN '2019-11-01' AND '2019-11-30'\n  GROUP BY country_id\n)\nSELECT\n  c.country_name,\n  CASE\n    WHEN n.avg_state <= 15 THEN 'Cold'\n    WHEN n.avg_state >= 25 THEN 'Hot'\n    ELSE 'Warm'\n  END AS weather_type\nFROM november AS n\nJOIN Countries AS c\n  ON c.country_id = n.country_id;",
+  "brute": "SELECT c.country_name, 'Cold' AS weather_type\nFROM Countries AS c\nWHERE (SELECT AVG(w.weather_state) FROM Weather AS w\n       WHERE w.country_id = c.country_id AND YEAR(w.day) = 2019 AND MONTH(w.day) = 11) <= 15\nUNION ALL\nSELECT c.country_name, 'Hot'\nFROM Countries AS c\nWHERE (SELECT AVG(w.weather_state) FROM Weather AS w\n       WHERE w.country_id = c.country_id AND YEAR(w.day) = 2019 AND MONTH(w.day) = 11) >= 25\nUNION ALL\nSELECT c.country_name, 'Warm'\nFROM Countries AS c\nWHERE (SELECT AVG(w.weather_state) FROM Weather AS w\n       WHERE w.country_id = c.country_id AND YEAR(w.day) = 2019 AND MONTH(w.day) = 11) > 15\n  AND (SELECT AVG(w.weather_state) FROM Weather AS w\n       WHERE w.country_id = c.country_id AND YEAR(w.day) = 2019 AND MONTH(w.day) = 11) < 25",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['USA', 'Australia', 'Peru', 'China', 'Morocco', 'Spain', 'Chile', 'Kenya'];\n  const small = size === 'small';\n  const countryCount = small ? Math.floor(rand() * 6) : 120;\n  const Countries = [];\n  for (let i = 0; i < countryCount; i++) Countries.push([i * 2 + 1, small ? names[i] : `Land${i + 1}`]);\n  // Small sets cluster dates around the November 2019 boundaries and temperatures around 15 and 25.\n  const smallDays = ['2019-10-31', '2019-11-01', '2019-11-02', '2019-11-15', '2019-11-29', '2019-11-30', '2019-12-01', '2020-11-10', '2018-11-20'];\n  const smallStates = [-3, 0, 10, 14, 15, 16, 20, 24, 25, 26, 30];\n  const day = () => {\n    if (small) return pick(smallDays);\n    const month = pick(['10', '11', '11', '11', '12']);\n    const year = rand() < 0.85 ? '2019' : '2020';\n    return `${year}-${month}-${String(1 + Math.floor(rand() * 30)).padStart(2, '0')}`;\n  };\n  const Weather = [], seen = new Set();\n  const target = countryCount === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  for (let attempt = 0; Weather.length < target && attempt < target * 4; attempt++) {\n    const [id] = pick(Countries), when = day(), key = `${id}/${when}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Weather.push([id, small ? pick(smallStates) : Math.floor(rand() * 46) - 5, when]);\n  }\n  return [{ Countries, Weather }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Countries":[[2,"USA"],[3,"Australia"],[7,"Peru"],[5,"China"],[8,"Morocco"],[9,"Spain"]],"Weather":[[2,15,"2019-11-01"],[2,12,"2019-10-28"],[2,12,"2019-10-27"],[3,-2,"2019-11-10"],[3,0,"2019-11-11"],[3,3,"2019-11-12"],[5,16,"2019-11-07"],[5,18,"2019-11-09"],[5,21,"2019-11-23"],[7,25,"2019-11-28"],[7,22,"2019-12-01"],[7,20,"2019-12-02"],[8,25,"2019-11-05"],[8,27,"2019-11-15"],[8,31,"2019-11-25"],[9,7,"2019-10-23"],[9,3,"2019-12-23"]]}],"expected":{"columns":["country_name","weather_type"],"rows":[["USA","Cold"],["Australia","Cold"],["Peru","Hot"],["China","Warm"],["Morocco","Hot"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Countries":[],"Weather":[]}]},
+    {"name":"Test 2","input":[{"Countries":[[1,"Chile"]],"Weather":[]}]},
+    {"name":"Test 3","input":[{"Countries":[[1,"Chile"],[2,"Kenya"]],"Weather":[[1,15,"2019-11-03"],[2,25,"2019-11-04"]]}]},
+    {"name":"Test 4","input":[{"Countries":[[1,"Chile"],[2,"Kenya"]],"Weather":[[1,15,"2019-11-03"],[1,16,"2019-11-04"],[2,24,"2019-11-04"],[2,25,"2019-11-05"]]}]},
+    {"name":"Test 5","input":[{"Countries":[[1,"Chile"],[2,"Kenya"],[3,"Spain"]],"Weather":[[1,30,"2019-10-31"],[1,10,"2019-11-01"],[2,30,"2019-11-30"],[2,5,"2019-12-01"],[3,20,"2020-11-15"]]}]},
+    {"name":"Test 6","input":[{"Countries":[[4,"Peru"]],"Weather":[[4,40,"2018-11-20"],[4,40,"2020-11-20"],[4,20,"2019-11-20"]]}]},
+    {"name":"Test 7","input":[{"Countries":[[1,"Chile"],[2,"Kenya"],[3,"Spain"]],"Weather":[[1,-5,"2019-11-01"],[1,-1,"2019-11-02"],[2,26,"2019-11-01"],[2,30,"2019-11-02"],[3,18,"2019-11-01"],[3,22,"2019-11-02"]]}]},
+    {"name":"Test 8","input":[{"Countries":[[1,"Chile"],[2,"Kenya"]],"Weather":[[1,14,"2019-11-10"],[1,17,"2019-11-11"],[2,24,"2019-11-10"],[2,27,"2019-11-11"]]}]},
+    {"name":"Test 9","input":[{"Countries":[[1,"Chile"],[2,"Kenya"],[3,"Spain"]],"Weather":[[1,15,"2019-11-05"],[2,15,"2019-10-05"],[2,26,"2019-11-05"],[3,25,"2019-12-05"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach country gets one label computed from one number: the average of its November 2019 readings. That is a filter (keep only November 2019 rows), a group per country with `AVG`, and a `CASE` that turns the average into a word. Countries without any November reading never form a group, so they drop out on their own.\n\n## Approach\n\n1. CTE `november`: keep rows with `day` between `'2019-11-01'` and `'2019-11-30'`, group them by `country_id` and compute `avg_state`.\n2. Join `november` to `Countries` to turn the id into `country_name`.\n3. A `CASE` maps the average to `'Cold'` (at most 15), `'Hot'` (at least 25) or `'Warm'`, named `weather_type`.\n\n## Example 1, step by step\n\n`november` holds one row per country with a reading in the month:\n\n- USA (2): only 15 on 2019-11-01 counts (the October rows are filtered out), average 15 → Cold.\n- Australia (3): (-2 + 0 + 3) / 3 ≈ 0.33 → Cold.\n- China (5): (16 + 18 + 21) / 3 ≈ 18.33 → Warm.\n- Peru (7): only 25 on 2019-11-28; the December rows are dropped, average 25 → Hot.\n- Morocco (8): (25 + 27 + 31) / 3 ≈ 27.67 → Hot.\n\nSpain (9) has readings only in October and December, so it has no row in `november` and is not reported.\n\n## Complexity\n\n- Time: O(W) to filter and group W weather rows, plus O(C) to join the C countries by id.\n- Space: O(C) for the per-country averages.\n\n## Pitfalls\n\n- Filtering with `MONTH(day) = 11` alone also counts November of other years; the year must be fixed too.\n- The boundaries are inclusive: an average of exactly 15 is Cold and exactly 25 is Hot, so use `<=` and `>=`.\n- Averaging before filtering (or putting the date test in `HAVING`) mixes October and December readings into the average.\n- Starting from `Countries` with a left join would report countries without November data with a null average and the label `'Warm'`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `november` | one row per country with November 2019 readings: `country_id` and its average `avg_state` |\n| `n` | alias of `november` in the final query |\n| `c` | `Countries`, supplying `country_name` |\n| `weather_type` | the `CASE` label: Cold, Hot or Warm |",
+  "narration": {
+    "1": "The november stage computes one average temperature per country.",
+    "4": "Only readings from 1 to 30 November 2019 take part, both ends included.",
+    "5": "Grouping by country makes AVG average each country's November readings.",
+    "9": "The CASE turns the average into the weather_type label.",
+    "10": "An average of at most 15, including exactly 15, is Cold.",
+    "11": "An average of 25 or more is Hot; anything strictly between 15 and 25 falls to Warm.",
+    "14": "The averages are the driving table, so countries without November data never appear.",
+    "15": "Joining Countries on country_id swaps the id for the country's name."
+  }
+}

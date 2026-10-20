@@ -1,0 +1,53 @@
+{
+  "number": 1264,
+  "title": "Page Recommendations",
+  "spec": "recalled",
+  "statement": "Two tables describe a social network:\n\n- `Friendship(user1_id, user2_id)`: each row says the two users are friends, in both directions; `(user1_id, user2_id)` is unique and the two ids differ. A friendship may be stored with user 1 in either column.\n- `Likes(user_id, page_id)`: the user likes the page; `(user_id, page_id)` is unique.\n\nRecommend pages to the user with `user_id = 1`: a page is recommended when at least one friend of user 1 likes it and user 1 does not already like it. Report each recommended page once, in a single column `recommended_page`. Rows may come in any order.",
+  "constraints": [
+    "(user1_id, user2_id) is unique in Friendship",
+    "user1_id != user2_id",
+    "(user_id, page_id) is unique in Likes"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Friendship": [["user1_id","INT"],["user2_id","INT"]],
+    "Likes": [["user_id","INT"],["page_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Friendship = [], Likes = [] }] = input;\n  const pairs = new Set(), likes = new Set();\n  for (const [a, b] of Friendship) {\n    if (a === null || b === null) return 'Friendship ids may not be null.';\n    if (a === b) return `User ${a} cannot be friends with themselves.`;\n    if (pairs.has(`${a},${b}`)) return `Friendship (${a}, ${b}) appears twice.`;\n    pairs.add(`${a},${b}`);\n  }\n  for (const [user, page] of Likes) {\n    if (user === null || page === null) return 'Likes ids may not be null.';\n    if (likes.has(`${user},${page}`)) return `Like (${user}, ${page}) appears twice.`;\n    likes.add(`${user},${page}`);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH friends AS (\n  SELECT user2_id AS friend_id\n  FROM Friendship\n  WHERE user1_id = 1\n  UNION\n  SELECT user1_id\n  FROM Friendship\n  WHERE user2_id = 1\n)\nSELECT DISTINCT l.page_id AS recommended_page\nFROM Likes AS l\nWHERE l.user_id IN (SELECT friend_id FROM friends)\n  AND l.page_id NOT IN (SELECT page_id FROM Likes WHERE user_id = 1);",
+  "brute": "SELECT DISTINCT l.page_id AS recommended_page\nFROM Friendship AS f\nJOIN Likes AS l\n  ON l.user_id = CASE WHEN f.user1_id = 1 THEN f.user2_id ELSE f.user1_id END\nLEFT JOIN Likes AS mine\n  ON mine.user_id = 1 AND mine.page_id = l.page_id\nWHERE (f.user1_id = 1 OR f.user2_id = 1)\n  AND mine.page_id IS NULL",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const users = small ? 6 : 800, pages = small ? 7 : 300;\n  const pairs = new Set(), likes = new Set(), Friendship = [], Likes = [];\n  const friendRows = small ? Math.floor(rand() * 9) : 2000;\n  for (let tries = 0; Friendship.length < friendRows && tries < friendRows * 5; tries++) {\n    // Many friendships involve user 1, on either side, so the answer is rarely empty.\n    let a = rand() < (small ? 0.5 : 0.1) ? 1 : 1 + Math.floor(rand() * users);\n    let b = 1 + Math.floor(rand() * users);\n    if (a === b) continue;\n    if (rand() < 0.5) [a, b] = [b, a];\n    if (pairs.has(`${a},${b}`)) continue;\n    pairs.add(`${a},${b}`);\n    Friendship.push([a, b]);\n  }\n  const likeRows = small ? Math.floor(rand() * 9) : 2000;\n  for (let tries = 0; Likes.length < likeRows && tries < likeRows * 5; tries++) {\n    const user = rand() < (small ? 0.25 : 0.05) ? 1 : 1 + Math.floor(rand() * users);\n    const page = 10 + Math.floor(rand() * pages);\n    if (likes.has(`${user},${page}`)) continue;\n    likes.add(`${user},${page}`);\n    Likes.push([user, page]);\n  }\n  return [{ Friendship, Likes }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Friendship":[[1,2],[1,3],[1,4],[2,3],[2,4],[2,5],[6,1]],"Likes":[[1,88],[2,23],[3,24],[4,56],[5,11],[6,33],[2,77],[3,77],[6,88]]}],"expected":{"columns":["recommended_page"],"rows":[[23],[24],[56],[33],[77]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Friendship":[],"Likes":[]}]},
+    {"name":"Test 2","input":[{"Friendship":[[2,3],[3,4]],"Likes":[[2,10],[3,11],[1,12]]}]},
+    {"name":"Test 3","input":[{"Friendship":[[5,1],[7,1]],"Likes":[[5,40],[7,41],[1,41]]}]},
+    {"name":"Test 4","input":[{"Friendship":[[1,2],[1,3]],"Likes":[[1,50],[1,51],[2,50],[3,51]]}]},
+    {"name":"Test 5","input":[{"Friendship":[[1,2],[3,1],[1,4]],"Likes":[[2,60],[3,60],[4,60],[4,61]]}]},
+    {"name":"Test 6","input":[{"Friendship":[[1,2],[2,3],[3,4]],"Likes":[[3,70],[4,71],[2,72]]}]},
+    {"name":"Test 7","input":[{"Friendship":[[1,2]],"Likes":[[2,1],[2,2],[2,3]]}]},
+    {"name":"Test 8","input":[{"Friendship":[[1,2],[2,1],[3,5]],"Likes":[[2,80],[3,81],[5,80],[1,82]]}]},
+    {"name":"Test 9","input":[{"Friendship":[[4,1],[1,6],[6,4]],"Likes":[[1,90],[4,90],[4,91],[6,92],[6,91],[9,93]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo questions decide each page: is it liked by a friend of user 1, and is it not liked by user 1? Each is a set, so build them as subqueries. The one subtlety is that a friendship row names user 1 in **either** column, so the friend list is the other column from rows where user 1 is `user1_id`, together with the other column from rows where user 1 is `user2_id`.\n\n## Approach\n\n1. `friends`: `user2_id` from rows with `user1_id = 1`, `UNION` `user1_id` from rows with `user2_id = 1`. `UNION` also removes a friend stored in both directions.\n2. From `Likes` (alias `l`) keep rows whose `user_id` is `IN` the friends.\n3. Drop pages that are `IN` user 1's own likes, using `NOT IN`.\n4. `SELECT DISTINCT` the page as `recommended_page`, since several friends may like the same page.\n\n## Example 1, step by step\n\n- Rows with `user1_id = 1` give friends 2, 3 and 4; the row `(6, 1)` gives friend 6. So `friends` is {2, 3, 4, 6}; user 5 is a friend of 2 but not of 1.\n- Their likes: 2 → 23, 77; 3 → 24, 77; 4 → 56; 6 → 33, 88.\n- User 1 likes 88, so 88 is removed.\n- The distinct remaining pages are 23, 24, 56, 33 and 77 (77 is liked by two friends but reported once).\n\n## Complexity\n\n- Time: O(F + L) with hashing, for F friendship rows and L likes: one pass over `Friendship`, then one lookup per like in each set (O((F + L) log(F + L)) with sorting).\n- Space: O(F + L) for the friend set, user 1's pages and the distinct results.\n\n## Pitfalls\n\n- Reading friends only from `user2_id` where `user1_id = 1` misses friendships stored as `(6, 1)`.\n- Forgetting `DISTINCT` repeats a page liked by several friends.\n- Leaving out the exclusion recommends pages user 1 already likes.\n- `NOT IN` returns no rows if its list contains a null; it is safe here because `page_id` is part of the key, but `NOT EXISTS` is the robust habit.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `friends` | every friend of user 1, from either column of `Friendship` |\n| `friend_id` | the other user of a friendship that contains user 1 |\n| `l` | a row of `Likes` |\n| `recommended_page` | a page a friend likes and user 1 does not |",
+  "narration": {
+    "1": "The friends stage collects every friend of user 1.",
+    "2": "When user 1 is the first column, the friend is the second.",
+    "5": "UNION adds friendships stored the other way round and removes repeats.",
+    "6": "When user 1 is the second column, the friend is the first.",
+    "10": "Report each page once, even when several friends like it.",
+    "11": "Read every like in the network.",
+    "12": "Keep only likes by friends of user 1.",
+    "13": "Drop pages user 1 already likes."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 1355,
+  "title": "Activity Participants",
+  "spec": "recalled",
+  "statement": "Two tables describe a group of friends and the activities they do:\n\n- `Friends(id, name, activity)`: one row per friend; `id` is unique. `activity` is the name of the one activity this friend takes part in, and it always matches a name in `Activities`.\n- `Activities(id, name)`: one row per activity; `id` and `name` are unique. Every activity has at least one participant in `Friends`.\n\nThe number of participants of an activity is how many friends list it. Report the name of every activity whose number of participants is **neither the largest nor the smallest** among all activities, as one column named `activity`. Every activity tied for the largest count and every activity tied for the smallest count is left out, so when all activities have the same count the result is empty. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Friends",
+    "id and name are each unique in Activities",
+    "Every Friends.activity is a name in Activities",
+    "Every activity in Activities has at least one participant",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Friends": [["id","INT"],["name","VARCHAR(30)"],["activity","VARCHAR(30)"]],
+    "Activities": [["id","INT"],["name","VARCHAR(30)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Friends = [], Activities = [] }] = input;\n  const ids = new Set(), names = new Set(), used = new Set(), friends = new Set();\n  for (const [id, name] of Activities) {\n    if (id === null || name === null) return 'Activities rows may not contain null.';\n    if (ids.has(id)) return `Activity id ${id} appears twice.`;\n    if (names.has(name.toLowerCase())) return `Activity ${name} appears twice.`;\n    ids.add(id); names.add(name.toLowerCase());\n  }\n  for (const [id, name, activity] of Friends) {\n    if (id === null || name === null || activity === null) return 'Friends rows may not contain null.';\n    if (friends.has(id)) return `Friend id ${id} appears twice.`;\n    if (!names.has(activity.toLowerCase())) return `Friend ${id} does an unknown activity ${activity}.`;\n    friends.add(id); used.add(activity.toLowerCase());\n  }\n  if (used.size !== names.size) return 'Every activity needs at least one participant.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH participants AS (\n  SELECT activity, COUNT(*) AS friend_count\n  FROM Friends\n  GROUP BY activity\n),\nbounds AS (\n  SELECT MIN(friend_count) AS fewest, MAX(friend_count) AS most\n  FROM participants\n)\nSELECT p.activity\nFROM participants AS p\nCROSS JOIN bounds AS b\nWHERE p.friend_count > b.fewest\n  AND p.friend_count < b.most;",
+  "brute": "SELECT c.activity\nFROM (\n  SELECT activity, COUNT(*) AS n\n  FROM Friends\n  GROUP BY activity\n) AS c\nWHERE EXISTS (SELECT 1 FROM Friends AS f GROUP BY f.activity HAVING COUNT(*) < c.n)\n  AND EXISTS (SELECT 1 FROM Friends AS f GROUP BY f.activity HAVING COUNT(*) > c.n)",
+  "generator": "function generate(rand, size) {\n  const people = ['Jonathan D.', 'Jade W.', 'Victor J.', 'Elvis Q.', 'Daniel A.', 'Bob B.', 'Mia K.', 'Omar S.'];\n  const pool = ['Eating', 'Singing', 'Horse Riding', 'Dancing', 'Reading', 'Hiking'];\n  const small = size === 'small';\n  const kinds = small ? Math.floor(rand() * 5) : 40;\n  const names = small ? pool.slice(0, kinds) : Array.from({ length: kinds }, (_, i) => `Hobby ${i + 1}`);\n  const Activities = names.map((name, i) => [i + 1, name]);\n  // Every activity gets one participant; the rest go to random activities so counts collide and differ.\n  const picks = [...names];\n  const extra = kinds === 0 ? 0 : small ? Math.floor(rand() * (9 - kinds)) : 2000 - kinds;\n  for (let i = 0; i < extra; i++) picks.push(names[Math.floor(Math.pow(rand(), small ? 1 : 2) * kinds)]);\n  for (let i = picks.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [picks[i], picks[j]] = [picks[j], picks[i]]; }\n  const Friends = picks.map((activity, i) => [i + 1, people[Math.floor(rand() * people.length)], activity]);\n  return [{ Friends, Activities }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Friends":[[1,"Jonathan D.","Eating"],[2,"Jade W.","Singing"],[3,"Victor J.","Singing"],[4,"Elvis Q.","Eating"],[5,"Daniel A.","Eating"],[6,"Bob B.","Horse Riding"]],"Activities":[[1,"Eating"],[2,"Singing"],[3,"Horse Riding"]]}],"expected":{"columns":["activity"],"rows":[["Singing"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Friends":[],"Activities":[]}]},
+    {"name":"Test 2","input":[{"Friends":[[1,"Bob B.","Eating"]],"Activities":[[1,"Eating"]]}]},
+    {"name":"Test 3","input":[{"Friends":[[1,"Bob B.","Eating"],[2,"Jade W.","Eating"],[3,"Mia K.","Singing"]],"Activities":[[1,"Eating"],[2,"Singing"]]}]},
+    {"name":"Test 4","input":[{"Friends":[[1,"Bob B.","Eating"],[2,"Jade W.","Singing"],[3,"Mia K.","Reading"],[4,"Omar S.","Reading"],[5,"Elvis Q.","Singing"],[6,"Victor J.","Eating"]],"Activities":[[1,"Eating"],[2,"Singing"],[3,"Reading"]]}]},
+    {"name":"Test 5","input":[{"Friends":[[1,"Bob B.","Dancing"],[2,"Jade W.","Dancing"],[3,"Mia K.","Dancing"],[4,"Omar S.","Hiking"],[5,"Elvis Q.","Hiking"],[6,"Victor J.","Reading"]],"Activities":[[7,"Reading"],[3,"Dancing"],[5,"Hiking"]]}]},
+    {"name":"Test 6","input":[{"Friends":[[1,"Bob B.","Eating"],[2,"Jade W.","Eating"],[3,"Mia K.","Eating"],[4,"Omar S.","Singing"],[5,"Elvis Q.","Singing"],[6,"Victor J.","Singing"],[7,"Daniel A.","Reading"],[8,"Jonathan D.","Reading"],[9,"Bob B.","Hiking"]],"Activities":[[1,"Eating"],[2,"Singing"],[3,"Reading"],[4,"Hiking"]]}]},
+    {"name":"Test 7","input":[{"Friends":[[1,"Bob B.","Eating"],[2,"Jade W.","Singing"],[3,"Mia K.","Reading"],[4,"Omar S.","Reading"],[5,"Elvis Q.","Hiking"],[6,"Victor J.","Hiking"],[7,"Daniel A.","Hiking"],[8,"Jonathan D.","Hiking"]],"Activities":[[1,"Eating"],[2,"Singing"],[3,"Reading"],[4,"Hiking"]]}]},
+    {"name":"Test 8","input":[{"Friends":[[1,"Bob B.","Eating"],[2,"Jade W.","Singing"],[3,"Mia K.","Singing"],[4,"Omar S.","Reading"],[5,"Elvis Q.","Reading"],[6,"Victor J.","Dancing"],[7,"Daniel A.","Dancing"],[8,"Jonathan D.","Dancing"],[9,"Bob B.","Hiking"],[10,"Mia K.","Hiking"],[11,"Jade W.","Hiking"],[12,"Omar S.","Hiking"]],"Activities":[[1,"Eating"],[2,"Singing"],[3,"Reading"],[4,"Dancing"],[5,"Hiking"]]}]},
+    {"name":"Test 9","input":[{"Friends":[[10,"Bob B.","Horse Riding"],[4,"Jade W.","Eating"],[8,"Mia K.","Horse Riding"],[2,"Omar S.","Eating"],[6,"Elvis Q.","Horse Riding"]],"Activities":[[2,"Horse Riding"],[1,"Eating"]]}]},
+    {"name":"Test 10","input":[{"Friends":[[1,"Bob B.","Singing"],[2,"Bob B.","Singing"],[3,"Bob B.","Eating"],[4,"Bob B.","Eating"],[5,"Bob B.","Dancing"],[6,"Bob B.","Dancing"],[7,"Bob B.","Reading"]],"Activities":[[1,"Singing"],[2,"Eating"],[3,"Dancing"],[4,"Reading"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Neither the most nor the fewest participants\" compares activities by a per-activity count, so the counts have to exist first. Grouping `Friends` by `activity` produces them. The largest and smallest counts are then one more aggregation, `MAX` and `MIN`, over those counts. An activity survives exactly when its count lies strictly between the two, which automatically removes every activity tied at either end. `Activities` adds nothing: every friend's activity is listed there and every listed activity has a participant, so the groups of `Friends` are exactly the activities.\n\n## Approach\n\n1. `participants`: group `Friends` by `activity` and count the friends as `friend_count`.\n2. `bounds`: one row holding `fewest = MIN(friend_count)` and `most = MAX(friend_count)`.\n3. Pair each activity with that single row (`CROSS JOIN`) and keep it when `fewest < friend_count < most`.\n\n## Example 1, step by step\n\n- `participants`: Eating → 3 (friends 1, 4, 5), Singing → 2 (friends 2, 3), Horse Riding → 1 (friend 6).\n- `bounds`: `fewest = 1`, `most = 3`.\n- Eating (3) is not below 3 and Horse Riding (1) is not above 1, so both drop. Singing (2) is strictly between and is the only row reported.\n\n## Complexity\n\n- Time: O(F) with hashing for F friends to build `participants`, then O(A) for A activities to find the bounds and filter.\n- Space: O(A) for the per-activity counts.\n\n## Pitfalls\n\n- `ORDER BY friend_count DESC LIMIT 1` (and its ascending twin) removes only one of several activities tied for the top or bottom count.\n- `MAX(COUNT(*))` cannot be nested in one `SELECT`; the counts need their own stage first.\n- When every activity has the same count, the smallest and largest are equal and nothing qualifies; a query that excludes only the single top and bottom rows would wrongly keep some.\n- Use strict comparisons: `>=` or `<=` would keep the extreme activities.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `participants` | one row per activity with its `friend_count` |\n| `bounds` | one row: `fewest` and `most`, the smallest and largest counts |\n| `p` | a row of `participants` |\n| `b` | the single `bounds` row, paired with every activity |",
+  "narration": {
+    "1": "The first stage counts the participants of every activity.",
+    "2": "Each group of friends sharing an activity becomes one row with its size as friend_count.",
+    "4": "Grouping by activity gives one row per activity.",
+    "6": "The second stage reduces those counts to their smallest and largest values.",
+    "7": "MIN and MAX run over the per-activity counts, not over Friends directly.",
+    "12": "The single bounds row is paired with every activity so both limits are available in WHERE.",
+    "13": "A count equal to the smallest one fails this strict comparison, so all activities tied for fewest drop.",
+    "14": "Likewise every activity tied for the most participants fails this strict comparison."
+  }
+}

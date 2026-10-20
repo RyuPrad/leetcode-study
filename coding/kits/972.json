@@ -1,0 +1,68 @@
+{
+  "number": 972,
+  "title": "Equal Rational Numbers",
+  "spec": "leetcode",
+  "statement": "Each of the strings `s` and `t` writes down a non-negative rational number in one of three forms:\n\n- `I`: only an integer part, such as `7` or `120`;\n- `I.N`: an integer part, a dot and a non-repeating part of decimals, which may be empty (`3.` is allowed);\n- `I.N(R)`: as above, followed by a block `R` in parentheses whose digits repeat after `N` forever; `N` may be empty here too.\n\nReturn `true` when `s` and `t` stand for exactly the same mathematical value and `false` otherwise. Values are compared exactly, so an expansion whose digits end in an endless run of 9s equals the number you get by rounding it up.",
+  "constraints": [
+    "Every part consists only of digits",
+    "The integer part has no leading zeros unless it is exactly 0",
+    "1 <= integer part length <= 4",
+    "0 <= non-repeating part length <= 4",
+    "1 <= repeating part length <= 4"
+  ],
+  "signature": "boolean isRationalEqual(String s, String t)",
+  "entry": "isRationalEqual",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "t"
+  ],
+  "validator": "function validate([s, t]) {\n  const shape = /^(0|[1-9]\\d{0,3})(\\.\\d{0,4}(\\(\\d{1,4}\\))?)?$/;\n  for (const [name, text] of [['s', s], ['t', t]]) {\n    if (typeof text !== 'string' || !shape.test(text)) return `${name} must look like I, I.N or I.N(R): I has 1 to 4 digits without leading zeros, N 0 to 4 digits, R 1 to 4 digits.`;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isRationalEqual(s, t) {\n  const gcd = (x, y) => (y === 0 ? x : gcd(y, x % y));\n\n  function toFraction(text) {\n    const dot = text.indexOf('.');\n    if (dot === -1) return [Number(text), 1];\n    const open = text.indexOf('(');\n    const integer = Number(text.slice(0, dot));\n    const fixed = text.slice(dot + 1, open === -1 ? text.length : open);\n    const shift = 10 ** fixed.length;\n    let numerator = integer * shift + Number(fixed);\n    let denominator = shift;\n    if (open !== -1) {\n      const cycle = text.slice(open + 1, -1);\n      const nines = 10 ** cycle.length - 1;\n      numerator = numerator * nines + Number(cycle);\n      denominator = denominator * nines;\n    }\n    const divisor = gcd(numerator, denominator);\n    return [numerator / divisor, denominator / divisor];\n  }\n\n  const first = toFraction(s);\n  const second = toFraction(t);\n  return first[0] === second[0] && first[1] === second[1];\n}",
+  "brute": "function isRationalEqual(s, t) {\n  // Write 60 decimal places of each number as one big integer. Equal values differ by at most\n  // one unit in the last place (0.999... against 1.000...); distinct values differ far more.\n  const expand = (text) => {\n    const [, whole, fixed = '', cycle = ''] = text.match(/^(\\d+)(?:\\.(\\d*)(?:\\((\\d+)\\))?)?$/);\n    let digits = fixed;\n    while (cycle && digits.length < 60) digits += cycle;\n    return BigInt(whole + digits.slice(0, 60).padEnd(60, '0'));\n  };\n  const gap = expand(s) - expand(t);\n  return gap >= -1n && gap <= 1n;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (k) => Math.floor(rand() * k);\n  const digits = (length) => Array.from({ length }, () => String(pick(10))).join('');\n  const limit = size === 'large' ? 4 : 3;\n  const randomForm = () => {\n    const width = 1 + pick(limit);\n    const I = width === 1 ? String(pick(10)) : String(1 + pick(9)) + digits(width - 1);\n    const form = pick(3);\n    if (form === 0) return { I, N: '', R: null, dot: false };\n    const N = digits(pick(limit + 1));\n    if (form === 1) return { I, N, R: null, dot: rand() < 0.5 || N !== '' };\n    const roll = rand();\n    const R = roll < 0.15 ? '9'.repeat(1 + pick(2)) : roll < 0.3 ? '0'.repeat(1 + pick(2)) : digits(1 + pick(limit));\n    return { I, N, R, dot: true };\n  };\n  // Each step rewrites a number into another valid spelling of the same value (or returns null).\n  const shiftDigits = (x, delta, R) => {\n    const all = x.I + x.N;\n    const moved = String(Number(all) + delta).padStart(all.length, '0');\n    const cut = moved.length - x.N.length;\n    const I = moved.slice(0, cut).replace(/^0+(?=\\d)/, '');\n    return I.length > 4 ? null : { I, N: moved.slice(cut), R, dot: true };\n  };\n  const steps = [\n    (x) => (x.R && x.N.length < 4 ? { ...x, N: x.N + x.R[0], R: x.R.slice(1) + x.R[0] } : null),\n    (x) => (x.R && x.N && x.N.at(-1) === x.R.at(-1) ? { ...x, N: x.N.slice(0, -1), R: x.R.at(-1) + x.R.slice(0, -1) } : null),\n    (x) => (x.R && x.R.length * 2 <= 4 ? { ...x, R: x.R + x.R } : null),\n    (x) => (x.R && x.R.length % 2 === 0 && x.R.slice(0, x.R.length / 2) === x.R.slice(x.R.length / 2) ? { ...x, R: x.R.slice(0, x.R.length / 2) } : null),\n    (x) => (x.R && /^0+$/.test(x.R) ? { ...x, R: null } : null),\n    (x) => (!x.R ? { ...x, R: '0'.repeat(1 + pick(2)), dot: true } : null),\n    (x) => (!x.R && x.N.length < 4 ? { ...x, N: x.N + '0', dot: true } : null),\n    (x) => (!x.R && x.N.endsWith('0') ? { ...x, N: x.N.slice(0, -1) } : null),\n    (x) => (!x.R && !x.N ? { ...x, dot: !x.dot } : null),\n    (x) => (!x.R && Number(x.I + x.N) > 0 ? shiftDigits(x, -1, '9') : null),\n    (x) => (x.R && /^9+$/.test(x.R) ? shiftDigits(x, 1, null) : null),\n  ];\n  const walk = (x) => {\n    for (let count = pick(7); count > 0; count--) {\n      const options = steps.map(step => step(x)).filter(Boolean);\n      if (options.length === 0) break;\n      x = options[pick(options.length)];\n    }\n    return x;\n  };\n  const tweak = (x) => {\n    const keys = ['I', 'N', 'R'].filter(key => x[key]);\n    const key = keys[pick(keys.length)];\n    const at = pick(x[key].length);\n    let digit = String(pick(10));\n    if (key === 'I' && at === 0 && x[key].length > 1 && digit === '0') digit = '1';\n    return { ...x, [key]: x[key].slice(0, at) + digit + x[key].slice(at + 1) };\n  };\n  const write = (x) => x.I + (x.dot || x.N || x.R ? '.' + x.N : '') + (x.R ? '(' + x.R + ')' : '');\n  const base = randomForm();\n  const first = walk(base);\n  let second = walk(base);\n  const mode = rand();\n  if (mode < 0.3) second = tweak(second);\n  else if (mode < 0.42) second = randomForm();\n  return rand() < 0.5 ? [write(first), write(second)] : [write(second), write(first)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["0.(52)","0.5(25)"],"expected":true},
+    {"name":"Example 2","input":["0.1666(6)","0.166(66)"],"expected":true},
+    {"name":"Example 3","input":["0.9(9)","1."],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["0","0."]},
+    {"name":"Test 2","input":["0.(0)","0"]},
+    {"name":"Test 3","input":["1.(9)","2"]},
+    {"name":"Test 4","input":["9999.(9)","9999.9(9)"]},
+    {"name":"Test 5","input":["0.(1)","0.1"]},
+    {"name":"Test 6","input":["0.0000(1)","0"]},
+    {"name":"Test 7","input":["1.2(34)","1.234(3434)"]},
+    {"name":"Test 8","input":["0.(123)","0.(1231)"]},
+    {"name":"Test 9","input":["12.34","12.340(0)"]},
+    {"name":"Test 10","input":["3.1415(9265)","3.1415(9266)"]},
+    {"name":"Test 11","input":["0.(01)","0.0(10)"]},
+    {"name":"Test 12","input":["5","5.0001"]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOne value has many spellings: the cycle can be rolled (`0.(52)` and `0.5(25)`), written twice (`(6)` and `(66)`), padded with zeros, or end in endless 9s (`0.9(9)` is `1`). Rewriting strings into one canonical spelling means handling every one of these cases. Instead, turn each string into an exact fraction in lowest terms: equal values have identical reduced fractions, so the spelling no longer matters. A brute-force alternative writes out dozens of decimal places and compares them, allowing a difference of one in the last place for the 9s case.\n\n## Approach\n\n1. Without a dot the string is an integer: the fraction is `[value, 1]`.\n2. Otherwise read `integer` and the non-repeating digits `fixed`. With `shift = 10^len(fixed)`, the terminating part is `(integer * shift + fixed) / shift`.\n3. If there is a cycle of length b, write `nines = 10^b - 1`. A block repeating forever after the shift adds `cycle / (shift * nines)`, so multiply `numerator` by `nines`, add `cycle`, and multiply `denominator` by `nines`.\n4. Divide both by their `gcd` and compare the two reduced pairs.\n\n## Example 1, step by step\n\n`s = \"0.(52)\"`: `fixed` is empty, so `shift = 1`, `numerator = 0`, `denominator = 1`. The cycle `52` gives `nines = 99`, so the fraction is `52/99`, already reduced.\n\n`t = \"0.5(25)\"`: `fixed = \"5\"`, `shift = 10`, `numerator = 5`, `denominator = 10`. The cycle `25` gives `nines = 99`: `numerator = 5 * 99 + 25 = 520`, `denominator = 990`. Their gcd is 10, giving `52/99`. The pairs match, so the answer is `true`.\n\n## Complexity\n\n- Time: O(L) for strings of length L (at most 15 here), plus a logarithmic gcd.\n- Space: O(1) beyond the small substrings.\n\n## Pitfalls\n\n- Comparing floating-point values needs a carefully chosen tolerance; exact fractions need none.\n- `Number(\"\")` is `0`, which covers an empty non-repeating part as in `\"1.\"` or `\"0.(52)\"`.\n- Reduce before comparing. Cross-multiplying unreduced fractions can reach about 10^20, past exact integer range; reduced numerators stay below 10^12.\n- Endless 9s need no special case: `(9)` contributes `9/9 = 1` unit of the last fixed place.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `toFraction` | turns one string into a reduced `[numerator, denominator]` |\n| `dot`, `open` | positions of `.` and `(` (`-1` when absent) |\n| `integer`, `fixed`, `cycle` | the integer part, the non-repeating digits, the repeating digits |\n| `shift` | `10^len(fixed)` |\n| `nines` | `10^len(cycle) - 1` |\n| `numerator`, `denominator` | the fraction being built |\n| `divisor` | their greatest common divisor |\n| `first`, `second` | the reduced fractions of `s` and `t` |",
+  "narration": {
+    "2": "Euclid's algorithm finds the greatest common divisor used to reduce a fraction.",
+    "5": "Find the decimal point; -1 means the string is a plain integer.",
+    "6": "A plain integer is the fraction value/1.",
+    "7": "Find the opening parenthesis of a repeating block, if any.",
+    "9": "The non-repeating digits sit between the dot and the parenthesis (or the end); they may be empty.",
+    "10": "Shifting the decimals left by their length turns them into an integer.",
+    "11": "The terminating part as a fraction over shift: integer digits followed by the fixed digits.",
+    "13": "Only a string with a repeating block needs the extra term.",
+    "15": "A block of b digits repeating forever equals block / (10^b - 1), scaled down by shift.",
+    "16": "Bring both terms over the common denominator shift * nines and add the cycle.",
+    "17": "The denominator gains the same factor of nines.",
+    "19": "Reduce the fraction so equal values get the same pair.",
+    "20": "Return the fraction in lowest terms.",
+    "25": "The numbers are equal exactly when both reduced numerators and denominators match."
+  }
+}

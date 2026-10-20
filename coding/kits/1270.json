@@ -1,0 +1,53 @@
+{
+  "number": 1270,
+  "title": "All People Report to the Given Manager",
+  "spec": "recalled",
+  "statement": "One table describes who manages whom:\n\n- `Employees(employee_id, employee_name, manager_id)`: one row per employee; `employee_id` is unique and `manager_id` is the `employee_id` of that employee's direct manager (always an existing employee).\n\nEmployee `1` is the head of the company and is listed as their own manager (`manager_id = 1`). Other employees can also be their own manager, or belong to chains or loops that never lead to the head.\n\nReport the `employee_id` of every employee **other than the head** whose chain of managers reaches the head, either directly or through other managers. The company is small: anyone who reaches the head does so in at most three steps (employee, manager, manager's manager, head). The single output column is `employee_id`; rows may come in any order.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "Every manager_id is the employee_id of an existing employee",
+    "If employee 1 exists, its manager_id is 1",
+    "An employee whose chain reaches employee 1 does so within 3 steps"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["employee_name","VARCHAR(30)"],["manager_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const boss = new Map();\n  for (const row of Employees) {\n    if (row.some((v) => v === null)) return 'Employees rows may not contain null.';\n    if (boss.has(row[0])) return `employee_id ${row[0]} appears twice.`;\n    boss.set(row[0], row[2]);\n  }\n  for (const [id, manager] of boss) if (!boss.has(manager)) return `Employee ${id} has a manager_id that is not an employee.`;\n  if (boss.has(1) && boss.get(1) !== 1) return 'Employee 1 must be their own manager.';\n  for (const id of boss.keys()) {\n    let at = id, steps = 0;\n    while (at !== 1 && steps <= boss.size) { at = boss.get(at); steps++; }\n    if (at === 1 && steps > 3) return `Employee ${id} is ${steps} steps from the head; at most 3 are allowed.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT e.employee_id\nFROM Employees AS e\nJOIN Employees AS m1\n  ON m1.employee_id = e.manager_id\nJOIN Employees AS m2\n  ON m2.employee_id = m1.manager_id\nWHERE m2.manager_id = 1\n  AND e.employee_id <> 1;",
+  "brute": "WITH RECURSIVE reports AS (\n  SELECT employee_id\n  FROM Employees\n  WHERE manager_id = 1 AND employee_id <> 1\n  UNION\n  SELECT sub.employee_id\n  FROM Employees AS sub, reports AS r\n  WHERE sub.manager_id = r.employee_id\n)\nSELECT employee_id FROM reports",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const names = ['Boss', 'Alice', 'Bob', 'Daniel', 'Luis', 'John', 'Angela', 'Robert', 'Mia', 'Omar', 'Yuki', 'Ines'];\n  const small = size === 'small';\n  const count = small ? pick(9) : 2000;\n  const pool = small ? [2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 77] : Array.from({ length: 3000 }, (_, i) => i + 2);\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const rows = [], tree = [], outside = [];\n  // The head is usually present; employees then join its tree (depth at most 3) or form groups that never reach it.\n  const hasHead = count > 0 && (!small || rand() < 0.85);\n  if (hasHead) { rows.push([1, 'Boss', 1]); tree.push([1, 0]); }\n  for (let i = 0; rows.length < count; i++) {\n    const id = pool[i], name = names[pick(names.length)], r = rand();\n    const open = tree.filter(([, depth]) => depth < 3);\n    if (r < 0.6 && open.length) {\n      const [manager, depth] = open[pick(open.length)];\n      rows.push([id, name, manager]);\n      tree.push([id, depth + 1]);\n    } else if (r < 0.75 || !outside.length) {\n      rows.push([id, name, id]);\n      outside.push(rows.length - 1);\n    } else {\n      const other = outside[pick(outside.length)];\n      rows.push([id, name, rows[other][0]]);\n      // Sometimes a self-managed employee is redirected to the newcomer, closing a loop of two.\n      if (rows[other][2] === rows[other][0] && rand() < 0.3) rows[other][2] = id;\n      outside.push(rows.length - 1);\n    }\n  }\n  for (let i = rows.length - 1; i > 0; i--) { const j = pick(i + 1); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ Employees: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[1,"Boss",1],[3,"Alice",3],[2,"Bob",1],[4,"Daniel",2],[7,"Luis",4],[8,"John",3],[9,"Angela",8],[77,"Robert",1]]}],"expected":{"columns":["employee_id"],"rows":[[2],[77],[4],[7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Boss",1]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"Boss",1],[2,"Bob",1],[3,"Mia",1]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,"Boss",1],[2,"Bob",1],[3,"Daniel",2],[4,"Luis",3]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Boss",1],[5,"Alice",5],[6,"John",5],[7,"Angela",6],[8,"Omar",1]]}]},
+    {"name":"Test 6","input":[{"Employees":[[1,"Boss",1],[5,"Alice",6],[6,"John",5],[7,"Angela",5],[2,"Bob",1]]}]},
+    {"name":"Test 7","input":[{"Employees":[[40,"Yuki",30],[30,"Ines",20],[20,"Omar",1],[1,"Boss",1],[99,"Mia",99]]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,"Boss",1],[2,"Bob",1],[3,"Mia",1],[4,"Luis",2],[5,"Ines",2],[6,"Omar",3],[7,"Yuki",4],[8,"John",6]]}]},
+    {"name":"Test 9","input":[{"Employees":[[2,"Alice",2],[3,"Bob",2],[4,"John",3]]}]},
+    {"name":"Test 10","input":[{"Employees":[[1,"Boss",1],[2,"Alice",2],[3,"Bob",2],[4,"John",3],[5,"Mia",1],[6,"Omar",5]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFollowing a chain of managers is normally a recursive walk, but the problem caps the chain at three steps, so a fixed number of self-joins is enough. Join each employee `e` to their manager `m1`, and `m1` to their manager `m2`; then `m2`'s own manager is three steps above `e`. The head is their own manager, so once a chain reaches employee 1 it stays there: someone who reports to the head in one or two steps still ends at 1 after three. The check is simply `m2.manager_id = 1`. The head passes that test too, so it is removed explicitly.\n\n## Approach\n\n1. Take every employee as `e`.\n2. Join `m1`, the employee whose `employee_id` is `e.manager_id`.\n3. Join `m2`, the manager of `m1`.\n4. Keep rows where `m2.manager_id = 1` (three steps up lands on the head) and drop the head itself with `e.employee_id <> 1`.\n\n## Example 1, step by step\n\n| e | m1 | m2 | m2.manager_id | kept |\n| --- | --- | --- | --- | --- |\n| 1 Boss | 1 Boss | 1 Boss | 1 | no, it is the head |\n| 2 Bob | 1 Boss | 1 Boss | 1 | yes |\n| 4 Daniel | 2 Bob | 1 Boss | 1 | yes |\n| 7 Luis | 4 Daniel | 2 Bob | 1 | yes |\n| 77 Robert | 1 Boss | 1 Boss | 1 | yes |\n| 3 Alice | 3 Alice | 3 Alice | 3 | no |\n| 8 John | 3 Alice | 3 Alice | 3 | no |\n| 9 Angela | 8 John | 3 Alice | 3 | no |\n\nThe result is 2, 4, 7 and 77.\n\n## Complexity\n\n- Time: O(n) for n employees with an index on `employee_id` (each join is a key lookup); O(n^2) per join without one.\n- Space: O(n) for the joined rows.\n\n## Pitfalls\n\n- Forgetting `e.employee_id <> 1` reports the head, whose self-loop satisfies every join.\n- Stopping at two joins misses employees three steps away, such as Luis in Example 1.\n- Testing `m1.manager_id = 1 OR m2.manager_id = 1` is redundant: the head's self-loop already carries short chains up to `m2`.\n- Self-managed employees like Alice loop on themselves forever, so a hand-written walk needs a stop; the fixed joins never loop.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `e` | the employee being tested |\n| `m1` | `e`'s direct manager |\n| `m2` | `m1`'s manager, two steps above `e` |\n| `m2.manager_id` | the employee three steps above `e`; it is 1 exactly when `e` reports to the head |",
+  "narration": {
+    "1": "The answer is the id of the employee being tested.",
+    "2": "Every employee is a candidate, including people outside the head's tree.",
+    "3": "Join each employee to their direct manager.",
+    "5": "Join that manager to their own manager, two steps above the employee.",
+    "7": "Three steps up must be the head; the head's self-loop lets shorter chains pass this test too.",
+    "8": "The head also passes, so it is excluded explicitly."
+  }
+}

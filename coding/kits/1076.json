@@ -1,0 +1,52 @@
+{
+  "number": 1076,
+  "title": "Project Employees II",
+  "spec": "recalled",
+  "statement": "Two tables describe who works on which project:\n\n- `Project(project_id, employee_id)`: one row per assignment of an employee to a project; the pair `(project_id, employee_id)` is unique, and every `employee_id` exists in `Employee`.\n- `Employee(employee_id, name, experience_years)`: one row per employee; `employee_id` is unique.\n\nThe size of a project is the number of employees assigned to it in `Project`. Report every project whose size is the largest of all projects, as one column named `project_id`. When several projects tie for the largest size, report each of them. An empty `Project` table gives no rows. Rows may come in any order.",
+  "constraints": [
+    "(project_id, employee_id) is unique in Project",
+    "employee_id is unique in Employee",
+    "Every Project.employee_id exists in Employee",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Project": [["project_id","INT"],["employee_id","INT"]],
+    "Employee": [["employee_id","INT"],["name","VARCHAR(10)"],["experience_years","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Project = [], Employee = [] }] = input;\n  const staff = new Set();\n  for (const row of Employee) {\n    if (row.some((v) => v === null)) return 'Employee rows may not contain null.';\n    if (staff.has(row[0])) return `employee_id ${row[0]} appears twice in Employee.`;\n    if (row[2] < 0) return `Employee ${row[0]} has negative experience_years.`;\n    staff.add(row[0]);\n  }\n  const pairs = new Set();\n  for (const [project, employee] of Project) {\n    if (project === null || employee === null) return 'Project rows may not contain null.';\n    if (!staff.has(employee)) return `Project ${project} names unknown employee ${employee}.`;\n    const key = `${project}|${employee}`;\n    if (pairs.has(key)) return `(project ${project}, employee ${employee}) appears twice in Project.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH team_sizes AS (\n  SELECT project_id, COUNT(employee_id) AS staff\n  FROM Project\n  GROUP BY project_id\n)\nSELECT project_id\nFROM team_sizes\nWHERE staff = (SELECT MAX(staff) FROM team_sizes);",
+  "brute": "SELECT project_id\nFROM (\n  SELECT project_id, RANK() OVER (ORDER BY COUNT(*) DESC) AS size_rank\n  FROM Project\n  GROUP BY project_id\n) AS ranked\nWHERE size_rank = 1",
+  "generator": "function generate(rand, size) {\n  const names = ['Khaled', 'Ali', 'John', 'Doe', 'Mona', 'Sara', 'Omar', 'Lina'];\n  const small = size === 'small';\n  const people = small ? Math.floor(rand() * 6) : 1000;\n  const Employee = [];\n  for (let id = 1; id <= people; id++) Employee.push([id, names[Math.floor(rand() * names.length)], Math.floor(rand() * (small ? 4 : 30))]);\n  const Project = [];\n  if (people > 0) {\n    const projects = small ? 1 + Math.floor(rand() * 4) : 120;\n    const target = small ? Math.floor(rand() * 9) : 2000;\n    const seen = new Set();\n    for (let tries = 0; Project.length < target && tries < target * 3; tries++) {\n      const project = small ? projects - Math.floor(rand() * projects) : 1 + Math.floor(rand() * projects);\n      const employee = 1 + Math.floor(rand() * people);\n      if (seen.has(`${project}|${employee}`)) continue;\n      seen.add(`${project}|${employee}`);\n      Project.push([project, employee]);\n    }\n  }\n  return [{ Project, Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Project":[[1,1],[1,2],[1,3],[2,1],[2,4]],"Employee":[[1,"Khaled",3],[2,"Ali",2],[3,"John",1],[4,"Doe",2]]}],"expected":{"columns":["project_id"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Project":[],"Employee":[]}]},
+    {"name":"Test 2","input":[{"Project":[],"Employee":[[1,"Ali",4]]}]},
+    {"name":"Test 3","input":[{"Project":[[7,1]],"Employee":[[1,"Ali",4]]}]},
+    {"name":"Test 4","input":[{"Project":[[1,1],[1,2],[2,3],[2,4]],"Employee":[[1,"Ali",1],[2,"John",2],[3,"Doe",3],[4,"Mona",4]]}]},
+    {"name":"Test 5","input":[{"Project":[[1,1],[2,2],[3,3]],"Employee":[[1,"Ali",1],[2,"John",2],[3,"Doe",3]]}]},
+    {"name":"Test 6","input":[{"Project":[[1,1],[2,1],[2,2],[3,1]],"Employee":[[1,"Sara",5],[2,"Omar",0]]}]},
+    {"name":"Test 7","input":[{"Project":[[10,1],[10,2],[20,1],[20,2],[20,3],[30,3]],"Employee":[[1,"Ali",2],[2,"John",2],[3,"Doe",9]]}]},
+    {"name":"Test 8","input":[{"Project":[[4,1],[4,2],[5,2],[5,3],[6,1],[6,3],[7,4]],"Employee":[[1,"Ali",1],[2,"John",1],[3,"Doe",1],[4,"Lina",8]]}]},
+    {"name":"Test 9","input":[{"Project":[[100,2],[3,1],[3,2],[3,3],[100,3],[100,1],[50,4]],"Employee":[[1,"Khaled",3],[2,"Ali",2],[3,"John",1],[4,"Doe",2]]}]},
+    {"name":"Test 10","input":[{"Project":[[1,1],[1,2],[1,3],[2,4]],"Employee":[[1,"Ali",1],[2,"Ali",1],[3,"Ali",1],[4,"Mona",2],[5,"Sara",3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The most employees\" compares projects by a per-project count, so the counts must exist before they can be compared. Grouping `Project` by `project_id` gives each project's size; the largest size is then one more aggregate, `MAX`, over those counts. Keeping every project whose count equals that maximum reports all tied winners, which a \"sort and take the first row\" query would not. `Employee` holds no information needed here: every assignment already names a valid employee, so counting `Project` rows is enough.\n\n## Approach\n\n1. `team_sizes`: group `Project` by `project_id` and count the employees as `staff`.\n2. Compute the largest `staff` with a scalar subquery `(SELECT MAX(staff) FROM team_sizes)`.\n3. Return `project_id` for every row of `team_sizes` whose `staff` equals that maximum.\n\n## Example 1, step by step\n\n- `team_sizes` holds project 1 → 3 (employees 1, 2, 3) and project 2 → 2 (employees 1, 4).\n- `MAX(staff)` is 3.\n- Only project 1 has `staff = 3`, so the result is the single row `1`.\n\nIf project 2 also had three employees, both projects would pass the filter and both would be reported.\n\n## Complexity\n\n- Time: O(A) with hashing for A assignment rows to build `team_sizes`, then two passes over its P rows.\n- Space: O(P) for the P projects in `team_sizes`.\n\n## Pitfalls\n\n- `ORDER BY COUNT(*) DESC LIMIT 1` returns one project even when several share the top size.\n- Joining `Employee` is unnecessary; an inner join is harmless here only because every assignment names a real employee.\n- `MAX(COUNT(*))` cannot be nested in one `SELECT` in MySQL; the counts need their own stage (a CTE or derived table) first.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `team_sizes` | one row per project with its number of employees |\n| `staff` | `COUNT(employee_id)` for that project |\n| `(SELECT MAX(staff) FROM team_sizes)` | the largest project size |",
+  "narration": {
+    "1": "The first stage measures every project.",
+    "2": "Count the employees assigned to each project and call it staff.",
+    "4": "One group per project, so team_sizes has one row per project.",
+    "6": "The answer lists project ids only.",
+    "8": "Keep every project whose size equals the largest size, so ties are all reported."
+  }
+}

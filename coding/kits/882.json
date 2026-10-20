@@ -1,0 +1,75 @@
+{
+  "number": 882,
+  "title": "Reachable Nodes In Subdivided Graph",
+  "spec": "leetcode",
+  "statement": "An undirected graph has `n` nodes labelled `0` to `n - 1`. Each entry `edges[i] = [u, v, cnt]` is an edge between `u` and `v` that gets split by `cnt` brand-new nodes: it is replaced by the chain `u - x1 - x2 - ... - xcnt - v`, made of `cnt + 1` edges of length 1 (with `cnt = 0` the edge stays a single edge).\n\nIn this expanded graph, a node counts as reachable when its shortest distance from node `0` is at most `maxMoves`. Return the number of reachable nodes, counting both original and newly added nodes (node `0` itself always counts).",
+  "constraints": [
+    "1 <= n <= 3000",
+    "0 <= edges.length <= min(n * (n - 1) / 2, 10^4)",
+    "edges[i].length == 3",
+    "0 <= u < v < n for every edge [u, v, cnt]",
+    "No two edges join the same pair of nodes",
+    "0 <= cnt <= 10^4",
+    "0 <= maxMoves <= 10^9"
+  ],
+  "signature": "int reachableNodes(int[][] edges, int maxMoves, int n)",
+  "entry": "reachableNodes",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "maxMoves",
+    "n"
+  ],
+  "validator": "function validate([edges, maxMoves, n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 3000) return 'n is between 1 and 3000.';\n  if (!Number.isInteger(maxMoves) || maxMoves < 0 || maxMoves > 1e9) return 'maxMoves is between 0 and 10^9.';\n  if (!Array.isArray(edges) || edges.length > Math.min(n * (n - 1) / 2, 10000)) return 'There are too many edges for n nodes.';\n  const seen = new Set();\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3 || !edge.every(Number.isInteger)) return 'Each edge is [u, v, cnt].';\n    const [u, v, cnt] = edge;\n    if (u < 0 || u >= v || v >= n) return 'Each edge needs 0 <= u < v < n.';\n    if (cnt < 0 || cnt > 10000) return 'cnt is between 0 and 10^4.';\n    if (seen.has(u * n + v)) return 'Two edges cannot join the same pair of nodes.';\n    seen.add(u * n + v);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function reachableNodes(edges, maxMoves, n) {\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v, cnt] of edges) {\n    graph[u].push([v, cnt + 1]);\n    graph[v].push([u, cnt + 1]);\n  }\n  // Binary min-heap of [distance, node] pairs.\n  const heap = [];\n  const push = (entry) => {\n    heap.push(entry);\n    let child = heap.length - 1;\n    while (child > 0) {\n      const parent = (child - 1) >> 1;\n      if (heap[parent][0] <= heap[child][0]) break;\n      [heap[parent], heap[child]] = [heap[child], heap[parent]];\n      child = parent;\n    }\n  };\n  const pop = () => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    heap[0] = last;\n    let parent = 0;\n    for (;;) {\n      const left = 2 * parent + 1;\n      const right = left + 1;\n      let smallest = parent;\n      if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;\n      if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;\n      if (smallest === parent) break;\n      [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];\n      parent = smallest;\n    }\n    return top;\n  };\n\n  const dist = new Array(n).fill(Infinity);\n  dist[0] = 0;\n  push([0, 0]);\n  while (heap.length > 0) {\n    const [d, node] = pop();\n    if (d > dist[node]) continue;\n    for (const [next, weight] of graph[node]) {\n      if (d + weight < dist[next]) {\n        dist[next] = d + weight;\n        push([dist[next], next]);\n      }\n    }\n  }\n  let reachable = 0;\n  for (let i = 0; i < n; i++) {\n    if (dist[i] <= maxMoves) reachable++;\n  }\n  for (const [u, v, cnt] of edges) {\n    const fromU = Math.max(0, maxMoves - dist[u]);\n    const fromV = Math.max(0, maxMoves - dist[v]);\n    reachable += Math.min(cnt, fromU + fromV);\n  }\n  return reachable;\n}",
+  "brute": "function reachableNodes(edges, maxMoves, n) {\n  // Bellman-Ford over the original edges, then check every new node one by one.\n  const dist = new Array(n).fill(Infinity);\n  dist[0] = 0;\n  for (let round = 0; round < n; round++) {\n    let changed = false;\n    for (const [u, v, cnt] of edges) {\n      if (dist[u] + cnt + 1 < dist[v]) { dist[v] = dist[u] + cnt + 1; changed = true; }\n      if (dist[v] + cnt + 1 < dist[u]) { dist[u] = dist[v] + cnt + 1; changed = true; }\n    }\n    if (!changed) break;\n  }\n  let count = dist.filter(d => d <= maxMoves).length;\n  for (const [u, v, cnt] of edges) {\n    // The s-th new node from u is s steps from u and cnt + 1 - s steps from v.\n    for (let s = 1; s <= cnt; s++) {\n      if (Math.min(dist[u] + s, dist[v] + cnt + 1 - s) <= maxMoves) count++;\n    }\n  }\n  return count;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    const n = int(1, 6);\n    const edges = [];\n    const density = rand();\n    for (let u = 0; u < n; u++)\n      for (let v = u + 1; v < n; v++)\n        if (rand() < density) edges.push([u, v, rand() < 0.2 ? 0 : int(0, 6)]);\n    for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n    return [edges, rand() < 0.1 ? 0 : int(0, 20), n];\n  }\n  const n = rand() < 0.5 ? 1000 : 2000;\n  const m = 2000;\n  const used = new Set();\n  const edges = [];\n  const add = (a, b) => {\n    const u = Math.min(a, b), v = Math.max(a, b);\n    if (u === v || used.has(u * n + v)) return;\n    used.add(u * n + v);\n    edges.push([u, v, rand() < 0.1 ? 0 : int(0, 10000)]);\n  };\n  // A random tree over part of the nodes keeps most of the graph connected to node 0.\n  const treeSize = Math.min(n, int(Math.floor(m / 2), m));\n  for (let i = 1; i < treeSize; i++) add(i, int(0, i - 1));\n  while (edges.length < m) add(int(0, n - 1), int(0, n - 1));\n  for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const roll = rand();\n  const maxMoves = roll < 0.25 ? 1000000000 : roll < 0.5 ? int(0, 20000) : int(20000, 200000);\n  return [edges, maxMoves, n];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,10],[0,2,1],[1,2,2]],6,3],"expected":13},
+    {"name":"Example 2","input":[[[0,1,4],[1,2,6],[0,2,8],[1,3,1]],10,4],"expected":23},
+    {"name":"Example 3","input":[[[1,2,4],[1,4,5],[1,3,1],[2,3,4],[3,4,5]],17,5],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],0,1]},
+    {"name":"Test 2","input":[[],5,3]},
+    {"name":"Test 3","input":[[[0,1,0]],0,2]},
+    {"name":"Test 4","input":[[[0,1,0]],1,2]},
+    {"name":"Test 5","input":[[[0,1,5]],3,2]},
+    {"name":"Test 6","input":[[[0,1,5]],6,2]},
+    {"name":"Test 7","input":[[[0,1,4]],10,2]},
+    {"name":"Test 8","input":[[[0,1,1],[1,2,1],[0,2,10]],5,3]},
+    {"name":"Test 9","input":[[[0,1,10],[0,2,1],[1,2,1]],4,3]},
+    {"name":"Test 10","input":[[[0,1,10000],[1,2,10000],[0,2,10000]],1000000000,3]},
+    {"name":"Test 11","input":[[[0,1,2],[2,3,4]],10,4]},
+    {"name":"Test 12","input":[[[0,3,7],[1,3,2],[0,2,3],[2,4,0],[1,4,9],[3,4,1]],6,5]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBuilding the expanded graph is hopeless: one edge alone can add 10^4 nodes. Instead, treat each original edge as a single edge of weight `cnt + 1` and run Dijkstra from node 0. That gives `dist` for every original node, which settles the original nodes directly. For the new nodes on an edge `[u, v, cnt]`, a walker standing at `u` with `maxMoves - dist[u]` steps left can enter that many of them from the `u` side, and likewise from the `v` side. The two stretches may overlap, but the edge only has `cnt` new nodes, so take the smaller of `cnt` and their sum.\n\n## Approach\n\n1. Build `graph`: each edge `[u, v, cnt]` links `u` and `v` with weight `cnt + 1`.\n2. Run Dijkstra from node 0 with a binary min-heap, skipping stale heap entries, to fill `dist`.\n3. Count the original nodes with `dist[i] <= maxMoves`.\n4. For every edge, compute `fromU = max(0, maxMoves - dist[u])` and `fromV` the same way, and add `min(cnt, fromU + fromV)`.\n5. Return the total.\n\n## Example 1, step by step\n\nThe weights are `0-1: 11`, `0-2: 2`, `1-2: 3`. Dijkstra gives `dist = [0, 5, 2]` (node 1 is cheaper through node 2: `2 + 3 = 5 < 11`). All three are within 6 moves, so `reachable = 3`. Edge `[0,1,10]`: `fromU = 6`, `fromV = 1`, adds `min(10, 7) = 7`. Edge `[0,2,1]`: `6 + 4` caps at 1. Edge `[1,2,2]`: `1 + 4` caps at 2. Total `3 + 7 + 1 + 2 = 13`.\n\n## Complexity\n\n- Time: O((n + E) log E): Dijkstra pushes at most one heap entry per edge relaxation; the final pass is O(n + E).\n- Space: O(n + E) for the adjacency lists, `dist` and the heap.\n\n## Pitfalls\n\n- Count new nodes per edge, not per endpoint: reaching an edge from both sides must not count its nodes twice, hence the cap at `cnt`.\n- An unreachable endpoint has `dist = Infinity`; `Math.max(0, ...)` turns its contribution into 0 instead of a negative number.\n- The edge weight is `cnt + 1` (that many unit steps), not `cnt`.\n- `maxMoves` can be 10^9, so any approach that walks one step at a time is far too slow.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency lists of `[neighbour, weight]` with weight `cnt + 1` |\n| `heap`, `push`, `pop` | min-heap of `[distance, node]` and its operations |\n| `dist[i]` | shortest distance from node 0 to original node `i` |\n| `d`, `node` | the entry just taken from the heap |\n| `reachable` | running count of reachable nodes |\n| `fromU`, `fromV` | new nodes of an edge that can be entered from each end |",
+  "narration": {
+    "2": "Make an adjacency list for the original nodes only.",
+    "4": "Crossing an edge split by cnt new nodes takes cnt + 1 steps, so that is its weight.",
+    "9": "push adds an entry at the end and lifts it while it is smaller than its parent.",
+    "19": "pop removes the smallest entry and sinks the last entry down to restore the heap.",
+    "38": "No original node has a known distance yet...",
+    "39": "...except node 0, the start.",
+    "40": "Seed the heap with the start node at distance 0.",
+    "41": "Dijkstra: keep taking the closest node not yet settled.",
+    "43": "Skip stale entries whose distance was improved after they were pushed.",
+    "45": "Going through node is shorter than the best known route to next...",
+    "46": "...so record the shorter distance...",
+    "47": "...and queue next to relax its neighbours later.",
+    "53": "An original node counts when its shortest distance fits in maxMoves.",
+    "55": "Now count the new nodes edge by edge.",
+    "56": "Steps left after reaching u, which is how many new nodes we can enter from u's side (0 if u is out of reach).",
+    "57": "The same from v's side.",
+    "58": "The two stretches may overlap, so never count more than the cnt new nodes the edge has.",
+    "60": "Return original plus new reachable nodes."
+  }
+}

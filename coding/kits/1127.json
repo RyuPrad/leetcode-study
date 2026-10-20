@@ -1,0 +1,54 @@
+{
+  "number": 1127,
+  "title": "User Purchase Platform",
+  "spec": "recalled",
+  "statement": "One table records purchases on a store that has a desktop site and a mobile app:\n\n- `Spending(user_id, spend_date, platform, amount)`: each row is the `amount` a user spent on `spend_date` through `platform`, which is `'desktop'` or `'mobile'`. `(user_id, spend_date, platform)` is unique, so a user has one or two rows per date.\n\nOn each date, every user who spent something that day falls into exactly one category: `'desktop'` if they used only desktop that day, `'mobile'` if they used only mobile, and `'both'` if they used both.\n\nFor every date that appears in `Spending`, report **three** rows, one per category, with the columns:\n\n- `spend_date`: the date.\n- `platform`: the category, `'desktop'`, `'mobile'` or `'both'`.\n- `total_amount`: the total spent that day by the users in that category (for `'both'`, their desktop and mobile amounts added together).\n- `total_users`: the number of users in that category that day.\n\nA category with no users on a date still gets its row, with `0` as both totals. Rows may come in any order.",
+  "constraints": [
+    "(user_id, spend_date, platform) is unique in Spending",
+    "platform is 'desktop' or 'mobile'",
+    "amount is 0 or more"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Spending": [["user_id","INT"],["spend_date","DATE"],["platform","ENUM('desktop', 'mobile')"],["amount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Spending = [] }] = input;\n  const keys = new Set();\n  for (const [user, date, platform, amount] of Spending) {\n    if (user === null || date === null || platform === null || amount === null) return 'Every column is required.';\n    if (platform !== 'desktop' && platform !== 'mobile') return `Unknown platform ${platform}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `spend_date ${date} is not YYYY-MM-DD.`;\n    if (amount < 0) return 'amount cannot be negative.';\n    const key = `${user}|${date}|${platform}`;\n    if (keys.has(key)) return `User ${user} has two ${platform} rows on ${date}.`;\n    keys.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH user_day AS (\n  SELECT\n    user_id,\n    spend_date,\n    IF(COUNT(DISTINCT platform) = 2, 'both', MAX(platform)) AS platform,\n    SUM(amount) AS amount\n  FROM Spending\n  GROUP BY user_id, spend_date\n),\nslots AS (\n  SELECT d.spend_date, p.platform\n  FROM (SELECT DISTINCT spend_date FROM Spending) AS d\n  CROSS JOIN (\n    SELECT 'desktop' AS platform UNION ALL SELECT 'mobile' UNION ALL SELECT 'both'\n  ) AS p\n)\nSELECT\n  s.spend_date,\n  s.platform,\n  IFNULL(SUM(u.amount), 0) AS total_amount,\n  COUNT(u.user_id) AS total_users\nFROM slots AS s\nLEFT JOIN user_day AS u\n  ON u.spend_date = s.spend_date\n  AND u.platform = s.platform\nGROUP BY s.spend_date, s.platform;",
+  "brute": "WITH tagged AS (\n  SELECT s.user_id, s.spend_date, s.amount,\n    CASE WHEN EXISTS (\n        SELECT 1 FROM Spending AS o\n        WHERE o.user_id = s.user_id AND o.spend_date = s.spend_date AND o.platform <> s.platform)\n      THEN 'both' ELSE s.platform END AS kind\n  FROM Spending AS s\n)\nSELECT\n  d.spend_date,\n  k.kind AS platform,\n  (SELECT IFNULL(SUM(t.amount), 0) FROM tagged AS t\n   WHERE t.spend_date = d.spend_date AND t.kind = k.kind) AS total_amount,\n  (SELECT COUNT(DISTINCT t.user_id) FROM tagged AS t\n   WHERE t.spend_date = d.spend_date AND t.kind = k.kind) AS total_users\nFROM (SELECT DISTINCT spend_date FROM Spending) AS d,\n  (SELECT 'desktop' AS kind UNION SELECT 'mobile' UNION SELECT 'both') AS k",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const amounts = [10, 25, 50, 100, 100, 250];\n  const day = offset => new Date(Date.UTC(2019, 6, 1 + offset)).toISOString().slice(0, 10);\n  const users = small ? 1 + pick(4) : 40, days = small ? 1 + pick(3) : 60, rows = small ? pick(9) : 2000;\n  const Spending = [], seen = new Set();\n  for (let tries = 0; Spending.length < rows && tries < rows * 10; tries++) {\n    const user = 1 + pick(users), date = day(pick(days));\n    // Half the time a user who spent on one platform that day also spends on the other.\n    const platforms = rand() < 0.5 ? ['desktop', 'mobile'] : [rand() < 0.5 ? 'desktop' : 'mobile'];\n    for (const platform of platforms) {\n      const key = `${user}|${date}|${platform}`;\n      if (seen.has(key) || Spending.length >= rows) continue;\n      seen.add(key);\n      Spending.push([user, date, platform, amounts[pick(amounts.length)]]);\n    }\n  }\n  return [{ Spending }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Spending":[[1,"2019-07-01","mobile",100],[1,"2019-07-01","desktop",100],[2,"2019-07-01","mobile",100],[2,"2019-07-02","mobile",100],[3,"2019-07-01","desktop",100],[3,"2019-07-02","desktop",100]]}],"expected":{"columns":["spend_date","platform","total_amount","total_users"],"rows":[["2019-07-01","desktop",100,1],["2019-07-01","mobile",100,1],["2019-07-01","both",200,1],["2019-07-02","desktop",100,1],["2019-07-02","mobile",100,1],["2019-07-02","both",0,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Spending":[]}]},
+    {"name":"Test 2","input":[{"Spending":[[1,"2019-07-01","mobile",40]]}]},
+    {"name":"Test 3","input":[{"Spending":[[1,"2019-07-01","desktop",30],[1,"2019-07-01","mobile",70]]}]},
+    {"name":"Test 4","input":[{"Spending":[[1,"2019-07-01","desktop",30],[2,"2019-07-01","desktop",20],[3,"2019-07-02","mobile",15],[3,"2019-07-02","desktop",5]]}]},
+    {"name":"Test 5","input":[{"Spending":[[1,"2019-07-01","desktop",10],[1,"2019-07-01","mobile",20],[1,"2019-07-02","mobile",30],[2,"2019-07-02","mobile",40],[2,"2019-07-03","desktop",50]]}]},
+    {"name":"Test 6","input":[{"Spending":[[1,"2020-02-29","desktop",100],[1,"2020-02-29","mobile",200],[2,"2020-02-29","desktop",300],[2,"2020-02-29","mobile",400],[3,"2020-02-29","mobile",50]]}]},
+    {"name":"Test 7","input":[{"Spending":[[5,"2019-08-10","mobile",60],[6,"2019-08-10","mobile",0],[7,"2019-08-10","desktop",25],[7,"2019-08-11","mobile",25],[8,"2019-08-11","mobile",75]]}]},
+    {"name":"Test 8","input":[{"Spending":[[1,"2019-07-05","desktop",100],[2,"2019-07-05","desktop",100],[3,"2019-07-05","desktop",100],[1,"2019-07-06","desktop",100],[1,"2019-07-06","mobile",1]]}]},
+    {"name":"Test 9","input":[{"Spending":[[9,"2019-07-01","mobile",12],[9,"2019-07-01","desktop",8],[4,"2019-07-01","mobile",3],[4,"2019-07-02","desktop",7],[9,"2019-07-02","desktop",9],[9,"2019-07-02","mobile",1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe category of a user depends on all of that user's rows on one date, so the first job is to collapse `Spending` to one row per (user, date) carrying a category and a total. After that the report is an ordinary group-and-sum, with one catch: every date needs all three categories even when nobody is in one. Build that full grid of (date, category) slots first and **left join** the user rows onto it, so empty slots survive with zero totals.\n\n## Approach\n\n1. CTE `user_day`: `GROUP BY user_id, spend_date`. Two distinct platforms means `'both'`; otherwise the single platform (`MAX` of one value) is the category. `SUM(amount)` is what the user spent that day.\n2. CTE `slots`: every distinct date `CROSS JOIN` the three category names, giving three rows per date.\n3. `LEFT JOIN user_day` on the same date and category, so each slot meets the users in it, or none.\n4. `GROUP BY` the slot: `IFNULL(SUM(u.amount), 0)` is `total_amount` and `COUNT(u.user_id)` (which skips the nulls of an empty slot) is `total_users`.\n\n## Example 1, step by step\n\n- `user_day`: on 2019-07-01 user 1 is `both` with 200, user 2 `mobile` with 100, user 3 `desktop` with 100; on 2019-07-02 user 2 is `mobile` with 100 and user 3 `desktop` with 100.\n- `slots`: `desktop`, `mobile` and `both` for each of the two dates, six rows.\n- Joining fills five slots with one user each; the slot `(2019-07-02, both)` finds nobody and becomes `0, 0`.\n\n## Complexity\n\n- Time: O(n) to group the n rows into u user-days, then a join of 3·d slots for d dates against them, O(u + d) with hashing.\n- Space: O(u + d) for the two CTEs.\n\n## Pitfalls\n\n- Grouping `Spending` by date and platform directly counts a `both` user under desktop and under mobile.\n- Without the slot grid, a category with no users simply has no row; the task requires a `0, 0` row.\n- `COUNT(*)` after the left join reports 1 user for an empty slot; count a column of `user_day`.\n- `SUM` over an empty slot is null, not 0; wrap it in `IFNULL`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `user_day` | one row per user and date: the category (`platform`) and the day's total `amount` |\n| `slots` | every (date, category) pair that must appear in the output |\n| `d` | the distinct dates of `Spending` |\n| `p` | the three category names |\n| `s` | a slot row; `u` a user-day row joined into it |",
+  "narration": {
+    "1": "Stage one, user_day, collapses each user's spending on a date into one row.",
+    "5": "Two different platforms make the user a both user; otherwise their only platform is the category.",
+    "6": "The user's total for the day, across both platforms when they used both.",
+    "10": "Stage two, slots, lists every (date, category) pair the report must contain.",
+    "12": "Each distinct date in the table ...",
+    "13": "... is paired with all three category names, so every date gets three slots.",
+    "20": "Empty slots have a null sum, so IFNULL turns it into 0.",
+    "21": "Counting a user_day column skips the nulls of an empty slot, giving 0 users there.",
+    "23": "A left join keeps every slot, even one that no user falls into.",
+    "26": "One output row per slot."
+  }
+}

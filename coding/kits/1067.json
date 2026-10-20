@@ -1,0 +1,63 @@
+{
+  "number": 1067,
+  "title": "Digit Count in Range",
+  "spec": "recalled",
+  "statement": "You get a single decimal digit `d` and two positive integers `low` and `high`. Write down every integer from `low` to `high`, both included, in ordinary decimal form (no leading zeros), and return the total number of times the digit `d` appears. Every occurrence counts, so a number such as `133` contributes two `3`s.",
+  "constraints": [
+    "0 <= d <= 9",
+    "1 <= low <= high <= 2 * 10^8"
+  ],
+  "signature": "int digitsCount(int d, int low, int high)",
+  "entry": "digitsCount",
+  "kind": "function",
+  "parameters": [
+    "d",
+    "low",
+    "high"
+  ],
+  "validator": "function validate([d, low, high]) {\n  if (!Number.isInteger(d) || d < 0 || d > 9) return 'd is a single digit from 0 to 9.';\n  if (!Number.isInteger(low) || !Number.isInteger(high)) return 'low and high must be integers.';\n  if (low < 1 || high > 200000000) return 'low and high are between 1 and 200000000.';\n  if (low > high) return 'low cannot be larger than high.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function digitsCount(d, low, high) {\n  const countUpTo = (n) => {\n    const digits = String(n);\n    const memo = new Map();\n    const dfs = (pos, count, tight, started) => {\n      if (pos === digits.length) return count;\n      const key = `${pos},${count},${tight},${started}`;\n      if (memo.has(key)) return memo.get(key);\n      const limit = tight ? Number(digits[pos]) : 9;\n      let total = 0;\n      for (let digit = 0; digit <= limit; digit++) {\n        const nowStarted = started || digit > 0;\n        const hit = nowStarted && digit === d ? 1 : 0;\n        total += dfs(pos + 1, count + hit, tight && digit === limit, nowStarted);\n      }\n      memo.set(key, total);\n      return total;\n    };\n    return dfs(0, 0, true, false);\n  };\n  return countUpTo(high) - countUpTo(low - 1);\n}",
+  "brute": "function digitsCount(d, low, high) {\n  const target = String(d);\n  let total = 0;\n  for (let x = low; x <= high; x++) {\n    for (const ch of String(x)) if (ch === target) total++;\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const d = Math.floor(rand() * 10);\n  if (size === 'large') {\n    const high = 1 + Math.floor(rand() * 200000000);\n    const low = 1 + Math.floor(rand() * Math.min(high, 1000 + Math.floor(rand() * high)));\n    return [d, low, high];\n  }\n  // Small ranges, sometimes placed right around a power of ten.\n  const power = [1, 10, 100, 1000, 10000, 100000][Math.floor(rand() * 6)];\n  const around = rand() < 0.4;\n  const low = around ? Math.max(1, power - Math.floor(rand() * 30)) : 1 + Math.floor(rand() * 3000);\n  const high = low + Math.floor(rand() * (around ? 60 : 400));\n  return [d, low, high];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,1,13],"expected":6},
+    {"name":"Example 2","input":[3,100,250],"expected":35}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0,1,9]},
+    {"name":"Test 2","input":[0,1,10]},
+    {"name":"Test 3","input":[5,5,5]},
+    {"name":"Test 4","input":[7,123,123]},
+    {"name":"Test 5","input":[0,100,100]},
+    {"name":"Test 6","input":[0,1,1000000]},
+    {"name":"Test 7","input":[9,1,999999]},
+    {"name":"Test 8","input":[1,199999000,200000000]},
+    {"name":"Test 9","input":[0,99999990,100000010]},
+    {"name":"Test 10","input":[2,2222,22222]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nLooping over every number from `low` to `high` and counting its digits is obviously right but can mean 2·10^8 numbers. Instead, count occurrences in `1..n` with a function `countUpTo(n)`; the answer is `countUpTo(high) - countUpTo(low - 1)`. A digit DP builds the numbers up to `n` one digit at a time, so numbers sharing the same prefix situation are counted together instead of one by one.\n\n## Approach\n\n1. Write `n` as the string `digits` and fill positions left to right with `dfs(pos, count, tight, started)`.\n2. `count` is how many `d`s the prefix holds, `tight` says the prefix equals `n`'s prefix (so the next digit is capped at `digits[pos]`), and `started` says a non-zero digit was placed (zeros before it are leading zeros, not digits).\n3. At the end of the number return `count`; otherwise sum the results of every allowed next `digit`, adding a `hit` when the number has started and `digit === d`.\n4. Cache each state in `memo`; once `tight` is false the remaining positions are free and states repeat a lot.\n5. Return `countUpTo(high) - countUpTo(low - 1)`.\n\n## Example 1, step by step\n\n`d = 1`, range `1..13`. For `countUpTo(13)`, `digits = \"13\"`. A first digit `0` (leading zero) leaves the one-digit numbers `1..9`, contributing one `1`. A first digit `1` is a hit and stays tight, so the second digit runs `0..3`: `10, 11, 12, 13` give `1 + 2 + 1 + 1 = 5`. Total `6`; `countUpTo(0) = 0`, so the answer is `6`.\n\n## Complexity\n\n- Time: O(L² · 2 · 2 · 10) per call with `L ≤ 9` digits: states are `pos` × `count` × `tight` × `started`, each trying 10 digits.\n- Space: O(L²) for `memo` and O(L) recursion depth.\n\n## Pitfalls\n\n- For `d = 0`, leading zeros must not count; that is what `started` is for.\n- Subtract `countUpTo(low - 1)`, not `countUpTo(low)`, or `low` itself is lost.\n- `tight` stays true only while every digit so far equals `n`'s digit.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `countUpTo(n)` | occurrences of `d` in `1..n` |\n| `digits` | `n` as a decimal string |\n| `pos` | position being filled |\n| `count` | `d`s placed so far |\n| `tight` | prefix equals `n`'s prefix |\n| `started` | a non-zero digit has been placed |\n| `limit` | largest digit allowed here |\n| `memo`, `key` | cache of finished states |",
+  "narration": {
+    "2": "countUpTo(n) counts the digit d over all numbers from 1 to n.",
+    "3": "Work with n's decimal digits from left to right.",
+    "5": "dfs fills one position at a time and returns the d's in all completions of this prefix.",
+    "6": "A full number is built; it contains count copies of d.",
+    "8": "This state was solved before, so reuse its answer.",
+    "9": "While tight the next digit may not exceed n's digit; otherwise any digit works.",
+    "11": "Try every allowed digit at this position.",
+    "12": "The number starts at its first non-zero digit; earlier zeros are leading zeros.",
+    "13": "Count this digit only if it is d and not a leading zero.",
+    "14": "Recurse; the prefix stays tight only if we also placed the limit digit.",
+    "16": "Remember the result for this state.",
+    "19": "Start at the first position: no digits, tight, not started.",
+    "21": "Occurrences in low..high are those up to high minus those below low."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "number": 1336,
+  "title": "Number of Transactions per Visit",
+  "spec": "recalled",
+  "statement": "Two tables describe bank visits and the transactions made during them:\n\n- `Visits(user_id, visit_date)`: user `user_id` visited the bank on `visit_date`; `(user_id, visit_date)` is unique. The table has at least one row.\n- `Transactions(user_id, transaction_date, amount)`: one transaction of `amount` made by `user_id` on `transaction_date`. The table has no key, so identical rows are separate transactions. Every transaction happened during a visit: `(user_id, transaction_date)` always appears in `Visits`.\n\nThe number of transactions of a visit is the number of `Transactions` rows with the same user and date (0 when there are none). Build a histogram of these numbers: one row for **every** value `transactions_count` from 0 up to the largest number of transactions any visit has, with `visits_count`, the number of visits that had exactly that many transactions (0 when no visit did).\n\nReturn the columns `transactions_count` and `visits_count`, ordered by `transactions_count` ascending.",
+  "constraints": [
+    "(user_id, visit_date) is unique in Visits",
+    "Visits has at least one row",
+    "Transactions may contain duplicate rows",
+    "Every (user_id, transaction_date) in Transactions appears in Visits"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Visits": [["user_id","INT"],["visit_date","DATE"]],
+    "Transactions": [["user_id","INT"],["transaction_date","DATE"],["amount","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Visits = [], Transactions = [] }] = input;\n  if (Visits.length === 0) return 'Visits has at least one row.';\n  const visits = new Set();\n  for (const [user, day] of Visits) {\n    if (user === null || day === null) return 'Every visit needs a user_id and a visit_date.';\n    const key = `${user}/${day}`;\n    if (visits.has(key)) return `User ${user} visits twice on ${day}.`;\n    visits.add(key);\n  }\n  for (const [user, day, amount] of Transactions) {\n    if (user === null || day === null || amount === null) return 'Every transaction needs a user_id, a transaction_date and an amount.';\n    if (!visits.has(`${user}/${day}`)) return `User ${user} has a transaction on ${day} without a visit.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE per_visit AS (\n  SELECT v.user_id, v.visit_date, COUNT(t.user_id) AS transactions_count\n  FROM Visits AS v\n  LEFT JOIN Transactions AS t\n    ON t.user_id = v.user_id\n   AND t.transaction_date = v.visit_date\n  GROUP BY v.user_id, v.visit_date\n),\ncounts AS (\n  SELECT MAX(transactions_count) AS transactions_count\n  FROM per_visit\n  UNION ALL\n  SELECT transactions_count - 1\n  FROM counts\n  WHERE transactions_count > 0\n)\nSELECT c.transactions_count, COUNT(p.user_id) AS visits_count\nFROM counts AS c\nLEFT JOIN per_visit AS p\n  ON p.transactions_count = c.transactions_count\nGROUP BY c.transactions_count\nORDER BY c.transactions_count;",
+  "brute": "WITH visit_counts AS (\n  SELECT v.user_id, v.visit_date,\n    (SELECT COUNT(*) FROM Transactions AS t\n     WHERE t.user_id = v.user_id AND t.transaction_date = v.visit_date) AS cnt\n  FROM Visits AS v\n),\nnumbers AS (\n  SELECT 0 AS n\n  UNION ALL\n  SELECT ROW_NUMBER() OVER (ORDER BY user_id, transaction_date) FROM Transactions\n)\nSELECT\n  numbers.n AS transactions_count,\n  (SELECT COUNT(*) FROM visit_counts WHERE visit_counts.cnt = numbers.n) AS visits_count\nFROM numbers\nWHERE numbers.n <= (SELECT MAX(cnt) FROM visit_counts)\nORDER BY numbers.n",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const dayText = offset => new Date(Date.UTC(2020, 0, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const users = small ? 4 : 300, days = small ? 4 : 30;\n  const pairs = [];\n  for (let u = 1; u <= users; u++) for (let d = 0; d < days; d++) pairs.push([u, dayText(d)]);\n  for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }\n  const Visits = pairs.slice(0, small ? 1 + Math.floor(rand() * 8) : 1500);\n  // A few \"busy\" visits collect most transactions, so counts have gaps and a long tail.\n  const busy = Visits.slice(0, Math.max(1, Math.floor(Visits.length / 10)));\n  const Transactions = [];\n  const count = small ? Math.floor(rand() * 9) : 1500;\n  const amounts = [1, 7, 22, 33, 120];\n  for (let i = 0; i < count; i++) {\n    const [user, day] = rand() < 0.5 ? busy[Math.floor(rand() * busy.length)] : Visits[Math.floor(rand() * Visits.length)];\n    Transactions.push([user, day, small ? amounts[Math.floor(rand() * amounts.length)] : 1 + Math.floor(rand() * 500)]);\n  }\n  return [{ Visits, Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Visits":[[1,"2020-01-01"],[2,"2020-01-02"],[12,"2020-01-01"],[19,"2020-01-03"],[1,"2020-01-02"],[2,"2020-01-03"],[1,"2020-01-04"],[7,"2020-01-11"],[9,"2020-01-25"],[8,"2020-01-28"]],"Transactions":[[1,"2020-01-02",120],[2,"2020-01-03",22],[7,"2020-01-11",232],[1,"2020-01-04",7],[9,"2020-01-25",33],[9,"2020-01-25",66],[8,"2020-01-28",1],[9,"2020-01-25",99]]}],"expected":{"columns":["transactions_count","visits_count"],"rows":[[0,4],[1,5],[2,0],[3,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Visits":[[1,"2020-01-01"]],"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Visits":[[1,"2020-01-01"]],"Transactions":[[1,"2020-01-01",50]]}]},
+    {"name":"Test 3","input":[{"Visits":[[1,"2020-01-01"],[2,"2020-01-01"]],"Transactions":[[1,"2020-01-01",5],[1,"2020-01-01",6],[1,"2020-01-01",7]]}]},
+    {"name":"Test 4","input":[{"Visits":[[3,"2020-02-02"]],"Transactions":[[3,"2020-02-02",10],[3,"2020-02-02",10]]}]},
+    {"name":"Test 5","input":[{"Visits":[[1,"2020-01-01"],[1,"2020-01-02"],[2,"2020-01-01"]],"Transactions":[[1,"2020-01-02",5],[2,"2020-01-01",6],[2,"2020-01-01",7]]}]},
+    {"name":"Test 6","input":[{"Visits":[[1,"2020-03-01"],[2,"2020-03-01"],[3,"2020-03-02"]],"Transactions":[[1,"2020-03-01",4],[2,"2020-03-01",8],[3,"2020-03-02",15],[3,"2020-03-02",16]]}]},
+    {"name":"Test 7","input":[{"Visits":[[1,"2020-01-01"],[2,"2020-01-02"],[3,"2020-01-03"],[4,"2020-01-04"]],"Transactions":[]}]},
+    {"name":"Test 8","input":[{"Visits":[[5,"2020-04-01"],[6,"2020-04-01"],[5,"2020-04-02"],[7,"2020-04-03"],[8,"2020-04-03"]],"Transactions":[[5,"2020-04-01",1],[5,"2020-04-01",2],[5,"2020-04-01",3],[5,"2020-04-01",4],[6,"2020-04-01",9],[7,"2020-04-03",9],[8,"2020-04-03",3],[8,"2020-04-03",3]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe work splits into three questions. How many transactions did each visit have? Which counts must appear in the output? How many visits have each count? The first is a left join with a group per visit. The second is the tricky part: counts that no visit has (like 2 in Example 1) must still appear with `visits_count = 0`, so the list 0, 1, ..., max has to be generated rather than read from the data. A recursive CTE produces that list, and a left join from it to the per-visit counts fills in the histogram.\n\n## Approach\n\n1. CTE `per_visit`: `LEFT JOIN` `Transactions` to `Visits` on both user and date, group per visit and count `t.user_id` (0 for a visit without transactions).\n2. Recursive CTE `counts`: start from the largest `transactions_count` in `per_visit` and keep subtracting 1 until reaching 0.\n3. Left join `counts` to `per_visit` on the count, group by the count, and count matching visits with `COUNT(p.user_id)`, which is 0 for a missing count.\n4. `ORDER BY c.transactions_count`.\n\n## Example 1, step by step\n\n`per_visit` gives 0 for the four visits (1, 01-01), (12, 01-01), (2, 01-02) and (19, 01-03); 1 for (1, 01-02), (2, 01-03), (1, 01-04), (7, 01-11) and (8, 01-28); and 3 for (9, 01-25).\n\n`counts` starts at the maximum 3 and produces 3, 2, 1, 0.\n\nJoining and counting gives 0 → 4, 1 → 5, 2 → 0 (no visit had two transactions) and 3 → 1.\n\n## Complexity\n\n- Time: O(V + T) to join and group V visits with T transactions by hash, plus O(M) recursion steps for the maximum count M.\n- Space: O(V + M) for the per-visit counts and the list of counts.\n\n## Pitfalls\n\n- `COUNT(*)` after the left join counts the null row of a visit without transactions as 1; count a column from `Transactions` instead.\n- Joining on `user_id` alone mixes a user's transactions from different days into one visit.\n- Grouping `per_visit` by its counts directly skips counts that no visit has; the full range from 0 to the maximum must be generated.\n- An inner join from `counts` to `per_visit` drops those missing counts again; it must be a left join.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `per_visit` | one row per visit with its `transactions_count` |\n| `counts` | every number from the maximum count down to 0 |\n| `v` / `t` | `Visits` and `Transactions` inside `per_visit` |\n| `c` / `p` | `counts` and `per_visit` in the final join |\n| `visits_count` | how many visits had exactly `transactions_count` transactions |",
+  "narration": {
+    "1": "The per_visit stage counts the transactions of every visit; RECURSIVE allows the counts stage below.",
+    "2": "Counting t.user_id ignores the null row that the left join adds for a visit without transactions.",
+    "4": "A left join keeps visits with no transactions.",
+    "6": "A transaction belongs to a visit only when the date matches as well as the user.",
+    "7": "One group per visit.",
+    "9": "The counts stage lists every possible number of transactions.",
+    "10": "It starts from the largest number of transactions in any visit.",
+    "13": "Each recursive step adds the next smaller number.",
+    "15": "The recursion stops after producing 0.",
+    "17": "For every count, visits_count tallies the visits with exactly that many transactions.",
+    "19": "The left join keeps counts that no visit has, so they report 0.",
+    "22": "The histogram is listed from 0 upward."
+  }
+}

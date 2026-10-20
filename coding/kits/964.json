@@ -1,0 +1,64 @@
+{
+  "number": 964,
+  "title": "Least Operators to Express Number",
+  "spec": "leetcode",
+  "statement": "You build an expression out of copies of the positive integer `x` only, putting exactly one binary operator between each pair of neighbouring copies, for example `x * x - x / x`. The allowed operators are `+`, `-`, `*` and `/`.\n\n- There are no parentheses; `*` and `/` are applied before `+` and `-`, as usual.\n- `/` is exact division, so intermediate values may be fractions.\n- There is no unary minus: the expression cannot begin with `-` (`x - x` is fine, `-x + x` is not).\n\nReturn the smallest number of operators an expression of this kind can use while its value equals `target`.",
+  "constraints": [
+    "2 <= x <= 100",
+    "1 <= target <= 2 * 10^8"
+  ],
+  "signature": "int leastOpsExpressTarget(int x, int target)",
+  "entry": "leastOpsExpressTarget",
+  "kind": "function",
+  "parameters": [
+    "x",
+    "target"
+  ],
+  "validator": "function validate([x, target]) {\n  if (!Number.isInteger(x) || x < 2 || x > 100) return 'x is a whole number from 2 to 100.';\n  if (!Number.isInteger(target) || target < 1 || target > 200000000) return 'target is a whole number from 1 to 2 * 10^8.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function leastOpsExpressTarget(x, target) {\n  const memo = new Map();\n\n  function termCost(power) {\n    return power === 0 ? 2 : power;\n  }\n\n  function solve(power, value) {\n    if (value === 0) {\n      return 0;\n    }\n    if (value === 1) {\n      return termCost(power);\n    }\n    const key = power + ':' + value;\n    if (memo.has(key)) {\n      return memo.get(key);\n    }\n    const digit = value % x;\n    const rest = (value - digit) / x;\n    let best = digit * termCost(power) + solve(power + 1, rest);\n    if (digit > 0) {\n      const borrow = (x - digit) * termCost(power) + solve(power + 1, rest + 1);\n      best = Math.min(best, borrow);\n    }\n    memo.set(key, best);\n    return best;\n  }\n\n  return solve(0, target) - 1;\n}",
+  "brute": "function leastOpsExpressTarget(x, target) {\n  // Shortest path over values: each step adds or subtracts one term x^e,\n  // costing its sign plus the operators inside it (x/x for e = 0, e - 1 products otherwise).\n  const limit = 2 * x * target + x;\n  const moves = [];\n  for (let e = 0, p = 1; p <= limit; e++, p *= x) moves.push([p, e === 0 ? 2 : e]);\n  const dist = new Map([[0, 0]]);\n  const buckets = [[0]];\n  for (let d = 0; d < buckets.length; d++) {\n    const bucket = buckets[d];\n    if (!bucket) continue;\n    for (const v of bucket) {\n      if (dist.get(v) !== d) continue;\n      if (v === target) return d - 1;\n      for (const [p, c] of moves) {\n        for (const w of [v + p, v - p]) {\n          if (Math.abs(w) > limit) continue;\n          const nd = d + c;\n          if (dist.has(w) && dist.get(w) <= nd) continue;\n          dist.set(w, nd);\n          if (!buckets[nd]) buckets[nd] = [];\n          buckets[nd].push(w);\n        }\n      }\n    }\n  }\n  return -1;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const x = rand() < 0.4 ? pick(2, 6) : pick(2, 100);\n    let target = pick(10000000, 200000000);\n    if (rand() < 0.25) {\n      let power = 1;\n      while (power * x <= 200000000) power *= x;\n      target = Math.max(1, Math.min(200000000, power + pick(-3, 3)));\n    }\n    return [x, target];\n  }\n  const x = rand() < 0.75 ? pick(2, 9) : pick(10, 100);\n  let target = pick(1, 400);\n  if (rand() < 0.3) {\n    let power = 1;\n    const steps = pick(0, 4);\n    for (let i = 0; i < steps && power * x <= 400; i++) power *= x;\n    target = Math.max(1, power + pick(-2, 2));\n  }\n  return [x, target];\n}",
+  "examples": [
+    {"name":"Example 1","input":[3,19],"expected":5},
+    {"name":"Example 2","input":[5,501],"expected":8},
+    {"name":"Example 3","input":[100,100000000],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,1]},
+    {"name":"Test 2","input":[2,2]},
+    {"name":"Test 3","input":[3,2]},
+    {"name":"Test 4","input":[100,99]},
+    {"name":"Test 5","input":[2,1023]},
+    {"name":"Test 6","input":[7,1999]},
+    {"name":"Test 7","input":[100,200000000]},
+    {"name":"Test 8","input":[5,63]},
+    {"name":"Test 9","input":[3,365]},
+    {"name":"Test 10","input":[10,99999999]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithout parentheses the expression is a chain of terms joined by `+` and `-`, and each term is a run of `x`s joined by `*` and `/`, which is some power `x^e`. The cheapest `x^e` for `e >= 1` uses `e - 1` multiplications, and `1 = x / x` uses one division. Count the sign in front of every term too (and remove one at the end, since the first term has none): a term `x^e` then costs `e`, except `x^0`, which costs 2. The task becomes writing `target` as a signed sum of powers of `x` as cheaply as possible.\n\nLook at `target` in base `x`. The lowest digit `d` must come from copies of `x^0`: either add `d` of them, or subtract `x - d` of them and carry 1 into the next digit. More than `x` copies never helps, because `x` copies of `x^p` cost at least as much as one `x^(p+1)`. Two choices per digit make a small memoized search. A brute force runs a shortest path over values with steps of `±x^e`.\n\n## Approach\n\n1. `termCost(power)` is the price of one signed term `x^power`: 2 for power 0, otherwise `power`.\n2. `solve(power, value)` is the cheapest way to build `value · x^power` from terms of that power or higher.\n3. A `value` of 0 costs nothing; a `value` of 1 is one term.\n4. Otherwise split `value` into its lowest base-`x` `digit` and the `rest`.\n5. Either add `digit` terms and solve `rest` one power up, or (when `digit > 0`) subtract `x - digit` terms and solve `rest + 1`. Keep the cheaper in `best` and store it in `memo`.\n6. Return `solve(0, target) - 1`.\n\n## Example 1, step by step\n\n`x = 3`, `target = 19` (base 3: `201`). At power 0 the `digit` is 1 and `rest` is 6. Adding costs `1 · 2 + solve(1, 6)`; `solve(1, 6)` has digit 0, so it equals `solve(2, 2) = 2 · 2 = 4`, giving 6. Borrowing costs `2 · 2 + solve(1, 7) = 4 + 5 = 9`. The best is 6, so the answer is `6 - 1 = 5`: `3 * 3 + 3 * 3 + 3 / 3`.\n\n## Complexity\n\n- Time: O(log_x target): each power sees at most two values (`rest` and `rest + 1`), and each state does constant work.\n- Space: O(log_x target) for `memo` and the recursion depth.\n\n## Pitfalls\n\n- `1` is not free: `x / x` needs a division plus its sign, so `x^0` costs 2.\n- Forgetting the final `- 1` counts a sign in front of the first term.\n- Picking the cheaper side of each digit on its own fails, because a borrow raises the next digit: for `x = 3`, `target = 6` it chooses `3 * 3 - 3` (2 operators) over `3 + 3` (1).\n- Without the `value === 1` case, borrowing on 1 would recurse forever.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `memo` | cached answers keyed by `power:value` |\n| `termCost(power)` | operators for one signed term `x^power` |\n| `power` | the power of `x` the current digit stands for |\n| `value` | what is still to be built, in units of `x^power` |\n| `digit`, `rest` | `value`'s lowest base-`x` digit and the part above it |\n| `best`, `borrow` | cost of adding the digit, and cost of subtracting its complement |",
+  "narration": {
+    "2": "Cache results by power and value so each state is solved once.",
+    "5": "One signed term x^power costs its sign plus power - 1 products, except 1 = x / x, which costs 2.",
+    "8": "solve returns the cheapest way to build value copies of x^power from powers at least this high.",
+    "9": "Nothing left to build costs nothing.",
+    "12": "Exactly one copy of x^power is left: a single term finishes it.",
+    "16": "This state was already solved; reuse its answer.",
+    "19": "The lowest base-x digit must be made from terms x^power.",
+    "20": "What remains above that digit, in units of the next power.",
+    "21": "Option one: add digit terms here and build the rest one power up.",
+    "22": "Borrowing only makes sense when the digit is not already zero.",
+    "23": "Option two: subtract x - digit terms here and carry one extra unit into the next power.",
+    "24": "Keep the cheaper of the two options.",
+    "26": "Remember the answer for this state.",
+    "30": "Solve from power 0 and drop the sign that the first term does not need."
+  }
+}

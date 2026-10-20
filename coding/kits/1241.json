@@ -1,0 +1,53 @@
+{
+  "number": 1241,
+  "title": "Number of Comments per Post",
+  "spec": "recalled",
+  "statement": "One table holds the submissions of a forum:\n\n- `Submissions(sub_id, parent_id)`: a row with `parent_id` null is a **post** with id `sub_id`; any other row is a **comment** with id `sub_id` that replies to the post `parent_id`. The table has no key and may contain identical duplicate rows; a submission always has the same `parent_id`. A comment's `parent_id` may name a post that is not in the table, or a submission that is not a post.\n\nFor every distinct post, report `post_id` (its `sub_id`) and `number_of_comments`: how many **distinct** comments reply to it (duplicate comment rows count once; 0 when it has none). Comments whose parent is not a post in the table are not reported. Order the rows by `post_id` ascending.",
+  "constraints": [
+    "Submissions has no primary key and may contain duplicate rows",
+    "parent_id is null for posts",
+    "All rows with the same sub_id have the same parent_id",
+    "A comment never replies to itself"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Submissions": [["sub_id","INT"],["parent_id","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Submissions = [] }] = input;\n  const parentOf = new Map();\n  for (const [id, parent] of Submissions) {\n    if (id === null) return 'Every submission needs a sub_id.';\n    if (id === parent) return `Submission ${id} replies to itself.`;\n    if (parentOf.has(id) && parentOf.get(id) !== parent) return `Submission ${id} has two different parent_id values.`;\n    parentOf.set(id, parent);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH posts AS (\n  SELECT DISTINCT sub_id AS post_id\n  FROM Submissions\n  WHERE parent_id IS NULL\n)\nSELECT p.post_id, COUNT(DISTINCT c.sub_id) AS number_of_comments\nFROM posts AS p\nLEFT JOIN Submissions AS c\n  ON c.parent_id = p.post_id\nGROUP BY p.post_id\nORDER BY p.post_id;",
+  "brute": "SELECT DISTINCT s.sub_id AS post_id,\n       (SELECT COUNT(*)\n        FROM (SELECT DISTINCT sub_id, parent_id FROM Submissions) AS c\n        WHERE c.parent_id = s.sub_id) AS number_of_comments\nFROM Submissions AS s\nWHERE s.parent_id IS NULL\nORDER BY post_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const idCount = small ? 12 : 1500;\n  // Give every id one role first, so duplicate rows of an id always agree on parent_id.\n  const posts = [], roles = [];\n  for (let id = 1; id <= idCount; id++) if (rand() < 0.3) posts.push(id);\n  for (let id = 1; id <= idCount; id++) {\n    if (posts.includes(id)) { roles.push([id, null]); continue; }\n    let parent;\n    const roll = rand();\n    if (roll < 0.75 && posts.length) parent = posts[Math.floor(rand() * posts.length)];\n    else if (roll < 0.9) parent = idCount + 1 + Math.floor(rand() * 5); // a post that does not exist\n    else parent = 1 + Math.floor(rand() * idCount); // possibly another comment\n    if (parent === id) parent = idCount + 1;\n    roles.push([id, parent]);\n  }\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const Submissions = [];\n  for (let i = 0; i < rows; i++) Submissions.push([...roles[Math.floor(rand() * roles.length)]]);\n  return [{ Submissions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Submissions":[[1,null],[2,null],[1,null],[12,null],[3,1],[5,2],[3,1],[4,1],[9,1],[10,2],[6,7]]}],"expected":{"columns":["post_id","number_of_comments"],"rows":[[1,3],[2,2],[12,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Submissions":[]}]},
+    {"name":"Test 2","input":[{"Submissions":[[5,null],[2,null],[5,null]]}]},
+    {"name":"Test 3","input":[{"Submissions":[[3,8],[4,8],[5,9]]}]},
+    {"name":"Test 4","input":[{"Submissions":[[1,null],[2,1],[2,1],[2,1],[3,1]]}]},
+    {"name":"Test 5","input":[{"Submissions":[[1,null],[2,1],[3,2],[4,3]]}]},
+    {"name":"Test 6","input":[{"Submissions":[[10,null],[9,null],[1,10],[2,10],[3,10],[4,10],[5,9]]}]},
+    {"name":"Test 7","input":[{"Submissions":[[7,1],[8,1],[1,null],[1,null],[1,null],[20,null],[21,20],[21,20],[22,99]]}]},
+    {"name":"Test 8","input":[{"Submissions":[[4,null]]}]},
+    {"name":"Test 9","input":[{"Submissions":[[2,null],[3,null],[4,2],[5,3],[6,3],[6,3],[7,2],[8,6],[1,null]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer has one row per post, and posts are the rows with a null `parent_id`. So first collect the distinct posts, then attach each post's comments with a **left join** on `comment.parent_id = post.post_id`. A left join keeps posts that have no comment, and `COUNT(DISTINCT c.sub_id)` counts each comment once even when its row is duplicated, and counts 0 for the all-null row of a post without comments.\n\n## Approach\n\n1. `posts`: the distinct `sub_id` values whose `parent_id` is null, renamed `post_id`. Duplicate post rows collapse here.\n2. Left join `posts` (alias `p`) to `Submissions` again (alias `c`) on `c.parent_id = p.post_id`; only comments match, since posts have a null parent.\n3. Group by `p.post_id` and count `DISTINCT c.sub_id` as `number_of_comments`.\n4. Order by `post_id`.\n\n## Example 1, step by step\n\n- `posts` holds 1, 2 and 12 (post 1 appears twice in the input but once here).\n- Post 1 joins the comment rows 3, 3, 4 and 9; the distinct ids are 3, 4 and 9, so the count is 3.\n- Post 2 joins comments 5 and 10: count 2.\n- Post 12 joins nothing; its row has `c.sub_id` null, and `COUNT` skips nulls: 0.\n- Comment 6 replies to post 7, which is not a post in the table, so it never joins.\n\n## Complexity\n\n- Time: O(S log S) for S rows: the distinct posts and the grouping each sort or hash the rows once, and the join is a lookup per post with an index or hash on `parent_id`.\n- Space: O(S) for the joined rows.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(c.sub_id)` counts duplicate comment rows, and `COUNT(*)` also counts 1 for a post without comments.\n- Grouping the comments by `parent_id` alone reports parents that are not posts and misses posts with no comments.\n- Not removing duplicate posts first is harmless with `COUNT(DISTINCT ...)` but doubles the counts with a plain `COUNT`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `posts` | distinct ids of posts (rows with null `parent_id`) |\n| `p` | a row of `posts` |\n| `c` | a `Submissions` row that replies to post `p` |\n| `number_of_comments` | distinct comment ids joined to the post |",
+  "narration": {
+    "1": "The posts stage keeps each post id once.",
+    "4": "Posts are exactly the rows without a parent.",
+    "6": "Count every post's distinct comments; duplicate comment rows count once.",
+    "7": "Start from the posts, so every post produces a row.",
+    "8": "A left join keeps posts without comments, giving a null comment that COUNT skips.",
+    "9": "A comment belongs to the post its parent_id names.",
+    "10": "One group, and one output row, per post.",
+    "11": "Report the posts in increasing id order."
+  }
+}

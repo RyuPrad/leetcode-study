@@ -1,0 +1,52 @@
+{
+  "number": 1097,
+  "title": "Game Play Analysis V",
+  "spec": "recalled",
+  "statement": "One table logs player sessions:\n\n- `Activity(player_id, device_id, event_date, games_played)`: each row says a player logged in on `event_date` from `device_id` and played `games_played` games (possibly 0). A player has at most one row per date, so `(player_id, event_date)` is unique.\n\nA player's **install date** is their earliest `event_date`. For every date that is the install date of at least one player, report one row with these columns:\n\n- `install_dt`: the install date.\n- `installs`: the number of players whose install date it is.\n- `Day1_retention`: the fraction of those players who also have a row dated exactly one calendar day after their install date, rounded to 2 decimal places.\n\nDates on which nobody installed are not reported. Rows may come in any order.",
+  "constraints": [
+    "(player_id, event_date) is unique in Activity",
+    "games_played is 0 or more",
+    "event_date is a date written YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["player_id","INT"],["device_id","INT"],["event_date","DATE"],["games_played","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const keys = new Set();\n  for (const [player, device, date, games] of Activity) {\n    if (player === null || date === null) return 'player_id and event_date are required.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `event_date ${date} is not YYYY-MM-DD.`;\n    const key = `${player}|${date}`;\n    if (keys.has(key)) return `Player ${player} has two rows on ${date}.`;\n    keys.add(key);\n    if (games !== null && games < 0) return 'games_played cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_login AS (\n  SELECT player_id, MIN(event_date) AS install_dt\n  FROM Activity\n  GROUP BY player_id\n)\nSELECT\n  f.install_dt,\n  COUNT(*) AS installs,\n  ROUND(COUNT(next_day.player_id) / COUNT(*), 2) AS Day1_retention\nFROM first_login AS f\nLEFT JOIN Activity AS next_day\n  ON next_day.player_id = f.player_id\n  AND next_day.event_date = DATE_ADD(f.install_dt, INTERVAL 1 DAY)\nGROUP BY f.install_dt;",
+  "brute": "SELECT\n  a.event_date AS install_dt,\n  COUNT(*) AS installs,\n  ROUND(AVG(CASE WHEN EXISTS (\n      SELECT 1 FROM Activity AS n\n      WHERE n.player_id = a.player_id AND DATEDIFF(n.event_date, a.event_date) = 1)\n    THEN 1 ELSE 0 END), 2) AS Day1_retention\nFROM Activity AS a\nWHERE NOT EXISTS (\n  SELECT 1 FROM Activity AS e\n  WHERE e.player_id = a.player_id AND e.event_date < a.event_date)\nGROUP BY a.event_date",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  // Install dates sit next to month, leap-day and year boundaries so \"the next day\" crosses them.\n  const starts = ['2016-02-28', '2016-02-29', '2016-03-01', '2016-12-31', '2017-02-28', '2019-04-30'];\n  const day = (date, offset) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + offset)).toISOString().slice(0, 10); };\n  const Activity = [], seen = new Set();\n  const add = (player, date) => {\n    if (seen.has(`${player}|${date}`)) return;\n    seen.add(`${player}|${date}`);\n    Activity.push([player, 1 + pick(5), date, pick(8)]);\n  };\n  if (size === 'small') {\n    // At most 5 players, so no install date has 8 players and no ratio ends in an exact half at the third decimal.\n    const players = pick(6), rows = pick(9), first = [];\n    for (let p = 1; p <= players; p++) { first[p] = starts[pick(3)]; add(p, first[p]); }\n    for (let tries = 0; players && Activity.length < rows && tries < 40; tries++) {\n      const p = 1 + pick(players);\n      add(p, day(first[p], 1 + pick(3)));\n    }\n  } else {\n    // Each install date gets a player count that is never a multiple of 8.\n    const sizes = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23];\n    let player = 0;\n    const firsts = [];\n    for (let i = 0; i < 40; i++) {\n      const date = day(starts[i % starts.length], 7 * Math.floor(i / starts.length));\n      const count = sizes[pick(sizes.length)];\n      for (let k = 0; k < count; k++) { player++; firsts.push([player, date]); add(player, date); }\n    }\n    for (let tries = 0; Activity.length < 2000 && tries < 20000; tries++) {\n      const [p, date] = firsts[pick(firsts.length)];\n      add(p, day(date, 1 + pick(10)));\n    }\n  }\n  // Shuffle so rows do not arrive in date order.\n  for (let i = Activity.length - 1; i > 0; i--) { const j = pick(i + 1); [Activity[i], Activity[j]] = [Activity[j], Activity[i]]; }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[1,2,"2016-03-01",5],[1,2,"2016-03-02",6],[2,3,"2017-06-25",1],[3,1,"2016-03-01",0],[3,4,"2018-07-03",5]]}],"expected":{"columns":["install_dt","installs","Day1_retention"],"rows":[["2016-03-01",2,0.5],["2017-06-25",1,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[]}]},
+    {"name":"Test 2","input":[{"Activity":[[4,1,"2020-05-05",3]]}]},
+    {"name":"Test 3","input":[{"Activity":[[1,1,"2020-05-05",3],[1,2,"2020-05-06",0],[2,1,"2020-05-05",1],[2,1,"2020-05-07",1]]}]},
+    {"name":"Test 4","input":[{"Activity":[[1,1,"2016-02-28",1],[1,1,"2016-02-29",1],[2,1,"2016-02-29",2],[2,1,"2016-03-01",2],[3,2,"2017-02-28",0],[3,2,"2017-03-01",0],[4,2,"2016-12-31",4],[4,2,"2017-01-01",4]]}]},
+    {"name":"Test 5","input":[{"Activity":[[1,1,"2019-01-01",1],[1,1,"2019-01-03",1],[1,1,"2019-01-04",1],[2,2,"2019-01-01",0],[2,2,"2019-01-02",0],[3,3,"2019-01-01",2]]}]},
+    {"name":"Test 6","input":[{"Activity":[[1,1,"2020-01-01",1],[2,1,"2019-12-31",1],[2,1,"2020-01-01",1],[3,1,"2019-12-31",1],[3,1,"2020-01-02",1]]}]},
+    {"name":"Test 7","input":[{"Activity":[[5,1,"2018-07-04",2],[5,1,"2018-07-03",2],[6,2,"2018-07-10",0],[6,2,"2018-07-03",0],[7,3,"2018-07-05",1],[7,3,"2018-07-04",1]]}]},
+    {"name":"Test 8","input":[{"Activity":[[1,1,"2021-03-01",1],[1,1,"2021-03-02",1],[2,1,"2021-03-01",1],[2,1,"2021-03-02",1],[3,1,"2021-03-01",1],[3,1,"2021-03-02",1]]}]},
+    {"name":"Test 9","input":[{"Activity":[[1,1,"2022-06-01",0],[2,1,"2022-06-01",0],[3,1,"2022-06-01",0],[4,1,"2022-06-01",0],[5,1,"2022-06-01",0],[6,1,"2022-06-01",0],[1,1,"2022-06-02",0],[2,1,"2022-06-02",0],[3,1,"2022-06-02",0],[4,1,"2022-06-02",0],[5,1,"2022-06-02",0]]}]},
+    {"name":"Test 10","input":[{"Activity":[[1,3,"2023-08-31",2],[1,3,"2023-09-01",0],[2,3,"2023-08-31",1],[3,3,"2023-08-31",5],[3,1,"2023-09-02",5],[4,2,"2023-09-01",0],[4,2,"2023-09-02",0]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery output row is about a group of players who share an install date, so first collapse each player to one row holding that install date. Then each player needs one yes/no fact: is there a login dated the day after it? A **left join** to `Activity` on \"same player, install date + 1\" keeps every player and fills the joined columns only for the ones who came back. Grouping those rows by install date gives the number of installs (all rows) and the number of returners (non-null matches) side by side.\n\n## Approach\n\n1. CTE `first_login`: `GROUP BY player_id` with `MIN(event_date)` gives one row per player and their `install_dt`.\n2. `LEFT JOIN Activity` as `next_day` on the same player and `event_date = DATE_ADD(install_dt, INTERVAL 1 DAY)`. Since a player has at most one row per date, each player matches at most once.\n3. `GROUP BY f.install_dt`: `COUNT(*)` is the number of installs that day, and `COUNT(next_day.player_id)` skips nulls, so it counts only the returners.\n4. Divide the two counts and `ROUND(..., 2)` to get `Day1_retention`.\n\n## Example 1, step by step\n\n- `first_login`: `(1, 2016-03-01)`, `(2, 2017-06-25)`, `(3, 2016-03-01)`.\n- Player 1 looks for 2016-03-02 and finds it. Player 2 looks for 2017-06-26: no row. Player 3 looks for 2016-03-02: no row (their other login is 2018-07-03).\n- Group 2016-03-01 holds players 1 and 3: `installs = 2`, one match, `ROUND(1 / 2, 2) = 0.50`.\n- Group 2017-06-25 holds player 2: `installs = 1`, no match, `0.00`.\n\n## Complexity\n\n- Time: O(n) to group the n rows of `Activity`, plus a join that is O(p) for p players with the `(player_id, event_date)` primary key as its index.\n- Space: O(p) for `first_login`.\n\n## Pitfalls\n\n- Grouping `Activity` by `event_date` directly counts every login on that date, not only installs; a returning player would be counted again on a later date.\n- An inner join keeps only the returners, so `installs` shrinks and every retention becomes 1.\n- Any two consecutive logins are not enough: a player active on days 1, 3 and 4 did not return the day after installing.\n- `install_dt + 1` in MySQL is arithmetic on the number 20160301, not a date, and breaks at month ends; use `DATE_ADD` or `DATEDIFF`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_login` | one row per player: `player_id` and their `install_dt` |\n| `f` | a row of `first_login` |\n| `next_day` | the player's login on `install_dt + 1`, or nulls when there is none |\n| `installs` | players in the install-date group |\n| `Day1_retention` | returners divided by installs, rounded to 2 decimals |",
+  "narration": {
+    "1": "Stage one, first_login, turns the log into one row per player.",
+    "2": "MIN over a player's rows is their install date.",
+    "8": "Inside an install-date group, every row is one player, so COUNT(*) is the number of installs.",
+    "9": "COUNT on the joined column skips nulls, so it counts returners; divide and round to 2 decimals.",
+    "11": "A left join keeps players who never came back; their next_day columns are null.",
+    "13": "The joined login must be the same player's, dated exactly one day after the install date.",
+    "14": "One output row per install date."
+  }
+}

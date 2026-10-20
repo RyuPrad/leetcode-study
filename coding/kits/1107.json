@@ -1,0 +1,50 @@
+{
+  "number": 1107,
+  "title": "New Users Daily Count",
+  "spec": "recalled",
+  "statement": "One table logs what users do on a website:\n\n- `Traffic(user_id, activity, activity_date)`: each row says the user performed `activity` on `activity_date`. `activity` is one of `'login'`, `'logout'`, `'jobs'`, `'groups'`, `'homepage'`. The table has no primary key, so identical rows can repeat.\n\nTreat **2019-06-30** as today; no `activity_date` is later than that. A user's first login date is the earliest `activity_date` among that user's `'login'` rows (other activities do not count as logging in).\n\nFor every date at most 90 days before today, that is from 2019-04-01 through 2019-06-30 with both ends included, report how many users logged in for the first time on that date. Output the columns `login_date` and `user_count`, one row per date that has at least one such user. Rows may come in any order.",
+  "constraints": [
+    "Traffic has no primary key and may contain duplicate rows",
+    "activity is one of 'login', 'logout', 'jobs', 'groups', 'homepage'",
+    "Every activity_date is on or before 2019-06-30"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Traffic": [["user_id","INT"],["activity","ENUM('login', 'logout', 'jobs', 'groups', 'homepage')"],["activity_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Traffic = [] }] = input;\n  const kinds = ['login', 'logout', 'jobs', 'groups', 'homepage'];\n  for (const [user, activity, date] of Traffic) {\n    if (user === null || activity === null || date === null) return 'user_id, activity and activity_date are required.';\n    if (!kinds.includes(activity)) return `Unknown activity ${activity}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `activity_date ${date} is not YYYY-MM-DD.`;\n    if (date > '2019-06-30') return `activity_date ${date} is after today, 2019-06-30.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH first_login AS (\n  SELECT user_id, MIN(activity_date) AS login_date\n  FROM Traffic\n  WHERE activity = 'login'\n  GROUP BY user_id\n)\nSELECT login_date, COUNT(*) AS user_count\nFROM first_login\nWHERE login_date >= DATE_SUB('2019-06-30', INTERVAL 90 DAY)\nGROUP BY login_date;",
+  "brute": "SELECT t.activity_date AS login_date, COUNT(DISTINCT t.user_id) AS user_count\nFROM Traffic AS t\nWHERE t.activity = 'login'\n  AND DATEDIFF('2019-06-30', t.activity_date) <= 90\n  AND NOT EXISTS (\n    SELECT 1 FROM Traffic AS e\n    WHERE e.user_id = t.user_id\n      AND e.activity = 'login'\n      AND e.activity_date < t.activity_date)\nGROUP BY t.activity_date",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const kinds = ['login', 'login', 'login', 'logout', 'jobs', 'groups', 'homepage'];\n  const day = offset => new Date(Date.UTC(2019, 5, 30 - offset)).toISOString().slice(0, 10);\n  const Traffic = [];\n  if (size === 'small') {\n    // Offsets cluster around the 90-day boundary (2019-04-01) and today.\n    const offsets = [0, 1, 9, 89, 90, 91, 120];\n    const users = 1 + pick(4), rows = pick(9);\n    for (let i = 0; i < rows; i++) {\n      if (Traffic.length && rand() < 0.15) { Traffic.push([...Traffic[pick(Traffic.length)]]); continue; }\n      Traffic.push([1 + pick(users), kinds[pick(kinds.length)], day(offsets[pick(offsets.length)])]);\n    }\n  } else {\n    for (let i = 0; i < 2000; i++) Traffic.push([1 + pick(400), kinds[pick(kinds.length)], day(pick(180))]);\n  }\n  return [{ Traffic }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Traffic":[[1,"login","2019-05-01"],[1,"homepage","2019-05-01"],[1,"logout","2019-05-01"],[2,"login","2019-06-21"],[2,"logout","2019-06-21"],[3,"login","2019-01-01"],[3,"jobs","2019-01-01"],[3,"logout","2019-01-01"],[4,"login","2019-06-21"],[4,"groups","2019-06-21"],[4,"logout","2019-06-21"],[5,"login","2019-03-01"],[5,"logout","2019-03-01"],[5,"login","2019-06-21"],[5,"logout","2019-06-21"]]}],"expected":{"columns":["login_date","user_count"],"rows":[["2019-05-01",1],["2019-06-21",2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Traffic":[]}]},
+    {"name":"Test 2","input":[{"Traffic":[[1,"login","2019-06-30"]]}]},
+    {"name":"Test 3","input":[{"Traffic":[[1,"login","2019-04-01"],[2,"login","2019-03-31"],[3,"login","2019-04-02"],[3,"logout","2019-04-02"]]}]},
+    {"name":"Test 4","input":[{"Traffic":[[1,"login","2019-05-10"],[1,"login","2019-05-10"],[1,"logout","2019-05-10"],[1,"login","2019-05-11"],[2,"login","2019-05-11"],[2,"login","2019-05-11"]]}]},
+    {"name":"Test 5","input":[{"Traffic":[[1,"homepage","2019-03-01"],[1,"login","2019-05-01"],[2,"jobs","2019-04-20"],[2,"groups","2019-04-21"],[3,"logout","2019-04-25"],[3,"login","2019-04-26"]]}]},
+    {"name":"Test 6","input":[{"Traffic":[[1,"login","2019-02-01"],[1,"login","2019-06-01"],[2,"login","2019-03-31"],[2,"login","2019-04-01"],[3,"login","2018-12-31"]]}]},
+    {"name":"Test 7","input":[{"Traffic":[[4,"login","2019-06-15"],[5,"login","2019-06-15"],[6,"login","2019-06-15"],[7,"login","2019-06-16"],[4,"login","2019-06-16"],[8,"login","2019-06-30"]]}]},
+    {"name":"Test 8","input":[{"Traffic":[[1,"login","2019-06-20"],[1,"login","2019-05-02"],[2,"logout","2019-06-20"],[2,"login","2019-06-25"],[2,"login","2019-06-01"],[3,"jobs","2019-05-02"]]}]},
+    {"name":"Test 9","input":[{"Traffic":[[1,"login","2019-04-01"],[2,"login","2019-04-01"],[3,"homepage","2019-04-01"],[3,"login","2019-04-02"],[4,"login","2019-03-31"],[4,"login","2019-04-01"],[5,"groups","2019-03-30"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Logged in for the first time on date d\" is a fact about each user, not about each row, so first reduce every user to one date: the minimum date over their `'login'` rows. Duplicated rows and later logins disappear in that step. What remains is a list of first-login dates; keep the ones in the 90-day window and count users per date.\n\n## Approach\n\n1. CTE `first_login`: keep only rows with `activity = 'login'`, then `GROUP BY user_id` with `MIN(activity_date)`, giving one row per user with their `login_date`.\n2. Filter `login_date >= DATE_SUB('2019-06-30', INTERVAL 90 DAY)`, which is 2019-04-01. No date is after today, so no upper bound is needed.\n3. `GROUP BY login_date` and `COUNT(*)`: each row of `first_login` is a distinct user, so the count is `user_count`.\n\n## Example 1, step by step\n\n- `first_login`: user 1 at 2019-05-01, user 2 at 2019-06-21, user 3 at 2019-01-01, user 4 at 2019-06-21, user 5 at 2019-03-01 (their 2019-06-21 login is not their first).\n- The window starts at 2019-04-01, so users 3 and 5 drop out.\n- Grouping leaves 2019-05-01 with 1 user and 2019-06-21 with 2 users.\n\n## Complexity\n\n- Time: O(n) to filter and group the n rows of `Traffic` with hashing, then O(u) over the u users.\n- Space: O(u) for `first_login`.\n\n## Pitfalls\n\n- Filtering the window **before** taking the minimum makes user 5 look new on 2019-06-21; the window must apply to the first login, after grouping.\n- Forgetting `activity = 'login'` lets a `'homepage'` or `'logout'` row count as a first login.\n- Counting rows on a date instead of users counts duplicate login rows twice.\n- Off-by-one on the boundary: 2019-04-01 is exactly 90 days before today and belongs in the window; 2019-03-31 does not.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `first_login` | one row per user who ever logged in, with that user's earliest `login_date` |\n| `login_date` | a user's first login date, and the output's date column |\n| `user_count` | how many users have that first login date |",
+  "narration": {
+    "1": "Stage one, first_login, reduces each user to a single first-login date.",
+    "4": "Only login rows count; other activities never make a user new.",
+    "5": "Grouping by user and taking MIN gives each user's earliest login, which also removes duplicates.",
+    "7": "Each remaining row is one user, so counting rows per date counts new users.",
+    "9": "The window is applied to first-login dates: 2019-04-01 or later is at most 90 days before today.",
+    "10": "One output row per first-login date."
+  }
+}
