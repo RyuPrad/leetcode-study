@@ -1,0 +1,48 @@
+{
+  "number": 1378,
+  "title": "Replace Employee ID With The Unique Identifier",
+  "spec": "leetcode",
+  "statement": "A company keeps two tables about its staff:\n\n- `Employees(id, name)`: one row per employee; `id` is unique.\n- `EmployeeUNI(id, unique_id)`: maps an employee `id` to that employee's unique identifier; the pair `(id, unique_id)` is unique. Not every employee has a row here, and a row's `id` may belong to nobody in `Employees`.\n\nReport every employee from `Employees` with the columns `unique_id` and `name`. An employee with no row in `EmployeeUNI` still appears, with `null` as `unique_id`; an employee with several rows there appears once per row. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Employees",
+    "(id, unique_id) is unique in EmployeeUNI",
+    "EmployeeUNI.id may not appear in Employees"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["id","INT"],["name","VARCHAR(20)"]],
+    "EmployeeUNI": [["id","INT"],["unique_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employees = [], EmployeeUNI = [] }] = input;\n  const ids = new Set(), pairs = new Set();\n  for (const [id] of Employees) {\n    if (id === null) return 'Every employee needs an id.';\n    if (ids.has(id)) return `Employee id ${id} appears twice.`;\n    ids.add(id);\n  }\n  for (const [id, unique] of EmployeeUNI) {\n    if (id === null || unique === null) return 'EmployeeUNI rows need both id and unique_id.';\n    const key = `${id}|${unique}`;\n    if (pairs.has(key)) return `The pair (${id}, ${unique}) appears twice in EmployeeUNI.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT u.unique_id, e.name\nFROM Employees AS e\nLEFT JOIN EmployeeUNI AS u\n  ON u.id = e.id;",
+  "brute": "SELECT u.unique_id, e.name\nFROM Employees AS e, EmployeeUNI AS u\nWHERE u.id = e.id\nUNION ALL\nSELECT NULL, e.name\nFROM Employees AS e\nWHERE NOT EXISTS (SELECT 1 FROM EmployeeUNI AS u WHERE u.id = e.id)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const int = n => Math.floor(rand() * n);\n  const names = ['Alice', 'Bob', 'Meir', 'Winston', 'Jonathan', 'Sara', 'Omar', 'Lee'];\n  const pool = small ? 10 : 3000;\n  const ids = [];\n  for (let id = 1; id <= pool; id++) if (rand() < (small ? 0.5 : 0.6)) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = int(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Employees = ids.slice(0, small ? int(9) : 1800).map(id => [id, small ? names[int(names.length)] : `Emp${id}`]);\n  // Unique ids go to existing employees, to ids nobody has, and now and then a second one to the same employee.\n  const EmployeeUNI = [], seen = new Set();\n  const target = small ? int(9) : 1800;\n  for (let tries = 0; EmployeeUNI.length < target && tries < target * 4; tries++) {\n    const id = rand() < 0.8 && Employees.length ? Employees[int(Employees.length)][0] : 1 + int(pool + 2);\n    const unique = 1 + int(small ? 6 : 5000);\n    const key = `${id}|${unique}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    EmployeeUNI.push([id, unique]);\n  }\n  return [{ Employees, EmployeeUNI }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[1,"Alice"],[7,"Bob"],[11,"Meir"],[90,"Winston"],[3,"Jonathan"]],"EmployeeUNI":[[3,1],[11,2],[90,3]]}],"expected":{"columns":["unique_id","name"],"rows":[[null,"Alice"],[null,"Bob"],[2,"Meir"],[3,"Winston"],[1,"Jonathan"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[],"EmployeeUNI":[[1,1]]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Alice"]],"EmployeeUNI":[]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"Alice"],[2,"Bob"]],"EmployeeUNI":[[1,10],[2,20]]}]},
+    {"name":"Test 4","input":[{"Employees":[[5,"Sara"]],"EmployeeUNI":[[4,1],[6,2]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Omar"],[2,"Lee"]],"EmployeeUNI":[[1,7],[1,8]]}]},
+    {"name":"Test 6","input":[{"Employees":[[1,"Bob"],[2,"Bob"],[3,"Bob"]],"EmployeeUNI":[[2,5],[3,5]]}]},
+    {"name":"Test 7","input":[{"Employees":[[3,"Jonathan"],[11,"Meir"]],"EmployeeUNI":[[11,3],[3,11]]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,"Alice"],[2,"Winston"],[3,"Meir"],[4,"Lee"]],"EmployeeUNI":[[4,0],[9,1],[2,2]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe output is a list of employees, each decorated with a value from another table when one exists. That is the job of a **left join**: every row of the left table (`Employees`) survives, and the right table's columns (`EmployeeUNI`) are filled in when the join condition matches and left `null` otherwise. An inner join would quietly drop Alice and Bob in Example 1.\n\n## Approach\n\n1. Read from `Employees` (alias `e`), the table whose rows must all appear.\n2. `LEFT JOIN EmployeeUNI` (alias `u`) on `u.id = e.id`.\n3. Select `u.unique_id` and `e.name`, in that column order. Employees with no mapping get `null`; mapping rows whose `id` is no employee never join and are not reported.\n\n## Example 1, step by step\n\n- Alice (1) and Bob (7) have no `EmployeeUNI` row, so they are kept with `unique_id = null`.\n- Meir (11) matches `(11, 2)`, Winston (90) matches `(90, 3)` and Jonathan (3) matches `(3, 1)`.\n\nThe result is five rows: `(null, Alice)`, `(null, Bob)`, `(2, Meir)`, `(3, Winston)`, `(1, Jonathan)`.\n\n## Complexity\n\n- Time: O(E + U) for E employees and U mapping rows with a hash or index on `EmployeeUNI.id` (the leading column of its key); O(E · U) without one.\n- Space: O(E + U) for the result.\n\n## Pitfalls\n\n- An inner `JOIN` (or a comma join with `WHERE u.id = e.id`) loses every employee without a unique id.\n- Writing `EmployeeUNI` on the left reports mapping rows instead of employees, including ids that belong to nobody.\n- Selecting `e.name, u.unique_id` gives the right values in the wrong column order; the expected header is `unique_id`, then `name`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `e` | `Employees`, the source of every output row |\n| `u` | `EmployeeUNI`, joined when `u.id = e.id` |\n| `LEFT JOIN ... ON` | keeps employees with no match, with `u.unique_id = null` |",
+  "narration": {
+    "1": "Output the unique id first and the employee name second, as the result header requires.",
+    "2": "Employees is the left table, so every employee yields at least one row.",
+    "3": "A left join keeps employees without a mapping and fills unique_id with null for them.",
+    "4": "A mapping row belongs to the employee whose id it carries; rows for unknown ids match nobody."
+  }
+}

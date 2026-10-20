@@ -1,0 +1,63 @@
+{
+  "number": 1651,
+  "title": "Hopper Company Queries III",
+  "spec": "recalled",
+  "statement": "A ride-hailing company keeps three tables:\n\n- `Drivers(driver_id, join_date)`: one row per driver; `driver_id` is unique. This table is not needed for the answer.\n- `Rides(ride_id, user_id, requested_at)`: one row per ride request; `ride_id` is unique. `requested_at` is the day the user asked for the ride.\n- `AcceptedRides(ride_id, driver_id, ride_distance, ride_duration)`: one row per request that a driver accepted; `ride_id` is unique and always exists in `Rides`.\n\nConsider the ten three-month windows of 2020 that start in January, February, ..., October (January–March, February–April, ..., October–December). An accepted ride belongs to the month in which it was requested. For each window report:\n\n- `month`: the number of the window's first month, 1 to 10;\n- `average_ride_distance`: the total `ride_distance` of the accepted rides in the window's three months, **divided by 3**, rounded to 2 decimals;\n- `average_ride_duration`: the same for `ride_duration`.\n\nA window with no accepted rides reports 0 for both. Order the rows by `month` ascending.",
+  "constraints": [
+    "driver_id is unique in Drivers",
+    "ride_id is unique in Rides",
+    "ride_id is unique in AcceptedRides and exists in Rides",
+    "ride_distance >= 0 and ride_duration >= 0",
+    "Dates may lie in any year; only 2020 is reported",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Drivers": [["driver_id","INT"],["join_date","DATE"]],
+    "Rides": [["ride_id","INT"],["user_id","INT"],["requested_at","DATE"]],
+    "AcceptedRides": [["ride_id","INT"],["driver_id","INT"],["ride_distance","INT"],["ride_duration","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Drivers = [], Rides = [], AcceptedRides = [] }] = input;\n  const isDate = (d) => /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\n  const drivers = new Set(), rides = new Set(), accepted = new Set();\n  for (const [id, date] of Drivers) {\n    if (id === null || date === null) return 'Drivers rows may not contain null.';\n    if (drivers.has(id)) return `driver_id ${id} appears twice in Drivers.`;\n    if (!isDate(date)) return 'Dates must look like 2020-01-31.';\n    drivers.add(id);\n  }\n  for (const row of Rides) {\n    if (row.some((v) => v === null)) return 'Rides rows may not contain null.';\n    if (rides.has(row[0])) return `ride_id ${row[0]} appears twice in Rides.`;\n    if (!isDate(row[2])) return 'Dates must look like 2020-01-31.';\n    rides.add(row[0]);\n  }\n  for (const row of AcceptedRides) {\n    if (row.some((v) => v === null)) return 'AcceptedRides rows may not contain null.';\n    const [id, , distance, duration] = row;\n    if (accepted.has(id)) return `ride_id ${id} appears twice in AcceptedRides.`;\n    if (!rides.has(id)) return `Accepted ride ${id} is missing from Rides.`;\n    if (distance < 0 || duration < 0) return 'Distances and durations may not be negative.';\n    accepted.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE months AS (\n  SELECT 1 AS month\n  UNION ALL\n  SELECT month + 1 FROM months WHERE month < 12\n),\nmonthly AS (\n  SELECT MONTH(r.requested_at) AS month,\n    SUM(ar.ride_distance) AS distance,\n    SUM(ar.ride_duration) AS duration\n  FROM AcceptedRides AS ar\n  JOIN Rides AS r\n    ON r.ride_id = ar.ride_id\n  WHERE YEAR(r.requested_at) = 2020\n  GROUP BY MONTH(r.requested_at)\n),\nwindowed AS (\n  SELECT m.month,\n    SUM(IFNULL(mo.distance, 0)) OVER (ORDER BY m.month ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS window_distance,\n    SUM(IFNULL(mo.duration, 0)) OVER (ORDER BY m.month ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS window_duration\n  FROM months AS m\n  LEFT JOIN monthly AS mo\n    ON mo.month = m.month\n)\nSELECT month,\n  ROUND(window_distance / 3, 2) AS average_ride_distance,\n  ROUND(window_duration / 3, 2) AS average_ride_duration\nFROM windowed\nWHERE month <= 10\nORDER BY month;",
+  "brute": "SELECT m.month,\n  ROUND(IFNULL((\n    SELECT SUM(ar.ride_distance)\n    FROM AcceptedRides AS ar, Rides AS r\n    WHERE r.ride_id = ar.ride_id AND YEAR(r.requested_at) = 2020\n      AND MONTH(r.requested_at) BETWEEN m.month AND m.month + 2\n  ), 0) / 3, 2) AS average_ride_distance,\n  ROUND(IFNULL((\n    SELECT SUM(ar.ride_duration)\n    FROM AcceptedRides AS ar, Rides AS r\n    WHERE r.ride_id = ar.ride_id AND YEAR(r.requested_at) = 2020\n      AND MONTH(r.requested_at) BETWEEN m.month AND m.month + 2\n  ), 0) / 3, 2) AS average_ride_duration\nFROM (\n  SELECT 1 AS month UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5\n  UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10\n) AS m\nORDER BY m.month",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const pool = ['2019-12-31', '2020-01-01', '2020-02-29', '2020-03-31', '2020-04-01', '2020-06-15', '2020-09-30', '2020-10-01', '2020-11-11', '2020-12-31', '2021-01-01'];\n  const date = () => small ? pick(pool) : `${2019 + Math.floor(rand() * 3)}-${String(1 + Math.floor(rand() * 12)).padStart(2, '0')}-${String(1 + Math.floor(rand() * 28)).padStart(2, '0')}`;\n  const driverCount = small ? Math.floor(rand() * 4) : 300;\n  const rideCount = small ? Math.floor(rand() * 9) : 2000;\n  const Drivers = [], Rides = [], AcceptedRides = [];\n  for (let id = 1; id <= driverCount; id++) Drivers.push([id, date()]);\n  for (let id = 1; id <= rideCount; id++) {\n    Rides.push([id, 1 + Math.floor(rand() * (small ? 5 : 300)), date()]);\n    if (rand() < 0.7) AcceptedRides.push([id, 1 + Math.floor(rand() * Math.max(driverCount, 1)), Math.floor(rand() * (small ? 20 : 200)), Math.floor(rand() * (small ? 20 : 150))]);\n  }\n  return [{ Drivers, Rides, AcceptedRides }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Drivers":[[10,"2019-12-10"],[8,"2020-01-13"],[5,"2020-02-16"],[7,"2020-03-08"],[4,"2020-05-17"],[1,"2020-10-24"],[6,"2021-01-05"]],"Rides":[[6,75,"2019-12-09"],[1,54,"2020-02-09"],[10,63,"2020-03-04"],[19,39,"2020-04-06"],[3,41,"2020-06-03"],[13,52,"2020-06-22"],[7,69,"2020-07-16"],[17,70,"2020-08-25"],[20,81,"2020-11-02"],[5,57,"2020-11-09"],[2,42,"2020-12-09"],[11,68,"2021-01-11"],[15,32,"2021-01-17"],[12,11,"2021-01-19"],[14,18,"2021-01-27"]],"AcceptedRides":[[10,10,63,38],[13,10,73,96],[7,8,100,28],[17,7,119,68],[20,1,121,92],[5,7,42,101],[2,4,6,38],[11,8,37,43],[15,8,108,82],[12,8,38,34],[14,1,90,74]]}],"expected":{"columns":["month","average_ride_distance","average_ride_duration"],"rows":[[1,21,12.67],[2,21,12.67],[3,21,12.67],[4,24.33,32],[5,57.67,41.33],[6,97.33,64],[7,73,32],[8,39.67,22.67],[9,54.33,64.33],[10,56.33,77]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Drivers":[],"Rides":[],"AcceptedRides":[]}]},
+    {"name":"Test 2","input":[{"Drivers":[[1,"2020-01-01"]],"Rides":[[1,7,"2020-12-31"]],"AcceptedRides":[[1,1,30,60]]}]},
+    {"name":"Test 3","input":[{"Drivers":[[1,"2019-05-05"]],"Rides":[[1,7,"2020-01-01"]],"AcceptedRides":[[1,1,30,60]]}]},
+    {"name":"Test 4","input":[{"Drivers":[[1,"2019-05-05"]],"Rides":[[1,7,"2019-12-31"],[2,8,"2021-01-01"],[3,9,"2019-03-15"]],"AcceptedRides":[[1,1,10,20],[2,1,30,40],[3,1,50,60]]}]},
+    {"name":"Test 5","input":[{"Drivers":[[1,"2019-05-05"]],"Rides":[[1,7,"2020-05-05"],[2,8,"2020-06-06"],[3,9,"2020-07-07"]],"AcceptedRides":[[3,1,9,12]]}]},
+    {"name":"Test 6","input":[{"Drivers":[[1,"2019-05-05"],[2,"2019-06-06"]],"Rides":[[1,7,"2020-04-10"],[2,8,"2020-04-20"],[3,9,"2020-04-30"]],"AcceptedRides":[[1,1,1,2],[2,2,1,5],[3,1,0,0]]}]},
+    {"name":"Test 7","input":[{"Drivers":[[1,"2019-05-05"]],"Rides":[[1,7,"2020-03-31"],[2,7,"2020-04-01"],[3,8,"2020-06-30"],[4,8,"2020-07-01"]],"AcceptedRides":[[1,1,3,30],[2,1,6,60],[3,1,9,90],[4,1,12,120]]}]},
+    {"name":"Test 8","input":[{"Drivers":[[1,"2019-05-05"]],"Rides":[[1,7,"2020-01-15"],[2,7,"2020-03-15"],[3,8,"2020-06-15"]],"AcceptedRides":[[1,1,10,4],[2,1,20,5],[3,1,40,7]]}]},
+    {"name":"Test 9","input":[{"Drivers":[],"Rides":[[1,7,"2020-01-05"],[2,7,"2020-02-05"],[3,8,"2020-03-05"],[4,8,"2020-04-05"],[5,9,"2020-05-05"],[6,9,"2020-06-05"],[7,9,"2020-07-05"],[8,9,"2020-08-05"],[9,9,"2020-09-05"],[10,9,"2020-10-05"],[11,9,"2020-11-05"],[12,9,"2020-12-05"]],"AcceptedRides":[[1,1,1,12],[2,1,2,11],[3,1,3,10],[4,1,4,9],[5,1,5,8],[6,1,6,7],[7,1,7,6],[8,1,8,5],[9,1,9,4],[10,1,10,3],[11,1,11,2],[12,1,12,1]]}]},
+    {"name":"Test 10","input":[{"Drivers":[[1,"2020-02-02"]],"Rides":[[1,7,"2020-11-11"],[2,7,"2020-11-12"],[3,8,"2020-12-01"],[4,9,"2021-02-01"]],"AcceptedRides":[[1,1,100,50],[2,1,1,1],[3,1,20,10],[4,1,999,999]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row is a **sliding window** over the months of 2020: month `k` and the two months after it. First reduce the rides to one total per month, make sure all twelve months exist (empty ones with 0), and then a window function can add up \"this row and the next two\" in one pass. The divisor is always 3 (months), not the number of rides.\n\n## Approach\n\n1. `months`: a recursive CTE producing the numbers 1 to 12.\n2. `monthly`: join `AcceptedRides` to `Rides` for the request date, keep 2020, and sum distance and duration per month.\n3. `windowed`: left-join `months` to `monthly` so missing months become 0, then `SUM(...) OVER (ORDER BY month ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING)` adds each month to the next two.\n4. Divide the window totals by 3, round to 2 decimals, keep the windows starting in months 1 to 10, and order by month.\n\n## Example 1, step by step\n\n- `monthly` (accepted rides requested in 2020): March 63 / 38, June 73 / 96, July 100 / 28, August 119 / 68, November 121 + 42 = 163 / 92 + 101 = 193, December 6 / 38. Rides 1, 19 and 3 were never accepted; rides 11, 15, 12 and 14 are from 2021.\n- `windowed` for month 1 covers January to March: 63 and 38, so 63 / 3 = 21.00 and 38 / 3 = 12.67. Months 2 and 3 also contain only March's ride.\n- Month 6 covers June to August: 73 + 100 + 119 = 292 and 96 + 28 + 68 = 192, giving 97.33 and 64.00.\n- Month 10 covers October to December: 163 + 6 = 169 and 193 + 38 = 231, giving 56.33 and 77.00.\n- Months 11 and 12 have incomplete windows and are dropped.\n\n## Complexity\n\n- Time: O(A) to join and total the A accepted rides with an index on `Rides.ride_id`, then O(12) for the window.\n- Space: O(12) for the monthly and windowed rows.\n\n## Pitfalls\n\n- `AVG(ride_distance)` divides by the number of rides; the problem divides the three-month total by 3.\n- A row-based window over only the months that have rides skips empty months, so a window could span more than three calendar months. Build all twelve months first.\n- The window looks **forward** (current and 2 following), not back; month 1 means January to March.\n- Rides from 2019 or 2021 must be excluded before grouping by `MONTH`, or January 2021 lands in month 1.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `months` / `m` | the numbers 1 to 12 |\n| `ar`, `r` | `AcceptedRides` and the `Rides` row holding its request date |\n| `monthly` / `mo` | `month`, total `distance` and `duration` of 2020 months with rides |\n| `windowed` | `window_distance`, `window_duration`: totals of each month and the next two |",
+  "narration": {
+    "1": "The recursive CTE months starts at 1 ...",
+    "4": "... and adds 1 until it reaches 12, so every month of 2020 has a row.",
+    "6": "The CTE monthly totals the distance and duration of accepted rides per request month.",
+    "10": "AcceptedRides holds the distance and duration of each ride a driver took ...",
+    "12": "... and joining Rides on ride_id supplies the date it was requested.",
+    "13": "Only rides requested in 2020 count.",
+    "16": "The CTE windowed adds each month to the two months after it.",
+    "18": "The window frame is the current row and the next two, in month order; a missing month counts as 0.",
+    "21": "The left join keeps months without rides, so every frame spans exactly three calendar months.",
+    "25": "The three-month total is divided by 3, not by the number of rides, and rounded to 2 decimals.",
+    "28": "Windows starting in November or December would run past 2020, so only months 1 to 10 are kept.",
+    "29": "Rows are reported from January onwards."
+  }
+}

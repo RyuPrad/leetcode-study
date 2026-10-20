@@ -1,0 +1,55 @@
+{
+  "number": 1731,
+  "title": "The Number of Employees Which Report to Each Employee",
+  "spec": "leetcode",
+  "statement": "One table lists the staff of a company:\n\n- `Employees(employee_id, name, reports_to, age)`: one row per employee; `employee_id` is unique. `reports_to` holds the `employee_id` of the person this employee reports to directly, or `null` when they report to nobody.\n\nCall an employee a **manager** when at least one other employee has `reports_to` equal to their id. For every manager, return `employee_id`, `name`, `reports_count` (how many employees report to them directly) and `average_age` (the mean age of those direct reports, rounded to the nearest integer, with halves rounded up). Employees who manage nobody are not listed. Order the rows by `employee_id`.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "reports_to is null or the id of the direct manager",
+    "age is not null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["name","VARCHAR(20)"],["reports_to","INT"],["age","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const seen = new Set();\n  for (const [id, , , age] of Employees) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (seen.has(id)) return `employee_id ${id} appears twice.`;\n    seen.add(id);\n    if (age === null || age < 0) return `Employee ${id} needs a non-negative age.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT m.employee_id, m.name,\n       COUNT(r.employee_id) AS reports_count,\n       ROUND(AVG(r.age)) AS average_age\nFROM Employees AS m\nJOIN Employees AS r\n  ON r.reports_to = m.employee_id\nGROUP BY m.employee_id, m.name\nORDER BY m.employee_id;",
+  "brute": "SELECT m.employee_id, m.name,\n       (SELECT COUNT(*) FROM Employees AS x WHERE x.reports_to = m.employee_id) AS reports_count,\n       (SELECT ROUND(SUM(x.age) / COUNT(*)) FROM Employees AS x WHERE x.reports_to = m.employee_id) AS average_age\nFROM Employees AS m\nWHERE EXISTS (SELECT 1 FROM Employees AS x WHERE x.reports_to = m.employee_id)\nORDER BY m.employee_id",
+  "generator": "function generate(rand, size) {\n  const names = ['Hercy', 'Alice', 'Bob', 'Winston', 'Michael', 'Eve', 'Grace', 'Frank'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const pool = size === 'small' ? 12 : 2000;\n  // Distinct ids in shuffled order, so the output order must come from ORDER BY.\n  const ids = Array.from({ length: pool }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const chosen = ids.slice(0, count);\n  // In large cases a few bosses take most reports, so groups are big; small cases mix nulls and chains.\n  const bosses = chosen.slice(0, Math.max(1, Math.floor(count / 20)));\n  const Employees = chosen.map(id => {\n    let boss = null;\n    if (rand() < 0.7 && count > 1) {\n      boss = size === 'large' && rand() < 0.5 ? pick(bosses) : pick(chosen);\n      if (boss === id) boss = null;\n    }\n    return [id, pick(names), boss, 20 + Math.floor(rand() * 8) * (size === 'small' ? 1 : 5)];\n  });\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[9,"Hercy",null,43],[6,"Alice",9,41],[4,"Bob",9,36],[2,"Winston",null,37]]}],"expected":{"columns":["employee_id","name","reports_count","average_age"],"rows":[[9,"Hercy",2,39]]}},
+    {"name":"Example 2","input":[{"Employees":[[1,"Michael",null,45],[2,"Alice",1,38],[3,"Bob",1,42],[4,"Charlie",2,34],[5,"David",2,40],[6,"Eve",3,37],[7,"Frank",null,50],[8,"Grace",null,48]]}],"expected":{"columns":["employee_id","name","reports_count","average_age"],"rows":[[1,"Michael",2,40],[2,"Alice",2,37],[3,"Bob",1,37]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Ana",null,30],[2,"Ben",null,40]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"Ana",null,50],[2,"Ben",1,20],[3,"Cy",1,21]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,"Ana",null,50],[2,"Ben",1,30],[3,"Cy",1,30],[4,"Dee",1,31]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Ana",null,60],[2,"Ben",1,45],[3,"Cy",2,25],[4,"Dee",3,22]]}]},
+    {"name":"Test 6","input":[{"Employees":[[8,"Hal",null,55],[5,"Eve",null,41],[7,"Gus",8,33],[3,"Cy",5,29],[1,"Ana",8,36],[2,"Ben",5,28]]}]},
+    {"name":"Test 7","input":[{"Employees":[[1,"Kim",null,44],[2,"Kim",null,46],[3,"Lee",1,30],[4,"Max",2,40],[5,"Ned",2,42]]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,"Ana",null,40],[2,"Ben",99,30],[3,"Cy",1,27]]}]},
+    {"name":"Test 9","input":[{"Employees":[[4,"Dee",null,39],[1,"Ana",4,25],[2,"Ben",4,25],[3,"Cy",4,25],[5,"Eve",4,25],[6,"Fay",4,26]]}]},
+    {"name":"Test 10","input":[{"Employees":[[1,"Ana",2,33],[2,"Ben",1,47]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach manager row needs facts about *other* rows of the same table: the people whose `reports_to` points at them. Joining `Employees` to itself pairs every manager with each of their direct reports, one row per pair. Grouping those pairs by manager turns them into a count and an average. An inner join also does the filtering for free: an employee nobody reports to has no pair and disappears.\n\n## Approach\n\n1. Read `Employees` twice: `m` plays the manager, `r` the report.\n2. `JOIN` on `r.reports_to = m.employee_id`, giving one row per (manager, direct report) pair.\n3. `GROUP BY m.employee_id, m.name` so each manager becomes one row.\n4. `COUNT(r.employee_id)` gives `reports_count`; `ROUND(AVG(r.age))` gives `average_age`.\n5. `ORDER BY m.employee_id`.\n\n## Example 1, step by step\n\n- The join finds two pairs: (Hercy 9, Alice age 41) and (Hercy 9, Bob age 36). Alice, Bob and Winston have no reports, so they never appear as `m`.\n- Grouping by Hercy: count = 2, average = (41 + 36) / 2 = 38.5.\n- `ROUND(38.5)` is 39, so the single output row is `9, Hercy, 2, 39`.\n\n## Complexity\n\n- Time: O(n) with a hash or index on `reports_to` for n employees (O(n²) for a naive nested-loop self-join), plus O(k log k) to sort the k managers.\n- Space: O(n) for the joined pairs and the groups.\n\n## Pitfalls\n\n- A `LEFT JOIN` keeps employees with no reports and lists them with a count of 0; the task wants only managers.\n- Grouping by `name` alone merges two different managers who share a name; group by the id.\n- Averaging the manager's own age (`m.age`) instead of the reports' ages (`r.age`) is an easy slip in a self-join.\n- MySQL's `ROUND` on the decimal `AVG` rounds 38.5 up to 39; do not truncate with `FLOOR` or integer division.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `m` | `Employees` in the manager role; supplies `employee_id` and `name` |\n| `r` | `Employees` in the report role; one row per direct report of `m` |\n| `reports_count` | number of `r` rows in the manager's group |\n| `average_age` | mean of `r.age`, rounded to an integer |",
+  "narration": {
+    "1": "Report the manager id and name from the manager side of the self-join.",
+    "2": "Count the direct reports joined to this manager.",
+    "3": "Average the reports' ages and round to the nearest integer.",
+    "4": "The first copy of Employees plays the manager.",
+    "5": "The second copy plays the report; an inner join drops employees who manage nobody.",
+    "6": "Pair each report with the employee named in their reports_to column.",
+    "7": "Collapse all pairs of one manager into a single row; grouping by id keeps same-named managers apart.",
+    "8": "The problem asks for the managers ordered by id."
+  }
+}

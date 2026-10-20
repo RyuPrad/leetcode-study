@@ -1,0 +1,55 @@
+{
+  "number": 1280,
+  "title": "Students and Examinations",
+  "spec": "leetcode",
+  "statement": "Three tables describe a school's exams:\n\n- `Students(student_id, student_name)`: one row per student; `student_id` is unique (names may repeat).\n- `Subjects(subject_name)`: one row per subject; `subject_name` is unique.\n- `Examinations(student_id, subject_name)`: each row records one sitting of that subject's exam by that student. The table has no key, and a student may sit the same exam several times, giving identical rows.\n\nEvery student takes every subject. Report one row for **each pair** of a student and a subject, with the columns `student_id`, `student_name`, `subject_name` and `attended_exams`: the number of `Examinations` rows for that student and subject (0 when there are none). Only pairs of a student in `Students` and a subject in `Subjects` are reported. Order the rows by `student_id`, then by `subject_name`, both ascending.",
+  "constraints": [
+    "student_id is unique in Students",
+    "subject_name is unique in Subjects",
+    "Examinations has no primary key and may contain duplicate rows",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Students": [["student_id","INT"],["student_name","VARCHAR(20)"]],
+    "Subjects": [["subject_name","VARCHAR(20)"]],
+    "Examinations": [["student_id","INT"],["subject_name","VARCHAR(20)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Students = [], Subjects = [], Examinations = [] }] = input;\n  const students = new Set(), subjects = new Set();\n  for (const [id, name] of Students) {\n    if (id === null || name === null) return 'Students rows may not contain null.';\n    if (students.has(id)) return `student_id ${id} appears twice in Students.`;\n    students.add(id);\n  }\n  for (const [name] of Subjects) {\n    if (name === null) return 'subject_name may not be null.';\n    // Text compares without case, so 'Math' and 'math' would be the same key.\n    if (subjects.has(name.toLowerCase())) return `Subject ${name} appears twice in Subjects.`;\n    subjects.add(name.toLowerCase());\n  }\n  for (const row of Examinations) if (row.some((v) => v === null)) return 'Examinations rows may not contain null.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.student_id,\n       s.student_name,\n       sub.subject_name,\n       COUNT(e.student_id) AS attended_exams\nFROM Students AS s\nCROSS JOIN Subjects AS sub\nLEFT JOIN Examinations AS e\n  ON e.student_id = s.student_id\n AND e.subject_name = sub.subject_name\nGROUP BY s.student_id, s.student_name, sub.subject_name\nORDER BY s.student_id, sub.subject_name;",
+  "brute": "SELECT s.student_id,\n       s.student_name,\n       sub.subject_name,\n       (SELECT COUNT(*)\n        FROM Examinations AS e\n        WHERE e.student_id = s.student_id\n          AND e.subject_name = sub.subject_name) AS attended_exams\nFROM Students AS s, Subjects AS sub\nORDER BY s.student_id, sub.subject_name",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const names = ['Alice', 'Bob', 'John', 'Alex', 'Mia', 'Omar'];\n  const subjectPool = ['Programming', 'Math', 'Physics', 'Art', 'Biology', 'Chemistry', 'History', 'Music', 'Geography', 'Economics', 'Latin', 'Drama'];\n  const shuffle = (list) => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  const idPool = shuffle(Array.from({ length: small ? 15 : 300 }, (_, i) => i + 1));\n  const Students = idPool.slice(0, small ? Math.floor(rand() * 6) : 80).map((id) => [id, small ? pick(names) : `Student ${id}`]);\n  const Subjects = shuffle(subjectPool.slice()).slice(0, small ? Math.floor(rand() * 5) : 12).map((name) => [name]);\n  const Examinations = [];\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  for (let i = 0; i < rows; i++) {\n    // Mostly real pairs (with repeats); now and then a student or subject that is not listed.\n    const student = Students.length && rand() < 0.9 ? pick(Students)[0] : 900 + Math.floor(rand() * 3);\n    const subject = Subjects.length && rand() < 0.9 ? pick(Subjects)[0] : 'Astronomy';\n    Examinations.push([student, subject]);\n  }\n  return [{ Students, Subjects, Examinations }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Students":[[1,"Alice"],[2,"Bob"],[13,"John"],[6,"Alex"]],"Subjects":[["Math"],["Physics"],["Programming"]],"Examinations":[[1,"Math"],[1,"Physics"],[1,"Programming"],[2,"Programming"],[1,"Physics"],[1,"Math"],[13,"Math"],[13,"Programming"],[13,"Physics"],[2,"Math"],[1,"Math"]]}],"expected":{"columns":["student_id","student_name","subject_name","attended_exams"],"rows":[[1,"Alice","Math",3],[1,"Alice","Physics",2],[1,"Alice","Programming",1],[2,"Bob","Math",1],[2,"Bob","Physics",0],[2,"Bob","Programming",1],[6,"Alex","Math",0],[6,"Alex","Physics",0],[6,"Alex","Programming",0],[13,"John","Math",1],[13,"John","Physics",1],[13,"John","Programming",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Students":[],"Subjects":[["Math"]],"Examinations":[]}]},
+    {"name":"Test 2","input":[{"Students":[[1,"Alice"]],"Subjects":[],"Examinations":[]}]},
+    {"name":"Test 3","input":[{"Students":[[10,"Bob"],[2,"Alice"]],"Subjects":[["Physics"],["Math"]],"Examinations":[]}]},
+    {"name":"Test 4","input":[{"Students":[[7,"Mia"]],"Subjects":[["Art"]],"Examinations":[[7,"Art"],[7,"Art"],[7,"Art"],[7,"Art"]]}]},
+    {"name":"Test 5","input":[{"Students":[[1,"Alex"],[2,"Alex"]],"Subjects":[["Math"]],"Examinations":[[1,"Math"],[2,"Math"],[2,"Math"]]}]},
+    {"name":"Test 6","input":[{"Students":[[3,"Omar"]],"Subjects":[["Programming"],["Art"],["Math"],["Biology"]],"Examinations":[[3,"Programming"],[3,"Biology"],[3,"Biology"]]}]},
+    {"name":"Test 7","input":[{"Students":[[1,"Alice"],[5,"John"]],"Subjects":[["Math"],["Physics"]],"Examinations":[[99,"Math"],[1,"Astronomy"],[5,"Physics"],[1,"Math"]]}]},
+    {"name":"Test 8","input":[{"Students":[[4,"Bob"],[1,"Alice"],[3,"Mia"]],"Subjects":[["Physics"],["Math"],["Programming"]],"Examinations":[[4,"Math"],[1,"Physics"],[4,"Math"],[3,"Programming"],[1,"Physics"],[1,"Math"],[4,"Programming"]]}]},
+    {"name":"Test 9","input":[{"Students":[[8,"John"]],"Subjects":[["Math"],["Physics"]],"Examinations":[[8,"Math"],[8,"Physics"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe output must list every (student, subject) pair, including pairs with no exam at all, so the rows cannot come from `Examinations`. Build every pair first with a **cross join** of `Students` and `Subjects`, then **left join** the exam rows that match both the student and the subject, and count them per pair. A pair with no exam keeps a single row whose exam columns are null, and `COUNT(e.student_id)` counts that as 0.\n\n## Approach\n\n1. `Students` (alias `s`) `CROSS JOIN` `Subjects` (alias `sub`): one row per student and subject.\n2. `LEFT JOIN Examinations` (alias `e`) on the same `student_id` **and** the same `subject_name`; each sitting adds one row to its pair.\n3. Group by the pair (`s.student_id`, `s.student_name`, `sub.subject_name`) and count `e.student_id`, which ignores nulls.\n4. Order by `student_id`, then `subject_name`.\n\n## Example 1, step by step\n\n- The cross join makes 4 × 3 = 12 pairs.\n- Alice (1) with Math joins three exam rows, with Physics two, with Programming one: 3, 2, 1.\n- Bob (2) with Physics joins nothing; the pair keeps one row with `e.student_id` null, so its count is 0. Math and Programming give 1 each.\n- Alex (6) has no exam rows: all three of his pairs count 0.\n- John (13) sat each exam once: 1, 1, 1.\n- Sorting by id puts Alex (6) before John (13).\n\n## Complexity\n\n- Time: O(S · J + E) for S students, J subjects and E exam rows, with a hash or index on the join keys, plus O(S · J log(S · J)) to sort the result.\n- Space: O(S · J + E) for the joined rows.\n\n## Pitfalls\n\n- Starting from `Examinations` or using an inner join drops the zero-count pairs.\n- `COUNT(*)` counts the null row of an unattended pair as 1; count a column of `e`.\n- Joining on `student_id` only (not also `subject_name`) counts all of a student's exams for every subject.\n- Grouping by `student_name` instead of `student_id` merges two students who share a name.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Students`, one side of every pair |\n| `sub` | `Subjects`, the other side of every pair |\n| `e` | an `Examinations` row matching the pair, or nulls when none matches |\n| `attended_exams` | number of matching exam rows for the pair |",
+  "narration": {
+    "4": "Count the pair's exam rows; the null row of an unattended pair counts as 0.",
+    "5": "Every student is listed, whether or not they sat an exam.",
+    "6": "The cross join pairs each student with every subject.",
+    "7": "A left join keeps pairs that have no exam rows.",
+    "8": "An exam row must belong to the pair's student.",
+    "9": "It must also be for the pair's subject, so each sitting counts toward exactly one pair.",
+    "10": "One group, and one output row, per student and subject.",
+    "11": "Sort by student id, then by subject name."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 1501,
+  "title": "Countries You Can Safely Invest In",
+  "spec": "recalled",
+  "statement": "A telecom company looks at three tables:\n\n- `Person(id, name, phone_number)`: `id` is unique. `phone_number` has the form `xxx-yyyyyyy`: a 3-digit country code, a dash and a 7-digit number (leading zeros allowed in both parts).\n- `Country(name, country_code)`: `country_code` is a unique 3-digit code and `name` is unique. Every person's code is listed here; a country may have no people.\n- `Calls(caller_id, callee_id, duration)`: one row per call, `duration` in minutes. There is no key, so identical rows can repeat. Both ids are people in `Person`, and `caller_id` differs from `callee_id`.\n\nA call belongs to the caller's country **and** to the callee's country, so a call between two people of the same country counts twice for that country. A country's average call duration is the average `duration` over the calls that belong to it, each counted as often as it belongs.\n\nReport the countries whose average call duration is **strictly greater** than the global average duration of all rows in `Calls`, in one column named `country` holding the country's name. Rows may come in any order.",
+  "constraints": [
+    "id is unique in Person; phone_number looks like xxx-yyyyyyy",
+    "country_code is unique in Country and has 3 digits; names are unique",
+    "Every person's country code is in Country",
+    "Calls may contain duplicate rows; caller_id != callee_id and both are in Person"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Person": [["id","INT"],["name","VARCHAR(15)"],["phone_number","VARCHAR(11)"]],
+    "Country": [["name","VARCHAR(15)"],["country_code","VARCHAR(3)"]],
+    "Calls": [["caller_id","INT"],["callee_id","INT"],["duration","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Person = [], Country = [], Calls = [] }] = input;\n  const codes = new Set(), names = new Set(), people = new Set();\n  for (const [name, code] of Country) {\n    if (code === null || !/^\\d{3}$/.test(code)) return 'Every country_code has exactly 3 digits.';\n    if (codes.has(code)) return `country_code ${code} appears twice in Country.`;\n    if (name === null || names.has(name)) return 'Every country needs a unique name.';\n    codes.add(code); names.add(name);\n  }\n  for (const [id, , phone] of Person) {\n    if (id === null || people.has(id)) return 'Every person needs a unique id.';\n    people.add(id);\n    if (phone === null || !/^\\d{3}-\\d{7}$/.test(phone)) return `Person ${id}'s phone_number must look like 051-1234567.`;\n    if (!codes.has(phone.slice(0, 3))) return `Person ${id}'s country code is not in Country.`;\n  }\n  for (const [caller, callee, duration] of Calls) {\n    if (!people.has(caller) || !people.has(callee)) return 'Every caller and callee must be in Person.';\n    if (caller === callee) return 'A person cannot call themselves.';\n    if (duration === null || duration < 0) return 'Every duration must be a non-negative number.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH call_legs AS (\n  SELECT caller_id AS person_id, duration FROM Calls\n  UNION ALL\n  SELECT callee_id AS person_id, duration FROM Calls\n),\ncountry_legs AS (\n  SELECT c.name AS country, l.duration\n  FROM call_legs AS l\n  JOIN Person AS p ON p.id = l.person_id\n  JOIN Country AS c ON c.country_code = LEFT(p.phone_number, 3)\n)\nSELECT country\nFROM country_legs\nGROUP BY country\nHAVING AVG(duration) > (SELECT AVG(duration) FROM Calls);",
+  "brute": "SELECT c.name AS country\nFROM Country AS c\nWHERE (\n  SELECT AVG(k.duration)\n  FROM Calls AS k\n  JOIN Person AS p ON p.id IN (k.caller_id, k.callee_id)\n  WHERE SUBSTRING_INDEX(p.phone_number, '-', 1) = c.country_code\n) > (SELECT AVG(duration) FROM Calls)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const digits = n => Array.from({ length: n }, () => Math.floor(rand() * 10)).join('');\n  let Country, people, calls, durations;\n  if (size === 'small') {\n    const pool = [['Peru', '051'], ['Israel', '972'], ['Morocco', '212'], ['Germany', '049'], ['Ethiopia', '251']];\n    Country = pool.filter(() => rand() < 0.6);\n    if (!Country.length) Country = [pool[Math.floor(rand() * pool.length)]];\n    people = Math.floor(rand() * 7);\n    calls = people >= 2 ? Math.floor(rand() * 9) : 0;\n    durations = [1, 5, 10, 20, 30, 60];\n  } else {\n    Country = Array.from({ length: 12 }, (_, i) => [`Country${i + 1}`, String(100 + i * 7).padStart(3, '0')]);\n    people = 400; calls = 2000;\n    durations = Array.from({ length: 120 }, (_, i) => i + 1);\n  }\n  const names = ['Jonathan', 'Elvis', 'Moncef', 'Maroua', 'Meir', 'Rachel', 'Ana', 'Ben'];\n  const Person = [];\n  for (let id = 1; id <= people; id++) Person.push([id, pick(names), `${pick(Country)[1]}-${digits(7)}`]);\n  const Calls = [];\n  for (let i = 0; i < calls; i++) {\n    // Repeat the previous call now and then: Calls has no key.\n    if (Calls.length && rand() < 0.15) { Calls.push([...Calls[Calls.length - 1]]); continue; }\n    const caller = 1 + Math.floor(rand() * people);\n    let callee = 1 + Math.floor(rand() * (people - 1));\n    if (callee >= caller) callee++;\n    Calls.push([caller, callee, pick(durations)]);\n  }\n  return [{ Person, Country, Calls }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Person":[[3,"Jonathan","051-1234567"],[12,"Elvis","051-7654321"],[1,"Moncef","212-1234567"],[2,"Maroua","212-6523651"],[7,"Meir","972-1234567"],[9,"Rachel","972-0011100"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"],["Germany","049"],["Ethiopia","251"]],"Calls":[[1,9,33],[2,9,4],[1,2,59],[3,12,102],[3,12,330],[12,3,5],[7,9,13],[7,1,3],[9,7,1],[1,7,7]]}],"expected":{"columns":["country"],"rows":[["Peru"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Person":[[1,"Ana","051-1111111"],[3,"Cy","972-3333333"]],"Country":[["Peru","051"],["Israel","972"]],"Calls":[]}]},
+    {"name":"Test 2","input":[{"Person":[[1,"Ana","051-1111111"],[3,"Cy","972-3333333"]],"Country":[["Peru","051"],["Israel","972"]],"Calls":[[1,3,15]]}]},
+    {"name":"Test 3","input":[{"Person":[[1,"Ana","051-1111111"],[2,"Ben","051-2222222"],[3,"Cy","972-3333333"],[5,"Eli","212-5555555"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"]],"Calls":[[1,2,90],[1,3,30],[3,5,60]]}]},
+    {"name":"Test 4","input":[{"Person":[[1,"Ana","051-1111111"],[3,"Cy","972-3333333"],[4,"Dee","972-4444444"],[5,"Eli","212-5555555"],[6,"Fay","212-0000001"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"]],"Calls":[[1,3,100],[4,1,10],[5,6,40]]}]},
+    {"name":"Test 5","input":[{"Person":[[1,"Ana","051-1111111"],[3,"Cy","972-3333333"],[5,"Eli","212-5555555"],[6,"Fay","212-0000001"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"]],"Calls":[[1,5,30],[3,6,10]]}]},
+    {"name":"Test 6","input":[{"Person":[[1,"Ana","051-1111111"],[2,"Ben","051-2222222"],[3,"Cy","972-3333333"],[5,"Eli","212-5555555"],[6,"Fay","212-0000001"],[7,"Gil","049-0000007"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"],["Germany","049"],["Ethiopia","251"]],"Calls":[[7,3,100],[1,5,1],[2,6,1],[1,6,1]]}]},
+    {"name":"Test 7","input":[{"Person":[[1,"Ana","051-1111111"],[2,"Ben","051-2222222"],[3,"Cy","972-3333333"],[5,"Eli","212-5555555"],[7,"Gil","049-0000007"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"],["Germany","049"]],"Calls":[[1,3,50],[1,3,50],[5,7,5],[5,2,5]]}]},
+    {"name":"Test 8","input":[{"Person":[[1,"Ana","051-1111111"],[2,"Ben","051-2222222"],[3,"Cy","972-3333333"],[4,"Dee","972-4444444"],[5,"Eli","212-5555555"],[6,"Fay","212-0000001"]],"Country":[["Peru","051"],["Israel","972"],["Morocco","212"]],"Calls":[[5,6,100],[1,3,1],[2,4,1],[3,2,1]]}]},
+    {"name":"Test 9","input":[{"Person":[[1,"Ana","051-1111111"],[2,"Ben","051-2222222"],[3,"Cy","972-3333333"]],"Country":[["Peru","051"],["Israel","972"]],"Calls":[[1,2,12],[2,1,12],[3,1,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach call has two ends, and each end sits in a country. Splitting every call into two **legs** (one for the caller, one for the callee) turns the problem into an ordinary grouping: attach a country to each leg, then average the durations per country. A call inside one country produces two legs there, which is exactly the \"counts twice\" rule. The global average is simply the average of `Calls.duration`; because every call yields two legs of the same duration, averaging the legs would give the same value.\n\n## Approach\n\n1. `call_legs`: `UNION ALL` of `(caller_id, duration)` and `(callee_id, duration)`. `UNION ALL` keeps repeated legs; plain `UNION` would merge them.\n2. `country_legs`: join each leg to `Person` on the id, then to `Country` on the first three characters of `phone_number`.\n3. Final query: `GROUP BY country` and keep the groups whose `AVG(duration)` beats the scalar subquery `SELECT AVG(duration) FROM Calls`.\n\n## Example 1, step by step\n\n- Global average: the ten calls sum to 557 minutes, so 55.7.\n- Peru (Jonathan 3, Elvis 12): the calls 102, 330 and 5 are all between them, so each gives two Peru legs: (102 + 102 + 330 + 330 + 5 + 5) / 6 ≈ 145.67, above 55.7.\n- Israel (Meir 7, Rachel 9): legs 33, 4, 13, 13, 3, 1, 1, 7, average 9.375.\n- Morocco (Moncef 1, Maroua 2): legs 33, 4, 59, 59, 3, 7, average 27.5.\n- Germany and Ethiopia have no people, so no legs. Only Peru is reported.\n\n## Complexity\n\n- Time: O(C + P) for C calls and P people with hash joins on `id` and `country_code`; the legs table has 2C rows.\n- Space: O(C) for the legs.\n\n## Pitfalls\n\n- Counting only the caller (or only the callee) leaves out half of each country's calls.\n- Matching a call to a country with `caller in X OR callee in X` counts a same-country call once instead of twice.\n- The comparison is strict: a country whose average equals the global average is not reported.\n- The global average is over `Calls`, not the average of the countries' averages.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `call_legs` | two rows per call: `person_id` (caller or callee) and `duration` |\n| `l`, `p`, `c` | a leg, its person and that person's country |\n| `country_legs` | each leg labelled with its `country` name |\n| `HAVING AVG(duration) > (...)` | keeps countries above the global call average |",
+  "narration": {
+    "1": "The first stage splits every call into legs, one per participant.",
+    "2": "The caller's leg carries the call's duration.",
+    "3": "UNION ALL keeps every leg, including repeated ones, so same-country calls count twice.",
+    "4": "The callee's leg carries the same duration.",
+    "6": "The second stage labels each leg with the country of its person.",
+    "9": "Each leg is joined to the person who made or received the call.",
+    "10": "The first three characters of the phone number are the country code that picks the country.",
+    "13": "Grouping by country gathers all legs that belong to it.",
+    "14": "Only countries whose average leg duration beats the average of all calls are kept."
+  }
+}

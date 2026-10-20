@@ -1,0 +1,53 @@
+{
+  "number": 1479,
+  "title": "Sales by Day of the Week",
+  "spec": "recalled",
+  "statement": "A shop records its orders and its catalogue:\n\n- `Orders(order_id, customer_id, order_date, item_id, quantity)`: a customer ordered `quantity` units of item `item_id` on `order_date`. `(order_id, item_id)` is unique, and every `item_id` exists in `Items`.\n- `Items(item_id, item_name, item_category)`: one row per item; `item_id` is unique. Several items can share a category.\n\nBuild a sales report with one row per category that appears in `Items` and the columns `Category`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, `Saturday` and `Sunday`. Each day column holds the total `quantity` ordered in that category on that day of the week, across all weeks. A category with no orders on a day shows `0` there, and a category whose items were never ordered still appears with seven zeros.\n\nOrder the rows by `Category` ascending.",
+  "constraints": [
+    "(order_id, item_id) is unique in Orders",
+    "item_id is unique in Items",
+    "Every Orders.item_id exists in Items",
+    "quantity is a positive integer",
+    "order_date is a date YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Orders": [["order_id","INT"],["customer_id","INT"],["order_date","DATE"],["item_id","VARCHAR(30)"],["quantity","INT"]],
+    "Items": [["item_id","VARCHAR(30)"],["item_name","VARCHAR(30)"],["item_category","VARCHAR(30)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Orders = [], Items = [] }] = input;\n  const items = new Set(), orders = new Set();\n  for (const [id, name, category] of Items) {\n    if (id === null || category === null) return 'Every item needs an item_id and an item_category.';\n    if (items.has(id)) return `item_id ${id} appears twice in Items.`;\n    items.add(id);\n  }\n  for (const [order, customer, date, item, quantity] of Orders) {\n    if (order === null || customer === null || date === null || item === null || quantity === null) return 'Orders values cannot be null.';\n    const key = `${order}|${item}`;\n    if (orders.has(key)) return `(order_id, item_id) (${order}, ${item}) appears twice.`;\n    orders.add(key);\n    if (!items.has(item)) return `Order ${order} names item ${item}, which is not in Items.`;\n    if (quantity < 1) return 'quantity must be positive.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `order_date ${date} is not YYYY-MM-DD.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH sales AS (\n  SELECT i.item_category AS category, DAYNAME(o.order_date) AS weekday, o.quantity\n  FROM Items AS i\n  LEFT JOIN Orders AS o\n    ON o.item_id = i.item_id\n)\nSELECT\n  category AS Category,\n  SUM(IF(weekday = 'Monday', quantity, 0)) AS Monday,\n  SUM(IF(weekday = 'Tuesday', quantity, 0)) AS Tuesday,\n  SUM(IF(weekday = 'Wednesday', quantity, 0)) AS Wednesday,\n  SUM(IF(weekday = 'Thursday', quantity, 0)) AS Thursday,\n  SUM(IF(weekday = 'Friday', quantity, 0)) AS Friday,\n  SUM(IF(weekday = 'Saturday', quantity, 0)) AS Saturday,\n  SUM(IF(weekday = 'Sunday', quantity, 0)) AS Sunday\nFROM sales\nGROUP BY category\nORDER BY Category;",
+  "brute": "SELECT\n  c.item_category AS Category,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 0) AS Monday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 1) AS Tuesday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 2) AS Wednesday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 3) AS Thursday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 4) AS Friday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 5) AS Saturday,\n  (SELECT IFNULL(SUM(o.quantity), 0) FROM Orders o, Items i WHERE i.item_id = o.item_id AND i.item_category = c.item_category AND WEEKDAY(o.order_date) = 6) AS Sunday\nFROM (SELECT DISTINCT item_category FROM Items) AS c\nORDER BY c.item_category",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const categories = small ? ['Book', 'Phone', 'Glasses', 'T-shirt'] : ['Book', 'Phone', 'Glasses', 'T-shirt', 'Toys', 'Garden', 'Kitchen', 'Music', 'Sports', 'Shoes'];\n  const itemCount = small ? pick(7) : 300, orderCount = itemCount === 0 ? 0 : small ? pick(9) : 1700;\n  const span = small ? 15 : 400;\n  const Items = [], Orders = [];\n  for (let id = 1; id <= itemCount; id++) Items.push([String(id), `Item ${id}`, categories[pick(categories.length)]]);\n  const base = Date.UTC(2020, 5, 1);\n  const day = k => new Date(base + k * 86400000).toISOString().slice(0, 10);\n  for (let id = 1; id <= orderCount; id++) {\n    Orders.push([id, 1 + pick(small ? 5 : 200), day(pick(span)), String(1 + pick(itemCount)), 1 + pick(small ? 10 : 50)]);\n  }\n  return [{ Orders, Items }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Orders":[[1,1,"2020-06-01","1",10],[2,1,"2020-06-08","2",10],[3,2,"2020-06-02","1",5],[4,3,"2020-06-03","3",5],[5,4,"2020-06-04","4",1],[6,4,"2020-06-05","5",5],[7,5,"2020-06-05","1",10],[8,5,"2020-06-14","4",5],[9,5,"2020-06-21","3",5]],"Items":[["1","LC Alg. Book","Book"],["2","LC DB. Book","Book"],["3","LC SmarthPhone","Phone"],["4","LC Phone 2020","Phone"],["5","LC SmartGlass","Glasses"],["6","LC T-Shirt XL","T-shirt"]]}],"expected":{"columns":["Category","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"rows":[["Book",20,5,0,0,10,0,0],["Glasses",0,0,0,0,5,0,0],["Phone",0,0,5,1,0,0,10],["T-shirt",0,0,0,0,0,0,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Orders":[],"Items":[]}]},
+    {"name":"Test 2","input":[{"Orders":[],"Items":[["1","Pen","Stationery"],["2","Lamp","Home"],["3","Novel","Book"]]}]},
+    {"name":"Test 3","input":[{"Orders":[[1,1,"2020-06-06","1",4]],"Items":[["1","Pen","Stationery"]]}]},
+    {"name":"Test 4","input":[{"Orders":[[1,1,"2020-06-07","1",3],[2,2,"2020-06-08","1",7]],"Items":[["1","Novel","Book"]]}]},
+    {"name":"Test 5","input":[{"Orders":[[1,1,"2020-06-03","1",2],[2,2,"2020-06-10","2",3],[3,3,"2020-06-17","1",4]],"Items":[["1","Novel","Book"],["2","Atlas","Book"],["3","Phone X","Phone"]]}]},
+    {"name":"Test 6","input":[{"Orders":[[1,1,"2020-06-01","1",1],[1,1,"2020-06-01","2",2],[2,2,"2020-06-02","3",5]],"Items":[["1","Novel","Book"],["2","Phone X","Phone"],["3","Atlas","Book"],["4","Glass Y","Glasses"]]}]},
+    {"name":"Test 7","input":[{"Orders":[[1,1,"2019-12-31","1",6],[2,1,"2020-02-29","1",8],[3,2,"2021-01-01","2",9],[4,3,"2024-02-29","2",1]],"Items":[["1","Novel","Book"],["2","Phone X","Phone"]]}]},
+    {"name":"Test 8","input":[{"Orders":[[1,1,"2020-06-01","3",1],[2,1,"2020-06-02","3",2],[3,1,"2020-06-03","3",3],[4,1,"2020-06-04","3",4],[5,1,"2020-06-05","3",5],[6,1,"2020-06-06","3",6],[7,1,"2020-06-07","3",7]],"Items":[["3","Ball","Toys"],["2","Shirt","T-shirt"],["1","Rake","Garden"]]}]},
+    {"name":"Test 9","input":[{"Orders":[[5,2,"2020-06-12","2",10],[6,2,"2020-06-13","2",10],[7,3,"2020-06-14","1",10]],"Items":[["1","Rake","Garden"],["2","Hoe","Garden"],["3","Ball","Toys"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a pivot: categories become rows and the seven weekdays become columns. Each output cell is a sum of quantities restricted to one day, which a conditional aggregate expresses directly: `SUM(IF(day matches, quantity, 0))`. Because every category in `Items` must appear, even one that sold nothing, the rows have to start from `Items` and attach orders with a **left join**.\n\n## Approach\n\n1. In the CTE `sales`, left join `Items` to `Orders` on `item_id` and keep each order's `category`, its `weekday` name from `DAYNAME(order_date)` and its `quantity`. An item with no orders gives one row whose `weekday` and `quantity` are null.\n2. Group `sales` by `category`.\n3. For each weekday, sum `quantity` only on rows whose `weekday` matches and add 0 otherwise; null weekdays match nothing, so unsold categories get 0 everywhere.\n4. Order by `Category`.\n\n## Example 1, step by step\n\n`sales` holds: Book/Monday/10 (orders 1 and 2), Book/Tuesday/5, Book/Friday/10, Phone/Wednesday/5, Phone/Thursday/1, Phone/Sunday/5 (orders 8 and 9), Glasses/Friday/5, and T-shirt/null/null for the unsold T-shirt item. Grouping gives Book = 20, 5, 0, 0, 10, 0, 0; Glasses = 5 on Friday only; Phone = 5 on Wednesday, 1 on Thursday and 10 on Sunday; T-shirt = all zeros. Sorted by category this is Book, Glasses, Phone, T-shirt.\n\n## Complexity\n\n- Time: O(I + O) for I items and O orders with a hash join, plus O(C log C) to sort C categories.\n- Space: O(I + O) for the joined rows, O(C) for the groups.\n\n## Pitfalls\n\n- An inner join drops categories with no orders; the report must still list them with zeros.\n- `DAYOFWEEK` counts Sunday as 1 and Monday as 2, while `WEEKDAY` counts Monday as 0; mixing them shifts every column by one day.\n- `SUM(IF(..., quantity, NULL))` returns null for an empty day; use 0 as the else value.\n- Grouping by `item_id` or `item_name` instead of the category splits a category into several rows.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `i` | `Items`, so every category is present |\n| `o` | `Orders`, attached by `item_id` (null when an item never sold) |\n| `sales` | one row per order (or unsold item): `category`, `weekday`, `quantity` |\n| `SUM(IF(weekday = ..., quantity, 0))` | the units of one category sold on one weekday |",
+  "narration": {
+    "1": "The sales CTE gathers one row per order with its category and day name.",
+    "2": "DAYNAME turns each order date into a weekday name such as Monday.",
+    "4": "A left join from Items keeps categories whose items were never ordered.",
+    "9": "Each day column sums only the quantities of rows on that weekday and adds 0 for the rest.",
+    "17": "One group per category gives one report row.",
+    "18": "The report is sorted by category name."
+  }
+}

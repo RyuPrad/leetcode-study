@@ -1,0 +1,65 @@
+{
+  "number": 1240,
+  "title": "Tiling a Rectangle with the Fewest Squares",
+  "spec": "leetcode",
+  "statement": "You have a rectangle that is `n` units tall and `m` units wide. Cover it completely with squares whose side lengths are positive integers; the squares may have different sizes, must lie inside the rectangle, and must not overlap. Return the smallest number of squares that achieves such a cover.",
+  "constraints": [
+    "1 <= n <= 13",
+    "1 <= m <= 13"
+  ],
+  "signature": "int tilingRectangle(int n, int m)",
+  "entry": "tilingRectangle",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "m"
+  ],
+  "validator": "function validate([n, m]) {\n  if (!Number.isInteger(n) || n < 1 || n > 13) return 'n is a whole number from 1 to 13.';\n  if (!Number.isInteger(m) || m < 1 || m > 13) return 'm is a whole number from 1 to 13.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function tilingRectangle(n, m) {\n  const heights = new Array(m).fill(0);\n  let best = n * m;\n\n  function place(count) {\n    if (count >= best) return;\n    let start = 0;\n    for (let col = 1; col < m; col++) {\n      if (heights[col] < heights[start]) start = col;\n    }\n    if (heights[start] === n) {\n      best = count;\n      return;\n    }\n    let end = start;\n    while (end + 1 < m && heights[end + 1] === heights[start]) end++;\n    const maxSide = Math.min(end - start + 1, n - heights[start]);\n    for (let side = maxSide; side >= 1; side--) {\n      for (let col = start; col < start + side; col++) heights[col] += side;\n      place(count + 1);\n      for (let col = start; col < start + side; col++) heights[col] -= side;\n    }\n  }\n\n  place(0);\n  return best;\n}",
+  "brute": "function tilingRectangle(n, m) {\n  // Iterative deepening on a cell grid: try to fill it with at most `limit` squares, for limit = 1, 2, ...\n  const filled = Array.from({ length: n }, () => new Array(m).fill(false));\n  const fits = (r, c, s) => {\n    if (r + s > n || c + s > m) return false;\n    for (let i = r; i < r + s; i++) for (let j = c; j < c + s; j++) if (filled[i][j]) return false;\n    return true;\n  };\n  const mark = (r, c, s, v) => { for (let i = r; i < r + s; i++) for (let j = c; j < c + s; j++) filled[i][j] = v; };\n  const fill = (left, emptyCells) => {\n    if (emptyCells === 0) return true;\n    if (left === 0) return false;\n    let r = -1, c = -1;\n    outer: for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) if (!filled[i][j]) { r = i; c = j; break outer; }\n    const biggest = Math.min(n - r, m - c);\n    if (emptyCells > left * biggest * biggest) return false;\n    for (let s = biggest; s >= 1; s--) {\n      if (!fits(r, c, s)) continue;\n      mark(r, c, s, true);\n      const ok = fill(left - 1, emptyCells - s * s);\n      mark(r, c, s, false);\n      if (ok) return true;\n    }\n    return false;\n  };\n  for (let limit = 1; ; limit++) if (fill(limit, n * m)) return limit;\n}",
+  "generator": "function generate(rand, size) {\n  const low = size === 'large' ? 9 : 1, high = size === 'large' ? 13 : 7;\n  const pick = () => low + Math.floor(rand() * (high - low + 1));\n  return [pick(), pick()];\n}",
+  "examples": [
+    {"name":"Example 1","input":[2,3],"expected":3},
+    {"name":"Example 2","input":[5,8],"expected":5},
+    {"name":"Example 3","input":[11,13],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[1,13]},
+    {"name":"Test 3","input":[13,13]},
+    {"name":"Test 4","input":[13,11]},
+    {"name":"Test 5","input":[7,6]},
+    {"name":"Test 6","input":[12,13]},
+    {"name":"Test 7","input":[10,13]},
+    {"name":"Test 8","input":[4,9]},
+    {"name":"Test 9","input":[13,1]},
+    {"name":"Test 10","input":[9,10]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA greedy cut (take the biggest square, recurse on what is left) is not always optimal: `11 x 13` needs only 6 squares, but no sequence of straight cuts reaches that. So we search. The key to a small search is to decide *where* the next square goes: keep the filled part as a \"skyline\" (one height per column) and always put the next square in the lowest, leftmost gap. Its bottom-left corner must sit exactly there, so only its size is a choice.\n\n## Approach\n\n1. `heights[col]` is how high column `col` is already covered. `best` starts at `n * m` (all unit squares).\n2. `place(count)` stops if `count` already matches or exceeds `best`.\n3. Find `start`, the leftmost column with the smallest height. If even it reaches `n`, the rectangle is full: record `count`.\n4. Extend `end` right across columns of the same height. A square there can be at most `maxSide` wide: limited by that flat stretch and by the room left above.\n5. Try every `side` from `maxSide` down to 1: raise those columns, recurse with `count + 1`, then lower them back. Trying big squares first finds good tilings early, which makes the `count >= best` cut prune harder.\n\n## Example 1, step by step\n\n`n = 2, m = 3`, `heights = [0, 0, 0]`. The flat stretch is 3 wide but only 2 units of room, so `maxSide = 2`. Place a 2-square: `heights = [2, 2, 0]`. Now `start = 2`, `maxSide = 1`; two 1-squares give `[2, 2, 2]`, full with `count = 3`, so `best = 3`. The remaining branches (starting with a 1-square) cannot finish under 3 and are cut. The answer is `3`.\n\n## Complexity\n\n- Time: exponential in the worst case, but the skyline rule and the `best` bound keep it to a few thousand calls for sizes up to 13.\n- Space: O(m) for `heights`, plus recursion no deeper than `best`, which is at most `n * m` and in practice about the answer.\n\n## Pitfalls\n\n- Squares may be placed only where their whole bottom edge rests on one flat stretch; checking only the room above lets squares overlap.\n- Undo every change to `heights` after the recursive call.\n- Do not trust a cutting DP alone: it gives 8 for `11 x 13` instead of 6.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `heights` | covered height of each column |\n| `best` | fewest squares in a full tiling found so far |\n| `count` | squares placed on the current path |\n| `start`, `end` | ends of the lowest flat stretch |\n| `maxSide` | largest square that fits at `start` |\n| `side` | size of the square being tried |",
+  "narration": {
+    "2": "Every column starts empty: nothing is covered yet.",
+    "3": "Unit squares always work, so n * m is a safe first bound.",
+    "5": "place tries to finish the tiling with count squares already down.",
+    "6": "This path already uses as many squares as the best tiling: stop.",
+    "8": "Scan the columns for the lowest covered height.",
+    "9": "Keep the leftmost lowest column; the next square's corner goes there.",
+    "11": "If even the lowest column is full, the whole rectangle is covered.",
+    "12": "Record this smaller tiling as the new best.",
+    "16": "Extend right across neighbouring columns at the same height.",
+    "17": "The square must fit on that flat stretch and below the top edge.",
+    "18": "Try the biggest square first so good tilings are found early.",
+    "19": "Place the square by raising the columns it covers.",
+    "20": "Continue the search with one more square placed.",
+    "21": "Remove the square again before trying the next size.",
+    "25": "Start the search with no squares placed.",
+    "26": "Return the fewest squares any full tiling used."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "number": 1543,
+  "title": "Fix Product Name Format",
+  "spec": "recalled",
+  "statement": "A shop logs every sale in one table, but its product names were typed by hand:\n\n- `Sales(sale_id, product_name, sale_date)`: one row per sale; `sale_id` is unique. `product_name` may have extra spaces before or after it and may mix upper and lower case, so `'  LcPhOnE'` and `'LCPHONE '` are the same product. `sale_date` is the day of the sale.\n\nClean every name by removing its leading and trailing spaces and turning it into lower case (spaces inside a name are kept, so `'LC Phone'` and `'LCPhone'` stay different products). Then count the sales of each cleaned product in each calendar month.\n\nReport one row per product and month with at least one sale, with the columns `product_name` (the cleaned name), `sale_date` (the month as the text `'YYYY-MM'`) and `total` (how many sales it had that month). Order the rows by `product_name` ascending, then by `sale_date` ascending.",
+  "constraints": [
+    "sale_id is unique in Sales",
+    "product_name may have leading or trailing spaces and any letter case",
+    "sale_date is a valid date"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sales": [["sale_id","INT"],["product_name","VARCHAR(30)"],["sale_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Sales = [] }] = input;\n  const ids = new Set();\n  for (const [id, name, date] of Sales) {\n    if (id === null) return 'Every sale needs a sale_id.';\n    if (ids.has(id)) return `sale_id ${id} appears twice in Sales.`;\n    ids.add(id);\n    if (name === null || name.trim() === '') return `Sale ${id} needs a product_name.`;\n    if (date === null) return `Sale ${id} needs a sale_date.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH cleaned AS (\n  SELECT LOWER(TRIM(product_name)) AS product_name,\n         DATE_FORMAT(sale_date, '%Y-%m') AS sale_date\n  FROM Sales\n)\nSELECT product_name, sale_date, COUNT(*) AS total\nFROM cleaned\nGROUP BY product_name, sale_date\nORDER BY product_name, sale_date;",
+  "brute": "SELECT DISTINCT LOWER(TRIM(product_name)) AS product_name,\n       LEFT(sale_date, 7) AS sale_date,\n       COUNT(*) OVER (PARTITION BY LOWER(TRIM(product_name)), LEFT(sale_date, 7)) AS total\nFROM Sales\nORDER BY product_name, sale_date",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const products = ['LCPhone', 'LCKeyChain', 'Matryoshka', 'LC Phone', 'Teapot'];\n  if (!small) for (let k = 1; k <= 30; k++) products.push(`Gadget ${k}`);\n  const months = small\n    ? ['1999-12', '2000-01', '2000-02', '2000-03', '2001-01']\n    : Array.from({ length: 36 }, (_, i) => `${1999 + Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, '0')}`);\n  const days = small ? ['01', '16', '28'] : Array.from({ length: 28 }, (_, i) => String(i + 1).padStart(2, '0'));\n  // Each name gets a random letter case and up to two spaces on either side.\n  const mangle = name => {\n    const cased = [...name].map(ch => (rand() < 0.5 ? ch.toUpperCase() : ch.toLowerCase())).join('');\n    return ' '.repeat(Math.floor(rand() * 3)) + cased + ' '.repeat(Math.floor(rand() * 3));\n  };\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Sales = [];\n  for (let id = 1; id <= count; id++) Sales.push([id, mangle(pick(products)), `${pick(months)}-${pick(days)}`]);\n  return [{ Sales }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sales":[[1,"LCPHONE","2000-01-16"],[2,"LCPhone","2000-01-17"],[3,"LcPhOnE","2000-02-18"],[4,"LCKeyCHAiN","2000-02-19"],[5,"LCKeyChain","2000-02-28"],[6,"Matryoshka","2000-03-31"]]}],"expected":{"columns":["product_name","sale_date","total"],"rows":[["lckeychain","2000-02",2],["lcphone","2000-01",2],["lcphone","2000-02",1],["matryoshka","2000-03",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sales":[]}]},
+    {"name":"Test 2","input":[{"Sales":[[1,"  Matryoshka  ","2000-03-31"]]}]},
+    {"name":"Test 3","input":[{"Sales":[[1,"lcphone","2000-01-02"],[2," LCPHONE","2000-01-20"],[3,"LcPhOnE  ","2000-01-31"]]}]},
+    {"name":"Test 4","input":[{"Sales":[[1,"LCPhone","2000-01-05"],[2,"lcphone","2001-01-05"],[3,"LCPHONE","1999-01-05"]]}]},
+    {"name":"Test 5","input":[{"Sales":[[1," LC Phone","2000-01-05"],[2,"LCPhone ","2000-01-06"],[3,"lc phone","2000-01-07"]]}]},
+    {"name":"Test 6","input":[{"Sales":[[1,"Teapot","2000-01-31"],[2,"teapot","2000-02-01"],[3,"TEAPOT","2000-02-29"],[4,"Teapot","2000-03-01"]]}]},
+    {"name":"Test 7","input":[{"Sales":[[1,"zebra","2020-05-10"],[2," Apple","2020-06-01"],[3,"apple ","2020-01-15"],[4,"ZEBRA ","2019-12-31"],[5,"Mango","2020-03-03"]]}]},
+    {"name":"Test 8","input":[{"Sales":[[10,"b","2000-01-01"],[7,"A","2000-01-01"],[3,"a","2000-01-02"],[1,"B ","1999-12-31"]]}]},
+    {"name":"Test 9","input":[{"Sales":[[1,"  LCPHONE","2000-01-16"],[2,"LCPhone  ","2000-01-17"],[3,"  LcPhOnE ","2000-02-18"],[4," LCKeyCHAiN ","2000-02-19"],[5,"LCKeyChain","2000-02-28"],[6,"Matryoshka","2000-03-31"]]}]},
+    {"name":"Test 10","input":[{"Sales":[[1,"Teapot","2001-12-01"],[2,"teapot","2001-12-15"],[3,"Teapot","2002-01-01"],[4,"tEAPOT","2001-11-30"],[5,"Teapot","2001-12-31"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo spellings belong to the same product when they agree after the noise is stripped away: drop the spaces at the ends and ignore letter case. Likewise, two dates belong to the same month when their `'YYYY-MM'` prefixes agree. Once every row is rewritten into that clean form, the task is an ordinary count per (product, month) group.\n\n## Approach\n\n1. The CTE `cleaned` rewrites every sale: `LOWER(TRIM(product_name))` gives the clean name and `DATE_FORMAT(sale_date, '%Y-%m')` gives the month.\n2. Read from `cleaned` and `GROUP BY product_name, sale_date`, so each group is one product in one month.\n3. `COUNT(*) AS total` counts the sales in each group.\n4. `ORDER BY product_name, sale_date` sorts by name, then month.\n\n## Example 1, step by step\n\n`cleaned` turns the six sales into:\n\n| product_name | sale_date |\n| --- | --- |\n| lcphone | 2000-01 |\n| lcphone | 2000-01 |\n| lcphone | 2000-02 |\n| lckeychain | 2000-02 |\n| lckeychain | 2000-02 |\n| matryoshka | 2000-03 |\n\nGrouping gives (lckeychain, 2000-02) with 2 sales, (lcphone, 2000-01) with 2, (lcphone, 2000-02) with 1 and (matryoshka, 2000-03) with 1, already in the required order.\n\n## Complexity\n\n- Time: O(S log S) for S sales, dominated by grouping and sorting.\n- Space: O(S) for the cleaned rows and the groups.\n\n## Pitfalls\n\n- Forgetting `TRIM` leaves `'  lcphone'` and `'lcphone'` as separate products, and reports names with spaces.\n- Grouping by `MONTH(sale_date)` alone merges January 2000 with January 2001; the year must be part of the key.\n- In MySQL, `GROUP BY product_name` in the same `SELECT` that defines the alias `product_name` groups by the raw column, not the cleaned one; cleaning in a CTE first removes that ambiguity.\n- `TRIM` removes only the ends: `'lc phone'` keeps its inner space and is a different product from `'lcphone'`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `cleaned` | one row per sale with the clean name and its `'YYYY-MM'` month |\n| `product_name` | the trimmed, lower-case name |\n| `sale_date` | the month of the sale, as text |\n| `total` | number of sales of that product in that month |",
+  "narration": {
+    "1": "The CTE cleaned rewrites every sale into a canonical form before anything is counted.",
+    "2": "Trim the spaces at both ends and lower-case the name, so all spellings of a product agree.",
+    "3": "Keep only the year and month of the sale date, as YYYY-MM text.",
+    "6": "Report each product and month with the number of sales in it.",
+    "8": "Each group is one cleaned product in one month.",
+    "9": "Sort by name first, then by month."
+  }
+}

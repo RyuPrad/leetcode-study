@@ -1,0 +1,54 @@
+{
+  "number": 1571,
+  "title": "Warehouse Manager",
+  "spec": "recalled",
+  "statement": "A company stores its products in several warehouses:\n\n- `Warehouse(name, product_id, units)`: one row per warehouse and product it stocks; `(name, product_id)` is unique. Warehouse `name` holds `units` units of the product, and every `product_id` exists in `Products`.\n- `Products(product_id, product_name, Width, Length, Height)`: one row per product; `product_id` is unique. One unit of the product is a box of `Width * Length * Height` cubic feet.\n\nFor every warehouse that appears in `Warehouse`, find how much space its stock fills: add up, over its rows, `units` times the volume of one unit of that product.\n\nReport the columns `warehouse_name` and `volume` (that total), one row per warehouse, in any order.",
+  "constraints": [
+    "(name, product_id) is unique in Warehouse",
+    "product_id is unique in Products",
+    "Every Warehouse.product_id exists in Products",
+    "units >= 0; Width, Length and Height >= 1"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Warehouse": [["name","VARCHAR(50)"],["product_id","INT"],["units","INT"]],
+    "Products": [["product_id","INT"],["product_name","VARCHAR(50)"],["Width","INT"],["Length","INT"],["Height","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Warehouse = [], Products = [] }] = input;\n  const products = new Set(), stock = new Set();\n  for (const [id, , width, length, height] of Products) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (products.has(id)) return `product_id ${id} appears twice in Products.`;\n    products.add(id);\n    for (const side of [width, length, height]) {\n      if (side === null || side < 1) return `Product ${id} needs Width, Length and Height of at least 1.`;\n    }\n  }\n  for (const [name, id, units] of Warehouse) {\n    if (name === null) return 'Every Warehouse row needs a name.';\n    const key = `${String(name).toLowerCase()}|${id}`;\n    if (stock.has(key)) return `Warehouse ${name} lists product ${id} twice.`;\n    stock.add(key);\n    if (!products.has(id)) return `Warehouse ${name} stocks product ${id}, which is not in Products.`;\n    if (units === null || units < 0) return `Warehouse ${name} needs a units count of at least 0 for product ${id}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT w.name AS warehouse_name,\n       SUM(w.units * p.Width * p.Length * p.Height) AS volume\nFROM Warehouse AS w\nJOIN Products AS p\n  ON p.product_id = w.product_id\nGROUP BY w.name;",
+  "brute": "SELECT items.name AS warehouse_name, SUM(items.item_volume) AS volume\nFROM (\n  SELECT w.name,\n         w.units * (\n           SELECT p.Width * p.Length * p.Height\n           FROM Products AS p\n           WHERE p.product_id = w.product_id\n         ) AS item_volume\n  FROM Warehouse AS w\n) AS items\nGROUP BY items.name",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const names = ['LC-TV', 'LC-KeyChain', 'LC-Phone', 'LC-T-Shirt', 'LC-Lamp', 'LC-Desk'];\n  const sides = small ? [1, 2, 4, 5, 10] : [1, 2, 3, 5, 10, 20, 40, 50];\n  const houses = small ? ['LCHouse1', 'LCHouse2', 'LCHouse3', 'Depot'] : Array.from({ length: 20 }, (_, i) => `House${i + 1}`);\n  const unitPool = small ? [0, 1, 1, 2, 5, 10] : [0, 1, 2, 3, 5, 10, 25, 100];\n  const productCount = small ? Math.floor(rand() * 6) : 300;\n  const Products = [];\n  for (let id = 1; id <= productCount; id++) Products.push([id, pick(names), pick(sides), pick(sides), pick(sides)]);\n  const Warehouse = [];\n  if (productCount > 0) {\n    const target = small ? Math.floor(rand() * 9) : 2000;\n    const used = new Set();\n    // Draw (warehouse, product) pairs until enough distinct ones are found; small pools make repeats likely, so cap attempts.\n    for (let tries = 0; Warehouse.length < target && tries < target * 4; tries++) {\n      const house = pick(houses), product = 1 + Math.floor(rand() * productCount);\n      const key = `${house}|${product}`;\n      if (used.has(key)) continue;\n      used.add(key);\n      Warehouse.push([house, product, pick(unitPool)]);\n    }\n  }\n  return [{ Warehouse, Products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Warehouse":[["LCHouse1",1,1],["LCHouse1",2,10],["LCHouse1",3,5],["LCHouse2",1,2],["LCHouse2",2,2],["LCHouse3",4,1]],"Products":[[1,"LC-TV",5,50,40],[2,"LC-KeyChain",5,5,5],[3,"LC-Phone",2,10,10],[4,"LC-T-Shirt",4,10,20]]}],"expected":{"columns":["warehouse_name","volume"],"rows":[["LCHouse1",12250],["LCHouse2",20250],["LCHouse3",800]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Warehouse":[],"Products":[]}]},
+    {"name":"Test 2","input":[{"Warehouse":[],"Products":[[1,"LC-TV",5,50,40]]}]},
+    {"name":"Test 3","input":[{"Warehouse":[["Depot",1,1]],"Products":[[1,"LC-Phone",2,10,10]]}]},
+    {"name":"Test 4","input":[{"Warehouse":[["Depot",1,0],["LCHouse1",1,3]],"Products":[[1,"LC-Phone",2,10,10]]}]},
+    {"name":"Test 5","input":[{"Warehouse":[["LCHouse1",1,2],["LCHouse2",1,7],["LCHouse3",1,1]],"Products":[[1,"LC-KeyChain",5,5,5],[2,"LC-TV",5,50,40]]}]},
+    {"name":"Test 6","input":[{"Warehouse":[["LCHouse1",1,3],["LCHouse1",2,4],["LCHouse1",3,5]],"Products":[[1,"LC-Lamp",1,1,1],[2,"LC-Desk",2,3,4],[3,"LC-TV",10,1,2],[4,"LC-T-Shirt",4,10,20]]}]},
+    {"name":"Test 7","input":[{"Warehouse":[["LCHouse1",3,1000],["LCHouse2",2,1]],"Products":[[2,"LC-Lamp",1,1,1],[3,"LC-TV",50,50,40]]}]},
+    {"name":"Test 8","input":[{"Warehouse":[["LCHouse2",2,10],["LCHouse1",1,1],["LCHouse2",1,1],["LCHouse1",2,10]],"Products":[[1,"LC-Phone",2,10,10],[2,"LC-Phone",2,10,10]]}]},
+    {"name":"Test 9","input":[{"Warehouse":[["A",1,2],["B",2,2],["C",3,2],["A",3,1]],"Products":[[1,"LC-Desk",3,1,1],[2,"LC-Desk",1,3,1],[3,"LC-Desk",1,1,3]]}]},
+    {"name":"Test 10","input":[{"Warehouse":[["LCHouse1",1,1],["LCHouse1",2,10],["LCHouse1",3,5],["LCHouse2",1,2],["LCHouse2",2,2],["LCHouse3",4,1],["LCHouse3",3,0]],"Products":[[1,"LC-TV",5,50,40],[2,"LC-KeyChain",5,5,5],[3,"LC-Phone",2,10,10],[4,"LC-T-Shirt",4,10,20],[5,"LC-Lamp",1,2,3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe space one stock row fills is the number of units times the size of one unit, and the size lives in `Products`. Join each stock row to its product so both numbers sit on the same row, multiply, then add the results per warehouse.\n\n## Approach\n\n1. Read `Warehouse` (alias `w`), one row per warehouse and product.\n2. `JOIN Products` (alias `p`) on `product_id` to bring in `Width`, `Length` and `Height`.\n3. `GROUP BY w.name`, so each warehouse becomes one group.\n4. `SUM(w.units * p.Width * p.Length * p.Height)` adds up the space of every stock row in the group, reported as `volume` next to `warehouse_name`.\n\n## Example 1, step by step\n\nUnit volumes: LC-TV 5 * 50 * 40 = 10000, LC-KeyChain 125, LC-Phone 200, LC-T-Shirt 800.\n\n| warehouse | product | units | units * unit volume |\n| --- | --- | --- | --- |\n| LCHouse1 | LC-TV | 1 | 10000 |\n| LCHouse1 | LC-KeyChain | 10 | 1250 |\n| LCHouse1 | LC-Phone | 5 | 1000 |\n| LCHouse2 | LC-TV | 2 | 20000 |\n| LCHouse2 | LC-KeyChain | 2 | 250 |\n| LCHouse3 | LC-T-Shirt | 1 | 800 |\n\nSumming per warehouse gives LCHouse1 12250, LCHouse2 20250 and LCHouse3 800.\n\n## Complexity\n\n- Time: O(W + P) for W stock rows and P products with a hash join and hash grouping.\n- Space: O(P) for the join's lookup and O(number of warehouses) for the groups.\n\n## Pitfalls\n\n- Summing the unit volumes without multiplying by `units` counts each product once, however many units are stored.\n- Grouping by `product_id` (or by both columns) reports per-product rows instead of one row per warehouse.\n- The output column is `warehouse_name`, not the table's own `name`; it needs the alias.\n- Products that no warehouse stocks must not create rows, so the join starts from `Warehouse`, not `Products`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `w` | `Warehouse`, one stock row per warehouse and product |\n| `p` | `Products`, the size of one unit of the stocked product |\n| `warehouse_name` | the warehouse's `name`, the grouping key |\n| `volume` | total cubic feet of all units in that warehouse |",
+  "narration": {
+    "1": "Each output row names a warehouse.",
+    "2": "Space of one stock row is units times the unit box volume; summing gives the warehouse total.",
+    "3": "Start from the stock rows, so only warehouses that hold something appear.",
+    "4": "Join each stock row to its product to get its dimensions.",
+    "5": "Rows are matched on product_id.",
+    "6": "One group per warehouse collects all of its stock rows."
+  }
+}

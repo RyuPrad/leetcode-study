@@ -1,0 +1,63 @@
+{
+  "number": 1635,
+  "title": "Hopper Company Queries I",
+  "spec": "recalled",
+  "statement": "A ride-hailing company keeps three tables:\n\n- `Drivers(driver_id, join_date)`: one row per driver; `driver_id` is unique. The driver has worked for the company since `join_date` and never leaves.\n- `Rides(ride_id, user_id, requested_at)`: one row per ride request; `ride_id` is unique. `requested_at` is the day the user asked for the ride.\n- `AcceptedRides(ride_id, driver_id, ride_distance, ride_duration)`: one row per request that a driver accepted; `ride_id` is unique and always exists in `Rides`.\n\nReport one row for **each month of 2020**, all twelve of them, with the columns:\n\n- `month`: the month number, 1 for January through 12 for December;\n- `active_drivers`: how many drivers had joined by the end of that month (join date on or before the month's last day, so drivers who joined before 2020 count in every month);\n- `accepted_rides`: how many accepted rides were requested during that month of 2020 (0 when there were none).\n\nOrder the rows by `month` ascending.",
+  "constraints": [
+    "driver_id is unique in Drivers",
+    "ride_id is unique in Rides",
+    "ride_id is unique in AcceptedRides and exists in Rides",
+    "Dates may lie in any year; only 2020 is reported",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Drivers": [["driver_id","INT"],["join_date","DATE"]],
+    "Rides": [["ride_id","INT"],["user_id","INT"],["requested_at","DATE"]],
+    "AcceptedRides": [["ride_id","INT"],["driver_id","INT"],["ride_distance","INT"],["ride_duration","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Drivers = [], Rides = [], AcceptedRides = [] }] = input;\n  const isDate = (d) => /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\n  const drivers = new Set(), rides = new Set(), accepted = new Set();\n  for (const [id, date] of Drivers) {\n    if (id === null || date === null) return 'Drivers rows may not contain null.';\n    if (drivers.has(id)) return `driver_id ${id} appears twice in Drivers.`;\n    if (!isDate(date)) return 'Dates must look like 2020-01-31.';\n    drivers.add(id);\n  }\n  for (const row of Rides) {\n    if (row.some((v) => v === null)) return 'Rides rows may not contain null.';\n    if (rides.has(row[0])) return `ride_id ${row[0]} appears twice in Rides.`;\n    if (!isDate(row[2])) return 'Dates must look like 2020-01-31.';\n    rides.add(row[0]);\n  }\n  for (const row of AcceptedRides) {\n    if (row.some((v) => v === null)) return 'AcceptedRides rows may not contain null.';\n    const [id, , distance, duration] = row;\n    if (accepted.has(id)) return `ride_id ${id} appears twice in AcceptedRides.`;\n    if (!rides.has(id)) return `Accepted ride ${id} is missing from Rides.`;\n    if (distance < 0 || duration < 0) return 'Distances and durations may not be negative.';\n    accepted.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE months AS (\n  SELECT 1 AS month\n  UNION ALL\n  SELECT month + 1 FROM months WHERE month < 12\n),\nactive AS (\n  SELECT m.month, COUNT(d.driver_id) AS active_drivers\n  FROM months AS m\n  LEFT JOIN Drivers AS d\n    ON YEAR(d.join_date) < 2020\n    OR (YEAR(d.join_date) = 2020 AND MONTH(d.join_date) <= m.month)\n  GROUP BY m.month\n),\naccepted AS (\n  SELECT MONTH(r.requested_at) AS month, COUNT(*) AS accepted_rides\n  FROM AcceptedRides AS ar\n  JOIN Rides AS r\n    ON r.ride_id = ar.ride_id\n  WHERE YEAR(r.requested_at) = 2020\n  GROUP BY MONTH(r.requested_at)\n)\nSELECT a.month, a.active_drivers, IFNULL(acc.accepted_rides, 0) AS accepted_rides\nFROM active AS a\nLEFT JOIN accepted AS acc\n  ON acc.month = a.month\nORDER BY a.month;",
+  "brute": "SELECT m.month,\n  (SELECT COUNT(*) FROM Drivers AS d\n   WHERE DATE_FORMAT(d.join_date, '%Y-%m') <= CONCAT('2020-', LPAD(m.month, 2, '0'))) AS active_drivers,\n  (SELECT COUNT(*) FROM Rides AS r\n   WHERE DATE_FORMAT(r.requested_at, '%Y-%m') = CONCAT('2020-', LPAD(m.month, 2, '0'))\n     AND EXISTS (SELECT 1 FROM AcceptedRides AS ar WHERE ar.ride_id = r.ride_id)) AS accepted_rides\nFROM (\n  SELECT 1 AS month UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4\n  UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8\n  UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12\n) AS m\nORDER BY m.month",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const pool = ['2019-06-30', '2019-12-31', '2020-01-01', '2020-01-31', '2020-02-29', '2020-03-15', '2020-06-30', '2020-07-01', '2020-09-09', '2020-12-31', '2021-01-01', '2021-03-03'];\n  const date = () => small ? pick(pool) : `${2019 + Math.floor(rand() * 3)}-${String(1 + Math.floor(rand() * 12)).padStart(2, '0')}-${String(1 + Math.floor(rand() * 28)).padStart(2, '0')}`;\n  const driverCount = small ? Math.floor(rand() * 7) : 1000;\n  const rideCount = small ? Math.floor(rand() * 9) : 2000;\n  const Drivers = [], Rides = [], AcceptedRides = [];\n  for (let id = 1; id <= driverCount; id++) Drivers.push([id, date()]);\n  for (let id = 1; id <= rideCount; id++) {\n    Rides.push([id, 1 + Math.floor(rand() * (small ? 5 : 300)), date()]);\n    if (driverCount > 0 && rand() < 0.7) AcceptedRides.push([id, 1 + Math.floor(rand() * driverCount), 1 + Math.floor(rand() * 150), 1 + Math.floor(rand() * 120)]);\n  }\n  return [{ Drivers, Rides, AcceptedRides }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Drivers":[[10,"2019-12-10"],[8,"2020-01-13"],[5,"2020-02-16"],[7,"2020-03-08"],[4,"2020-05-17"],[1,"2020-10-24"],[6,"2021-01-05"]],"Rides":[[6,75,"2019-12-09"],[1,54,"2020-02-09"],[10,63,"2020-03-04"],[19,39,"2020-04-06"],[3,41,"2020-06-03"],[13,52,"2020-06-22"],[7,69,"2020-07-16"],[17,70,"2020-08-25"],[20,81,"2020-11-02"],[5,57,"2020-11-09"],[2,42,"2020-12-09"],[11,68,"2021-01-11"],[15,32,"2021-01-17"],[12,11,"2021-01-19"],[14,18,"2021-01-27"]],"AcceptedRides":[[10,10,63,38],[13,10,73,96],[7,8,100,28],[17,7,119,68],[20,1,121,92],[5,7,42,101],[2,4,6,38],[11,8,37,43],[15,8,108,82],[12,8,38,34],[14,1,90,74]]}],"expected":{"columns":["month","active_drivers","accepted_rides"],"rows":[[1,2,0],[2,3,0],[3,4,1],[4,4,0],[5,5,0],[6,5,1],[7,5,1],[8,5,1],[9,5,0],[10,6,0],[11,6,2],[12,6,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Drivers":[],"Rides":[],"AcceptedRides":[]}]},
+    {"name":"Test 2","input":[{"Drivers":[[1,"2018-05-05"],[2,"2019-12-31"]],"Rides":[],"AcceptedRides":[]}]},
+    {"name":"Test 3","input":[{"Drivers":[[1,"2020-01-01"],[2,"2020-12-31"],[3,"2021-01-01"],[4,"2020-06-30"],[5,"2020-07-01"]],"Rides":[],"AcceptedRides":[]}]},
+    {"name":"Test 4","input":[{"Drivers":[[1,"2019-01-01"]],"Rides":[[1,7,"2019-12-31"],[2,7,"2021-01-01"],[3,8,"2019-05-05"]],"AcceptedRides":[[1,1,10,10],[2,1,20,20],[3,1,30,30]]}]},
+    {"name":"Test 5","input":[{"Drivers":[[1,"2020-02-02"]],"Rides":[[1,7,"2020-03-03"],[2,8,"2020-03-04"],[3,9,"2020-08-08"]],"AcceptedRides":[]}]},
+    {"name":"Test 6","input":[{"Drivers":[[1,"2019-11-11"],[2,"2020-04-04"]],"Rides":[[1,7,"2020-01-01"],[2,8,"2020-01-31"],[3,9,"2020-12-31"],[4,7,"2020-02-01"],[5,8,"2020-12-30"]],"AcceptedRides":[[1,1,5,9],[2,1,6,8],[3,2,7,7],[5,2,8,6]]}]},
+    {"name":"Test 7","input":[{"Drivers":[[3,"2020-06-15"]],"Rides":[[1,7,"2020-02-02"],[2,7,"2020-06-01"]],"AcceptedRides":[[1,3,12,30],[2,3,14,31]]}]},
+    {"name":"Test 8","input":[{"Drivers":[[1,"2020-03-31"],[2,"2020-04-01"],[3,"2020-03-01"],[4,"2021-02-02"]],"Rides":[[1,7,"2020-03-15"],[2,7,"2020-04-15"],[3,9,"2020-04-20"],[4,9,"2020-04-21"]],"AcceptedRides":[[1,1,3,4],[2,2,5,6],[4,4,7,8]]}]},
+    {"name":"Test 9","input":[{"Drivers":[[1,"2021-06-06"]],"Rides":[[1,7,"2020-09-09"]],"AcceptedRides":[[1,1,40,50]]}]},
+    {"name":"Test 10","input":[{"Drivers":[[1,"2019-12-10"],[2,"2020-01-13"],[3,"2020-02-16"],[4,"2020-10-24"]],"Rides":[[1,54,"2020-02-09"],[2,63,"2020-03-04"],[3,52,"2020-06-22"],[4,81,"2020-11-02"],[5,57,"2020-11-09"],[6,42,"2021-01-11"]],"AcceptedRides":[[2,1,63,38],[3,1,73,96],[4,4,121,92],[5,2,42,101],[6,3,6,38]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer has exactly twelve rows even when a month has no drivers or no rides, so the months themselves must come from somewhere other than the data. Build them with a small recursive CTE, then attach the two statistics. They behave differently: **active drivers are cumulative** (everyone who joined on or before that month, including before 2020), while **accepted rides are per month** (only rides requested in that month of 2020 that also appear in `AcceptedRides`).\n\n## Approach\n\n1. `months`: a recursive CTE producing the numbers 1 to 12.\n2. `active`: left-join every month to the drivers who joined before 2020 or in 2020 up to that month, and count them per month. `COUNT(d.driver_id)` gives 0 for months with no match.\n3. `accepted`: join `AcceptedRides` to `Rides` to learn each accepted ride's request date, keep those in 2020 and count them per `MONTH(requested_at)`.\n4. Left-join `active` to `accepted` by month, turning a missing count into 0 with `IFNULL`, and order by month.\n\n## Example 1, step by step\n\n- `active`: driver 10 joined in 2019 and counts all year; 8 joins in January, 5 in February, 7 in March, 4 in May, 1 in October; driver 6 joins in 2021 and never counts. This gives 2, 3, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6.\n- `accepted`: rides 1, 19 and 3 were requested in 2020 but never accepted. Accepted rides in 2020 are 10 (March), 13 (June), 7 (July), 17 (August), 20 and 5 (November) and 2 (December), so `accepted` has rows (3, 1), (6, 1), (7, 1), (8, 1), (11, 2), (12, 1). Rides 11, 15, 12 and 14 are from 2021.\n- The final join fills the other months with 0, giving the twelve rows of the example.\n\n## Complexity\n\n- Time: O(12 · D) for the month-by-driver join plus O(A) to join and count the A accepted rides with an index on `Rides.ride_id`.\n- Space: O(12) for the CTE results.\n\n## Pitfalls\n\n- Counting only drivers who joined **in** a month (instead of by its end) gives monthly sign-ups, not active drivers; drivers from before 2020 must count too.\n- Starting from `Rides` or `Drivers` instead of a month list loses months with no activity; they must appear with zeros.\n- Counting every row of `Rides` counts requests that nobody accepted.\n- Filtering on the year is essential: a ride from March 2021 must not land in month 3.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `months` / `m` | the numbers 1 to 12 |\n| `d` | `Drivers`, matched to every month by which they had joined |\n| `active` / `a` | `month`, `active_drivers` for all twelve months |\n| `ar`, `r` | `AcceptedRides` and the `Rides` row holding its request date |\n| `accepted` / `acc` | `month`, `accepted_rides` for months of 2020 that have any |",
+  "narration": {
+    "1": "The recursive CTE months starts at 1 ...",
+    "4": "... and adds 1 until it reaches 12, one row per month of 2020.",
+    "6": "The CTE active counts, for every month, the drivers who had joined by its end.",
+    "9": "A left join keeps months with no drivers, which then count 0.",
+    "10": "A driver who joined before 2020 matches every month ...",
+    "11": "... and a 2020 driver matches the months from their joining month onwards.",
+    "14": "The CTE accepted counts accepted rides per month of their request.",
+    "16": "AcceptedRides lists the rides a driver took ...",
+    "18": "... and joining Rides on ride_id supplies each one's request date.",
+    "19": "Only rides requested in 2020 count.",
+    "22": "The final select keeps every month and turns a missing ride count into 0.",
+    "24": "Months without accepted rides find no partner in this left join, so they are kept with null.",
+    "26": "Rows come out from January to December."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 1809,
+  "title": "Ad-Free Sessions",
+  "spec": "recalled",
+  "statement": "A streaming service logs viewing sessions and the ads it plays:\n\n- `Playback(session_id, customer_id, start_time, end_time)`: one row per viewing session; `session_id` is unique. `start_time <= end_time`, and two sessions of the same customer never overlap.\n- `Ads(ad_id, customer_id, timestamp)`: one row per ad shown to a customer at the moment `timestamp`; `ad_id` is unique.\n\nAn ad belongs to a session when it went to the same customer and its `timestamp` lies between the session's `start_time` and `end_time`, **both ends included**. Report every session that has no such ad, as one column named `session_id`. Rows may come in any order.",
+  "constraints": [
+    "session_id is unique in Playback",
+    "ad_id is unique in Ads",
+    "start_time <= end_time in every session",
+    "Sessions of the same customer do not overlap",
+    "An ad may go to a customer who has no session, or fall outside every session"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Playback": [["session_id","INT"],["customer_id","INT"],["start_time","INT"],["end_time","INT"]],
+    "Ads": [["ad_id","INT"],["customer_id","INT"],["timestamp","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Playback = [], Ads = [] }] = input;\n  const sessions = new Set(), ads = new Set(), byCustomer = new Map();\n  for (const row of Playback) {\n    if (row.some((v) => v === null)) return 'Playback rows may not contain null.';\n    const [id, customer, start, end] = row;\n    if (sessions.has(id)) return `session_id ${id} appears twice in Playback.`;\n    sessions.add(id);\n    if (start > end) return `Session ${id} ends before it starts.`;\n    if (!byCustomer.has(customer)) byCustomer.set(customer, []);\n    byCustomer.get(customer).push([start, end]);\n  }\n  for (const [customer, spans] of byCustomer) {\n    spans.sort((a, b) => a[0] - b[0]);\n    for (let i = 1; i < spans.length; i++) if (spans[i][0] <= spans[i - 1][1]) return `Two sessions of customer ${customer} overlap.`;\n  }\n  for (const row of Ads) {\n    if (row.some((v) => v === null)) return 'Ads rows may not contain null.';\n    if (ads.has(row[0])) return `ad_id ${row[0]} appears twice in Ads.`;\n    ads.add(row[0]);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT p.session_id\nFROM Playback AS p\nLEFT JOIN Ads AS a\n  ON a.customer_id = p.customer_id\n  AND a.timestamp BETWEEN p.start_time AND p.end_time\nWHERE a.ad_id IS NULL;",
+  "brute": "SELECT session_id\nFROM Playback\nWHERE session_id NOT IN (\n  SELECT p.session_id\n  FROM Playback AS p, Ads AS a\n  WHERE a.customer_id = p.customer_id\n    AND a.timestamp >= p.start_time\n    AND a.timestamp <= p.end_time\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const customers = small ? 3 : 60;\n  const sessionCount = small ? pick(9) : 2000;\n  const adCount = small ? pick(9) : 2000;\n  // Each customer's sessions are laid out left to right with a gap, so they never overlap.\n  const cursor = Array.from({ length: customers + 1 }, () => pick(small ? 4 : 10));\n  const Playback = [];\n  for (let i = 0; i < sessionCount; i++) {\n    const customer = 1 + pick(customers);\n    const start = cursor[customer] + 1 + pick(small ? 3 : 20);\n    const end = start + pick(small ? 6 : 40);\n    cursor[customer] = end;\n    Playback.push([0, customer, start, end]);\n  }\n  // Shuffle the rows, then number them, so ids do not follow time order.\n  for (let i = Playback.length - 1; i > 0; i--) { const j = pick(i + 1); [Playback[i], Playback[j]] = [Playback[j], Playback[i]]; }\n  Playback.forEach((row, i) => { row[0] = i + 1; });\n  const Ads = [];\n  for (let i = 0; i < adCount; i++) {\n    let customer, timestamp;\n    if (Playback.length > 0 && rand() < 0.6) {\n      // Aim at a session: inside it, on an edge, or just outside an edge.\n      const [, owner, start, end] = Playback[pick(Playback.length)];\n      customer = rand() < 0.85 ? owner : 1 + pick(customers + 1);\n      timestamp = [start, end, start - 1, end + 1, start + pick(end - start + 1)][pick(5)];\n    } else {\n      customer = 1 + pick(customers + 1);\n      timestamp = pick(small ? 30 : 5000);\n    }\n    Ads.push([i + 1, customer, timestamp]);\n  }\n  return [{ Playback, Ads }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Playback":[[1,1,1,5],[2,1,15,23],[3,2,10,12],[4,2,17,28],[5,2,2,8]],"Ads":[[1,1,5],[2,2,17],[3,2,20]]}],"expected":{"columns":["session_id"],"rows":[[2],[3],[5]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Playback":[[1,1,1,5],[2,2,3,9]],"Ads":[]}]},
+    {"name":"Test 2","input":[{"Playback":[],"Ads":[[1,1,4]]}]},
+    {"name":"Test 3","input":[{"Playback":[[1,1,10,20],[2,1,30,40]],"Ads":[[1,1,10],[2,1,40]]}]},
+    {"name":"Test 4","input":[{"Playback":[[1,1,10,20],[2,1,30,40]],"Ads":[[1,1,9],[2,1,21],[3,1,29],[4,1,41]]}]},
+    {"name":"Test 5","input":[{"Playback":[[1,1,10,20],[2,2,10,20]],"Ads":[[1,2,15],[2,3,12]]}]},
+    {"name":"Test 6","input":[{"Playback":[[7,4,1,100]],"Ads":[[1,4,5],[2,4,50],[3,4,100]]}]},
+    {"name":"Test 7","input":[{"Playback":[[1,1,7,7],[2,2,7,7],[3,1,8,8]],"Ads":[[1,1,7]]}]},
+    {"name":"Test 8","input":[{"Playback":[[1,1,0,3],[2,2,5,6],[3,3,2,2]],"Ads":[[1,1,0],[2,2,6],[3,3,2],[4,1,2]]}]},
+    {"name":"Test 9","input":[{"Playback":[[3,5,12,18],[1,5,1,4],[2,6,5,9]],"Ads":[[10,5,8],[11,6,10],[12,7,6]]}]},
+    {"name":"Test 10","input":[{"Playback":[[1,1,1,5],[2,1,15,23],[3,2,10,12],[4,2,17,28],[5,2,2,8],[6,3,4,9]],"Ads":[[1,1,5],[2,2,17],[3,2,20],[4,3,3],[5,1,14]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA session is ad-free when **no** row of `Ads` matches it. \"Match\" here is a two-part condition: the same customer, and a timestamp inside the closed interval `[start_time, end_time]`. A left join with that whole condition in `ON` attaches every matching ad to its session; sessions that found no ad still appear once, with every `Ads` column set to `null`. Keeping only those null rows is the classic anti-join.\n\n## Approach\n\n1. Read every session from `Playback` (alias `p`).\n2. `LEFT JOIN Ads` (alias `a`) on the same `customer_id` **and** `timestamp BETWEEN start_time AND end_time`; `BETWEEN` includes both ends.\n3. Keep rows where `a.ad_id IS NULL`: `ad_id` is never null in a real ad, so a null there means the join found nothing.\n4. Select `session_id`. A session with ads never reaches the output, so several ads cannot duplicate it.\n\n## Example 1, step by step\n\n- Session 1 (customer 1, 1–5) matches ad 1 at time 5, the session's last moment, so it is dropped.\n- Session 2 (customer 1, 15–23): customer 1's only ad is at 5, so nothing matches and it is kept.\n- Session 3 (customer 2, 10–12): customer 2's ads are at 17 and 20, both later; kept.\n- Session 4 (customer 2, 17–28) matches ads 2 and 3 (two joined rows, neither null); dropped.\n- Session 5 (customer 2, 2–8): no ad of customer 2 falls in 2–8; kept.\n\nThe result is sessions 2, 3 and 5.\n\n## Complexity\n\n- Time: O(P · A) for P sessions and A ads in the worst case; with an index on `Ads(customer_id, timestamp)` each session only probes its own customer's ads.\n- Space: O(P) for the result.\n\n## Pitfalls\n\n- Strict comparisons (`>` and `<`) miss ads shown exactly at `start_time` or `end_time`, like ad 1 in Example 1.\n- Forgetting `a.customer_id = p.customer_id` lets another customer's ad spoil a session.\n- Moving the time condition from `ON` into `WHERE` turns the left join into an inner join, and the null test then removes every row.\n- An inner join with `NOT BETWEEN` reports a session once per ad that misses it, even when some other ad hits it.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Playback`, one row per session to judge |\n| `a` | `Ads` joined when the customer matches and the ad time is inside the session |\n| `a.ad_id IS NULL` | marks sessions for which the join found no ad |",
+  "narration": {
+    "1": "The answer is a single column: the id of each ad-free session.",
+    "2": "Every session starts as a candidate, so Playback is the left table.",
+    "3": "A left join keeps sessions that match no ad, filling the Ads columns with null.",
+    "4": "An ad can only interrupt a session of the same customer.",
+    "5": "BETWEEN includes both ends, so an ad at start_time or end_time counts as inside.",
+    "6": "Only sessions whose join found no ad have a null ad_id; they are the ad-free ones."
+  }
+}

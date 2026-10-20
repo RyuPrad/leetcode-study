@@ -1,0 +1,63 @@
+{
+  "number": 1223,
+  "title": "Dice Roll Simulation",
+  "spec": "leetcode",
+  "statement": "Each roll of a die shows one of the faces 1 to 6. A sequence of rolls is allowed when no face `i` appears more than `rollMax[i - 1]` times back to back anywhere in it (so `rollMax[0]` caps runs of face 1 and `rollMax[5]` caps runs of face 6). Count the allowed sequences made of exactly `n` rolls, where two sequences are different if they disagree in at least one position. The count can be huge, so return it modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= n <= 5000",
+    "rollMax.length == 6",
+    "1 <= rollMax[i] <= 15"
+  ],
+  "signature": "int dieSimulator(int n, int[] rollMax)",
+  "entry": "dieSimulator",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "rollMax"
+  ],
+  "validator": "function validate([n, rollMax]) {\n  if (!Number.isInteger(n) || n < 1 || n > 5000) return 'n is between 1 and 5000.';\n  if (!Array.isArray(rollMax) || rollMax.length !== 6) return 'rollMax has exactly 6 values.';\n  if (rollMax.some(v => !Number.isInteger(v) || v < 1 || v > 15)) return 'Each rollMax value is between 1 and 15.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function dieSimulator(n, rollMax) {\n  const MOD = 1e9 + 7;\n  let dp = Array.from({ length: 6 }, () => new Array(16).fill(0));\n  for (let face = 0; face < 6; face++) {\n    dp[face][1] = 1;\n  }\n\n  for (let roll = 2; roll <= n; roll++) {\n    const endsWith = dp.map(row => row.reduce((sum, ways) => (sum + ways) % MOD, 0));\n    const total = endsWith.reduce((sum, ways) => (sum + ways) % MOD, 0);\n    const next = Array.from({ length: 6 }, () => new Array(16).fill(0));\n    for (let face = 0; face < 6; face++) {\n      next[face][1] = (total - endsWith[face] + MOD) % MOD;\n      for (let run = 2; run <= rollMax[face]; run++) {\n        next[face][run] = dp[face][run - 1];\n      }\n    }\n    dp = next;\n  }\n\n  let answer = 0;\n  for (const row of dp) {\n    for (const ways of row) {\n      answer = (answer + ways) % MOD;\n    }\n  }\n  return answer;\n}",
+  "brute": "function dieSimulator(n, rollMax) {\n  // Simulate the state machine (last face, current run length) one roll at a time,\n  // trying every face from every state.\n  const MOD = 1e9 + 7;\n  let ways = new Array(6 * 16).fill(0);\n  for (let f = 0; f < 6; f++) ways[f * 16 + 1] = 1;\n  for (let step = 1; step < n; step++) {\n    const next = new Array(6 * 16).fill(0);\n    for (let last = 0; last < 6; last++) {\n      for (let run = 1; run <= 15; run++) {\n        const count = ways[last * 16 + run];\n        if (count === 0) continue;\n        for (let f = 0; f < 6; f++) {\n          const len = f === last ? run + 1 : 1;\n          if (len > rollMax[f]) continue;\n          next[f * 16 + len] = (next[f * 16 + len] + count) % MOD;\n        }\n      }\n    }\n    ways = next;\n  }\n  let total = 0;\n  for (const c of ways) total = (total + c) % MOD;\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const n = rand() < 0.5 ? 5000 : int(3000, 5000);\n    return [n, Array.from({ length: 6 }, () => int(1, 15))];\n  }\n  const n = int(1, 8);\n  const cap = rand() < 0.6 ? 3 : 15;\n  return [n, Array.from({ length: 6 }, () => int(1, cap))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[2,[1,1,2,2,2,3]],"expected":34},
+    {"name":"Example 2","input":[2,[1,1,1,1,1,1]],"expected":30},
+    {"name":"Example 3","input":[3,[1,1,1,2,2,3]],"expected":181}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[1,1,1,1,1,1]]},
+    {"name":"Test 2","input":[1,[15,15,15,15,15,15]]},
+    {"name":"Test 3","input":[3,[1,1,1,1,1,1]]},
+    {"name":"Test 4","input":[10,[15,15,15,15,15,15]]},
+    {"name":"Test 5","input":[15,[15,15,15,15,15,15]]},
+    {"name":"Test 6","input":[16,[15,15,15,15,15,15]]},
+    {"name":"Test 7","input":[6,[1,2,3,4,5,6]]},
+    {"name":"Test 8","input":[30,[2,1,1,3,1,1]]},
+    {"name":"Test 9","input":[5000,[1,1,1,1,1,1]]},
+    {"name":"Test 10","input":[5000,[15,15,15,15,15,15]]},
+    {"name":"Test 11","input":[4999,[8,3,15,1,6,11]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nListing all 6^n sequences is hopeless. What matters about a partial sequence is only how it ends: which face came last and how many times in a row. So group the sequences by that ending, `dp[face][run]`, and update the groups one roll at a time.\n\n## Approach\n\n1. After the first roll there is one sequence per face, each ending in a run of 1: `dp[face][1] = 1`.\n2. For every later roll, add up `endsWith[face]`, the sequences ending in each face, and their sum `total`.\n3. Rolling a different face from the last one starts a fresh run: `next[face][1] = total - endsWith[face]`.\n4. Rolling the same face again lengthens its run: `next[face][run] = dp[face][run - 1]`, but only while `run <= rollMax[face]`, so runs that are too long never appear.\n5. After `n` rolls, add up every cell of `dp`. Keep every sum modulo `10^9 + 7`.\n\n## Example 1, step by step\n\n`n = 2`, `rollMax = [1, 1, 2, 2, 2, 3]`. After roll 1 each face has `dp[face][1] = 1`, so `total = 6`. On roll 2, every face gets `next[face][1] = 6 - 1 = 5` (30 sequences). Faces 3 to 6 allow a run of 2, so each gets `next[face][2] = 1` (4 more); faces 1 and 2 do not. The answer is `30 + 4 = 34`.\n\n## Complexity\n\n- Time: O(n · 6 · 15): each roll touches every (face, run) cell a constant number of times.\n- Space: O(6 · 16): only the current and next tables are kept.\n\n## Pitfalls\n\n- `total - endsWith[face]` can go negative after taking remainders; add `MOD` before the final `%`.\n- `rollMax` is indexed from 0 for face 1; mixing up the offset shifts every limit.\n- The first roll fills the table directly, so the loop starts at `roll = 2`; running it `n` times would count sequences of `n + 1` rolls.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | the modulus `10^9 + 7` |\n| `dp[face][run]` | sequences so far ending with exactly `run` copies of `face` |\n| `roll` | how many rolls the sequences have after this step |\n| `endsWith[face]` | sequences so far whose last roll is `face` |\n| `total` | all sequences so far |\n| `next` | the table after one more roll |\n| `answer` | sum of every cell after `n` rolls |",
+  "narration": {
+    "2": "All counts are kept modulo 10^9 + 7.",
+    "3": "dp[face][run] counts sequences ending with exactly run copies of face; runs never exceed 15.",
+    "5": "After the first roll there is one sequence per face, ending in a run of length 1.",
+    "8": "Add the remaining rolls one at a time.",
+    "9": "For each face, count the sequences whose last roll is that face.",
+    "10": "Count all sequences built so far.",
+    "13": "Rolling a face different from the last one starts a new run of length 1.",
+    "14": "A run of the same face may only grow up to rollMax[face].",
+    "15": "Extend every run of length run - 1 by one more copy of the same face.",
+    "18": "The table for one more roll becomes the current one.",
+    "24": "Add every (face, run) group to the total.",
+    "27": "Return how many allowed sequences of n rolls exist."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "number": 1484,
+  "title": "Group Sold Products By The Date",
+  "spec": "leetcode",
+  "statement": "A market logs its sales in one table:\n\n- `Activities(sell_date, product)`: each row records that `product` was sold on `sell_date`. The table has no key, so the same pair can be logged more than once.\n\nFor every date that has at least one sale, report:\n\n- `sell_date`: the date,\n- `num_sold`: how many **different** products were sold that day,\n- `products`: those different product names in alphabetical order, joined by commas with no spaces (for example `Bible,Pencil`); each name appears once.\n\nOrder the rows by `sell_date`, earliest first.",
+  "constraints": [
+    "Activities has no primary key and may contain duplicate rows",
+    "sell_date is a date and product a non-empty name without commas"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activities": [["sell_date","DATE"],["product","VARCHAR(20)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Activities = [] }] = input;\n  for (const [date, product] of Activities) {\n    if (date === null || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return 'Every sell_date must be a date like 2020-05-30.';\n    if (product === null || product === '' || product.includes(',')) return 'Every product needs a name without commas.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT sell_date,\n       COUNT(DISTINCT product) AS num_sold,\n       GROUP_CONCAT(DISTINCT product ORDER BY product SEPARATOR ',') AS products\nFROM Activities\nGROUP BY sell_date\nORDER BY sell_date;",
+  "brute": "SELECT d.sell_date,\n       (SELECT COUNT(*)\n        FROM (SELECT DISTINCT sell_date, product FROM Activities) AS u\n        WHERE u.sell_date = d.sell_date) AS num_sold,\n       (SELECT GROUP_CONCAT(u.product ORDER BY u.product SEPARATOR ',')\n        FROM (SELECT DISTINCT sell_date, product FROM Activities) AS u\n        WHERE u.sell_date = d.sell_date) AS products\nFROM (SELECT DISTINCT sell_date FROM Activities) AS d\nORDER BY d.sell_date",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const Activities = [];\n  if (size === 'small') {\n    const dates = ['2020-05-30', '2020-06-01', '2020-06-02', '2019-12-31'];\n    const products = ['Headphone', 'Pencil', 'Pen', 'Mask', 'Basketball', 'Bible', 'T-Shirt', 'Lamp'];\n    const rows = Math.floor(rand() * 9);\n    for (let i = 0; i < rows; i++) {\n      // Repeat the previous row now and then so duplicates are common.\n      if (Activities.length && rand() < 0.25) Activities.push([...Activities[Activities.length - 1]]);\n      else Activities.push([pick(dates), pick(products)]);\n    }\n  } else {\n    const letters = 'abcdefghijklmnopqrstuvwxyz';\n    const products = Array.from({ length: 60 }, (_, i) => `Item${letters[i % 26]}${letters[Math.floor(i / 26)]}`);\n    for (let i = 0; i < 2000; i++) {\n      const day = new Date(Date.UTC(2020, 0, 1 + Math.floor(rand() * 200))).toISOString().slice(0, 10);\n      Activities.push([day, pick(products)]);\n    }\n  }\n  return [{ Activities }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activities":[["2020-05-30","Headphone"],["2020-06-01","Pencil"],["2020-06-02","Mask"],["2020-05-30","Basketball"],["2020-06-01","Bible"],["2020-06-02","Mask"],["2020-05-30","T-Shirt"]]}],"expected":{"columns":["sell_date","num_sold","products"],"rows":[["2020-05-30",3,"Basketball,Headphone,T-Shirt"],["2020-06-01",2,"Bible,Pencil"],["2020-06-02",1,"Mask"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activities":[]}]},
+    {"name":"Test 2","input":[{"Activities":[["2021-01-01","Lamp"]]}]},
+    {"name":"Test 3","input":[{"Activities":[["2020-03-03","Mask"],["2020-03-03","Mask"],["2020-03-03","Mask"]]}]},
+    {"name":"Test 4","input":[{"Activities":[["2020-07-01","Zebra"],["2020-07-01","Mango"],["2020-07-01","Apple"],["2020-07-01","Kiwi"]]}]},
+    {"name":"Test 5","input":[{"Activities":[["2020-01-10","Pencil"],["2019-12-31","Bible"],["2020-01-01","Mask"],["2020-01-01","Bible"],["2020-01-01","Lamp"]]}]},
+    {"name":"Test 6","input":[{"Activities":[["2020-05-30","Pencil"],["2020-05-30","Bible"],["2020-05-30","Pencil"],["2020-05-30","Bible"],["2020-05-31","Lamp"],["2020-05-31","Lamp"]]}]},
+    {"name":"Test 7","input":[{"Activities":[["2020-08-02","Mask"],["2020-08-01","Mask"],["2020-08-03","Mask"],["2020-08-01","Headphone"]]}]},
+    {"name":"Test 8","input":[{"Activities":[["2020-02-02","Pencil"],["2020-02-02","Pen"],["2020-02-02","Pencil"],["2020-02-01","Pen"]]}]},
+    {"name":"Test 9","input":[{"Activities":[["2020-06-02","T-Shirt"],["2020-06-02","Basketball"],["2020-06-01","Headphone"],["2020-06-02","Basketball"],["2020-06-01","Bible"],["2020-05-29","Mask"],["2020-06-01","Bible"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOne output row per date means grouping by `sell_date`. Inside each group two aggregates do the work: one counts the different products, the other glues the different names into one string. Because a product can be logged twice on the same day, both aggregates must ignore repeats, which is what `DISTINCT` inside an aggregate does. MySQL's `GROUP_CONCAT` also takes its own `ORDER BY`, so the names come out sorted.\n\n## Approach\n\n1. `FROM Activities` and `GROUP BY sell_date`: one group per day with sales.\n2. `COUNT(DISTINCT product)` gives `num_sold`, counting each product once.\n3. `GROUP_CONCAT(DISTINCT product ORDER BY product SEPARATOR ',')` gives `products`: repeats removed, names sorted, joined by commas.\n4. `ORDER BY sell_date` lists the days from the earliest.\n\n## Example 1, step by step\n\n- 2020-05-30 holds Headphone, Basketball and T-Shirt: three different products, sorted to `Basketball,Headphone,T-Shirt`.\n- 2020-06-01 holds Pencil and Bible: `num_sold = 2`, `products = Bible,Pencil`.\n- 2020-06-02 holds Mask twice: `COUNT(DISTINCT product) = 1` and the list is just `Mask`.\n\n## Complexity\n\n- Time: O(n log n) for n rows, to group the rows and sort the names inside each date.\n- Space: O(n) for the groups and the concatenated strings.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(product)` counts repeated sales, so a day with Mask twice would report 2.\n- Without `DISTINCT` inside `GROUP_CONCAT` the list repeats names (`Mask,Mask`).\n- Without the `ORDER BY` inside `GROUP_CONCAT` the names come out in whatever order the rows were read; the outer `ORDER BY` only sorts the dates.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY sell_date` | one group per day with sales |\n| `num_sold` | number of different products sold that day |\n| `products` | the day's different product names, sorted and comma-joined |\n| `ORDER BY sell_date` | output order, earliest day first |",
+  "narration": {
+    "1": "Each output row starts with the date its group belongs to.",
+    "2": "COUNT(DISTINCT product) counts every product once, however often it was logged that day.",
+    "3": "GROUP_CONCAT drops repeated names, sorts the rest alphabetically and joins them with commas.",
+    "5": "Grouping by sell_date makes one row per day with sales.",
+    "6": "The days are listed from the earliest."
+  }
+}

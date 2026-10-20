@@ -1,0 +1,52 @@
+{
+  "number": 1709,
+  "title": "Biggest Window Between Visits",
+  "spec": "recalled",
+  "statement": "One table logs the days users visited a store:\n\n- `UserVisits(user_id, visit_date)`: one row per visit. The table has no key, so the same user may appear on the same day more than once. No visit is later than `2021-01-01`.\n\nTreat `2021-01-01` as today. Sort each user's visits by date; a **window** is the number of days from one visit to the user's next visit, or from the user's last visit to today. For each user, report the largest window in the columns `user_id` and `biggest_window` (a whole number of days, as `DATEDIFF` counts them). Order the rows by `user_id` ascending.",
+  "constraints": [
+    "UserVisits has no primary key; a user may visit several times on the same day",
+    "Every visit_date is on or before 2021-01-01, which counts as today",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "UserVisits": [["user_id","INT"],["visit_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ UserVisits = [] }] = input;\n  for (const [user, date] of UserVisits) {\n    if (user === null || date === null) return 'UserVisits rows may not contain null.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `visit_date ${date} is not a YYYY-MM-DD date.`;\n    if (date > '2021-01-01') return `visit_date ${date} is after today (2021-01-01).`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH next_visits AS (\n  SELECT\n    user_id,\n    visit_date,\n    LEAD(visit_date, 1, '2021-01-01') OVER (\n      PARTITION BY user_id\n      ORDER BY visit_date\n    ) AS next_date\n  FROM UserVisits\n)\nSELECT\n  user_id,\n  MAX(DATEDIFF(next_date, visit_date)) AS biggest_window\nFROM next_visits\nGROUP BY user_id\nORDER BY user_id;",
+  "brute": "SELECT\n  v.user_id,\n  MAX(DATEDIFF(\n    COALESCE(\n      (SELECT MIN(w.visit_date) FROM UserVisits AS w WHERE w.user_id = v.user_id AND w.visit_date > v.visit_date),\n      '2021-01-01'\n    ),\n    v.visit_date\n  )) AS biggest_window\nFROM UserVisits AS v\nGROUP BY v.user_id\nORDER BY v.user_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const start = Date.UTC(2020, 0, 1);\n  const toDate = (offset) => new Date(start + offset * 86400000).toISOString().slice(0, 10);\n  const users = small ? 4 : 300;\n  const rows = small ? pick(9) : 2000;\n  const UserVisits = [];\n  for (let k = 0; k < rows; k++) {\n    // Small cases sometimes repeat the previous visit, since a user may visit twice in a day.\n    if (small && UserVisits.length > 0 && rand() < 0.15) { UserVisits.push(UserVisits[UserVisits.length - 1].slice()); continue; }\n    // Offsets run up to 366, which is 2021-01-01 itself (2020 is a leap year).\n    const offset = small ? 300 + pick(67) : pick(367);\n    UserVisits.push([1 + pick(users), toDate(offset)]);\n  }\n  return [{ UserVisits }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"UserVisits":[[1,"2020-11-28"],[1,"2020-10-20"],[1,"2020-12-03"],[2,"2020-10-05"],[2,"2020-12-09"],[3,"2020-11-11"]]}],"expected":{"columns":["user_id","biggest_window"],"rows":[[1,39],[2,65],[3,51]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"UserVisits":[]}]},
+    {"name":"Test 2","input":[{"UserVisits":[[7,"2020-12-31"]]}]},
+    {"name":"Test 3","input":[{"UserVisits":[[7,"2021-01-01"],[8,"2020-01-01"]]}]},
+    {"name":"Test 4","input":[{"UserVisits":[[1,"2020-12-01"],[1,"2020-12-01"],[1,"2020-12-01"]]}]},
+    {"name":"Test 5","input":[{"UserVisits":[[1,"2020-03-01"],[1,"2020-02-01"],[1,"2020-12-30"]]}]},
+    {"name":"Test 6","input":[{"UserVisits":[[5,"2020-06-10"],[5,"2020-06-01"],[5,"2020-12-31"],[5,"2020-06-20"]]}]},
+    {"name":"Test 7","input":[{"UserVisits":[[3,"2020-12-01"],[1,"2020-11-01"],[2,"2020-10-01"],[3,"2020-12-25"],[1,"2020-12-31"]]}]},
+    {"name":"Test 8","input":[{"UserVisits":[[4,"2020-01-05"],[4,"2020-11-05"],[4,"2020-11-05"],[4,"2020-11-20"],[9,"2020-12-15"],[9,"2020-12-16"]]}]},
+    {"name":"Test 9","input":[{"UserVisits":[[2,"2019-12-31"],[2,"2020-01-01"],[2,"2020-12-31"],[6,"2020-07-04"],[6,"2020-07-04"]]}]},
+    {"name":"Test 10","input":[{"UserVisits":[[1,"2020-11-28"],[1,"2020-10-20"],[1,"2020-12-03"],[2,"2020-10-05"],[2,"2020-12-09"],[3,"2020-11-11"],[3,"2020-11-12"],[3,"2020-12-20"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA window joins each visit to the **next** one in date order, which is what `LEAD` reads: within one user's visits sorted by date, it fetches the following row's date. The last visit has no following row, and there the window ends today, so `LEAD` gets `'2021-01-01'` as its default. Once every visit knows its next date, the gap is a `DATEDIFF` and the biggest window is a per-user `MAX`.\n\n## Approach\n\n1. `next_visits`: for every visit, `LEAD(visit_date, 1, '2021-01-01') OVER (PARTITION BY user_id ORDER BY visit_date)` as `next_date`. The partition keeps users apart and the order makes \"next\" mean the next date.\n2. Compute `DATEDIFF(next_date, visit_date)`, the window that starts at each visit.\n3. `GROUP BY user_id` and take `MAX` of those windows as `biggest_window`.\n4. `ORDER BY user_id`.\n\n## Example 1, step by step\n\n`next_visits` (windows shown after the arrow):\n\n- User 1: 2020-10-20 → 2020-11-28 (39), 2020-11-28 → 2020-12-03 (5), 2020-12-03 → 2021-01-01 (29). Biggest: 39.\n- User 2: 2020-10-05 → 2020-12-09 (65), 2020-12-09 → 2021-01-01 (23). Biggest: 65.\n- User 3: 2020-11-11 → 2021-01-01 (51). Biggest: 51.\n\n## Complexity\n\n- Time: O(n log n) for n visits, dominated by sorting each user's visits for the window.\n- Space: O(n) for `next_visits`.\n\n## Pitfalls\n\n- `LEAD` without a default gives `null` for the last visit, so the window up to today is lost, and a user with one visit gets `null` instead of a number.\n- Without `ORDER BY visit_date` inside `OVER`, \"next\" follows the table's storage order; the input is not sorted.\n- `DATEDIFF(visit_date, next_date)` has the arguments reversed and returns negative windows.\n- Two visits on the same day give a window of 0, which never wins; it must not be treated as an error.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `next_visits` | every visit with the date of the same user's next visit |\n| `next_date` | the following visit's date, or `2021-01-01` after the last visit |\n| `DATEDIFF(next_date, visit_date)` | days in the window that starts at this visit |\n| `biggest_window` | the largest such window per user |",
+  "narration": {
+    "1": "The first stage pairs every visit with the date of the visit that follows it.",
+    "5": "LEAD reads the next row's date; after a user's last visit it falls back to today, 2021-01-01.",
+    "6": "Each user's visits form their own partition, so a window never jumps to another user.",
+    "7": "Sorting by date makes the next row the next visit in time.",
+    "13": "Turn every pair into a window length and keep the largest one for the user.",
+    "14": "One group per user gives one output row per user.",
+    "15": "The problem asks for the rows in user_id order."
+  }
+}

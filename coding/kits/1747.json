@@ -1,0 +1,53 @@
+{
+  "number": 1747,
+  "title": "Leetflex Banned Accounts",
+  "spec": "recalled",
+  "statement": "A streaming service logs every session of its accounts:\n\n- `LogInfo(account_id, ip_address, login, logout)`: one row per session, in which `account_id` was signed in from `ip_address` from `login` until `logout` (both datetimes). The table has no primary key, so identical rows can repeat. In every row `logout` is later than `login`.\n\nAn account must be **banned** when, at some single moment, it was signed in from two **different** IP addresses: two of its sessions with different `ip_address` values overlap in time. The endpoints count, so a session that ends at exactly the second another one starts does overlap with it. Return one column, `account_id`, listing each account to ban once. Rows may come in any order.",
+  "constraints": [
+    "LogInfo has no primary key; rows may repeat",
+    "login < logout in every row",
+    "login and logout are datetimes"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "LogInfo": [["account_id","INT"],["ip_address","INT"],["login","DATETIME"],["logout","DATETIME"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ LogInfo = [] }] = input;\n  const stamp = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;\n  for (const [account, ip, login, logout] of LogInfo) {\n    if (account === null || ip === null) return 'Every session needs an account_id and an ip_address.';\n    if (!stamp.test(String(login)) || !stamp.test(String(logout))) return `Account ${account} has a malformed login or logout.`;\n    if (!(login < logout)) return `Account ${account} logs out at or before logging in.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT a.account_id\nFROM LogInfo AS a\nJOIN LogInfo AS b\n  ON b.account_id = a.account_id\n AND b.ip_address <> a.ip_address\n AND a.login BETWEEN b.login AND b.logout;",
+  "brute": "SELECT account_id\nFROM LogInfo AS a\nGROUP BY account_id\nHAVING EXISTS (\n  SELECT 1\n  FROM LogInfo AS x, LogInfo AS y\n  WHERE x.account_id = a.account_id\n    AND y.account_id = a.account_id\n    AND x.ip_address != y.ip_address\n    AND NOT (x.logout < y.login OR y.logout < x.login)\n)",
+  "generator": "function generate(rand, size) {\n  const pad = n => String(n).padStart(2, '0');\n  // Times are minutes since 2021-02-01 00:00; most fall on a 30-minute grid so endpoints touch often.\n  const stamp = (minutes, seconds = 0) => {\n    const day = 1 + Math.floor(minutes / 1440), rest = minutes % 1440;\n    return `2021-02-${pad(day)} ${pad(Math.floor(rest / 60))}:${pad(rest % 60)}:${pad(seconds)}`;\n  };\n  const small = size === 'small';\n  const rows = small ? Math.floor(rand() * 9) : 2000;\n  const accounts = small ? 4 : 400, ips = small ? 3 : 40, days = small ? 2 : 27;\n  const LogInfo = [];\n  for (let i = 0; i < rows; i++) {\n    if (LogInfo.length && rand() < 0.08) { LogInfo.push([...LogInfo[Math.floor(rand() * LogInfo.length)]]); continue; }\n    const start = Math.floor(rand() * days) * 1440 + (small ? 16 * 60 : 0) + Math.floor(rand() * (small ? 8 : 48)) * 30;\n    const end = start + (1 + Math.floor(rand() * 4)) * 30;\n    // Ending one second early turns a touching pair into a near miss.\n    const logout = rand() < 0.3 ? stamp(end - 1, 59) : stamp(end);\n    LogInfo.push([1 + Math.floor(rand() * accounts), 1 + Math.floor(rand() * ips), stamp(start), logout]);\n  }\n  return [{ LogInfo }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"LogInfo":[[1,1,"2021-02-01 09:00:00","2021-02-01 09:30:00"],[1,2,"2021-02-01 08:00:00","2021-02-01 11:30:00"],[2,6,"2021-02-01 20:30:00","2021-02-01 22:00:00"],[2,7,"2021-02-02 20:30:00","2021-02-02 22:00:00"],[3,9,"2021-02-01 16:00:00","2021-02-01 16:59:59"],[3,13,"2021-02-01 17:00:00","2021-02-01 17:59:59"],[4,10,"2021-02-01 16:00:00","2021-02-01 17:00:00"],[4,11,"2021-02-01 17:00:00","2021-02-01 17:59:59"]]}],"expected":{"columns":["account_id"],"rows":[[1],[4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"LogInfo":[]}]},
+    {"name":"Test 2","input":[{"LogInfo":[[1,1,"2021-02-01 09:00:00","2021-02-01 10:00:00"]]}]},
+    {"name":"Test 3","input":[{"LogInfo":[[1,5,"2021-02-01 09:00:00","2021-02-01 11:00:00"],[1,5,"2021-02-01 10:00:00","2021-02-01 12:00:00"]]}]},
+    {"name":"Test 4","input":[{"LogInfo":[[7,1,"2021-03-01 10:00:00","2021-03-01 12:00:00"],[7,2,"2021-03-01 12:00:00","2021-03-01 13:00:00"]]}]},
+    {"name":"Test 5","input":[{"LogInfo":[[7,1,"2021-03-01 10:00:00","2021-03-01 11:59:59"],[7,2,"2021-03-01 12:00:00","2021-03-01 13:00:00"]]}]},
+    {"name":"Test 6","input":[{"LogInfo":[[2,3,"2021-02-01 08:00:00","2021-02-01 18:00:00"],[2,4,"2021-02-01 12:00:00","2021-02-01 12:30:00"]]}]},
+    {"name":"Test 7","input":[{"LogInfo":[[1,1,"2021-02-01 09:00:00","2021-02-01 11:00:00"],[2,2,"2021-02-01 10:00:00","2021-02-01 12:00:00"]]}]},
+    {"name":"Test 8","input":[{"LogInfo":[[3,1,"2021-02-01 09:00:00","2021-02-01 11:00:00"],[3,2,"2021-02-02 09:00:00","2021-02-02 11:00:00"]]}]},
+    {"name":"Test 9","input":[{"LogInfo":[[5,1,"2021-02-01 09:00:00","2021-02-01 12:00:00"],[5,2,"2021-02-01 10:00:00","2021-02-01 11:00:00"],[5,3,"2021-02-01 10:30:00","2021-02-01 13:00:00"]]}]},
+    {"name":"Test 10","input":[{"LogInfo":[[6,8,"2021-02-01 09:00:00","2021-02-01 10:00:00"],[6,8,"2021-02-01 09:00:00","2021-02-01 10:00:00"],[9,8,"2021-02-01 09:00:00","2021-02-01 10:00:00"]]}]},
+    {"name":"Test 11","input":[{"LogInfo":[[4,1,"2021-02-01 23:00:00","2021-02-02 01:00:00"],[4,2,"2021-02-02 00:30:00","2021-02-02 02:00:00"],[8,1,"2021-02-01 23:00:00","2021-02-01 23:59:59"],[8,2,"2021-02-02 00:00:00","2021-02-02 00:30:00"],[10,4,"2021-02-03 07:00:00","2021-02-03 08:00:00"],[10,5,"2021-02-03 06:00:00","2021-02-03 07:00:00"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Signed in from two IPs at the same moment\" is a question about **pairs** of sessions of one account. Joining `LogInfo` to itself on `account_id` lists every such pair; we keep the pairs whose IPs differ and whose time ranges overlap. Two closed ranges overlap exactly when one of them starts inside the other, and since the self-join produces each pair in both orders, testing \"`a` starts inside `b`\" is enough.\n\n## Approach\n\n1. Take each session `a` and join it to every session `b` of the same account.\n2. Keep the pair only if `b.ip_address <> a.ip_address`.\n3. Keep it only if `a.login` falls between `b.login` and `b.logout`, endpoints included (`BETWEEN` is inclusive).\n4. `SELECT DISTINCT a.account_id`, because an account can have many overlapping pairs.\n\n## Example 1, step by step\n\n- Account 1: the session from IP 1 starts at 09:00, inside the IP 2 session (08:00 to 11:30). Pair kept.\n- Account 2: its sessions are on different days, so no login lies inside the other session.\n- Account 3: the IP 13 session starts at 17:00:00, one second after the IP 9 session ends at 16:59:59. No overlap.\n- Account 4: the IP 11 session starts at 17:00:00, exactly when the IP 10 session ends. `BETWEEN` includes the end, so the pair is kept.\n\nDistinct accounts: 1 and 4.\n\n## Complexity\n\n- Time: O(sum of k²) over accounts, where k is an account's session count (O(n) pairs to build with a hash on `account_id`, n rows).\n- Space: O(n) for the join's working set and the distinct ids.\n\n## Pitfalls\n\n- Strict comparisons (`<` instead of `BETWEEN`) miss sessions that touch at one second, like account 4.\n- Forgetting `b.ip_address <> a.ip_address` bans anyone with two overlapping sessions from the same IP (or with a duplicate row, which matches itself).\n- Without `DISTINCT`, an account with several overlapping pairs is listed several times.\n- Comparing only the time of day ignores the date; account 2 would be banned wrongly.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a` | a session whose login moment is being tested |\n| `b` | another session of the same account from a different IP |\n| `BETWEEN b.login AND b.logout` | `a` starts while `b` is active, endpoints included |",
+  "narration": {
+    "1": "Report each banned account once, however many overlapping pairs it has.",
+    "2": "Session a is the one whose login moment we test.",
+    "3": "Pair it with every other session b in the same table.",
+    "4": "Both sessions must belong to the same account.",
+    "5": "They must come from different IP addresses; same-IP overlaps are allowed.",
+    "6": "a starts while b is active; the self-join also tries b against a, so every overlap is caught."
+  }
+}

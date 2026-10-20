@@ -1,0 +1,53 @@
+{
+  "number": 1459,
+  "title": "Rectangles Area",
+  "spec": "recalled",
+  "statement": "One table lists points on a plane:\n\n- `Points(id, x_value, y_value)`: one row per point; `id` is unique and the coordinates are integers (never `null`). Two points may share a coordinate, or even both.\n\nAny two points can be taken as opposite corners of a rectangle whose sides are parallel to the axes. Its area is the absolute difference of their `x_value`s times the absolute difference of their `y_value`s. Report every pair of points whose rectangle has a **non-zero** area, listing each pair once, with the smaller id first.\n\nReturn the columns `p1` (the smaller id), `p2` (the larger id) and `area`. Order the rows by `area` descending, then by `p1` ascending, then by `p2` ascending.",
+  "constraints": [
+    "id is unique in Points",
+    "x_value and y_value are integers and never null",
+    "p1 < p2 in every output row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Points": [["id","INT"],["x_value","INT"],["y_value","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Points = [] }] = input;\n  const seen = new Set();\n  for (const [id, x, y] of Points) {\n    if (id === null) return 'Every point needs an id.';\n    if (seen.has(id)) return `id ${id} appears twice in Points.`;\n    seen.add(id);\n    if (x === null || y === null) return `Point ${id} needs both coordinates.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  a.id AS p1,\n  b.id AS p2,\n  ABS(a.x_value - b.x_value) * ABS(a.y_value - b.y_value) AS area\nFROM Points AS a\nJOIN Points AS b\n  ON a.id < b.id\nWHERE a.x_value <> b.x_value\n  AND a.y_value <> b.y_value\nORDER BY area DESC, p1, p2;",
+  "brute": "SELECT pairs.p1, pairs.p2, pairs.area\nFROM (\n  SELECT\n    first.id AS p1,\n    second.id AS p2,\n    (GREATEST(first.x_value, second.x_value) - LEAST(first.x_value, second.x_value))\n      * (GREATEST(first.y_value, second.y_value) - LEAST(first.y_value, second.y_value)) AS area\n  FROM Points AS first\n  CROSS JOIN Points AS second\n  WHERE first.id < second.id\n) AS pairs\nWHERE pairs.area > 0\nORDER BY pairs.area DESC, pairs.p1 ASC, pairs.p2 ASC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 110;\n  const coords = small ? [-1, 0, 2, 4, 5, 7] : null;\n  const pick = () => (coords ? coords[Math.floor(rand() * coords.length)] : Math.floor(rand() * 41) - 10);\n  const ids = [];\n  for (let i = 1; i <= count; i++) ids.push(i * 3 - 1);\n  // Shuffle so ids are stored out of order.\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Points = ids.map((id) => [id, pick(), pick()]);\n  return [{ Points }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Points":[[1,2,7],[2,4,8],[3,2,10]]}],"expected":{"columns":["p1","p2","area"],"rows":[[2,3,4],[1,2,2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Points":[]}]},
+    {"name":"Test 2","input":[{"Points":[[1,3,3]]}]},
+    {"name":"Test 3","input":[{"Points":[[1,2,5],[2,2,9],[3,6,5]]}]},
+    {"name":"Test 4","input":[{"Points":[[8,1,1],[3,4,6]]}]},
+    {"name":"Test 5","input":[{"Points":[[1,0,0],[2,1,2],[3,2,1],[4,2,2]]}]},
+    {"name":"Test 6","input":[{"Points":[[5,3,3],[2,3,3],[9,0,0]]}]},
+    {"name":"Test 7","input":[{"Points":[[1,-3,-2],[2,4,5],[3,-3,5],[4,4,-2]]}]},
+    {"name":"Test 8","input":[{"Points":[[4,0,0],[1,2,3],[3,3,2],[2,6,1]]}]},
+    {"name":"Test 9","input":[{"Points":[[1,2,7],[2,4,8],[3,2,10],[4,5,5],[5,1,1],[6,4,10]]}]},
+    {"name":"Test 10","input":[{"Points":[[10,0,0],[20,10,10],[30,0,10],[40,10,0],[50,5,5]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA rectangle needs two points, so the query must look at **pairs** of rows of the same table: a self-join. Joining `Points` to itself on `a.id < b.id` produces each unordered pair exactly once, already with the smaller id first, which is how the output wants it. The rectangle's width and height are the absolute coordinate differences; when either is 0 the points share a vertical or horizontal line and the area is 0, so such pairs are filtered out.\n\n## Approach\n\n1. Self-join `Points` as `a` and `b` with `ON a.id < b.id`: every pair once, `a` holding the smaller id.\n2. `WHERE a.x_value <> b.x_value AND a.y_value <> b.y_value` drops pairs that give a flat (zero-area) rectangle.\n3. Select `a.id AS p1`, `b.id AS p2` and `ABS(a.x_value - b.x_value) * ABS(a.y_value - b.y_value) AS area`.\n4. `ORDER BY area DESC, p1, p2`.\n\n## Example 1, step by step\n\nThe join on `a.id < b.id` yields three pairs:\n\n| p1 | p2 | width | height | kept? |\n| --- | --- | --- | --- | --- |\n| 1 (2, 7) | 2 (4, 8) | 2 | 1 | yes, area 2 |\n| 1 (2, 7) | 3 (2, 10) | 0 | 3 | no, same x |\n| 2 (4, 8) | 3 (2, 10) | 2 | 2 | yes, area 4 |\n\nSorting by area descending gives `(2, 3, 4)` then `(1, 2, 2)`.\n\n## Complexity\n\n- Time: O(N²) for N points, since every pair is examined, plus sorting the pairs.\n- Space: O(N²) in the worst case for the result.\n\n## Pitfalls\n\n- Joining on `a.id <> b.id` reports every rectangle twice, once in each order.\n- Without `ABS`, a pair whose second point lies left of or below the first gets a negative or wrongly signed area.\n- Excluding only shared `x_value`s (or only shared `y_value`s) leaves zero-area rows in the result.\n- The order has three keys; ties on area must fall back to `p1` and then `p2`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a` | the corner with the smaller id |\n| `b` | the corner with the larger id |\n| `p1` / `p2` | the two ids, `p1 < p2` |\n| `area` | width times height of the pair's rectangle |",
+  "narration": {
+    "2": "The first corner, which the join makes the smaller id, becomes p1.",
+    "4": "Width times height, each taken as an absolute difference so the order of the points does not matter.",
+    "5": "Read the table once as the first corner of every pair.",
+    "6": "Join the table to itself to form pairs of points.",
+    "7": "Requiring a.id < b.id lists each pair once and puts the smaller id first.",
+    "8": "Points with the same x would make a rectangle of width 0.",
+    "9": "Points with the same y would make a rectangle of height 0.",
+    "10": "Largest area first; ties fall back to p1 and then p2."
+  }
+}

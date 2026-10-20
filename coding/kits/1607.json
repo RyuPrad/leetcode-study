@@ -1,0 +1,56 @@
+{
+  "number": 1607,
+  "title": "Sellers With No Sales",
+  "spec": "recalled",
+  "statement": "A web store keeps three tables:\n\n- `Customer(customer_id, customer_name)`: one row per customer; `customer_id` is unique.\n- `Orders(order_id, sale_date, order_cost, customer_id, seller_id)`: one row per order; `order_id` is unique. The order was sold by seller `seller_id` to customer `customer_id` on `sale_date`.\n- `Seller(seller_id, seller_name)`: one row per seller; `seller_id` is unique.\n\nFind every seller who made **no** sale at all during the year 2020 (from 2020-01-01 through 2020-12-31). A seller with no orders at all counts, and so does one whose orders all fall in other years. Return one column, `seller_name`, with one row per such seller, ordered by `seller_name` ascending.",
+  "constraints": [
+    "customer_id is unique in Customer",
+    "order_id is unique in Orders",
+    "seller_id is unique in Seller",
+    "Every Orders.customer_id exists in Customer and every Orders.seller_id exists in Seller",
+    "order_cost > 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customer": [["customer_id","INT"],["customer_name","VARCHAR(20)"]],
+    "Orders": [["order_id","INT"],["sale_date","DATE"],["order_cost","INT"],["customer_id","INT"],["seller_id","INT"]],
+    "Seller": [["seller_id","INT"],["seller_name","VARCHAR(20)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Customer = [], Orders = [], Seller = [] }] = input;\n  const customers = new Set(), sellers = new Set(), orders = new Set();\n  for (const [id, name] of Customer) {\n    if (id === null || name === null) return 'Customer rows may not contain null.';\n    if (customers.has(id)) return `customer_id ${id} appears twice in Customer.`;\n    customers.add(id);\n  }\n  for (const [id, name] of Seller) {\n    if (id === null || name === null) return 'Seller rows may not contain null.';\n    if (sellers.has(id)) return `seller_id ${id} appears twice in Seller.`;\n    sellers.add(id);\n  }\n  for (const row of Orders) {\n    if (row.some((v) => v === null)) return 'Orders rows may not contain null.';\n    const [id, date, cost, customer, seller] = row;\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return 'Dates must look like 2020-01-31.';\n    if (cost <= 0) return 'order_cost must be positive.';\n    if (!customers.has(customer)) return `Order ${id} names unknown customer ${customer}.`;\n    if (!sellers.has(seller)) return `Order ${id} names unknown seller ${seller}.`;\n    orders.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH sellers_2020 AS (\n  SELECT DISTINCT o.seller_id\n  FROM Orders AS o\n  WHERE YEAR(o.sale_date) = 2020\n)\nSELECT s.seller_name\nFROM Seller AS s\nWHERE s.seller_id NOT IN (SELECT seller_id FROM sellers_2020)\nORDER BY s.seller_name;",
+  "brute": "SELECT s.seller_name\nFROM Seller AS s\nLEFT JOIN Orders AS o\n  ON o.seller_id = s.seller_id\n  AND o.sale_date >= '2020-01-01'\n  AND o.sale_date < '2021-01-01'\nGROUP BY s.seller_id, s.seller_name\nHAVING COUNT(o.order_id) = 0\nORDER BY s.seller_name",
+  "generator": "function generate(rand, size) {\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const names = ['Daniel', 'Elizabeth', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];\n  const dates = ['2019-02-11', '2019-12-31', '2020-01-01', '2020-03-01', '2020-06-15', '2020-12-31', '2021-01-01', '2021-07-04'];\n  const small = size === 'small';\n  const sellerCount = small ? Math.floor(rand() * 7) : 800;\n  const customerCount = small ? 1 + Math.floor(rand() * 4) : 500;\n  const orderCount = small && sellerCount > 0 ? Math.floor(rand() * 9) : small ? 0 : 2000;\n  const Seller = [], Customer = [], Orders = [];\n  for (let id = 1; id <= sellerCount; id++) Seller.push([id, small ? pick(names) : `${pick(names)}${id}`]);\n  for (let id = 1; id <= customerCount; id++) Customer.push([100 + id, pick(['Alice', 'Bob', 'Charlie', 'Dana'])]);\n  for (let id = 1; id <= orderCount; id++) {\n    const date = small ? pick(dates) : `${2019 + Math.floor(rand() * 3)}-${String(1 + Math.floor(rand() * 12)).padStart(2, '0')}-${String(1 + Math.floor(rand() * 28)).padStart(2, '0')}`;\n    // Large tables give most orders to a few sellers so many sellers have none in 2020.\n    const seller = small ? 1 + Math.floor(rand() * sellerCount) : 1 + Math.floor(rand() * rand() * sellerCount);\n    Orders.push([id, date, 100 + Math.floor(rand() * 2000), 101 + Math.floor(rand() * customerCount), seller]);\n  }\n  return [{ Customer, Orders, Seller }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customer":[[101,"Alice"],[102,"Bob"],[103,"Charlie"]],"Orders":[[1,"2020-03-01",1500,101,1],[2,"2020-05-25",2400,102,2],[3,"2019-05-25",800,101,3],[4,"2020-09-13",1000,103,2],[5,"2019-02-11",700,101,2]],"Seller":[[1,"Daniel"],[2,"Elizabeth"],[3,"Frank"]]}],"expected":{"columns":["seller_name"],"rows":[["Frank"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customer":[[101,"Alice"]],"Orders":[],"Seller":[[2,"Grace"],[1,"Daniel"],[3,"Frank"]]}]},
+    {"name":"Test 2","input":[{"Customer":[[101,"Alice"]],"Orders":[],"Seller":[]}]},
+    {"name":"Test 3","input":[{"Customer":[[101,"Alice"],[102,"Bob"]],"Orders":[[1,"2020-02-02",300,101,1],[2,"2020-11-30",450,102,2],[3,"2020-07-07",120,101,2]],"Seller":[[1,"Daniel"],[2,"Elizabeth"]]}]},
+    {"name":"Test 4","input":[{"Customer":[[101,"Alice"]],"Orders":[[1,"2020-01-01",100,101,1],[2,"2020-12-31",100,101,2],[3,"2019-12-31",100,101,3],[4,"2021-01-01",100,101,4]],"Seller":[[1,"Daniel"],[2,"Elizabeth"],[3,"Frank"],[4,"Grace"]]}]},
+    {"name":"Test 5","input":[{"Customer":[[101,"Alice"]],"Orders":[[1,"2019-04-04",500,101,1],[2,"2020-04-04",500,101,1],[3,"2021-04-04",500,101,1],[4,"2021-05-05",200,101,2]],"Seller":[[1,"Henry"],[2,"Ivy"]]}]},
+    {"name":"Test 6","input":[{"Customer":[[101,"Alice"]],"Orders":[[1,"2019-08-08",90,101,5]],"Seller":[[1,"Jack"],[2,"Ivy"],[3,"Henry"],[4,"Grace"],[5,"Frank"]]}]},
+    {"name":"Test 7","input":[{"Customer":[[101,"Alice"],[102,"Bob"]],"Orders":[[1,"2021-03-03",700,102,2],[2,"2020-05-05",800,101,3]],"Seller":[[1,"Daniel"],[2,"Elizabeth"],[3,"Frank"]]}]},
+    {"name":"Test 8","input":[{"Customer":[[101,"Alice"]],"Orders":[[1,"2020-06-01",250,101,1],[2,"2019-06-01",250,101,2]],"Seller":[[1,"Ana"],[2,"Ana"],[3,"Bea"]]}]},
+    {"name":"Test 9","input":[{"Customer":[[101,"Alice"]],"Orders":[[1,"2020-10-10",999,101,7]],"Seller":[[7,"Daniel"]]}]},
+    {"name":"Test 10","input":[{"Customer":[[101,"Alice"],[102,"Bob"],[103,"Charlie"]],"Orders":[[1,"2020-03-01",1500,101,1],[2,"2019-12-31",2400,102,2],[3,"2021-01-01",800,103,3],[4,"2020-12-31",1000,103,4],[5,"2019-02-11",700,101,5]],"Seller":[[1,"Daniel"],[2,"Elizabeth"],[3,"Frank"],[4,"Grace"],[5,"Henry"],[6,"Ivy"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIt is hard to look for something that is missing, so turn the question around: first collect the sellers who **did** sell in 2020, then keep every seller who is not in that set. Sellers with no orders at all and sellers whose orders fall in 2019 or 2021 both end up outside the set, which is exactly what the problem wants.\n\n## Approach\n\n1. CTE `sellers_2020`: from `Orders`, keep orders whose `YEAR(sale_date)` is 2020 and take the distinct `seller_id` values.\n2. Read every row of `Seller` (alias `s`) and keep those whose `seller_id` is `NOT IN` `sellers_2020`.\n3. Return `seller_name` ordered alphabetically.\n\n## Example 1, step by step\n\n- Orders in 2020: order 1 (2020-03-01, seller 1), order 2 (2020-05-25, seller 2) and order 4 (2020-09-13, seller 2). Orders 3 and 5 are from 2019 and drop out.\n- `sellers_2020` is therefore `{1, 2}`.\n- Daniel (1) and Elizabeth (2) are in the set; Frank (3) only sold in 2019, so he is the one row of the result: `Frank`.\n\n## Complexity\n\n- Time: O(O) to scan the orders once, plus O(S log S) to check S sellers against the set and sort them by name.\n- Space: O(S) for the set of 2020 sellers and the result.\n\n## Pitfalls\n\n- An inner join of `Seller` with `Orders` loses sellers that have no orders at all, yet they must be reported.\n- Filtering `WHERE YEAR(sale_date) <> 2020` reports a seller who sold in both 2019 and 2020; the test must be \"no 2020 sale\", not \"some non-2020 sale\".\n- `NOT IN` returns no rows when the subquery yields a `NULL`; it is safe here only because every order names a seller. `NOT EXISTS` avoids the trap.\n- Year boundaries: a sale on 2020-12-31 counts as 2020, one on 2021-01-01 does not.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `sellers_2020` | distinct ids of sellers with at least one order dated in 2020 |\n| `o` | `Orders`, scanned for 2020 sales |\n| `s` | `Seller`, every candidate seller |\n| `NOT IN (...)` | keeps sellers missing from `sellers_2020` |",
+  "narration": {
+    "1": "The CTE sellers_2020 will hold every seller who sold something in 2020.",
+    "2": "DISTINCT keeps one row per seller even when they made several 2020 sales.",
+    "4": "YEAR(sale_date) = 2020 keeps only orders dated from 2020-01-01 to 2020-12-31.",
+    "7": "Every seller is a candidate, including those with no orders at all.",
+    "8": "NOT IN drops each seller who appears in sellers_2020, leaving those with no 2020 sale.",
+    "9": "The problem asks for the names in alphabetical order."
+  }
+}

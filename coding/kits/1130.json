@@ -1,0 +1,60 @@
+{
+  "number": 1130,
+  "title": "Minimum Cost Tree From Leaf Values",
+  "spec": "leetcode",
+  "statement": "You are given `arr`, a list of positive integers. Look at every binary tree that meets these rules:\n\n- each node has either no children (a leaf) or exactly two children;\n- reading the leaves from left to right (in-order) gives exactly the values of `arr`, in the same order;\n- every non-leaf node holds the product of two numbers: the biggest leaf value in its left subtree and the biggest leaf value in its right subtree.\n\nOver all such trees, return the minimum possible sum of the values held by the non-leaf nodes. That minimum is guaranteed to fit in a 32-bit signed integer.",
+  "constraints": [
+    "2 <= arr.length <= 40",
+    "1 <= arr[i] <= 15",
+    "The answer is less than 2^31"
+  ],
+  "signature": "int mctFromLeafValues(int[] arr)",
+  "entry": "mctFromLeafValues",
+  "kind": "function",
+  "parameters": [
+    "arr"
+  ],
+  "validator": "function validate([arr]) {\n  if (!Array.isArray(arr) || arr.length < 2 || arr.length > 40) return 'arr needs 2 to 40 values.';\n  if (arr.some(v => !Number.isInteger(v) || v < 1 || v > 15)) return 'Each value is a whole number from 1 to 15.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function mctFromLeafValues(arr) {\n  const n = arr.length;\n  const maxLeaf = Array.from({ length: n }, () => new Array(n).fill(0));\n  const dp = Array.from({ length: n }, () => new Array(n).fill(0));\n\n  for (let i = 0; i < n; i++) {\n    maxLeaf[i][i] = arr[i];\n    for (let j = i + 1; j < n; j++) {\n      maxLeaf[i][j] = Math.max(maxLeaf[i][j - 1], arr[j]);\n    }\n  }\n\n  for (let len = 2; len <= n; len++) {\n    for (let i = 0; i + len - 1 < n; i++) {\n      const j = i + len - 1;\n      dp[i][j] = Infinity;\n      for (let mid = i; mid < j; mid++) {\n        const root = maxLeaf[i][mid] * maxLeaf[mid + 1][j];\n        dp[i][j] = Math.min(dp[i][j], dp[i][mid] + dp[mid + 1][j] + root);\n      }\n    }\n  }\n  return dp[0][n - 1];\n}",
+  "brute": "function mctFromLeafValues(arr) {\n  // Build the tree bottom-up by repeatedly joining two neighbouring subtrees, trying every order.\n  // Each subtree is represented by its largest leaf; joining a and b costs a * b.\n  const memo = new Map();\n  const best = (list) => {\n    if (list.length === 1) return 0;\n    const key = list.join(',');\n    if (memo.has(key)) return memo.get(key);\n    let result = Number.MAX_SAFE_INTEGER;\n    for (let p = 0; p + 1 < list.length; p++) {\n      const joined = [...list.slice(0, p), Math.max(list[p], list[p + 1]), ...list.slice(p + 2)];\n      result = Math.min(result, list[p] * list[p + 1] + best(joined));\n    }\n    memo.set(key, result);\n    return result;\n  };\n  return best(arr);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const n = size === 'large' ? 30 + pick(11) : 2 + pick(7);\n  const top = rand() < 0.3 ? 1 + pick(4) : 15;\n  return [Array.from({ length: n }, () => 1 + pick(top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[6,2,4]],"expected":32},
+    {"name":"Example 2","input":[[4,11]],"expected":44}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,1]]},
+    {"name":"Test 2","input":[[15,15]]},
+    {"name":"Test 3","input":[[1,2,3,4,5]]},
+    {"name":"Test 4","input":[[5,4,3,2,1]]},
+    {"name":"Test 5","input":[[3,3,3,3]]},
+    {"name":"Test 6","input":[[15,1,15]]},
+    {"name":"Test 7","input":[[1,15,1,15,1]]},
+    {"name":"Test 8","input":[[6,2,4,1,5,3]]},
+    {"name":"Test 9","input":[[7,12,8,10]]},
+    {"name":"Test 10","input":[[2,9,1,14,3,11,6,6,13,4,8,1]]},
+    {"name":"Test 11","input":[[15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAny valid tree splits the leaves at its root into a left part `arr[i..mid]` and a right part `arr[mid+1..j]`. The root then costs (largest leaf on the left) × (largest leaf on the right), and the two subtrees are independent smaller versions of the same problem. Trying every tree directly is exponential (Catalan many), but the best cost of each contiguous range `arr[i..j]` only depends on `i` and `j`, so interval dynamic programming computes each range once.\n\n## Approach\n\n1. Precompute `maxLeaf[i][j]`, the largest value in `arr[i..j]`, by extending each start `i` to the right.\n2. Let `dp[i][j]` be the smallest non-leaf sum for the leaves `arr[i..j]`; a single leaf costs `0`.\n3. Fill ranges in order of length `len = 2, 3, ..., n` so shorter ranges are ready when needed.\n4. For range `[i, j]`, try every split point `mid`: the cost is `dp[i][mid] + dp[mid + 1][j]` plus the root value `maxLeaf[i][mid] * maxLeaf[mid + 1][j]`. Keep the minimum.\n5. Return `dp[0][n - 1]`.\n\n## Example 1, step by step\n\n`arr = [6, 2, 4]`. Length 2: `dp[0][1] = 6 * 2 = 12` and `dp[1][2] = 2 * 4 = 8`. Length 3, range `[0, 2]`: splitting at `mid = 0` gives `0 + 8 + 6 * 4 = 32`; splitting at `mid = 1` gives `12 + 0 + 6 * 4 = 36`. The minimum, `32`, is the answer.\n\n## Complexity\n\n- Time: O(n³): O(n²) ranges, each trying O(n) split points.\n- Space: O(n²) for the `dp` and `maxLeaf` tables.\n\n## Pitfalls\n\n- A root multiplies the largest **leaf** on each side, not the values of its two child nodes (those are products already).\n- Fill `dp` by increasing length; looping `i` and `j` in plain order reads ranges that are not computed yet.\n- Start each `dp[i][j]` (for `len >= 2`) at `Infinity` before taking the minimum, but leave single leaves at `0`.\n- A faster O(n) method exists (a decreasing monotonic stack that pairs each small leaf with its smaller neighbour), but the interval DP is the one that follows directly from the definition.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of leaves |\n| `maxLeaf[i][j]` | largest value among `arr[i..j]` |\n| `dp[i][j]` | smallest non-leaf sum for a tree over `arr[i..j]` |\n| `len` | length of the range being filled |\n| `i`, `j` | first and last leaf of the range |\n| `mid` | last leaf that goes into the left subtree |\n| `root` | value of the range's root for this split |",
+  "narration": {
+    "3": "maxLeaf[i][j] will hold the largest leaf among arr[i..j].",
+    "4": "dp[i][j] will hold the cheapest non-leaf sum for the leaves arr[i..j]; a single leaf costs 0.",
+    "6": "Compute range maximums starting from each index i.",
+    "9": "Extending the range by one leaf: its maximum is the old maximum or the new leaf.",
+    "13": "Solve ranges from short to long so every smaller range is already known.",
+    "15": "j is the last leaf of the range that starts at i.",
+    "16": "Start the range's best cost at Infinity so any real split beats it.",
+    "17": "Try each split point: leaves i..mid go left, mid+1..j go right.",
+    "18": "The root of this split is the product of the largest leaf on each side.",
+    "19": "Cost of this tree: both subtrees' best costs plus the root; keep the smaller.",
+    "23": "The whole array is the range 0..n-1; its best cost is the answer."
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "number": 1393,
+  "title": "Capital Gain/Loss",
+  "spec": "leetcode",
+  "statement": "One table logs stock trades:\n\n- `Stocks(stock_name, operation, operation_day, price)`: on day `operation_day` the stock `stock_name` was bought or sold at `price`. `operation` is `'Buy'` or `'Sell'`, and `(stock_name, operation_day)` is unique.\n- For each stock, taken in order of `operation_day`, the trades alternate: a `'Buy'` first, then a `'Sell'`, then a `'Buy'`, and so on, ending with a `'Sell'`. Every buy is therefore closed by a later sell.\n\nThe capital gain or loss of a stock is the total over all of its buy-then-sell rounds of (sell price minus buy price); it is negative when the stock lost money overall.\n\nReport one row per stock with the columns `stock_name` and `capital_gain_loss`. Rows may come in any order.",
+  "constraints": [
+    "(stock_name, operation_day) is unique in Stocks",
+    "operation is 'Buy' or 'Sell'",
+    "Per stock, trades ordered by day alternate Buy, Sell, Buy, Sell, ... and end with a Sell",
+    "price >= 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Stocks": [["stock_name","VARCHAR(15)"],["operation","ENUM('Sell', 'Buy')"],["operation_day","INT"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Stocks = [] }] = input;\n  const byStock = new Map();\n  for (const [name, operation, day, price] of Stocks) {\n    if (name === null || day === null) return 'Every trade needs a stock_name and an operation_day.';\n    if (operation !== 'Buy' && operation !== 'Sell') return `Unknown operation ${operation}.`;\n    if (price === null || price < 0) return `Trade of ${name} on day ${day} needs a non-negative price.`;\n    const key = name.toLowerCase();\n    if (!byStock.has(key)) byStock.set(key, []);\n    byStock.get(key).push([day, operation]);\n  }\n  for (const [name, trades] of byStock) {\n    trades.sort((a, b) => a[0] - b[0]);\n    for (let i = 0; i < trades.length; i++) {\n      if (i > 0 && trades[i][0] === trades[i - 1][0]) return `${name} trades twice on day ${trades[i][0]}.`;\n      if (trades[i][1] !== (i % 2 === 0 ? 'Buy' : 'Sell')) return `${name} must alternate Buy and Sell, starting with Buy.`;\n    }\n    if (trades.length % 2 === 1) return `${name} ends with a Buy that is never sold.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT stock_name,\n       SUM(CASE WHEN operation = 'Buy' THEN -price ELSE price END) AS capital_gain_loss\nFROM Stocks\nGROUP BY stock_name;",
+  "brute": "SELECT sell.stock_name,\n       SUM(sell.price - (\n         SELECT buy.price\n         FROM Stocks AS buy\n         WHERE buy.stock_name = sell.stock_name\n           AND buy.operation = 'Buy'\n           AND buy.operation_day < sell.operation_day\n         ORDER BY buy.operation_day DESC\n         LIMIT 1\n       )) AS capital_gain_loss\nFROM Stocks AS sell\nWHERE sell.operation = 'Sell'\nGROUP BY sell.stock_name",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const int = n => Math.floor(rand() * n);\n  const names = small ? ['Leetcode', 'Corona Masks', 'Handbags', 'Tesla'] : Array.from({ length: 100 }, (_, k) => `Stock${k}`);\n  const prices = [10, 500, 1000, 1010, 7000, 9000, 30000];\n  const Stocks = [];\n  const stockCount = small ? int(names.length + 1) : names.length;\n  for (const name of names.slice(0, stockCount)) {\n    // Small sets stay within 8 rows.\n    const rounds = small ? Math.min(1 + int(2), (8 - Stocks.length) / 2) : 10;\n    let day = 1 + int(3);\n    for (let r = 0; r < rounds; r++) {\n      Stocks.push([name, 'Buy', day, small ? prices[int(prices.length)] : 1 + int(50000)]);\n      day += 1 + int(small ? 3 : 20);\n      Stocks.push([name, 'Sell', day, small ? prices[int(prices.length)] : 1 + int(50000)]);\n      day += 1 + int(small ? 3 : 20);\n    }\n  }\n  for (let i = Stocks.length - 1; i > 0; i--) { const j = int(i + 1); [Stocks[i], Stocks[j]] = [Stocks[j], Stocks[i]]; }\n  return [{ Stocks }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Stocks":[["Leetcode","Buy",1,1000],["Corona Masks","Buy",2,10],["Leetcode","Sell",5,9000],["Handbags","Buy",17,30000],["Corona Masks","Sell",3,1010],["Corona Masks","Buy",4,1000],["Corona Masks","Sell",5,500],["Corona Masks","Buy",6,1000],["Handbags","Sell",29,7000],["Corona Masks","Sell",10,10000]]}],"expected":{"columns":["stock_name","capital_gain_loss"],"rows":[["Corona Masks",9500],["Leetcode",8000],["Handbags",-23000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Stocks":[]}]},
+    {"name":"Test 2","input":[{"Stocks":[["Tesla","Buy",1,100],["Tesla","Sell",2,250]]}]},
+    {"name":"Test 3","input":[{"Stocks":[["Tesla","Sell",9,40],["Tesla","Buy",3,100]]}]},
+    {"name":"Test 4","input":[{"Stocks":[["Handbags","Buy",1,500],["Handbags","Sell",2,500]]}]},
+    {"name":"Test 5","input":[{"Stocks":[["Leetcode","Buy",1,100],["Leetcode","Sell",2,300],["Leetcode","Buy",3,900],["Leetcode","Sell",4,700]]}]},
+    {"name":"Test 6","input":[{"Stocks":[["Leetcode","Buy",1,10],["Leetcode","Sell",2,5000],["Leetcode","Buy",3,20],["Leetcode","Sell",4,30],["Leetcode","Buy",5,4000],["Leetcode","Sell",6,4100]]}]},
+    {"name":"Test 7","input":[{"Stocks":[["Apple","Buy",1,10],["Pear","Buy",1,20],["Apple","Sell",2,15],["Pear","Sell",2,15],["Fig","Buy",7,0],["Fig","Sell",8,0]]}]},
+    {"name":"Test 8","input":[{"Stocks":[["Corona Masks","Sell",10,10000],["Corona Masks","Buy",6,1000],["Corona Masks","Sell",5,500],["Corona Masks","Buy",4,1000],["Corona Masks","Sell",3,1010],["Corona Masks","Buy",2,10]]}]},
+    {"name":"Test 9","input":[{"Stocks":[["Leetcode","Buy",2,300],["Leetcode","Sell",3,100],["Leetcode","Buy",8,50],["Leetcode","Sell",20,250],["Handbags","Buy",5,30000],["Handbags","Sell",6,7000]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe gain of one round is `sell - buy`, and the total is the sum over rounds. Since a sum can be rearranged freely, that equals (all sell prices) minus (all buy prices) of the stock. There is no need to pair each sell with its buy: give buy prices a minus sign, keep sell prices as they are, and add everything up per stock with one **aggregation**.\n\n## Approach\n\n1. Read `Stocks` once.\n2. Turn each row into a signed amount with `CASE`: `-price` for a `'Buy'`, `price` for a `'Sell'`.\n3. `GROUP BY stock_name` and `SUM` the signed amounts into `capital_gain_loss`.\n\n## Example 1, step by step\n\n- Leetcode: `-1000 + 9000 = 8000`.\n- Handbags: `-30000 + 7000 = -23000`.\n- Corona Masks: buys `-10 - 1000 - 1000 = -2010`, sells `1010 + 500 + 10000 = 11510`, total `9500`, the same as adding the three rounds `1000 - 500 + 9000`.\n\n## Complexity\n\n- Time: O(N) for N rows with hash aggregation (O(N log N) if the database sorts to group).\n- Space: O(S) for S distinct stocks.\n\n## Pitfalls\n\n- `SUM(price)` without a sign, or the sign reversed, reports turnover or the negated result instead of the gain.\n- `MAX(price) - MIN(price)`, or last sell minus first buy, ignores the rounds in between; it already fails on Corona Masks.\n- Grouping by `stock_name, operation` splits each stock into two rows; group by the stock alone.\n- Pairing each sell with \"a\" buy through a plain self-join on `stock_name` matches every buy with every sell and multiplies the amounts.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `CASE WHEN operation = 'Buy' ...` | the signed cash flow of one trade: money out is negative |\n| `SUM(...) AS capital_gain_loss` | the net result of all rounds of the stock |\n| `GROUP BY stock_name` | one output row per stock |",
+  "narration": {
+    "1": "Each output row names a stock.",
+    "2": "Buys count as money spent and sells as money received, so summing the signed prices gives the net gain or loss.",
+    "3": "Every trade is read once; no pairing of buys with sells is needed.",
+    "4": "Grouping by stock adds up all of its rounds into a single row."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "number": 1495,
+  "title": "Friendly Movies Streamed Last Month",
+  "spec": "recalled",
+  "statement": "A TV network keeps its schedule and its catalogue:\n\n- `TVProgram(program_date, content_id, channel)`: content `content_id` was broadcast on `channel` on `program_date`. `(program_date, content_id)` is unique, and every `content_id` exists in `Content`.\n- `Content(content_id, title, Kids_content, content_type)`: one row per piece of content; `content_id` is unique. `Kids_content` is `'Y'` when it is suitable for children and `'N'` otherwise; `content_type` is its kind, such as `'Movies'` or `'Series'`.\n\nReport the titles of kid-friendly movies (`Kids_content = 'Y'` and `content_type = 'Movies'`) that were broadcast at least once in **June 2020**. Output a single column `title` with each title listed once, even if it aired several times. Rows may come in any order.",
+  "constraints": [
+    "(program_date, content_id) is unique in TVProgram",
+    "content_id is unique in Content",
+    "Every TVProgram.content_id exists in Content",
+    "Kids_content is 'Y' or 'N'",
+    "program_date is a date YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "TVProgram": [["program_date","DATE"],["content_id","INT"],["channel","VARCHAR(30)"]],
+    "Content": [["content_id","VARCHAR(30)"],["title","VARCHAR(30)"],["Kids_content","ENUM('Y', 'N')"],["content_type","VARCHAR(30)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ TVProgram = [], Content = [] }] = input;\n  const contents = new Set(), slots = new Set();\n  for (const [id, title, kids, type] of Content) {\n    if (id === null || title === null || kids === null || type === null) return 'Content values cannot be null.';\n    if (contents.has(String(Number(id)))) return `content_id ${id} appears twice in Content.`;\n    if (!/^\\d+$/.test(id)) return `content_id ${id} must be a whole number.`;\n    contents.add(String(Number(id)));\n    if (kids !== 'Y' && kids !== 'N') return `Kids_content must be Y or N, not ${kids}.`;\n  }\n  for (const [date, id, channel] of TVProgram) {\n    if (date === null || id === null || channel === null) return 'TVProgram values cannot be null.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `program_date ${date} is not YYYY-MM-DD.`;\n    const key = `${date}|${id}`;\n    if (slots.has(key)) return `(program_date, content_id) (${date}, ${id}) appears twice.`;\n    slots.add(key);\n    if (!contents.has(String(id))) return `content_id ${id} is not in Content.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT DISTINCT c.title\nFROM TVProgram AS p\nJOIN Content AS c\n  ON c.content_id = p.content_id\nWHERE c.Kids_content = 'Y'\n  AND c.content_type = 'Movies'\n  AND p.program_date >= '2020-06-01'\n  AND p.program_date < '2020-07-01';",
+  "brute": "SELECT title\nFROM Content\nWHERE Kids_content = 'Y'\n  AND content_type = 'Movies'\n  AND EXISTS (\n    SELECT 1 FROM TVProgram\n    WHERE TVProgram.content_id = Content.content_id\n      AND YEAR(TVProgram.program_date) = 2020 AND MONTH(TVProgram.program_date) = 6\n  )\nGROUP BY title",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const titles = ['Aladdin', 'Cinderella', 'Frozen', 'Moana', 'Leetcode Movie', 'Database Sols', 'Alg. for Kids', 'Up'];\n  const types = ['Movies', 'Movies', 'Series', 'Documentary'];\n  const channels = ['LC-Channel', 'Disney Ch', 'Kids TV'];\n  const contentCount = small ? pick(7) : 500;\n  const Content = [], TVProgram = [];\n  for (let id = 1; id <= contentCount; id++) {\n    const title = small ? titles[pick(titles.length)] : `${titles[pick(titles.length)]} ${1 + pick(150)}`;\n    Content.push([String(id), title, rand() < 0.6 ? 'Y' : 'N', types[pick(types.length)]]);\n  }\n  const day = k => new Date(Date.UTC(2019, 0, 1) + k * 86400000).toISOString().slice(0, 10);\n  const smallDates = ['2020-05-31', '2020-06-01', '2020-06-15', '2020-06-15', '2020-06-30', '2020-07-01', '2019-06-10', '2021-06-10'];\n  const slots = new Set(), target = contentCount === 0 ? 0 : small ? pick(9) : 2000;\n  for (let tries = 0; TVProgram.length < target && tries < target * 4; tries++) {\n    const date = small ? smallDates[pick(smallDates.length)] : rand() < 0.4 ? day(517 + pick(30)) : day(pick(1095));\n    const id = 1 + pick(contentCount), key = `${date}|${id}`;\n    if (slots.has(key)) continue;\n    slots.add(key);\n    TVProgram.push([date, id, channels[pick(channels.length)]]);\n  }\n  return [{ TVProgram, Content }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"TVProgram":[["2020-06-10",1,"LC-Channel"],["2020-05-11",2,"LC-Channel"],["2020-05-12",3,"LC-Channel"],["2020-05-13",4,"Disney Ch"],["2020-06-18",4,"Disney Ch"],["2020-07-15",5,"Disney Ch"]],"Content":[["1","Leetcode Movie","N","Movies"],["2","Alg. for Kids","Y","Series"],["3","Database Sols","N","Series"],["4","Aladdin","Y","Movies"],["5","Cinderella","Y","Movies"]]}],"expected":{"columns":["title"],"rows":[["Aladdin"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"TVProgram":[],"Content":[]}]},
+    {"name":"Test 2","input":[{"TVProgram":[["2020-05-20",1,"Disney Ch"],["2020-07-02",1,"Disney Ch"]],"Content":[["1","Moana","Y","Movies"]]}]},
+    {"name":"Test 3","input":[{"TVProgram":[["2020-06-05",1,"Disney Ch"],["2020-06-12",1,"Kids TV"],["2020-06-19",1,"Disney Ch"]],"Content":[["1","Frozen","Y","Movies"]]}]},
+    {"name":"Test 4","input":[{"TVProgram":[["2020-06-01",1,"Kids TV"],["2020-06-30",2,"Kids TV"],["2020-05-31",3,"Kids TV"],["2020-07-01",4,"Kids TV"]],"Content":[["1","Up","Y","Movies"],["2","Moana","Y","Movies"],["3","Frozen","Y","Movies"],["4","Cinderella","Y","Movies"]]}]},
+    {"name":"Test 5","input":[{"TVProgram":[["2019-06-15",1,"Disney Ch"],["2021-06-15",2,"Disney Ch"],["2020-06-15",3,"Disney Ch"]],"Content":[["1","Up","Y","Movies"],["2","Moana","Y","Movies"],["3","Frozen","N","Movies"]]}]},
+    {"name":"Test 6","input":[{"TVProgram":[["2020-06-10",1,"LC-Channel"],["2020-06-11",2,"LC-Channel"],["2020-06-12",3,"LC-Channel"]],"Content":[["1","Alg. for Kids","Y","Series"],["2","Leetcode Movie","N","Movies"],["3","Aladdin","Y","Movies"]]}]},
+    {"name":"Test 7","input":[{"TVProgram":[["2020-06-08",1,"Disney Ch"],["2020-06-09",2,"Kids TV"]],"Content":[["1","Cinderella","Y","Movies"],["2","Cinderella","Y","Movies"],["3","Up","Y","Movies"]]}]},
+    {"name":"Test 8","input":[{"TVProgram":[["2020-06-02",1,"Disney Ch"],["2020-06-02",2,"Disney Ch"],["2020-06-20",3,"Kids TV"],["2020-06-21",4,"Kids TV"],["2020-06-22",5,"Kids TV"]],"Content":[["1","Aladdin","Y","Movies"],["2","Cinderella","Y","Movies"],["3","Frozen","Y","Movies"],["4","Moana","Y","Documentary"],["5","Up","Y","Movies"]]}]},
+    {"name":"Test 9","input":[{"TVProgram":[["2020-06-14",2,"LC-Channel"]],"Content":[["1","Aladdin","Y","Movies"],["2","Database Sols","N","Series"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe broadcast dates live in `TVProgram` while the kid-friendly flag, the type and the title live in `Content`, so the two tables must be joined on `content_id`. After the join every row is one broadcast with its content details, and three filters keep the right ones: children's content, movies, and a June 2020 date. A movie that aired several times in June yields several rows, so the titles are deduplicated.\n\n## Approach\n\n1. Read `TVProgram` (alias `p`), one row per broadcast.\n2. Inner join `Content` (alias `c`) on `content_id` to attach title, flag and type.\n3. Keep rows with `Kids_content = 'Y'` and `content_type = 'Movies'`.\n4. Keep dates in the half-open range `['2020-06-01', '2020-07-01')`, which covers every day of June.\n5. `SELECT DISTINCT c.title` lists each qualifying title once.\n\n## Example 1, step by step\n\n- The join gives six broadcasts: Leetcode Movie (06-10), Alg. for Kids (05-11), Database Sols (05-12), Aladdin (05-13 and 06-18) and Cinderella (07-15).\n- Leetcode Movie aired in June but is not for kids. Alg. for Kids is for kids but is a series. Database Sols fails both.\n- Aladdin's May broadcast is outside June; its June 18 broadcast passes every filter.\n- Cinderella is a kids movie but aired only in July.\n\nThe result is the single title Aladdin.\n\n## Complexity\n\n- Time: O(P + C) for P broadcasts and C content rows with a hash join or an index on `content_id`.\n- Space: O(T) for the distinct titles T.\n\n## Pitfalls\n\n- Forgetting `DISTINCT` repeats a movie once per June broadcast.\n- `BETWEEN '2020-06-01' AND '2020-06-30'` is fine for a `DATE` column but would miss June 30 broadcasts if the column held times; the half-open range (or `DATE_FORMAT(program_date, '%Y-%m') = '2020-06'`) avoids that.\n- Checking only the month (`MONTH(program_date) = 6`) also counts June of other years.\n- Kid-friendly series are not movies; both conditions on `Content` are needed.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `TVProgram`, one row per broadcast |\n| `c` | `Content`, the title, flag and type of what aired |\n| `JOIN ... ON` | pairs each broadcast with its content row |\n| `DISTINCT` | lists each title once however often it aired |",
+  "narration": {
+    "1": "Each qualifying title is listed once, however many times it aired.",
+    "3": "Joining Content brings in the title, the kids flag and the content type of every broadcast.",
+    "5": "Only content suitable for children passes.",
+    "6": "Series and other kinds are dropped; only movies remain.",
+    "7": "The date range starts on June 1, 2020 and stops before July 1, covering all of June."
+  }
+}

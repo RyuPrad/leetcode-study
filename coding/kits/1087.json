@@ -1,0 +1,68 @@
+{
+  "number": 1087,
+  "title": "Brace Expansion",
+  "spec": "recalled",
+  "statement": "The string `s` describes a set of words one letter position at a time. A bare lowercase letter is a position with only that letter. A pair of curly braces holding letters separated by commas, such as `{a,b,c}`, is a single position whose letter can be any one of those options.\n\nBuild every word obtained by choosing one option at each position, from left to right, and return all of them sorted in lexicographical order.\n\n`s` is always well formed: braces are never nested, each pair of braces lists distinct letters, and commas appear only between letters inside braces.",
+  "constraints": [
+    "1 <= s.length <= 50",
+    "s contains only lowercase English letters, '{', '}' and ','",
+    "s is a valid pattern",
+    "Braces are never nested",
+    "The letters inside one pair of braces are all different"
+  ],
+  "signature": "String[] expand(String s)",
+  "entry": "expand",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 50) return 's has 1 to 50 characters.';\n  if (!/^[a-z{},]+$/.test(s)) return \"s contains only lowercase letters, '{', '}' and ','.\";\n  const tokens = s.match(/\\{[^{}]*\\}|[a-z]|./g);\n  for (const token of tokens) {\n    if (token.length === 1 && !/[a-z]/.test(token)) return 'Braces must be balanced and not nested; commas belong inside braces.';\n    if (token.length > 1) {\n      if (!/^\\{[a-z](,[a-z])*\\}$/.test(token)) return 'Inside braces, list single letters separated by commas.';\n      const options = token.slice(1, -1).split(',');\n      if (new Set(options).size !== options.length) return 'The letters inside one pair of braces must differ.';\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function expand(s) {\n  const groups = [];\n  let i = 0;\n  while (i < s.length) {\n    if (s[i] === '{') {\n      const close = s.indexOf('}', i);\n      groups.push(s.slice(i + 1, close).split(',').sort());\n      i = close + 1;\n    } else {\n      groups.push([s[i]]);\n      i++;\n    }\n  }\n\n  const words = [];\n  const path = [];\n  function backtrack(index) {\n    if (index === groups.length) {\n      words.push(path.join(''));\n      return;\n    }\n    for (const letter of groups[index]) {\n      path.push(letter);\n      backtrack(index + 1);\n      path.pop();\n    }\n  }\n\n  backtrack(0);\n  return words;\n}",
+  "brute": "function expand(s) {\n  const tokens = s.match(/\\{[^}]*\\}|[a-z]/g);\n  let words = [''];\n  for (const token of tokens) {\n    const options = token.length === 1 ? [token] : token.slice(1, -1).split(',');\n    const grown = [];\n    for (const word of words) for (const option of options) grown.push(word + option);\n    words = grown;\n  }\n  return words.sort();\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  const group = count => {\n    const pool = (size === 'large' ? letters : 'abcde').split('');\n    const chosen = [];\n    while (chosen.length < count) chosen.push(pool.splice(pick(pool.length), 1)[0]);\n    return '{' + chosen.join(',') + '}';\n  };\n  let s = '';\n  let total = 1;\n  if (size === 'large') {\n    for (let attempt = 0; attempt < 200 && s.length < 50; attempt++) {\n      const options = rand() < 0.3 ? 1 : 2 + pick(4);\n      const token = options === 1 ? letters[pick(26)] : group(options);\n      if (s.length + token.length > 50 || total * options > 1500) continue;\n      s += token;\n      total *= options;\n    }\n  } else {\n    const count = 1 + pick(5);\n    for (let t = 0; t < count; t++) {\n      s += rand() < 0.4 ? 'abcde'[pick(5)] : group(2 + pick(3));\n    }\n  }\n  return [s];\n}",
+  "examples": [
+    {"name":"Example 1","input":["{a,b}c{d,e}f"],"expected":["acdf","acef","bcdf","bcef"]},
+    {"name":"Example 2","input":["abcd"],"expected":["abcd"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["{a,b}"]},
+    {"name":"Test 3","input":["{c,b,a}"]},
+    {"name":"Test 4","input":["k{a,b}{z,y}"]},
+    {"name":"Test 5","input":["{a,b}{a,b}{a,b}"]},
+    {"name":"Test 6","input":["abc{e,d}"]},
+    {"name":"Test 7","input":["{z,a}b{y,c}d{x,e}"]},
+    {"name":"Test 8","input":["{g,f,e,d,c,b,a}"]},
+    {"name":"Test 9","input":["{b,a}{d,c}{f,e}{h,g}{j,i}"]},
+    {"name":"Test 10","input":["x{q,p}yz"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach position of the pattern contributes one letter, chosen from its own small list, so the answer is every combination of one choice per position. Backtracking builds these combinations one letter at a time. If each position's options are sorted first and are tried in that order, the words are produced in lexicographical order directly, because all of them have the same length and earlier positions matter most. The brute-force alternative grows the full list position by position and sorts it at the end.\n\n## Approach\n\n1. Parse `s` into `groups`: a bare letter becomes a one-option group; for `{...}`, find the matching `close` brace, split the inside on commas and sort the options.\n2. Keep the current partial word in `path`.\n3. `backtrack(index)`: when `index` reaches the number of groups, `path` is a full word, so join it and add it to `words`.\n4. Otherwise try each `letter` of `groups[index]` in sorted order: push it, recurse on `index + 1`, then pop it.\n5. Call `backtrack(0)` and return `words`.\n\n## Example 1, step by step\n\n`\"{a,b}c{d,e}f\"` parses into `[[a,b], [c], [d,e], [f]]`. Choosing `a`, `c`, `d`, `f` gives `acdf`; undoing the last two choices and taking `e` gives `acef`. Back at the first group, `b` gives `bcdf` and then `bcef`. The output is `[\"acdf\",\"acef\",\"bcdf\",\"bcef\"]`, already sorted.\n\n## Complexity\n\n- Time: O(K · m), where K is the number of words and m the number of positions: each finished word is joined once at length m, and every level of the search has at most K partial words.\n- Space: O(m) for `path` and the recursion, plus the output.\n\n## Pitfalls\n\n- The options inside braces may be listed out of order (`{c,b,a}`); sort them, or sort the final list.\n- A brace group is one position, not several: do not treat the commas or braces as letters.\n- Skip past the closing brace after parsing a group, otherwise its letters are read again as bare letters.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `groups` | sorted options for each position |\n| `i`, `close` | parse index and the index of the matching `}` |\n| `path` | letters chosen so far |\n| `index` | the position being filled |\n| `words` | finished words in sorted order |",
+  "narration": {
+    "2": "groups will hold the list of allowed letters for each position.",
+    "4": "Scan the pattern from left to right.",
+    "5": "An opening brace starts a position with several options.",
+    "6": "Find the brace that closes this group; groups are never nested.",
+    "7": "Take the letters between the braces and sort them so the words come out in order.",
+    "8": "Continue just after the closing brace.",
+    "10": "A bare letter is a position with a single option.",
+    "15": "words collects the finished words.",
+    "16": "path holds the letters chosen so far.",
+    "17": "backtrack fills the position at index with each allowed letter in turn.",
+    "18": "Every position has a letter: path is a complete word.",
+    "19": "Join the chosen letters and save the word.",
+    "22": "Try the options for this position in sorted order.",
+    "23": "Choose this letter.",
+    "24": "Fill the remaining positions.",
+    "25": "Undo the choice before trying the next letter.",
+    "29": "Start filling from the first position.",
+    "30": "The words were produced in lexicographical order."
+  }
+}

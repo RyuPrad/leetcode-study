@@ -1,0 +1,51 @@
+{
+  "number": 1435,
+  "title": "Create a Session Bar Chart",
+  "spec": "recalled",
+  "statement": "One table records how long visitors stayed on an app:\n\n- `Sessions(session_id, duration)`: one row per session; `session_id` is unique and `duration` is the session's length in **seconds** (a non-negative integer).\n\nBuild the data for a bar chart of session lengths in minutes using four bins, labelled exactly:\n\n- `[0-5>`: shorter than 5 minutes (under 300 seconds);\n- `[5-10>`: at least 5 and under 10 minutes;\n- `[10-15>`: at least 10 and under 15 minutes;\n- `15 or more`: 15 minutes (900 seconds) or longer.\n\nReturn the columns `bin` and `total`, where `total` is the number of sessions in the bin. All four bins appear in the result, with `total = 0` for an empty bin. Rows may come in any order.",
+  "constraints": [
+    "session_id is unique in Sessions",
+    "duration is a non-negative number of seconds and never null",
+    "Bins: [0, 300), [300, 600), [600, 900) and 900 or more seconds"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sessions": [["session_id","INT"],["duration","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Sessions = [] }] = input;\n  const seen = new Set();\n  for (const [id, duration] of Sessions) {\n    if (id === null) return 'Every session needs a session_id.';\n    if (seen.has(id)) return `session_id ${id} appears twice in Sessions.`;\n    seen.add(id);\n    if (duration === null) return 'duration is never null.';\n    if (duration < 0) return `Session ${id} has a negative duration.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH labeled AS (\n  SELECT\n    CASE\n      WHEN duration < 300 THEN '[0-5>'\n      WHEN duration < 600 THEN '[5-10>'\n      WHEN duration < 900 THEN '[10-15>'\n      ELSE '15 or more'\n    END AS bin\n  FROM Sessions\n),\nbins AS (\n  SELECT '[0-5>' AS bin\n  UNION ALL SELECT '[5-10>'\n  UNION ALL SELECT '[10-15>'\n  UNION ALL SELECT '15 or more'\n)\nSELECT b.bin, COUNT(l.bin) AS total\nFROM bins AS b\nLEFT JOIN labeled AS l\n  ON l.bin = b.bin\nGROUP BY b.bin;",
+  "brute": "SELECT '[0-5>' AS bin, (SELECT COUNT(*) FROM Sessions WHERE duration / 60 < 5) AS total\nUNION ALL\nSELECT '[5-10>', (SELECT COUNT(*) FROM Sessions WHERE duration / 60 >= 5 AND duration / 60 < 10)\nUNION ALL\nSELECT '[10-15>', (SELECT COUNT(*) FROM Sessions WHERE duration / 60 >= 10 AND duration / 60 < 15)\nUNION ALL\nSELECT '15 or more', (SELECT COUNT(*) FROM Sessions WHERE duration / 60 >= 15)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pool = [0, 30, 199, 299, 300, 301, 580, 599, 600, 601, 899, 900, 1000, 5000];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const ids = [];\n  for (let i = 1; i <= count; i++) ids.push(i);\n  // Shuffle so session ids arrive in no particular order.\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Sessions = ids.map((id) => [id, small ? pool[Math.floor(rand() * pool.length)] : Math.floor(rand() * 1500)]);\n  return [{ Sessions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sessions":[[1,30],[2,199],[3,299],[4,580],[5,1000]]}],"expected":{"columns":["bin","total"],"rows":[["[0-5>",3],["[5-10>",1],["[10-15>",0],["15 or more",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sessions":[]}]},
+    {"name":"Test 2","input":[{"Sessions":[[1,0]]}]},
+    {"name":"Test 3","input":[{"Sessions":[[1,299],[2,300],[3,599],[4,600],[5,899],[6,900]]}]},
+    {"name":"Test 4","input":[{"Sessions":[[7,900],[3,12000],[5,901]]}]},
+    {"name":"Test 5","input":[{"Sessions":[[1,300],[2,450],[3,599]]}]},
+    {"name":"Test 6","input":[{"Sessions":[[1,600],[2,720],[3,899],[4,10]]}]},
+    {"name":"Test 7","input":[{"Sessions":[[1,59],[2,60],[3,61],[4,240],[5,298]]}]},
+    {"name":"Test 8","input":[{"Sessions":[[10,301],[20,302],[30,601],[40,602],[50,603],[60,1800]]}]},
+    {"name":"Test 9","input":[{"Sessions":[[1,30],[2,199],[3,299],[4,580],[5,1000],[6,650],[7,840],[8,330]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo separate jobs hide here. First, every session must be put in exactly one bin, which is a `CASE` over the duration in seconds (5, 10 and 15 minutes are 300, 600 and 900 seconds). Second, the chart needs **all four** bins, even empty ones. Grouping the sessions alone can only produce bins that contain a session, so the four labels have to come from a small table of their own, and the sessions are counted against it with a left join.\n\n## Approach\n\n1. CTE `labeled`: one row per session holding its `bin` label. The `CASE` tests the upper bounds in increasing order, so the first true branch is the right bin.\n2. CTE `bins`: the four labels, written as a `UNION ALL` of constant rows.\n3. `LEFT JOIN` `labeled` (alias `l`) to `bins` (alias `b`) on the label, so a bin with no sessions still yields one row whose `l.bin` is `null`.\n4. `GROUP BY b.bin` and report `COUNT(l.bin)` as `total`. `COUNT` of a column skips nulls, so an empty bin counts 0.\n\n## Example 1, step by step\n\n`labeled` turns the durations 30, 199, 299, 580 and 1000 into `[0-5>`, `[0-5>`, `[0-5>`, `[5-10>` and `15 or more`. Joining with `bins`:\n\n| b.bin | matching l.bin rows | total |\n| --- | --- | --- |\n| `[0-5>` | 3 | 3 |\n| `[5-10>` | 1 | 1 |\n| `[10-15>` | none (one row with null) | 0 |\n| `15 or more` | 1 | 1 |\n\n## Complexity\n\n- Time: O(N) to label N sessions, plus a join against four bins.\n- Space: O(N) for `labeled`.\n\n## Pitfalls\n\n- `GROUP BY` the `CASE` alone silently omits bins with no sessions, such as `[10-15>` in the example.\n- `COUNT(*)` after the left join counts the null row of an empty bin as 1; count `l.bin` instead.\n- Boundaries are half-open: 300 seconds is already `[5-10>` and 900 seconds is `15 or more`. Using `<=` moves sessions of exactly 5, 10 or 15 minutes into the wrong bin.\n- The labels must match character for character, including the `>` and the spaces in `15 or more`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `labeled` | each session reduced to its bin label |\n| `bins` | the four labels, so empty bins still exist |\n| `b` / `l` | a bin and the labeled sessions that fall into it |\n| `COUNT(l.bin)` | sessions in the bin, 0 when only the null row joined |",
+  "narration": {
+    "1": "The labeled stage gives every session its bin.",
+    "4": "Under 300 seconds is under 5 minutes; the branches are tried in order, so later ones only see longer sessions.",
+    "11": "The bins stage lists all four labels so that empty bins are not lost.",
+    "17": "Report each bin with the number of sessions that matched it.",
+    "18": "Start from the bins, the side whose rows must all appear.",
+    "19": "A left join keeps a bin even when no session carries its label.",
+    "21": "One result row per bin."
+  }
+}

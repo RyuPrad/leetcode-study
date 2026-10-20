@@ -1,0 +1,53 @@
+{
+  "number": 1581,
+  "title": "Customer Who Visited but Did Not Make Any Transactions",
+  "spec": "leetcode",
+  "statement": "A mall records visits and the purchases made during them:\n\n- `Visits(visit_id, customer_id)`: one row per visit; `visit_id` is unique. A customer can visit many times.\n- `Transactions(transaction_id, visit_id, amount)`: one row per purchase; `transaction_id` is unique. A visit can have any number of transactions, including none.\n\nA visit is **empty** when no row of `Transactions` has its `visit_id`. For every customer with at least one empty visit, report `customer_id` and `count_no_trans`, the number of that customer's empty visits. Customers whose visits all had transactions are not listed. Rows may come in any order.",
+  "constraints": [
+    "visit_id is unique in Visits",
+    "transaction_id is unique in Transactions",
+    "customer_id and Transactions.visit_id are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Visits": [["visit_id","INT"],["customer_id","INT"]],
+    "Transactions": [["transaction_id","INT"],["visit_id","INT"],["amount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Visits = [], Transactions = [] }] = input;\n  const visits = new Set(), transactions = new Set();\n  for (const [visit, customer] of Visits) {\n    if (visit === null || customer === null) return 'Every visit needs a visit_id and a customer_id.';\n    if (visits.has(visit)) return `visit_id ${visit} appears twice in Visits.`;\n    visits.add(visit);\n  }\n  for (const [id, visit] of Transactions) {\n    if (id === null || visit === null) return 'Every transaction needs a transaction_id and a visit_id.';\n    if (transactions.has(id)) return `transaction_id ${id} appears twice in Transactions.`;\n    transactions.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT v.customer_id, COUNT(*) AS count_no_trans\nFROM Visits AS v\nLEFT JOIN Transactions AS t\n  ON t.visit_id = v.visit_id\nWHERE t.transaction_id IS NULL\nGROUP BY v.customer_id;",
+  "brute": "SELECT customer_id, COUNT(visit_id) AS count_no_trans\nFROM Visits\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Transactions\n  WHERE Transactions.visit_id = Visits.visit_id\n)\nGROUP BY customer_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const visitCount = small ? Math.floor(rand() * 9) : 1500;\n  const customers = small ? 3 : 300;\n  const Visits = [], Transactions = [];\n  for (let id = 1; id <= visitCount; id++) Visits.push([id, 10 + Math.floor(rand() * customers)]);\n  // Transactions land on existing visits (often several on one visit) or on visit ids missing from Visits.\n  const transactionCount = small ? Math.floor(rand() * 9) : 2000;\n  for (let id = 1; id <= transactionCount; id++) {\n    const visit = 1 + Math.floor(rand() * (visitCount + (small ? 3 : 200)));\n    Transactions.push([id, visit, 1 + Math.floor(rand() * 1000)]);\n  }\n  return [{ Visits, Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Visits":[[1,23],[2,9],[4,30],[5,54],[6,96],[7,54],[8,54]],"Transactions":[[2,5,310],[3,5,300],[9,5,200],[12,1,910],[13,2,970]]}],"expected":{"columns":["customer_id","count_no_trans"],"rows":[[54,2],[30,1],[96,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Visits":[],"Transactions":[[1,1,50]]}]},
+    {"name":"Test 2","input":[{"Visits":[[1,7],[2,7],[3,8]],"Transactions":[]}]},
+    {"name":"Test 3","input":[{"Visits":[[1,7],[2,8]],"Transactions":[[1,1,10],[2,2,20],[3,2,30]]}]},
+    {"name":"Test 4","input":[{"Visits":[[1,5],[2,5],[3,5]],"Transactions":[[10,1,100],[11,1,200],[12,1,300]]}]},
+    {"name":"Test 5","input":[{"Visits":[[1,3],[2,4]],"Transactions":[[1,9,40],[2,10,60]]}]},
+    {"name":"Test 6","input":[{"Visits":[[11,1]],"Transactions":[]}]},
+    {"name":"Test 7","input":[{"Visits":[[1,2],[2,2],[3,2],[4,2],[5,6]],"Transactions":[[1,5,0],[2,3,15]]}]},
+    {"name":"Test 8","input":[{"Visits":[[1,1],[2,2],[3,1],[4,2],[5,3],[6,3]],"Transactions":[[1,1,5],[2,1,6],[3,4,7],[4,4,8],[5,7,9]]}]},
+    {"name":"Test 9","input":[{"Visits":[[1,23],[2,9],[4,30],[5,54],[6,96],[7,54],[8,54],[9,9],[10,23]],"Transactions":[[2,5,310],[3,5,300],[9,5,200],[12,1,910],[13,2,970],[14,10,15],[15,3,80]]}]},
+    {"name":"Test 10","input":[{"Visits":[[100,1],[200,2],[300,3],[400,1]],"Transactions":[[1,400,25],[2,400,75],[3,300,12],[4,100,3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about visits that have **no** partner row in `Transactions`. A left join from `Visits` keeps every visit and, when no transaction matches, fills the transaction columns with `null`. Keeping only those null rows leaves exactly the empty visits, one row each, and grouping them by customer counts them.\n\n## Approach\n\n1. Start from `Visits` (alias `v`).\n2. `LEFT JOIN Transactions` (alias `t`) on `visit_id`. A visit with three transactions becomes three rows; an empty visit becomes one row with `t.transaction_id = null`.\n3. `WHERE t.transaction_id IS NULL` keeps only the empty visits. Visits with transactions vanish entirely, so their multiple join rows never reach the count.\n4. `GROUP BY v.customer_id` and `COUNT(*)` give `count_no_trans`.\n\n## Example 1, step by step\n\nThe left join produces:\n\n| visit_id | customer_id | transaction_id |\n| --- | --- | --- |\n| 1 | 23 | 12 |\n| 2 | 9 | 13 |\n| 4 | 30 | null |\n| 5 | 54 | 2, 3, 9 (three rows) |\n| 6 | 96 | null |\n| 7 | 54 | null |\n| 8 | 54 | null |\n\nThe null rows are visits 4, 6, 7 and 8. Grouped by customer: 30 has 1, 96 has 1, 54 has 2 (visits 7 and 8). Customers 23 and 9 have no empty visit and do not appear.\n\n## Complexity\n\n- Time: O(V + T) for V visits and T transactions with a hash or index on `Transactions.visit_id`.\n- Space: O(V + T) for the join rows and the groups.\n\n## Pitfalls\n\n- An inner join keeps only visits **with** transactions, the opposite of what is asked.\n- Grouping the left join without the `IS NULL` filter counts every visit, and visits with several transactions count several times.\n- Transactions may name visits missing from `Visits`; starting the join from `Transactions` would wrongly involve them.\n- `NOT IN (SELECT visit_id FROM Transactions)` returns nothing at all if that column ever holds a `null`; `NOT EXISTS` or the left join avoids the trap.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `v` | `Visits`, every visit is kept |\n| `t` | `Transactions`, matched on `visit_id`; all nulls for an empty visit |\n| `count_no_trans` | number of a customer's visits without a transaction |",
+  "narration": {
+    "1": "Report each customer with the number of their visits that had no purchase.",
+    "2": "Visits is the left table, so every visit is kept.",
+    "3": "A left join keeps visits without transactions and fills the Transactions columns with null.",
+    "4": "A transaction belongs to the visit with the same visit_id.",
+    "5": "A null transaction id marks a visit with no purchases; all other rows are dropped.",
+    "6": "Count the remaining empty visits per customer."
+  }
+}

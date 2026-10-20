@@ -1,0 +1,56 @@
+{
+  "number": 1384,
+  "title": "Total Sales Amount by Year",
+  "spec": "recalled",
+  "statement": "Two tables describe products and how they sold:\n\n- `Product(product_id, product_name)`: one row per product; `product_id` is unique.\n- `Sales(product_id, period_start, period_end, average_daily_sales)`: `product_id` is unique here too, so a product has at most one sales period, and it always exists in `Product`. The product earned `average_daily_sales` on **every** day from `period_start` through `period_end`, both days included. All dates lie between 2018-01-01 and 2020-12-31.\n\nFor each product and each calendar year that contains at least one day of its sales period, report how much it earned in that year: `average_daily_sales` times the number of days of the period that fall inside the year (2020 is a leap year). Output the columns `product_id`, `product_name`, `report_year` and `total_amount`. `report_year` is the four-digit year; LeetCode returns it as text such as `'2019'`, and a number is accepted here too. Products with no sales do not appear. Order the rows by `product_id`, then by `report_year`, both ascending.",
+  "constraints": [
+    "product_id is unique in Product",
+    "product_id is unique in Sales and exists in Product",
+    "period_start <= period_end, both between 2018-01-01 and 2020-12-31",
+    "average_daily_sales > 0",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Product": [["product_id","INT"],["product_name","VARCHAR(30)"]],
+    "Sales": [["product_id","INT"],["period_start","DATE"],["period_end","DATE"],["average_daily_sales","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Product = [], Sales = [] }] = input;\n  const products = new Set(), sold = new Set();\n  for (const [id, name] of Product) {\n    if (id === null || name === null) return 'Product rows may not contain null.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    products.add(id);\n  }\n  for (const row of Sales) {\n    if (row.some((v) => v === null)) return 'Sales rows may not contain null.';\n    const [id, start, end, daily] = row;\n    if (sold.has(id)) return `product_id ${id} appears twice in Sales.`;\n    if (!products.has(id)) return `Sales names unknown product ${id}.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(start) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(end)) return 'Dates must look like 2019-01-31.';\n    if (start > end) return `The period of product ${id} ends before it starts.`;\n    if (start < '2018-01-01' || end > '2020-12-31') return 'Sales dates must lie in 2018 to 2020.';\n    if (daily <= 0) return 'average_daily_sales must be positive.';\n    sold.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH years AS (\n  SELECT '2018' AS report_year, '2018-01-01' AS year_start, '2018-12-31' AS year_end\n  UNION ALL SELECT '2019', '2019-01-01', '2019-12-31'\n  UNION ALL SELECT '2020', '2020-01-01', '2020-12-31'\n)\nSELECT s.product_id, p.product_name, y.report_year,\n  s.average_daily_sales\n    * (DATEDIFF(LEAST(s.period_end, y.year_end), GREATEST(s.period_start, y.year_start)) + 1) AS total_amount\nFROM Sales AS s\nJOIN Product AS p\n  ON p.product_id = s.product_id\nJOIN years AS y\n  ON s.period_start <= y.year_end\n  AND s.period_end >= y.year_start\nORDER BY s.product_id, y.report_year;",
+  "brute": "WITH RECURSIVE spans AS (\n  SELECT product_id, YEAR(period_start) AS yr, period_start, period_end, average_daily_sales\n  FROM Sales\n  UNION ALL\n  SELECT product_id, yr + 1, period_start, period_end, average_daily_sales\n  FROM spans\n  WHERE yr < YEAR(period_end)\n)\nSELECT sp.product_id, p.product_name, CONCAT(sp.yr, '') AS report_year,\n  sp.average_daily_sales * (DATEDIFF(\n    CASE WHEN sp.period_end < CONCAT(sp.yr, '-12-31') THEN sp.period_end ELSE CONCAT(sp.yr, '-12-31') END,\n    CASE WHEN sp.period_start > CONCAT(sp.yr, '-01-01') THEN sp.period_start ELSE CONCAT(sp.yr, '-01-01') END\n  ) + 1) AS total_amount\nFROM spans AS sp, Product AS p\nWHERE p.product_id = sp.product_id\nORDER BY sp.product_id, sp.yr",
+  "generator": "function generate(rand, size) {\n  const names = ['LC Phone', 'LC T-Shirt', 'LC Keychain', 'LC Mug', 'LC Hoodie', 'LC Sticker'];\n  const small = size === 'small';\n  const day = (n) => new Date(Date.UTC(2018, 0, 1) + n * 86400000).toISOString().slice(0, 10);\n  const last = 1095; // 2020-12-31\n  const count = small ? Math.floor(rand() * 6) : 1200;\n  const ids = Array.from({ length: count }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Product = ids.map((id) => [id, names[Math.floor(rand() * names.length)]]);\n  const Sales = [];\n  for (const [id] of Product) {\n    if (rand() < 0.2) continue;\n    // Starts and lengths often sit near year boundaries, and sometimes span all three years.\n    const roll = rand();\n    const start = roll < 0.3 ? [364, 365, 729, 730][Math.floor(rand() * 4)] : Math.floor(rand() * (last + 1));\n    const length = roll > 0.85 ? last : Math.floor(rand() * (rand() < 0.5 ? 40 : 600));\n    Sales.push([id, day(start), day(Math.min(last, start + length)), 1 + Math.floor(rand() * (small ? 20 : 500))]);\n  }\n  return [{ Product, Sales }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Product":[[1,"LC Phone "],[2,"LC T-Shirt"],[3,"LC Keychain"]],"Sales":[[1,"2019-01-25","2019-02-28",100],[2,"2018-12-01","2020-01-01",10],[3,"2019-12-01","2020-01-31",1]]}],"expected":{"columns":["product_id","product_name","report_year","total_amount"],"rows":[[1,"LC Phone ","2019",3500],[2,"LC T-Shirt","2018",310],[2,"LC T-Shirt","2019",3650],[2,"LC T-Shirt","2020",10],[3,"LC Keychain","2019",31],[3,"LC Keychain","2020",31]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Product":[],"Sales":[]}]},
+    {"name":"Test 2","input":[{"Product":[[1,"LC Mug"]],"Sales":[]}]},
+    {"name":"Test 3","input":[{"Product":[[4,"LC Mug"]],"Sales":[[4,"2019-07-04","2019-07-04",25]]}]},
+    {"name":"Test 4","input":[{"Product":[[1,"LC Mug"],[2,"LC Hoodie"]],"Sales":[[2,"2020-01-01","2020-12-31",1],[1,"2019-01-01","2019-12-31",2]]}]},
+    {"name":"Test 5","input":[{"Product":[[1,"LC Sticker"]],"Sales":[[1,"2020-02-28","2020-03-01",7]]}]},
+    {"name":"Test 6","input":[{"Product":[[9,"LC Phone"]],"Sales":[[9,"2018-01-01","2020-12-31",3]]}]},
+    {"name":"Test 7","input":[{"Product":[[2,"LC Hoodie"],[1,"LC Mug"]],"Sales":[[2,"2018-12-31","2019-01-01",50],[1,"2019-12-31","2020-01-01",40]]}]},
+    {"name":"Test 8","input":[{"Product":[[30,"LC Mug"],[10,"LC Mug"],[20,"LC Phone"],[40,"LC Sticker"]],"Sales":[[30,"2018-06-01","2018-06-30",4],[10,"2019-11-15","2020-02-15",6],[20,"2018-03-01","2020-03-01",2]]}]},
+    {"name":"Test 9","input":[{"Product":[[5,"LC Keychain"],[3,"LC T-Shirt"]],"Sales":[[5,"2018-02-01","2018-02-28",10],[3,"2019-02-01","2019-03-01",10]]}]},
+    {"name":"Test 10","input":[{"Product":[[1,"LC Phone"],[2,"LC Phone"],[3,"LC Phone"]],"Sales":[[3,"2020-12-31","2020-12-31",999],[1,"2018-01-01","2018-01-01",999],[2,"2018-12-31","2020-01-01",1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach sales period has to be cut at year boundaries, and each piece priced separately. Because every date lies in 2018 to 2020, the years can be listed by hand as a tiny table with their first and last day. Joining every sale to every year it overlaps gives one row per (product, year) piece. The piece's days run from the later of the two starts to the earlier of the two ends, which is exactly what `GREATEST` and `LEAST` compute, and `DATEDIFF(...) + 1` counts them with both ends included.\n\n## Approach\n\n1. `years`: three rows, each a `report_year` with its `year_start` and `year_end`.\n2. Join `Sales` (`s`) to `Product` (`p`) for the name.\n3. Join `years` (`y`) on overlap: the period starts no later than the year ends and ends no earlier than the year starts.\n4. `total_amount` is `average_daily_sales` times `DATEDIFF(LEAST(period_end, year_end), GREATEST(period_start, year_start)) + 1`.\n5. Order by `product_id`, then `report_year`.\n\n## Example 1, step by step\n\n- Product 1, 2019-01-25 to 2019-02-28, overlaps only 2019: 7 days in January plus 28 in February, 35 × 100 = 3500.\n- Product 2, 2018-12-01 to 2020-01-01: 2018 keeps December (31 days, 310), 2019 is a full year (365 days, 3650), 2020 keeps January 1 (1 day, 10).\n- Product 3, 2019-12-01 to 2020-01-31: 31 days in each year at 1 per day, giving 31 and 31.\n\n## Complexity\n\n- Time: O(S log S) for S sales; each sale meets the 3 years once, then the rows are sorted.\n- Space: O(S) for the result, at most three rows per sale.\n\n## Pitfalls\n\n- Forgetting `+ 1`: `DATEDIFF` counts nights, not days, so a one-day period would earn nothing.\n- Hard-coding 365 days per year misprices the leap year 2020 (366 days, including 2020-02-29).\n- Joining on `YEAR(period_start) = report_year` alone loses the later years of a period that crosses New Year.\n- The order is part of the answer: sort by `product_id` first, then `report_year`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `years` | 2018, 2019 and 2020 with their first and last day |\n| `s` | a sales period from `Sales` |\n| `p` | the matching `Product` row, for `product_name` |\n| `y` | one year that the period overlaps |\n| `total_amount` | daily sales times the days of the period inside `y` |",
+  "narration": {
+    "1": "The years stage lists every year a sale can touch, with its first and last day.",
+    "6": "Each output row is one product in one year.",
+    "8": "The overlap runs from the later start to the earlier end; DATEDIFF plus one counts its days, both ends included.",
+    "10": "Join Product to pick up the name of each sold product.",
+    "12": "Pair each sale with the years it touches, producing one row per year piece.",
+    "13": "The period must start on or before the last day of the year...",
+    "14": "...and end on or after its first day, otherwise it does not overlap that year.",
+    "15": "Sort by product, then year, as the problem requires."
+  }
+}

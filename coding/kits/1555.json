@@ -1,0 +1,58 @@
+{
+  "number": 1555,
+  "title": "Bank Account Summary",
+  "spec": "recalled",
+  "statement": "A bank keeps its customers and the transfers between them:\n\n- `Users(user_id, user_name, credit)`: one row per customer; `user_id` is unique. `credit` is the customer's balance before any of the transfers below.\n- `Transactions(trans_id, paid_by, paid_to, amount, transacted_on)`: one row per transfer; `trans_id` is unique. User `paid_by` sends `amount` (a positive number) to user `paid_to` on `transacted_on`; both are users in `Users`.\n\nAfter every transfer is applied, a user's balance is their starting `credit`, minus all the amounts they sent, plus all the amounts they received.\n\nReport **every** user, including those with no transfers, with the columns `user_id`, `user_name`, `credit` (the balance after all transfers) and `credit_limit_breached`, which is `'Yes'` when that balance is below 0 and `'No'` otherwise. Rows may come in any order.",
+  "constraints": [
+    "user_id is unique in Users",
+    "trans_id is unique in Transactions",
+    "paid_by and paid_to exist in Users",
+    "amount > 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["user_name","VARCHAR(20)"],["credit","INT"]],
+    "Transactions": [["trans_id","INT"],["paid_by","INT"],["paid_to","INT"],["amount","INT"],["transacted_on","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Users = [], Transactions = [] }] = input;\n  const users = new Set(), transfers = new Set();\n  for (const [id, , credit] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (users.has(id)) return `user_id ${id} appears twice in Users.`;\n    if (credit === null) return `User ${id} needs a credit.`;\n    users.add(id);\n  }\n  for (const [id, from, to, amount, date] of Transactions) {\n    if (id === null) return 'Every transaction needs a trans_id.';\n    if (transfers.has(id)) return `trans_id ${id} appears twice in Transactions.`;\n    transfers.add(id);\n    if (!users.has(from)) return `Transaction ${id} is paid by user ${from}, who is not in Users.`;\n    if (!users.has(to)) return `Transaction ${id} is paid to user ${to}, who is not in Users.`;\n    if (amount === null || amount <= 0) return `Transaction ${id} needs a positive amount.`;\n    if (date === null) return `Transaction ${id} needs a date.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH movements AS (\n  SELECT paid_by AS user_id, -amount AS delta\n  FROM Transactions\n  UNION ALL\n  SELECT paid_to, amount\n  FROM Transactions\n),\nnet AS (\n  SELECT user_id, SUM(delta) AS net_change\n  FROM movements\n  GROUP BY user_id\n)\nSELECT u.user_id,\n       u.user_name,\n       u.credit + IFNULL(n.net_change, 0) AS credit,\n       IF(u.credit + IFNULL(n.net_change, 0) < 0, 'Yes', 'No') AS credit_limit_breached\nFROM Users AS u\nLEFT JOIN net AS n\n  ON n.user_id = u.user_id;",
+  "brute": "SELECT b.user_id, b.user_name, b.balance AS credit,\n       CASE WHEN b.balance < 0 THEN 'Yes' ELSE 'No' END AS credit_limit_breached\nFROM (\n  SELECT u.user_id, u.user_name,\n         u.credit\n         + (SELECT COALESCE(SUM(t.amount), 0) FROM Transactions AS t WHERE t.paid_to = u.user_id)\n         - (SELECT COALESCE(SUM(t.amount), 0) FROM Transactions AS t WHERE t.paid_by = u.user_id) AS balance\n  FROM Users AS u\n) AS b",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const names = ['Moustafa', 'Jonathan', 'Winston', 'Luis', 'Ana', 'Ravi', 'Sofia', 'Ana'];\n  // Credits and amounts share round values so balances often land exactly on 0 or just below it.\n  const credits = small ? [0, 10, 100, 200, 500, 800] : [0, 100, 250, 500, 1000, 5000];\n  const amounts = small ? [10, 90, 100, 110, 200, 400, 500] : [10, 50, 100, 200, 400, 500, 1000];\n  const dates = ['2020-08-01', '2020-08-02', '2020-08-03', '2020-09-15', '2021-01-01'];\n  const userCount = small ? Math.floor(rand() * 7) : 500;\n  const transferCount = userCount < 2 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  const Users = [], Transactions = [];\n  for (let id = 1; id <= userCount; id++) Users.push([id, pick(names), pick(credits)]);\n  for (let id = 1; id <= transferCount; id++) {\n    const from = 1 + Math.floor(rand() * userCount);\n    let to = 1 + Math.floor(rand() * (userCount - 1));\n    if (to >= from) to++;\n    Transactions.push([id, from, to, pick(amounts), pick(dates)]);\n  }\n  return [{ Users, Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"Moustafa",100],[2,"Jonathan",200],[3,"Winston",10000],[4,"Luis",800]],"Transactions":[[1,1,3,400,"2020-08-01"],[2,3,2,500,"2020-08-02"],[3,2,1,200,"2020-08-03"]]}],"expected":{"columns":["user_id","user_name","credit","credit_limit_breached"],"rows":[[1,"Moustafa",-100,"Yes"],[2,"Jonathan",500,"No"],[3,"Winston",9900,"No"],[4,"Luis",800,"No"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[],"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"Ana",0],[2,"Ravi",50]],"Transactions":[]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"Ana",100],[2,"Ravi",0]],"Transactions":[[1,1,2,100,"2020-08-01"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"Ana",100],[2,"Ravi",0]],"Transactions":[[1,1,2,101,"2020-08-01"]]}]},
+    {"name":"Test 5","input":[{"Users":[[1,"Ana",10],[2,"Ravi",20],[3,"Sofia",30]],"Transactions":[[1,1,2,50,"2020-08-01"]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"Ana",100],[2,"Ravi",100]],"Transactions":[[1,1,2,60,"2020-08-01"],[2,1,2,60,"2020-08-02"],[3,1,2,60,"2020-08-03"],[4,2,1,50,"2020-08-04"],[5,2,1,50,"2020-08-05"]]}]},
+    {"name":"Test 7","input":[{"Users":[[1,"Ana",10],[2,"Ravi",10],[3,"Sofia",10]],"Transactions":[[1,1,2,30,"2020-08-01"],[2,2,3,30,"2020-08-02"],[3,3,1,30,"2020-08-03"]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"Ana",500],[2,"Ana",0],[3,"Luis",0]],"Transactions":[[1,2,3,1,"2021-01-01"],[2,1,3,499,"2021-01-02"]]}]},
+    {"name":"Test 9","input":[{"Users":[[7,"Winston",10000],[3,"Luis",800]],"Transactions":[[4,7,3,400,"2020-08-01"],[9,3,7,1300,"2020-08-02"]]}]},
+    {"name":"Test 10","input":[{"Users":[[1,"Moustafa",100],[2,"Jonathan",200],[3,"Winston",10000],[4,"Luis",800],[5,"Sofia",0]],"Transactions":[[1,1,3,400,"2020-08-01"],[2,3,2,500,"2020-08-02"],[3,2,1,200,"2020-08-03"],[4,4,5,800,"2020-08-04"],[5,5,1,300,"2020-08-05"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery transfer moves money in two directions at once: it takes `amount` from the payer and gives `amount` to the receiver. If each transfer is split into those two signed movements, a user's net change is just the sum of their movements, and the final balance is the starting credit plus that net change. A **left join** from `Users` keeps the people who never sent or received anything.\n\n## Approach\n\n1. `movements`: `UNION ALL` of two passes over `Transactions`, one row `(paid_by, -amount)` for the payer and one row `(paid_to, amount)` for the receiver.\n2. `net`: `GROUP BY user_id` and `SUM(delta)`, one net change per user who appears in any transfer.\n3. Start from `Users` (alias `u`) and `LEFT JOIN net` (alias `n`) on `user_id`; users with no transfers get `null`, which `IFNULL` turns into 0.\n4. `credit` is `u.credit` plus the net change, and `IF(... < 0, 'Yes', 'No')` labels it.\n\n## Example 1, step by step\n\n- `movements`: (1, -400), (3, +400), (3, -500), (2, +500), (2, -200), (1, +200).\n- `net`: user 1 has -200, user 2 has +300, user 3 has -100; user 4 never appears.\n- Joined: Moustafa 100 - 200 = -100 (Yes), Jonathan 200 + 300 = 500 (No), Winston 10000 - 100 = 9900 (No), Luis 800 + 0 = 800 (No).\n\n## Complexity\n\n- Time: O(T + U) for T transfers and U users with hash grouping and a hash join.\n- Space: O(T) for the movements and O(U) for the net changes.\n\n## Pitfalls\n\n- Joining `Transactions` twice (once as payer, once as receiver) and summing both multiplies the rows: a user with 3 payments and 2 receipts gets 6 joined rows, so each sum is counted several times. Aggregate each side before joining.\n- An inner join drops users who made no transfers; they must still be reported with their starting credit.\n- `null` arithmetic: `u.credit + n.net_change` is `null` for those users unless the missing change becomes 0.\n- A balance of exactly 0 is not breached; the test is strictly below 0.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `movements` | one signed row per side of every transfer |\n| `delta` | `-amount` for the payer, `+amount` for the receiver |\n| `net` | each user's total change across all transfers |\n| `u` | `Users`, one output row per user |\n| `n` | that user's `net` row, or nulls when they made no transfers |",
+  "narration": {
+    "1": "The CTE movements splits every transfer into a money-out row and a money-in row.",
+    "2": "The payer loses the amount, so it is stored with a minus sign.",
+    "4": "UNION ALL keeps both sides, even when two movements look identical.",
+    "5": "The receiver gains the amount.",
+    "8": "The CTE net adds up each user's movements into one change.",
+    "11": "One group per user who sent or received money.",
+    "15": "The final balance is the starting credit plus the net change, with 0 for users without transfers.",
+    "16": "A balance below 0 means the credit limit was breached.",
+    "17": "Every user comes from Users, so no one is lost.",
+    "18": "A left join attaches the net change and keeps users who never transacted."
+  }
+}

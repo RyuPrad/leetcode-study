@@ -1,0 +1,52 @@
+{
+  "number": 1699,
+  "title": "Number of Calls Between Two Persons",
+  "spec": "recalled",
+  "statement": "One table logs phone calls:\n\n- `Calls(from_id, to_id, duration)`: one row per call, placed by `from_id` to `to_id` and lasting `duration`. The table has no primary key, so identical rows are separate calls. `from_id` and `to_id` always differ, and `duration` is positive.\n\nA call between two people counts for their pair no matter who dialled: a call from 4 to 3 and a call from 3 to 4 both belong to the pair (3, 4).\n\nFor every pair of people with at least one call between them, report:\n\n- `person1`: the smaller of the two ids,\n- `person2`: the larger of the two ids,\n- `call_count`: how many calls the two made to each other, in either direction,\n- `total_duration`: the sum of those calls' durations.\n\nRows may come in any order.",
+  "constraints": [
+    "Calls has no primary key and may contain duplicate rows",
+    "from_id != to_id in every row",
+    "duration > 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Calls": [["from_id","INT"],["to_id","INT"],["duration","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Calls = [] }] = input;\n  for (const [from, to, duration] of Calls) {\n    if (from === null || to === null || duration === null) return 'Every call needs from_id, to_id and duration.';\n    if (from === to) return `Person ${from} cannot call themselves.`;\n    if (duration <= 0) return 'Every duration must be positive.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH pairs AS (\n  SELECT LEAST(from_id, to_id) AS person1,\n         GREATEST(from_id, to_id) AS person2,\n         duration\n  FROM Calls\n)\nSELECT person1,\n       person2,\n       COUNT(*) AS call_count,\n       SUM(duration) AS total_duration\nFROM pairs\nGROUP BY person1, person2;",
+  "brute": "SELECT both_directions.person1,\n       both_directions.person2,\n       COUNT(*) AS call_count,\n       SUM(both_directions.duration) AS total_duration\nFROM (\n  SELECT from_id AS person1, to_id AS person2, duration FROM Calls WHERE from_id < to_id\n  UNION ALL\n  SELECT to_id, from_id, duration FROM Calls WHERE from_id > to_id\n) AS both_directions\nGROUP BY both_directions.person1, both_directions.person2",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const people = small ? 4 : 60, count = small ? Math.floor(rand() * 9) : 2000;\n  const durations = [5, 10, 20, 59, 100, 200];\n  const Calls = [];\n  for (let i = 0; i < count; i++) {\n    // Repeat an earlier call now and then so identical rows appear.\n    if (Calls.length && rand() < 0.15) { Calls.push([...Calls[Math.floor(rand() * Calls.length)]]); continue; }\n    const from = 1 + Math.floor(rand() * people);\n    let to = 1 + Math.floor(rand() * (people - 1));\n    if (to >= from) to++;\n    const duration = small ? durations[Math.floor(rand() * durations.length)] : 1 + Math.floor(rand() * 1000);\n    Calls.push([from, to, duration]);\n  }\n  return [{ Calls }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Calls":[[1,2,59],[2,1,11],[1,3,20],[3,4,100],[3,4,200],[3,4,200],[4,3,499]]}],"expected":{"columns":["person1","person2","call_count","total_duration"],"rows":[[1,2,2,70],[1,3,1,20],[3,4,4,999]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Calls":[]}]},
+    {"name":"Test 2","input":[{"Calls":[[5,2,30]]}]},
+    {"name":"Test 3","input":[{"Calls":[[1,2,10],[2,1,15]]}]},
+    {"name":"Test 4","input":[{"Calls":[[3,7,40],[3,7,40],[3,7,40]]}]},
+    {"name":"Test 5","input":[{"Calls":[[10,9,5],[9,10,6],[2,10,7]]}]},
+    {"name":"Test 6","input":[{"Calls":[[1,2,1],[1,3,2],[1,4,3],[4,1,4],[3,1,5],[2,1,6]]}]},
+    {"name":"Test 7","input":[{"Calls":[[6,5,100],[6,5,100],[5,6,100],[7,8,1]]}]},
+    {"name":"Test 8","input":[{"Calls":[[1,2,59],[2,1,11],[1,3,20],[3,4,100],[3,4,200],[3,4,200],[4,3,499],[4,1,1]]}]},
+    {"name":"Test 9","input":[{"Calls":[[2,3,1000],[3,2,1000],[2,3,1],[4,5,2],[5,4,3],[1,5,9]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA call from 4 to 3 and a call from 3 to 4 belong to the same pair, but grouping by `(from_id, to_id)` would put them in different groups. The fix is to write every pair in one canonical form first: smaller id first, larger id second. After that, an ordinary `GROUP BY` on the canonical pair counts the calls and adds their durations.\n\n## Approach\n\n1. CTE `pairs`: for each call, `LEAST(from_id, to_id)` becomes `person1` and `GREATEST(from_id, to_id)` becomes `person2`; the call's `duration` comes along. Every row of `Calls` survives, duplicates included.\n2. Group `pairs` by `(person1, person2)`.\n3. `COUNT(*)` gives `call_count` and `SUM(duration)` gives `total_duration` for each group.\n\n## Example 1, step by step\n\n`pairs` rewrites the seven calls as:\n\n| person1 | person2 | duration |\n| --- | --- | --- |\n| 1 | 2 | 59 |\n| 1 | 2 | 11 |\n| 1 | 3 | 20 |\n| 3 | 4 | 100 |\n| 3 | 4 | 200 |\n| 3 | 4 | 200 |\n| 3 | 4 | 499 |\n\nGrouping gives (1, 2): 2 calls, 59 + 11 = 70; (1, 3): 1 call, 20; (3, 4): 4 calls, 100 + 200 + 200 + 499 = 999. The call from 2 to 1 and the call from 4 to 3 joined their reverse-direction partners.\n\n## Complexity\n\n- Time: O(C) to build `pairs` plus O(C log C) (or O(C) with hashing) to group C calls.\n- Space: O(P) for the P distinct pairs in the result.\n\n## Pitfalls\n\n- Grouping by `from_id, to_id` splits each pair into up to two rows, one per direction.\n- Rows are separate calls even when identical: `COUNT(DISTINCT ...)`, `SELECT DISTINCT` or `UNION` (instead of `UNION ALL`) would merge them.\n- Filtering `WHERE from_id < to_id` alone drops every call placed by the larger id.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pairs` | one row per call, with the pair written smaller id first |\n| `person1`, `person2` | the smaller and larger id of the pair |\n| `call_count` | number of calls in the pair's group |\n| `total_duration` | sum of the group's durations |",
+  "narration": {
+    "1": "The CTE pairs rewrites every call so the pair it belongs to has one fixed spelling.",
+    "2": "LEAST puts the smaller id first, whoever placed the call.",
+    "3": "GREATEST puts the larger id second, so 4 to 3 and 3 to 4 become the same pair.",
+    "7": "The final query reports each pair with its two statistics.",
+    "9": "COUNT(*) counts every call in the group, identical rows included.",
+    "10": "SUM adds the durations of all calls between the two people.",
+    "12": "Grouping by the canonical pair merges both directions into one row."
+  }
+}

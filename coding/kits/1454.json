@@ -1,0 +1,53 @@
+{
+  "number": 1454,
+  "title": "Active Users",
+  "spec": "recalled",
+  "statement": "Two tables describe accounts and the days they were used:\n\n- `Accounts(id, name)`: one row per account; `id` is unique.\n- `Logins(id, login_date)`: one row per login; `id` is the account that logged in on `login_date`. The table has no key: an account can log in several times on the same day.\n\nAn account is **active** when it logged in on at least 5 consecutive calendar days (for example 2020-05-30 through 2020-06-03). Several logins on one day count as that one day.\n\nReport the active accounts with the columns `id` and `name`, each account once, ordered by `id` ascending.",
+  "constraints": [
+    "id is unique in Accounts",
+    "Logins has no primary key and may repeat a row",
+    "Every Logins.id is an id in Accounts",
+    "login_date is a date such as '2020-05-30'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Accounts": [["id","INT"],["name","VARCHAR(10)"]],
+    "Logins": [["id","INT"],["login_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Accounts = [], Logins = [] }] = input;\n  const ids = new Set();\n  for (const [id, name] of Accounts) {\n    if (id === null || name === null) return 'Every account needs an id and a name.';\n    if (ids.has(id)) return `Account id ${id} appears twice.`;\n    ids.add(id);\n  }\n  for (const [id, date] of Logins) {\n    if (!ids.has(id)) return `Login id ${id} is not an account.`;\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) return 'login_date must be a date like 2020-05-30.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH days AS (\n  SELECT DISTINCT id, login_date\n  FROM Logins\n),\nahead AS (\n  SELECT id, login_date,\n    LEAD(login_date, 4) OVER (PARTITION BY id ORDER BY login_date) AS fifth_date\n  FROM days\n)\nSELECT DISTINCT a.id, a.name\nFROM ahead AS h\nJOIN Accounts AS a\n  ON a.id = h.id\nWHERE DATEDIFF(h.fifth_date, h.login_date) = 4\nORDER BY a.id;",
+  "brute": "SELECT acc.id, acc.name\nFROM Accounts AS acc\nWHERE EXISTS (\n  SELECT 1\n  FROM Logins AS s\n  WHERE s.id = acc.id\n    AND (SELECT COUNT(DISTINCT x.login_date)\n         FROM Logins AS x\n         WHERE x.id = s.id\n           AND x.login_date BETWEEN s.login_date AND DATE_ADD(s.login_date, INTERVAL 4 DAY)) = 5\n)\nORDER BY acc.id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = offset => new Date(Date.UTC(small ? 2020 : 2019, small ? 4 : 10, small ? 25 : 1) + offset * 86400000).toISOString().slice(0, 10);\n  const names = ['Winston', 'Jonathan', 'Mia', 'Omar', 'Rosa', 'Lee', 'Priya', 'Sam'];\n  const accountCount = small ? Math.floor(rand() * 4) : 200;\n  const ids = [];\n  for (let id = 1; id <= (small ? 6 : 400); id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Accounts = ids.slice(0, accountCount).map(id => [id, names[Math.floor(rand() * names.length)]]);\n  const Logins = [];\n  if (!Accounts.length) return [{ Accounts, Logins }];\n  const someone = () => Accounts[Math.floor(rand() * Accounts.length)][0];\n  if (small) {\n    // One near-miss or winning streak of 3 to 6 days, then a few duplicates, neighbours or strays.\n    if (rand() < 0.7) {\n      const who = someone(), start = Math.floor(rand() * 10), length = 3 + Math.floor(rand() * 4);\n      for (let k = 0; k < length; k++) if (rand() < 0.92) Logins.push([who, day(start + k)]);\n    }\n    while (Logins.length < 8 && rand() < 0.6) {\n      const r = rand();\n      if (r < 0.3 && Logins.length) Logins.push(Logins[Math.floor(rand() * Logins.length)].slice());\n      else if (r < 0.6 && Logins.length) { const [who, date] = Logins[Logins.length - 1]; Logins.push([who, day(Math.round((Date.parse(date) - Date.UTC(2020, 4, 25)) / 86400000) + 1 + Math.floor(rand() * 2))]); }\n      else Logins.push([someone(), day(Math.floor(rand() * 14))]);\n    }\n    for (let i = Logins.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Logins[i], Logins[j]] = [Logins[j], Logins[i]]; }\n  } else {\n    // Runs of 1 to 7 days scattered over about 400 days, crossing a year end, with some repeated logins.\n    while (Logins.length < 2000) {\n      const who = someone(), start = Math.floor(rand() * 400), length = 1 + Math.floor(rand() * 7);\n      for (let k = 0; k < length && Logins.length < 2000; k++) {\n        Logins.push([who, day(start + k)]);\n        if (rand() < 0.1 && Logins.length < 2000) Logins.push([who, day(start + k)]);\n      }\n    }\n  }\n  return [{ Accounts, Logins }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Accounts":[[1,"Winston"],[7,"Jonathan"]],"Logins":[[7,"2020-05-30"],[1,"2020-05-30"],[7,"2020-05-31"],[7,"2020-06-01"],[7,"2020-06-02"],[7,"2020-06-02"],[7,"2020-06-03"],[1,"2020-06-07"],[7,"2020-06-10"]]}],"expected":{"columns":["id","name"],"rows":[[7,"Jonathan"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Accounts":[[1,"Mia"]],"Logins":[]}]},
+    {"name":"Test 2","input":[{"Accounts":[[1,"Mia"]],"Logins":[[1,"2020-03-10"],[1,"2020-03-11"],[1,"2020-03-12"],[1,"2020-03-13"],[1,"2020-03-14"]]}]},
+    {"name":"Test 3","input":[{"Accounts":[[1,"Mia"],[2,"Omar"]],"Logins":[[1,"2020-03-10"],[1,"2020-03-11"],[1,"2020-03-12"],[1,"2020-03-13"],[1,"2020-03-15"],[2,"2020-03-14"]]}]},
+    {"name":"Test 4","input":[{"Accounts":[[4,"Rosa"]],"Logins":[[4,"2021-01-01"],[4,"2021-01-01"],[4,"2021-01-02"],[4,"2021-01-03"],[4,"2021-01-03"],[4,"2021-01-04"]]}]},
+    {"name":"Test 5","input":[{"Accounts":[[1,"Lee"],[2,"Sam"]],"Logins":[[1,"2020-02-27"],[1,"2020-02-28"],[1,"2020-02-29"],[1,"2020-03-01"],[1,"2020-03-02"],[2,"2019-12-30"],[2,"2019-12-31"],[2,"2020-01-01"],[2,"2020-01-02"],[2,"2020-01-03"]]}]},
+    {"name":"Test 6","input":[{"Accounts":[[9,"Zed"],[3,"Amy"],[5,"Bob"]],"Logins":[[9,"2020-06-01"],[3,"2020-06-05"],[9,"2020-06-02"],[3,"2020-06-04"],[9,"2020-06-03"],[3,"2020-06-03"],[9,"2020-06-04"],[3,"2020-06-02"],[9,"2020-06-05"],[3,"2020-06-01"],[5,"2020-06-01"]]}]},
+    {"name":"Test 7","input":[{"Accounts":[[2,"Priya"]],"Logins":[[2,"2020-01-01"],[2,"2020-01-02"],[2,"2020-01-03"],[2,"2020-01-04"],[2,"2020-01-05"],[2,"2020-01-06"],[2,"2020-01-07"],[2,"2020-02-01"],[2,"2020-02-02"],[2,"2020-02-03"],[2,"2020-02-04"],[2,"2020-02-05"]]}]},
+    {"name":"Test 8","input":[{"Accounts":[[1,"Ana"],[2,"Ben"]],"Logins":[[1,"2020-05-01"],[2,"2020-05-02"],[1,"2020-05-03"],[2,"2020-05-04"],[1,"2020-05-05"],[2,"2020-05-01"],[1,"2020-05-02"],[2,"2020-05-03"]]}]},
+    {"name":"Test 9","input":[{"Accounts":[[6,"Kim"],[8,"Kai"]],"Logins":[[6,"2020-05-30"],[6,"2020-05-31"],[6,"2020-05-31"],[6,"2020-06-01"],[6,"2020-06-02"],[6,"2020-06-03"],[8,"2020-05-30"],[8,"2020-05-31"],[8,"2020-06-01"],[8,"2020-06-03"],[8,"2020-06-04"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFive consecutive days starting on day `d` means the account's distinct login days include `d`, `d + 1`, ..., `d + 4`. If the distinct days are sorted, those five are neighbours in the list, so the day four places after `d` is exactly `d + 4`. `LEAD(login_date, 4)` reads that day directly; the account is active when some day's fourth successor is exactly 4 days later.\n\n## Approach\n\n1. `days`: `SELECT DISTINCT id, login_date` removes repeated logins on the same day, so each row is one distinct day per account.\n2. `ahead`: `LEAD(login_date, 4) OVER (PARTITION BY id ORDER BY login_date)` puts the account's fourth next login day beside each day as `fifth_date` (null near the end of the list).\n3. Keep rows where `DATEDIFF(fifth_date, login_date) = 4`: five distinct days fit in a five-day span, so they are consecutive.\n4. Join `Accounts` for the name, use `DISTINCT` because a long or repeated streak passes on several rows, and order by `a.id`.\n\n## Example 1, step by step\n\n- `days`: Jonathan (7) has 05-30, 05-31, 06-01, 06-02, 06-03, 06-10 (the second 06-02 login is dropped); Winston (1) has 05-30 and 06-07.\n- `ahead`: Jonathan's 05-30 gets `fifth_date` 06-03, and 05-31 gets 06-10; his later days and both of Winston's get null.\n- Filter: 06-03 minus 05-30 is 4 days, so Jonathan qualifies; 06-10 minus 05-31 is 10.\n- Result: `(7, Jonathan)`.\n\n## Complexity\n\n- Time: O(L log L) for L logins to deduplicate and sort each account's days, then O(L) for the window and filter.\n- Space: O(L) for the distinct days.\n\n## Pitfalls\n\n- Without removing duplicate days, a repeated login fills one of the four `LEAD` steps and a real streak is missed, as Jonathan's would be.\n- Counting logins (`COUNT(*)`) instead of distinct days lets three logins on one day look like three days.\n- Comparing dates as numbers or by the day of month breaks across month and year ends (02-29 to 03-01, 12-31 to 01-01); use `DATEDIFF`.\n- An account with a seven-day streak passes on three rows; without `DISTINCT` it is reported three times.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `days` | distinct `(id, login_date)` pairs |\n| `ahead` | each distinct day with `fifth_date`, the account's login day four places later |\n| `h` | rows of `ahead` |\n| `a` | `Accounts`, for the name |",
+  "narration": {
+    "1": "days keeps one row per account and day, so repeated logins on a day count once.",
+    "5": "ahead pairs every distinct login day with a later day of the same account.",
+    "7": "LEAD looks four rows ahead in the account's sorted days: the fifth day of a possible streak.",
+    "10": "Report each qualifying account once, even when it has several streaks.",
+    "12": "Join Accounts to fetch the name of each account.",
+    "14": "Five distinct days spanning exactly four days apart are five consecutive days.",
+    "15": "Active accounts are listed by id."
+  }
+}

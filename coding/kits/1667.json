@@ -1,0 +1,47 @@
+{
+  "number": 1667,
+  "title": "Fix Names in a Table",
+  "spec": "leetcode",
+  "statement": "One table holds user names typed with random capitalisation:\n\n- `Users(user_id, name)`: one row per user; `user_id` is unique. Every `name` is made only of English letters, some upper case and some lower case.\n\nNormalise every name so that its first letter is upper case and all of its remaining letters are lower case (`aLice` becomes `Alice`, `bOB` becomes `Bob`, `x` becomes `X`).\n\nReport every user with the columns `user_id` and `name` (the fixed name), sorted by `user_id` in ascending order.",
+  "constraints": [
+    "user_id is unique in Users",
+    "name is a non-empty string of English letters (A-Z, a-z), at most 40 characters"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["name","VARCHAR(40)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Users = [] }] = input;\n  const ids = new Set();\n  for (const [id, name] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (ids.has(id)) return `user_id ${id} appears twice in Users.`;\n    ids.add(id);\n    if (name === null || !/^[A-Za-z]{1,40}$/.test(name)) return `The name of user ${id} must be 1 to 40 English letters.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT user_id,\n       CONCAT(UPPER(LEFT(name, 1)), LOWER(SUBSTRING(name, 2))) AS name\nFROM Users\nORDER BY user_id;",
+  "brute": "SELECT fixed.user_id, fixed.name\nFROM (\n  SELECT user_id,\n         CONCAT(UCASE(MID(LCASE(name), 1, 1)), RIGHT(LCASE(name), CHAR_LENGTH(name) - 1)) AS name\n  FROM Users\n) AS fixed\nORDER BY fixed.user_id",
+  "generator": "function generate(rand, size) {\n  const bases = ['alice', 'bob', 'x', 'jo', 'charlie', 'mary', 'z', 'ann', 'leetcode'];\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  // Each letter's case is drawn at random, so names arrive all lower, all upper, mixed, or already correct.\n  const scramble = word => [...word].map(c => (rand() < 0.5 ? c.toUpperCase() : c)).join('');\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const ids = [];\n  for (let id = 1; ids.length < count; id++) if (size !== 'small' || rand() < 0.7) ids.push(id);\n  // Shuffle so the stored order differs from the user_id order the output needs.\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Users = ids.map(id => {\n    let word;\n    if (size === 'small') word = bases[Math.floor(rand() * bases.length)];\n    else { const length = 1 + Math.floor(rand() * 12); word = ''; for (let k = 0; k < length; k++) word += letters[Math.floor(rand() * 26)]; }\n    return [id, scramble(word)];\n  });\n  return [{ Users }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"aLice"],[2,"bOB"]]}],"expected":{"columns":["user_id","name"],"rows":[[1,"Alice"],[2,"Bob"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[]}]},
+    {"name":"Test 2","input":[{"Users":[[7,"a"]]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"Alice"],[2,"Bob"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"BOB"],[2,"MARY"],[3,"Z"]]}]},
+    {"name":"Test 5","input":[{"Users":[[3,"cHARLIE"],[1,"aLICE"],[2,"bob"]]}]},
+    {"name":"Test 6","input":[{"Users":[[10,"ann"],[4,"ANN"],[6,"aNn"]]}]},
+    {"name":"Test 7","input":[{"Users":[[1,"aB"],[2,"Ab"],[3,"ab"],[4,"AB"]]}]},
+    {"name":"Test 8","input":[{"Users":[[5,"lEeTcOdE"],[2,"x"],[9,"jOHN"],[1,"mArY"]]}]},
+    {"name":"Test 9","input":[{"Users":[[1,"aBCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn"],[2,"ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA name splits into two parts with different rules: the first letter must become upper case, and everything after it must become lower case. MySQL has a function for each piece: `LEFT` and `SUBSTRING` cut the name apart, `UPPER` and `LOWER` change the case, and `CONCAT` glues the two parts back together.\n\n## Approach\n\n1. `LEFT(name, 1)` takes the first letter and `UPPER` capitalises it.\n2. `SUBSTRING(name, 2)` takes everything from the second letter to the end (an empty string for a one-letter name) and `LOWER` turns it to lower case.\n3. `CONCAT` joins the two parts; the result is renamed `name` so the output keeps the original column name.\n4. `ORDER BY user_id` gives the required row order.\n\n## Example 1, step by step\n\n| user_id | name | `UPPER(LEFT(name, 1))` | `LOWER(SUBSTRING(name, 2))` | result |\n| --- | --- | --- | --- | --- |\n| 1 | aLice | A | lice | Alice |\n| 2 | bOB | B | ob | Bob |\n\nSorted by `user_id`, the output is `(1, Alice)`, `(2, Bob)`.\n\n## Complexity\n\n- Time: O(U · L + U log U) for U users with names of length L: each name is rebuilt once, then the rows are sorted.\n- Space: O(U · L) for the result.\n\n## Pitfalls\n\n- Upper-casing only the first letter (`CONCAT(UPPER(LEFT(name, 1)), SUBSTRING(name, 2))`) leaves `bOB` as `BOB`; the rest must be lowered too.\n- MySQL strings are 1-indexed: `SUBSTRING(name, 1)` is the whole name, not the tail.\n- Forgetting `ORDER BY user_id`: the table's stored order is not guaranteed and the output must be sorted.\n- Without the alias `AS name` the column is named after the whole expression and the result's columns do not match.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `Users` | the only table; one output row per user |\n| `LEFT(name, 1)` | the first letter of the name |\n| `SUBSTRING(name, 2)` | the rest of the name, from the second letter on |\n| `name` (output) | the rebuilt name: upper-case first letter plus lower-case rest |",
+  "narration": {
+    "1": "Keep each user_id unchanged; it identifies the row in the output.",
+    "2": "Upper-case the first letter, lower-case everything after it, glue the two parts with CONCAT and keep the column name name.",
+    "3": "Every user appears once, so there is no filter, join or grouping.",
+    "4": "The output must be sorted by user_id in ascending order."
+  }
+}

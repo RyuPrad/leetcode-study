@@ -1,0 +1,50 @@
+{
+  "number": 1633,
+  "title": "Percentage of Users Attended a Contest",
+  "spec": "leetcode",
+  "statement": "Two tables track users and their contest sign-ups:\n\n- `Users(user_id, user_name)`: one row per user; `user_id` is unique.\n- `Register(contest_id, user_id)`: user `user_id` signed up for contest `contest_id`; each `(contest_id, user_id)` pair appears at most once, and every `user_id` is a user in `Users`.\n\nFor every contest that appears in `Register`, compute `percentage`: the number of users signed up for it, times 100, divided by the total number of users in `Users` (including users who signed up for nothing), rounded to 2 decimal places.\n\nReturn the columns `contest_id` and `percentage`, ordered by `percentage` descending, then by `contest_id` ascending when percentages tie.",
+  "constraints": [
+    "user_id is unique in Users",
+    "(contest_id, user_id) is unique in Register",
+    "Every Register.user_id appears in Users"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["user_name","VARCHAR(20)"]],
+    "Register": [["contest_id","INT"],["user_id","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Users = [], Register = [] }] = input;\n  const users = new Set(), pairs = new Set();\n  for (const [id] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (users.has(id)) return `user_id ${id} appears twice in Users.`;\n    users.add(id);\n  }\n  for (const [contest, user] of Register) {\n    if (contest === null || user === null) return 'Every registration needs a contest_id and a user_id.';\n    if (!users.has(user)) return `Register names user ${user}, who is not in Users.`;\n    const key = `${contest}/${user}`;\n    if (pairs.has(key)) return `User ${user} registers for contest ${contest} twice.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT r.contest_id,\n  ROUND(COUNT(r.user_id) * 100 / (SELECT COUNT(*) FROM Users), 2) AS percentage\nFROM Register AS r\nGROUP BY r.contest_id\nORDER BY percentage DESC, r.contest_id;",
+  "brute": "SELECT DISTINCT r.contest_id,\n  ROUND(\n    (SELECT COUNT(*) FROM Register AS same WHERE same.contest_id = r.contest_id) * 100\n    / (SELECT COUNT(*) FROM Users), 2) AS percentage\nFROM Register AS r\nORDER BY percentage DESC, contest_id",
+  "generator": "function generate(rand, size) {\n  const names = ['Alice', 'Bob', 'Alex', 'Dana', 'Eve', 'Femi', 'Kai', 'Lee'];\n  const small = size === 'small';\n  const userCount = small ? Math.floor(rand() * 7) : 400;\n  const Users = [];\n  // Ids are scattered so they are not simply 1..n.\n  let id = 0;\n  for (let i = 0; i < userCount; i++) { id += 1 + Math.floor(rand() * 3); Users.push([id, names[Math.floor(rand() * names.length)]]); }\n  const contests = small ? [207, 208, 209, 210, 215] : Array.from({ length: 40 }, (_, i) => 100 + i * 3);\n  const Register = [];\n  if (Users.length) {\n    for (const contest of contests) {\n      // Each contest gets its own sign-up rate, so some contests share a percentage and some are full.\n      const rate = small ? [0, 0.3, 0.5, 1][Math.floor(rand() * 4)] : rand() * 0.12;\n      for (const [user] of Users) if (rand() < rate) Register.push([contest, user]);\n    }\n    for (let i = Register.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Register[i], Register[j]] = [Register[j], Register[i]]; }\n  }\n  return [{ Users, Register: Register.slice(0, small ? 8 : 2000) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[6,"Alice"],[2,"Bob"],[7,"Alex"]],"Register":[[215,6],[209,2],[208,2],[210,6],[208,6],[209,7],[209,6],[215,7],[208,7],[210,2],[207,2],[210,7]]}],"expected":{"columns":["contest_id","percentage"],"rows":[[208,100],[209,100],[210,100],[215,66.67],[207,33.33]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[[1,"Ana"]],"Register":[]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"Ana"],[2,"Bob"],[3,"Kai"]],"Register":[[5,1],[5,2],[5,3]]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"Ana"],[2,"Bob"],[3,"Kai"]],"Register":[[9,1],[5,2],[3,3]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"Ana"],[2,"Bob"],[3,"Kai"],[4,"Lee"]],"Register":[[1,1],[1,2]]}]},
+    {"name":"Test 5","input":[{"Users":[[1,"A"],[2,"B"],[3,"C"],[4,"D"],[5,"E"],[6,"F"],[7,"G"]],"Register":[[10,1],[11,2],[11,3],[12,4],[12,5],[12,6]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"A"],[2,"B"],[3,"C"],[4,"D"],[5,"E"],[6,"F"],[7,"G"],[8,"H"]],"Register":[[40,8],[30,1],[30,2],[30,3],[20,4],[20,5],[20,6],[10,7]]}]},
+    {"name":"Test 7","input":[{"Users":[[4,"Kai"]],"Register":[[30,4],[10,4],[20,4]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"A"],[2,"B"],[3,"C"],[4,"D"],[5,"E"],[6,"F"]],"Register":[[300,1],[300,2],[300,3],[300,4],[200,5],[200,6],[100,1],[100,3],[100,5],[100,6],[400,2],[400,4]]}]},
+    {"name":"Test 9","input":[{"Users":[[1,"Ana"],[2,"Ana"],[3,"Ana"]],"Register":[[7,3],[8,3],[8,1],[6,2]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach contest's percentage is \"how many users signed up\" over \"how many users exist\". The numerator is a per-contest count, so it comes from grouping `Register` by contest. The denominator is the same for every contest, the size of `Users`, so a scalar subquery computes it once. The trap is the denominator: users who never signed up for anything still count.\n\n## Approach\n\n1. Read `Register` (alias `r`) and `GROUP BY r.contest_id`, so each contest becomes one row.\n2. `COUNT(r.user_id)` is that contest's sign-ups; multiply by 100 and divide by `(SELECT COUNT(*) FROM Users)`.\n3. `ROUND(..., 2)` keeps two decimals; name the column `percentage`.\n4. `ORDER BY percentage DESC, r.contest_id` puts the most popular contests first and breaks ties by id.\n\n## Example 1, step by step\n\n- `Users` has 3 rows, so the denominator is 3.\n- Contests 208, 209 and 210 each have 3 sign-ups: 3 · 100 / 3 = 100.\n- Contest 215 has 2 sign-ups (Alice, Alex): 200 / 3 = 66.666..., rounded to 66.67.\n- Contest 207 has 1 sign-up (Bob): 100 / 3 = 33.33.\n- Sorting by percentage descending puts the three 100s first, in contest order 208, 209, 210, then 215 and 207.\n\n## Complexity\n\n- Time: O(R log R) for R registrations to group and sort, plus O(U) to count U users.\n- Space: O(C) for C distinct contests.\n\n## Pitfalls\n\n- Dividing by the number of distinct users in `Register` instead of all users in `Users` overstates every percentage whenever someone never signs up.\n- Forgetting the `contest_id` tie-break leaves equal percentages in arbitrary order.\n- Joining `Users` to `Register` and counting the joined rows does not give the total user count; the denominator must ignore contests.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `r` | `Register`, one sign-up per row |\n| `COUNT(r.user_id)` | sign-ups in the current contest group |\n| `(SELECT COUNT(*) FROM Users)` | every user, the shared denominator |\n| `percentage` | sign-ups as a share of all users, 2 decimals |",
+  "narration": {
+    "1": "Each output row names a contest.",
+    "2": "Its sign-up count times 100, over the number of all users, rounded to two decimals.",
+    "3": "Registrations are the rows being counted.",
+    "4": "Grouping by contest turns each contest into one row with its own count.",
+    "5": "Highest percentage first; equal percentages fall back to contest_id ascending."
+  }
+}

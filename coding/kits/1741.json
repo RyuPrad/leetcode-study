@@ -1,0 +1,49 @@
+{
+  "number": 1741,
+  "title": "Find Total Time Spent by Each Employee",
+  "spec": "leetcode",
+  "statement": "One table logs office visits:\n\n- `Employees(emp_id, event_day, in_time, out_time)`: one row per visit. The employee `emp_id` arrived at minute `in_time` and left at minute `out_time` of the date `event_day`. The triple `(emp_id, event_day, in_time)` is unique.\n- Minutes run from 1 to 1440, every visit has `in_time < out_time`, and an employee's visits on one day never overlap. An employee may visit several times on the same day.\n\nA single visit lasts `out_time - in_time` minutes. For every employee and every day on which that employee visited, report the total minutes of all their visits that day. Output the columns `day` (the date), `emp_id` and `total_time`, one row per (employee, day) pair. Rows may come in any order.",
+  "constraints": [
+    "(emp_id, event_day, in_time) is unique in Employees",
+    "1 <= in_time < out_time <= 1440",
+    "An employee's visits on the same day do not overlap"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["emp_id","INT"],["event_day","DATE"],["in_time","INT"],["out_time","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const keys = new Set(), visits = new Map();\n  for (const [emp, day, start, end] of Employees) {\n    if (emp === null || day === null || start === null || end === null) return 'Employees rows may not contain null.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)) return `event_day ${day} is not a YYYY-MM-DD date.`;\n    if (start < 1 || end > 1440 || start >= end) return `Visit ${start}-${end} must satisfy 1 <= in_time < out_time <= 1440.`;\n    const key = `${emp}|${day}|${start}`;\n    if (keys.has(key)) return `(${emp}, ${day}, ${start}) appears twice.`;\n    keys.add(key);\n    const bucket = `${emp}|${day}`;\n    if (!visits.has(bucket)) visits.set(bucket, []);\n    visits.get(bucket).push([start, end]);\n  }\n  for (const [bucket, list] of visits) {\n    list.sort((a, b) => a[0] - b[0]);\n    for (let i = 1; i < list.length; i++) if (list[i][0] <= list[i - 1][1]) return `Visits of ${bucket.replace('|', ' on ')} overlap.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  event_day AS day,\n  emp_id,\n  SUM(out_time - in_time) AS total_time\nFROM Employees\nGROUP BY event_day, emp_id;",
+  "brute": "SELECT DISTINCT\n  e.event_day AS day,\n  e.emp_id,\n  (SELECT SUM(v.out_time) - SUM(v.in_time)\n   FROM Employees AS v\n   WHERE v.emp_id = e.emp_id AND v.event_day = e.event_day) AS total_time\nFROM Employees AS e",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const emps = small ? 3 : 50;\n  const days = small ? 3 : 20;\n  const rows = small ? pick(9) : 2000;\n  // Spread the visits over (employee, day) buckets, then give each bucket disjoint intervals.\n  const counts = new Map();\n  for (let k = 0; k < rows; k++) {\n    const bucket = `${1 + pick(emps)}|${1 + pick(days)}`;\n    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);\n  }\n  const Employees = [];\n  for (const [bucket, k] of counts) {\n    const [emp, d] = bucket.split('|').map(Number);\n    // Days run from 2021-01-28 across the month boundary into February.\n    const date = d + 27 <= 31 ? `2021-01-${d + 27}` : `2021-02-${String(d - 4).padStart(2, '0')}`;\n    const points = new Set();\n    while (points.size < 2 * k) {\n      const r = rand();\n      points.add(small && r < 0.1 ? 1 : small && r < 0.2 ? 1440 : 1 + pick(1440));\n    }\n    const sorted = [...points].sort((a, b) => a - b);\n    for (let i = 0; i < k; i++) Employees.push([emp, date, sorted[2 * i], sorted[2 * i + 1]]);\n  }\n  // Shuffle so rows of one bucket are not adjacent.\n  for (let i = Employees.length - 1; i > 0; i--) { const j = pick(i + 1); [Employees[i], Employees[j]] = [Employees[j], Employees[i]]; }\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[1,"2020-11-28",4,32],[1,"2020-11-28",55,200],[1,"2020-12-03",1,42],[2,"2020-11-28",3,33],[2,"2020-12-09",47,74]]}],"expected":{"columns":["day","emp_id","total_time"],"rows":[["2020-11-28",1,173],["2020-11-28",2,30],["2020-12-03",1,41],["2020-12-09",2,27]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"2021-01-01",1,1440]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"2021-01-01",10,20],[1,"2021-01-01",100,130]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,"2021-01-01",10,20],[1,"2021-01-02",10,20],[1,"2021-01-03",5,65]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"2021-03-15",60,120],[2,"2021-03-15",60,90],[3,"2021-03-15",1,2]]}]},
+    {"name":"Test 6","input":[{"Employees":[[4,"2021-02-28",1,2],[4,"2021-02-28",5,6],[4,"2021-02-28",1439,1440],[4,"2021-03-01",1,2]]}]},
+    {"name":"Test 7","input":[{"Employees":[[7,"2020-12-31",600,700],[7,"2021-01-01",600,700],[8,"2020-12-31",600,700],[8,"2020-12-31",800,801],[7,"2020-12-31",900,1000]]}]},
+    {"name":"Test 8","input":[{"Employees":[[2,"2021-06-01",300,400],[1,"2021-06-01",50,60],[2,"2021-06-02",300,400],[1,"2021-06-02",50,60],[2,"2021-06-01",10,20],[1,"2021-06-02",70,80]]}]},
+    {"name":"Test 9","input":[{"Employees":[[5,"2021-07-04",100,200],[5,"2021-07-04",201,300],[5,"2021-07-04",301,1440]]}]},
+    {"name":"Test 10","input":[{"Employees":[[10,"2021-08-08",1,1440],[11,"2021-08-08",1,1440],[10,"2021-08-09",720,721],[11,"2021-08-09",1,720]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row is one employee on one day, so the pair `(event_day, emp_id)` is the group key. Within a group, every visit contributes its own length `out_time - in_time`, and adding those lengths gives the time spent in the office that day. That is a plain `SUM` over a per-row expression, the core move of SQL aggregation.\n\n## Approach\n\n1. Read `Employees`.\n2. `GROUP BY event_day, emp_id`, so each group holds one employee's visits on one day.\n3. Select `event_day` renamed to `day`, the `emp_id`, and `SUM(out_time - in_time)` as `total_time`.\n\n## Example 1, step by step\n\n- (2020-11-28, 1): visits 4–32 and 55–200 last 28 and 145 minutes, so `total_time = 173`.\n- (2020-11-28, 2): one visit 3–33 gives 30.\n- (2020-12-03, 1): one visit 1–42 gives 41.\n- (2020-12-09, 2): one visit 47–74 gives 27.\n\nFour groups, four output rows, matching the expected table.\n\n## Complexity\n\n- Time: O(n) with hash grouping for n visits (O(n log n) if the database sorts to group).\n- Space: O(g) for g distinct (employee, day) pairs.\n\n## Pitfalls\n\n- `MAX(out_time) - MIN(in_time)` counts the gaps between visits as office time (it would give 196 instead of 173 for employee 1 on 2020-11-28).\n- Grouping by `emp_id` alone merges different days; grouping by `event_day` alone merges different employees.\n- `out_time - in_time + 1` counts both end minutes; the statement defines a visit's length as the plain difference.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY event_day, emp_id` | one group per employee per day |\n| `day` | the group's `event_day`, under the required output name |\n| `total_time` | sum of `out_time - in_time` over the group's visits |",
+  "narration": {
+    "2": "The date is reported under the required output name day.",
+    "4": "Each visit contributes out_time - in_time minutes, and SUM adds them up within the group.",
+    "5": "All visits come from the single Employees table.",
+    "6": "Grouping by day and employee makes one output row per employee per day."
+  }
+}

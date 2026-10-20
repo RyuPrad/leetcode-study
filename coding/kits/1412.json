@@ -1,0 +1,55 @@
+{
+  "number": 1412,
+  "title": "Find the Quiet Students in All Exams",
+  "spec": "recalled",
+  "statement": "Two tables describe students and their exam results:\n\n- `Student(student_id, student_name)`: one row per student; `student_id` is unique.\n- `Exam(exam_id, student_id, score)`: one row per student who sat an exam; `(exam_id, student_id)` is unique and `score` is never `null`.\n\nCall a student **quiet** when they sat at least one exam and, in every exam they sat, their score was neither that exam's highest score nor its lowest score. Scores that tie with the highest or the lowest count as highest or lowest, so a student who is the only one in an exam is never quiet in it. Students who never sat an exam are not quiet.\n\nReturn the columns `student_id` and `student_name` for every quiet student, ordered by `student_id` ascending.",
+  "constraints": [
+    "student_id is unique in Student",
+    "(exam_id, student_id) is unique in Exam",
+    "score is never null",
+    "Every Exam.student_id appears in Student"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Student": [["student_id","INT"],["student_name","VARCHAR(30)"]],
+    "Exam": [["exam_id","INT"],["student_id","INT"],["score","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Student = [], Exam = [] }] = input;\n  const students = new Set();\n  for (const [id] of Student) {\n    if (id === null) return 'Every student needs a student_id.';\n    if (students.has(id)) return `student_id ${id} appears twice in Student.`;\n    students.add(id);\n  }\n  const seen = new Set();\n  for (const [exam, student, score] of Exam) {\n    if (exam === null || student === null) return 'Every exam row needs an exam_id and a student_id.';\n    if (score === null) return 'score is never null.';\n    if (!students.has(student)) return `Exam names student ${student}, who is not in Student.`;\n    const key = `${exam}/${student}`;\n    if (seen.has(key)) return `Student ${student} sat exam ${exam} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH scored AS (\n  SELECT\n    student_id,\n    score,\n    MAX(score) OVER (PARTITION BY exam_id) AS top_score,\n    MIN(score) OVER (PARTITION BY exam_id) AS low_score\n  FROM Exam\n)\nSELECT s.student_id, s.student_name\nFROM Student AS s\nJOIN scored AS e\n  ON e.student_id = s.student_id\nGROUP BY s.student_id, s.student_name\nHAVING SUM(e.score = e.top_score OR e.score = e.low_score) = 0\nORDER BY s.student_id;",
+  "brute": "SELECT s.student_id, s.student_name\nFROM Student AS s\nWHERE EXISTS (SELECT 1 FROM Exam AS taken WHERE taken.student_id = s.student_id)\n  AND NOT EXISTS (\n    SELECT 1\n    FROM Exam AS mine\n    WHERE mine.student_id = s.student_id\n      AND (\n        NOT EXISTS (SELECT 1 FROM Exam AS other WHERE other.exam_id = mine.exam_id AND other.score > mine.score)\n        OR NOT EXISTS (SELECT 1 FROM Exam AS other WHERE other.exam_id = mine.exam_id AND other.score < mine.score)\n      )\n  )\nORDER BY s.student_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const names = ['Daniel', 'Jade', 'Stella', 'Jonathan', 'Will', 'Mia', 'Omar', 'Lena'];\n  const studentCount = small ? Math.floor(rand() * 7) : 400;\n  const examCount = small ? 1 + Math.floor(rand() * 3) : 25;\n  const ids = [];\n  for (let i = 1; i <= studentCount; i++) ids.push(i * 2 + 1);\n  // Shuffle so students are stored out of id order.\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Student = ids.map((id) => [id, names[Math.floor(rand() * names.length)]]);\n  const pairs = [];\n  for (let e = 1; e <= examCount; e++) for (const id of ids) if (rand() < (small ? 0.6 : 0.2)) pairs.push([e * 10, id]);\n  const limit = small ? 8 : 2000;\n  const scores = small ? [60, 70, 70, 80, 90] : null;\n  const Exam = pairs.slice(0, limit).map(([e, id]) => [e, id, scores ? scores[Math.floor(rand() * scores.length)] : 40 + 5 * Math.floor(rand() * 13)]);\n  return [{ Student, Exam }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Student":[[1,"Daniel"],[2,"Jade"],[3,"Stella"],[4,"Jonathan"],[5,"Will"]],"Exam":[[10,1,70],[10,2,80],[10,3,90],[20,1,80],[30,1,70],[30,3,80],[30,4,90],[40,1,60],[40,2,70],[40,4,80]]}],"expected":{"columns":["student_id","student_name"],"rows":[[2,"Jade"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Student":[[1,"Ana"],[2,"Ben"]],"Exam":[]}]},
+    {"name":"Test 2","input":[{"Student":[[1,"Ana"]],"Exam":[[5,1,75]]}]},
+    {"name":"Test 3","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"]],"Exam":[[5,1,80],[5,2,80],[5,3,80]]}]},
+    {"name":"Test 4","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"],[4,"Dee"]],"Exam":[[5,1,90],[5,2,90],[5,3,70],[5,4,50]]}]},
+    {"name":"Test 5","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"]],"Exam":[[5,1,60],[5,2,70],[5,3,80],[6,2,95],[6,3,85],[6,1,75]]}]},
+    {"name":"Test 6","input":[{"Student":[[9,"Ivy"],[4,"Dee"],[7,"Gus"],[2,"Ben"],[5,"Eve"]],"Exam":[[1,2,10],[1,4,50],[1,7,60],[1,9,100],[2,2,100],[2,4,40],[2,7,55],[2,9,0]]}]},
+    {"name":"Test 7","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"],[4,"Dee"]],"Exam":[[1,1,50],[1,2,70],[1,3,90],[2,1,70],[2,3,80],[2,4,85]]}]},
+    {"name":"Test 8","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"],[4,"Dee"],[5,"Eve"]],"Exam":[[1,1,40],[1,2,60],[1,3,80],[2,4,20],[2,5,40],[2,1,60],[2,3,50]]}]},
+    {"name":"Test 9","input":[{"Student":[[1,"Ana"],[2,"Ben"],[3,"Cy"],[4,"Dee"],[5,"Eve"],[6,"Fay"]],"Exam":[[1,1,30],[1,2,50],[1,3,50],[1,4,90],[2,2,65],[2,3,70],[2,5,75],[2,6,70],[2,1,60]]}]},
+    {"name":"Test 10","input":[{"Student":[[1,"Daniel"],[2,"Jade"],[3,"Stella"],[4,"Jonathan"],[5,"Will"],[6,"Mia"]],"Exam":[[10,1,70],[10,2,80],[10,3,90],[20,1,80],[30,1,70],[30,3,80],[30,4,90],[40,1,60],[40,2,70],[40,4,80],[40,6,75],[30,6,85]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWhether a score is extreme depends only on the other scores **in the same exam**, so first attach to every exam row that exam's highest and lowest score. Window functions do this without collapsing the rows: `MAX(score) OVER (PARTITION BY exam_id)` repeats the exam's maximum on each of its rows. A student is then quiet when none of their rows equals either extreme. Joining `Student` to these rows with an inner join also drops students who never sat an exam.\n\n## Approach\n\n1. CTE `scored`: every `Exam` row with `top_score` and `low_score`, the maximum and minimum of its exam.\n2. Inner join `Student` (alias `s`) to `scored` (alias `e`) on `student_id`, so only students with at least one exam remain.\n3. `GROUP BY` the student and keep the group when `SUM(e.score = e.top_score OR e.score = e.low_score) = 0`: the comparison is 1 for an extreme score and 0 otherwise, so the sum counts the student's loud exams.\n4. `ORDER BY s.student_id`.\n\n## Example 1, step by step\n\n`scored` gives exam 10: top 90, low 70; exam 20: top 80, low 80; exam 30: top 90, low 70; exam 40: top 80, low 60.\n\n| student | rows (score / top / low) | loud exams |\n| --- | --- | --- |\n| 1 Daniel | 70/90/70, 80/80/80, 70/90/70, 60/80/60 | 4 |\n| 2 Jade | 80/90/70, 70/80/60 | 0 |\n| 3 Stella | 90/90/70, 80/90/70 | 1 |\n| 4 Jonathan | 90/90/70, 80/80/60 | 2 |\n\nWill has no rows and disappears in the join. Only Jade has a sum of 0, so the result is `(2, Jade)`.\n\n## Complexity\n\n- Time: O(E log E) to partition the E exam rows, plus O(E + S) for the join and grouping with S students.\n- Space: O(E) for `scored`.\n\n## Pitfalls\n\n- Comparing with the overall maximum and minimum of the whole table instead of each exam's.\n- A left join, or `WHERE student_id NOT IN (loud students)` on `Student`, reports students who never sat an exam.\n- `ROW_NUMBER` to find the extremes marks only one of several tied top scorers; every tie at the top or bottom is loud.\n- A student alone in an exam is both its top and its low scorer, so that exam already makes them loud.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `scored` | every exam row with its exam's highest and lowest score |\n| `top_score` / `low_score` | the extremes of the row's exam |\n| `s` | `Student`, giving the name |\n| `e` | rows of `scored` that belong to the student |\n| `HAVING SUM(...) = 0` | the student was never at an extreme |",
+  "narration": {
+    "1": "The scored stage keeps every exam row and adds that exam's extremes.",
+    "5": "The window takes the highest score among the rows of the same exam.",
+    "6": "The lowest score of the same exam, repeated on each of its rows.",
+    "11": "An inner join keeps only students who sat at least one exam.",
+    "13": "One group per student, gathering all of their exam rows.",
+    "14": "Count the exams where the student hit an extreme and keep only students with none.",
+    "15": "Report students in ascending order of id."
+  }
+}

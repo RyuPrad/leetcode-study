@@ -1,0 +1,63 @@
+{
+  "number": 1012,
+  "title": "Numbers With Repeated Digits",
+  "spec": "leetcode",
+  "statement": "Given a positive integer `n`, count the integers `x` with `1 <= x <= n` whose usual decimal form (no leading zeros) uses some digit two or more times, and return that count. For example `121` and `100` qualify, while `120` does not.",
+  "constraints": [
+    "1 <= n <= 10^9"
+  ],
+  "signature": "int numDupDigitsAtMostN(int n)",
+  "entry": "numDupDigitsAtMostN",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 1000000000) return 'n is a whole number from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numDupDigitsAtMostN(n) {\n  const digits = String(n).split('').map(Number);\n  const memo = new Map();\n\n  function count(pos, mask, tight, started) {\n    if (pos === digits.length) {\n      return started ? 1 : 0;\n    }\n    const key = pos * 1024 + mask;\n    if (!tight && started && memo.has(key)) {\n      return memo.get(key);\n    }\n    const limit = tight ? digits[pos] : 9;\n    let total = 0;\n    for (let digit = 0; digit <= limit; digit++) {\n      const nextTight = tight && digit === limit;\n      if (!started && digit === 0) {\n        total += count(pos + 1, mask, nextTight, false);\n      } else if ((mask & (1 << digit)) === 0) {\n        total += count(pos + 1, mask | (1 << digit), nextTight, true);\n      }\n    }\n    if (!tight && started) {\n      memo.set(key, total);\n    }\n    return total;\n  }\n\n  return n - count(0, 0, true, false);\n}",
+  "brute": "function numDupDigitsAtMostN(n) {\n  // List every number up to n whose digits are all different by growing them one digit at a time.\n  let distinct = 0;\n  const used = new Array(10).fill(false);\n  const extend = (value) => {\n    for (let d = value === 0 ? 1 : 0; d <= 9; d++) {\n      if (used[d]) continue;\n      const next = value * 10 + d;\n      if (next > n) break;\n      used[d] = true;\n      distinct++;\n      extend(next);\n      used[d] = false;\n    }\n  };\n  extend(0);\n  return n - distinct;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = rand();\n  if (size === 'large') {\n    if (pick < 0.15) return [1000000000];\n    // A number with up to nine all-different digits, or a random one near the limit.\n    if (pick < 0.4) {\n      const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];\n      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n      if (pool[0] === 0) [pool[0], pool[1]] = [pool[1], pool[0]];\n      return [Number(pool.slice(0, 9).join(''))];\n    }\n    return [100000000 + Math.floor(rand() * 900000001)];\n  }\n  // Small: tiny values, powers of ten and their neighbours, repeated digits, or moderate values.\n  if (pick < 0.3) return [1 + Math.floor(rand() * 150)];\n  if (pick < 0.5) {\n    const power = 10 ** (1 + Math.floor(rand() * 5));\n    return [Math.max(1, power + Math.floor(rand() * 3) - 1)];\n  }\n  if (pick < 0.65) {\n    const digit = 1 + Math.floor(rand() * 9);\n    return [Number(String(digit).repeat(1 + Math.floor(rand() * 5)))];\n  }\n  return [1 + Math.floor(rand() * 200000)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[20],"expected":1},
+    {"name":"Example 2","input":[100],"expected":10},
+    {"name":"Example 3","input":[1000],"expected":262}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[10]},
+    {"name":"Test 3","input":[11]},
+    {"name":"Test 4","input":[99]},
+    {"name":"Test 5","input":[101]},
+    {"name":"Test 6","input":[1022]},
+    {"name":"Test 7","input":[9876]},
+    {"name":"Test 8","input":[123456789]},
+    {"name":"Test 9","input":[987654321]},
+    {"name":"Test 10","input":[999999999]},
+    {"name":"Test 11","input":[1000000000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nLooping over all `n` numbers is far too slow for `n = 10^9`. It is easier to count the opposite: numbers whose digits are **all different**, then subtract that from `n`. Those can be counted digit by digit, left to right, remembering only three things: which digits are already used (a 10-bit `mask`), whether the prefix so far equals `n`'s prefix (`tight`, which caps the next digit), and whether a non-zero digit has been placed yet (`started`, so leading zeros are not treated as used zeros). This is a digit DP.\n\n## Approach\n\n1. Split `n` into `digits`.\n2. `count(pos, mask, tight, started)` returns how many ways the positions from `pos` onward can be filled so that the whole number has distinct digits and stays at most `n`.\n3. At the end of the digits, return 1 if a number was started (0 itself is not counted).\n4. The next digit may go up to `digits[pos]` when `tight`, else up to 9. A leading zero keeps `started` false and the `mask` unchanged; any other digit must be absent from `mask` and is added to it.\n5. Results of states that are not tight and have started depend only on `pos` and `mask`, so they are cached in `memo`.\n6. Return `n - count(0, 0, true, false)`.\n\n## Example 1, step by step\n\n`n = 20`, `digits = [2, 0]`. A leading 0 followed by 1 to 9 gives the nine one-digit numbers. First digit 1 is not tight, and the second digit can be anything except 1: nine numbers (10, 12 to 19). First digit 2 is tight, so the second digit is capped at 0, giving 20. That is `9 + 9 + 1 = 19` numbers with distinct digits, so the answer is `20 - 19 = 1` (just 11).\n\n## Complexity\n\n- Time: O(D · 2^10 · 10), where D ≤ 10 is the number of digits: each cached state tries ten digits.\n- Space: O(D · 2^10) for `memo`, plus O(D) recursion.\n\n## Pitfalls\n\n- Leading zeros are not real digits: without `started`, the number 7 padded to `007` (when `n` has three digits) would seem to repeat 0 and be wrongly left out.\n- Do not cache tight states: their answer depends on the rest of `n`, not just `pos` and `mask`.\n- Count the complement and subtract; also make sure the empty number 0 is not counted as a distinct-digit number.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `digits` | the decimal digits of `n` |\n| `memo` | cached counts for free (non-tight, started) states |\n| `pos` | index of the digit being chosen |\n| `mask` | bit `d` is set when digit `d` is already used |\n| `tight`, `started` | prefix equals `n`'s prefix; a non-zero digit has been placed |\n| `limit`, `digit`, `nextTight` | largest allowed digit, the candidate digit, and the next state's tightness |\n| `total` | distinct-digit numbers counted from this state |",
+  "narration": {
+    "2": "Split n into its decimal digits so they can be matched one position at a time.",
+    "5": "count fills positions pos onward and returns how many all-distinct numbers up to n result.",
+    "6": "Every position is filled...",
+    "7": "...which is one valid number, unless only leading zeros were placed.",
+    "10": "A free state with digits already started depends only on pos and mask, so reuse a cached answer.",
+    "13": "While the prefix matches n, the next digit cannot exceed n's digit here.",
+    "15": "Try each allowed digit at this position.",
+    "16": "The number stays tight only if it was tight and this digit equals the cap.",
+    "17": "A zero before any real digit is a leading zero...",
+    "18": "...so it neither starts the number nor uses up the digit 0.",
+    "19": "A real digit is allowed only if the mask shows it unused so far.",
+    "20": "Mark the digit as used and continue with the next position.",
+    "24": "Store the count for this free state.",
+    "29": "Numbers with a repeated digit are everything up to n minus the all-distinct ones."
+  }
+}

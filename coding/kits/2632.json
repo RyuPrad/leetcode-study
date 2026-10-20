@@ -1,0 +1,67 @@
+{
+  "number": 2632,
+  "title": "Curry",
+  "spec": "recalled",
+  "statement": "Write `curry(fn)`, which returns a **curried** version of `fn`. The curried function accepts `fn`'s arguments spread over as many calls as you like: each call may pass any number of them, even none, and gets back another curried function that waits for the rest. As soon as the arguments collected so far reach `fn.length` (the number of parameters `fn` declares), `fn` is called with all of them, in the order they were given, and its return value is returned. So for `sum(a, b, c)`, the calls `curry(sum)(1)(2)(3)`, `curry(sum)(1, 2)(3)`, `curry(sum)()()(1, 2, 3)` and `curry(sum)(1, 2, 3)` all give `sum(1, 2, 3)`. When `fn.length` is `0`, the first call runs `fn` straight away.\n\nEach case gives:\n\n- `fn` as `{ name, length }`: `length` is its number of declared parameters and `name` says what it returns: `\"sum\"` the sum of its arguments, `\"list\"` an array of its arguments in order, and `\"life\"` always `42`.\n- `inputs`, the argument lists of the calls, in order.\n\nThe judge calls `curry(fn)`, then calls the result with the first list of `inputs`, calls what that returns with the second list, and so on. The answer is the value returned by the last call. Together the lists hold exactly `fn.length` arguments, and the last list is not empty, except when `fn.length` is `0` and `inputs` is `[[]]`.",
+  "constraints": [
+    "1 <= inputs.length <= 1000",
+    "0 <= inputs[i][j] <= 10^5",
+    "0 <= fn.length <= 1000",
+    "inputs.flat().length == fn.length",
+    "If fn.length > 0, the last list of inputs is not empty",
+    "If fn.length == 0, inputs is [[]]",
+    "fn.name is \"sum\", \"list\" or \"life\""
+  ],
+  "signature": "Object curry(Object fn, List<List<Integer>> inputs)",
+  "entry": "curry",
+  "kind": "function",
+  "parameters": [
+    "fn",
+    "inputs"
+  ],
+  "validator": "function validate(input) {\n  const [fn, inputs] = input;\n  if (fn === null || typeof fn !== 'object' || !['sum', 'list', 'life'].includes(fn.name)) return 'fn.name must be \"sum\", \"list\" or \"life\".';\n  if (!Number.isInteger(fn.length) || fn.length < 0 || fn.length > 1000) return 'fn.length must be an integer from 0 to 1000.';\n  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 1000) return 'Give 1 to 1000 argument lists.';\n  let total = 0;\n  for (const args of inputs) {\n    if (!Array.isArray(args) || !args.every(v => Number.isInteger(v) && v >= 0 && v <= 100000)) return 'Each argument list holds integers from 0 to 10^5.';\n    total += args.length;\n  }\n  if (total !== fn.length) return `The lists must hold exactly fn.length = ${fn.length} arguments in total.`;\n  if (fn.length > 0 && inputs[inputs.length - 1].length === 0) return 'The last argument list must not be empty.';\n  if (fn.length === 0 && inputs.length !== 1) return 'When fn.length is 0, inputs must be [[]].';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [spec, inputs] = input;\n  const body = { sum: (args) => args.reduce((total, value) => total + value, 0), list: (args) => args, life: () => 42 }[spec.name];\n  let runs = 0;\n  const fn = function (...args) {\n    runs += 1;\n    const result = body(args);\n    kit.trace(`${spec.name}(${args.join(', ')}) runs and returns ${JSON.stringify(result)}`);\n    return result;\n  };\n  // fn.length is what curry reads to know how many arguments fn needs.\n  Object.defineProperty(fn, 'length', { value: spec.length });\n  Object.defineProperty(fn, 'name', { value: spec.name });\n  let current = solve(fn);\n  if (typeof current !== 'function') throw new Error('curry must return a function.');\n  inputs.forEach((args, i) => {\n    if (typeof current !== 'function') throw new Error(`Call ${i} returned ${JSON.stringify(current)}, but arguments are still missing, so it should return a function.`);\n    current = current(...args);\n    kit.trace(`Call ${i + 1} with (${args.join(', ')}) returns ${typeof current === 'function' ? 'a function' : JSON.stringify(current)}`);\n  });\n  if (typeof current === 'function') throw new Error('Every argument was given, but the last call still returned a function instead of running fn.');\n  if (runs !== 1) throw new Error(`fn should run exactly once, but it ran ${runs} times.`);\n  return current;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn\n * @return {Function} the curried version of fn\n */\nfunction curry(fn) {\n  // Write your code here.\n  return function curried(...args) {\n  };\n}\n",
+    "typescript": "type AnyFn = (...args: any[]) => any;\n\nfunction curry(fn: AnyFn): AnyFn {\n  // Write your code here.\n  return function curried(...args) {\n  };\n}\n"
+  },
+  "api": "curry(fn: (...args: any[]) => any): (...args: any[]) => any",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function curry(fn) {\n  return function curried(...args) {\n    if (args.length >= fn.length) {\n      return fn(...args);\n    }\n    return function (...more) {\n      return curried(...args, ...more);\n    };\n  };\n}",
+  "brute": "function curry(fn) {\n  // Each partial call is a bound copy of step with the arguments so far fixed in front.\n  return function step(...args) {\n    if (args.length >= fn.length) return fn.apply(this, args);\n    return step.bind(this, ...args);\n  };\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const roll = rand();\n  const name = roll < 0.45 ? 'sum' : roll < 0.9 ? 'list' : 'life';\n  const length = small ? Math.floor(rand() * 5) : 900 + Math.floor(rand() * 101);\n  if (length === 0) return [{ name, length }, [[]]];\n  const values = Array.from({ length }, () => Math.floor(rand() * (small ? 10 : 100001)));\n  const inputs = [];\n  let next = 0;\n  while (next < length) {\n    // At most 1000 calls: the last one takes whatever is left.\n    const take = inputs.length === 998 ? length - next : Math.floor(rand() * (small ? 3 : 4));\n    inputs.push(values.slice(next, next + take));\n    next += take;\n  }\n  while (inputs[inputs.length - 1].length === 0) inputs.pop();\n  return [{ name, length }, inputs];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"name":"sum","length":3},[[1],[2],[3]]],"expected":6},
+    {"name":"Example 2","input":[{"name":"sum","length":3},[[1,2],[3]]],"expected":6},
+    {"name":"Example 3","input":[{"name":"sum","length":3},[[],[],[1,2,3]]],"expected":6},
+    {"name":"Example 4","input":[{"name":"life","length":0},[[]]],"expected":42}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"name":"list","length":3},[[1],[2],[3]]]},
+    {"name":"Test 2","input":[{"name":"list","length":3},[[3,2],[1]]]},
+    {"name":"Test 3","input":[{"name":"list","length":1},[[],[7]]]},
+    {"name":"Test 4","input":[{"name":"sum","length":1},[[100000]]]},
+    {"name":"Test 5","input":[{"name":"list","length":5},[[5],[],[4,3],[],[2,1]]]},
+    {"name":"Test 6","input":[{"name":"life","length":2},[[0],[0]]]},
+    {"name":"Test 7","input":[{"name":"sum","length":4},[[0,0,0,0]]]},
+    {"name":"Test 8","input":[{"name":"list","length":2},[[0],[0]]]},
+    {"name":"Test 9","input":[{"name":"list","length":6},[[1],[2],[3],[4],[5],[6]]]},
+    {"name":"Test 10","input":[{"name":"sum","length":10},[[],[1,2,3,4,5,6,7,8,9,10]]]},
+    {"name":"Test 11","input":[{"name":"list","length":0},[[]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nA curried function has to remember the arguments it has been given so far, and that memory lives in a closure. Each call adds its arguments to the remembered ones. If together they cover `fn.length`, it is time to call `fn`; otherwise the call returns a new function that remembers the longer list. Building a **new** list each time, instead of pushing into one shared array, keeps every partial result independent: `const add1 = curried(1)` can be finished as `add1(2)(3)` and later as `add1(5)(6)`. (The brute force does the same with `bind`: `step.bind(this, ...args)` is a function that calls `step` with `args` placed in front of the new arguments.)\n\n## Approach\n\n1. `curry` returns `curried`, a function whose `args` are all the arguments collected so far.\n2. If `args.length >= fn.length`, call `fn(...args)` and return its value.\n3. Otherwise return a function that takes the next call's arguments `more` and calls `curried(...args, ...more)`, so the check runs again on the longer list.\n\n## Example 1, step by step\n\n`fn` is `sum` with `fn.length = 3`, and `inputs = [[1], [2], [3]]`.\n\n- `curried(1)`: `args = [1]`, and 1 < 3, so it returns a function remembering `[1]`.\n- That function gets `(2)` and calls `curried(1, 2)`: 2 < 3, so it returns a function remembering `[1, 2]`.\n- That one gets `(3)` and calls `curried(1, 2, 3)`: 3 >= 3, so `sum(1, 2, 3)` runs and 6 is returned.\n\n## Complexity\n\n- Time: each call copies the arguments collected so far, so a chain of c calls with n arguments in total costs O(c · n) at worst, and O(n) when the arguments come in a few large calls.\n- Space: O(n) for the remembered arguments of a pending partial function.\n\n## Pitfalls\n\n- Pushing into one shared array: the first chain works, but reusing `curry(fn)` or a partial result sees arguments left over from earlier calls.\n- Testing only the current call's argument count instead of the total collected: `(1)(2)(3)` would never reach 3.\n- Calling `fn` on an empty call: `curried()` must return a function while arguments are missing (Example 3), but must run `fn` at once when `fn.length` is `0` (Example 4).\n- `fn.length` counts only plain declared parameters, not rest or default ones; this problem promises they are all declared.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `fn` | the function to curry; `fn.length` is how many arguments it needs |\n| `curried` | the curried function; it receives every argument collected so far |\n| `args` | the arguments collected so far, in order |\n| `more` | the arguments of the next call |",
+  "narration": {
+    "1": "curry receives fn and returns its curried version.",
+    "2": "curried gets every argument collected so far as args.",
+    "3": "Do the collected arguments cover all the parameters fn declares?",
+    "4": "Yes: run fn with all of them, in order, and return its result.",
+    "6": "Not yet: return a new function that waits for the next call; it remembers args through the closure.",
+    "7": "The next call appends its arguments to the remembered ones and checks again through curried."
+  }
+}

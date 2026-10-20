@@ -1,0 +1,65 @@
+{
+  "number": 2631,
+  "title": "Group By",
+  "spec": "leetcode",
+  "statement": "Give every array a method `groupBy(fn)`. Calling `array.groupBy(fn)` sorts the elements of `array` into groups and returns them as an object: `fn(item)` turns each element into a string key, and the object has one property per distinct key, holding the list of all elements that produced that key. Inside each list the elements keep their order from `array`; the properties themselves may come in any order. An empty array gives `{}`. The method belongs on `Array.prototype` so that every array has it, and it must be written by hand, without `Object.groupBy` or lodash's `_.groupBy`.\n\nA case is JSON, so `fn` is given as one of these descriptions, which the judge turns into the real function:\n\n- `\"string\"`: `String(item)`.\n- `{ \"get\": k }`: `String(item[k])`, the property or index `k` of the element as a string (`\"undefined\"` when it is missing).\n- `{ \"greaterThan\": v }`: `String(item > v)`, so `\"true\"` or `\"false\"`.\n- `{ \"mod\": m }`: `String(item % m)`.\n\nThe judge calls `array.groupBy(fn)` once and answers with the object it returns, its keys listed in sorted order.",
+  "constraints": [
+    "0 <= array.length <= 10^5",
+    "array is a valid JSON array",
+    "fn is \"string\", { \"get\": k }, { \"greaterThan\": v } or { \"mod\": m } with m a non-zero integer",
+    "With get, every element is an object or an array; with greaterThan and mod, every element is a number",
+    "fn returns a string for every element, and never \"__proto__\""
+  ],
+  "signature": "Object Array(List<Object> array, Object fn)",
+  "entry": "Array",
+  "kind": "function",
+  "parameters": [
+    "array",
+    "fn"
+  ],
+  "validator": "function validate(input) {\n  const [array, spec] = input;\n  if (!Array.isArray(array) || array.length > 100000) return 'array must be a JSON array of at most 10^5 elements.';\n  let keyOf = null;\n  if (spec === 'string') keyOf = (item) => String(item);\n  else if (spec !== null && typeof spec === 'object' && !Array.isArray(spec) && Object.keys(spec).length === 1) {\n    if (typeof spec.get === 'string' || Number.isInteger(spec.get)) {\n      if (!array.every(item => item !== null && typeof item === 'object')) return 'With get, every element must be an object or an array.';\n      keyOf = (item) => String(item[spec.get]);\n    } else if (typeof spec.greaterThan === 'number' || Number.isInteger(spec.mod) && spec.mod !== 0) {\n      if (!array.every(item => typeof item === 'number')) return 'With greaterThan or mod, every element must be a number.';\n      keyOf = 'mod' in spec ? (item) => String(item % spec.mod) : (item) => String(item > spec.greaterThan);\n    }\n  }\n  if (!keyOf) return 'fn must be \"string\", { \"get\": k }, { \"greaterThan\": v } or { \"mod\": m } with m not 0.';\n  if (array.some(item => keyOf(item) === '__proto__')) return 'No key may be \"__proto__\".';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [array, spec] = input;\n  if (typeof array.groupBy !== 'function') throw new Error('Arrays have no groupBy method yet: assign a function to Array.prototype.groupBy.');\n  const keyOf = spec === 'string' ? (item) => String(item)\n    : 'get' in spec ? (item) => String(item[spec.get])\n    : 'greaterThan' in spec ? (item) => String(item > spec.greaterThan)\n    : (item) => String(item % spec.mod);\n  const fn = (item) => {\n    const key = keyOf(item);\n    kit.trace(`fn(${JSON.stringify(item)}) returns \"${key}\"`);\n    return key;\n  };\n  const before = JSON.stringify(array);\n  const groups = array.groupBy(fn);\n  if (groups === null || typeof groups !== 'object' || Array.isArray(groups)) throw new Error('groupBy must return a plain object of groups.');\n  if (JSON.stringify(array) !== before) throw new Error('groupBy must not change the array.');\n  // Any key order is accepted, so list the keys in one fixed order.\n  const answer = Object.fromEntries(Object.keys(groups).sort().map(key => [key, groups[key]]));\n  kit.trace(`array.groupBy(fn) returns ${Object.keys(answer).length} groups`);\n  return answer;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn turns an element into a string key\n * @return {Object} the elements grouped by key\n */\nArray.prototype.groupBy = function (fn) {\n  // Write your code here.\n};\n",
+    "typescript": "interface Array<T> {\n  groupBy(fn: (item: T) => string): Record<string, T[]>;\n}\n\nArray.prototype.groupBy = function (fn) {\n  // Write your code here.\n  return {};\n};\n"
+  },
+  "api": "interface Array<T> { groupBy(fn: (item: T) => string): Record<string, T[]> }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "Array.prototype.groupBy = function (fn) {\n  const groups = {};\n  for (const item of this) {\n    const key = fn(item);\n    if (!Object.hasOwn(groups, key)) {\n      groups[key] = [];\n    }\n    groups[key].push(item);\n  }\n  return groups;\n};",
+  "brute": "Array.prototype.groupBy = function (fn) {\n  // Compute every key first, then gather each distinct key's elements with filter.\n  const keys = this.map((item) => fn(item));\n  const result = {};\n  for (const key of new Set(keys)) {\n    result[key] = this.filter((item, i) => keys[i] === key);\n  }\n  return result;\n};",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const length = small ? Math.floor(rand() * 7) : 2000;\n  const kind = pick(['string', 'id', 'index', 'greaterThan', 'mod']);\n  if (kind === 'string') {\n    const values = [0, 1, 2, '1', 'a', '', 'toString', 'constructor', true, 'true', null, [1], [1, 2], '1,2'];\n    return [Array.from({ length }, () => pick(values)), 'string'];\n  }\n  if (kind === 'id') {\n    const ids = small ? ['1', '2', 'a', 'toString'] : Array.from({ length: 50 }, (_, i) => String(i));\n    const array = Array.from({ length }, (_, i) => (rand() < 0.1 ? { n: i } : { id: pick(ids), n: i }));\n    return [array, { get: 'id' }];\n  }\n  if (kind === 'index') {\n    const array = Array.from({ length }, () => Array.from({ length: Math.floor(rand() * 4) }, () => Math.floor(rand() * 4)));\n    return [array, { get: 0 }];\n  }\n  const top = small ? 10 : 100000;\n  const array = Array.from({ length }, () => Math.floor(rand() * (2 * top + 1)) - top);\n  if (kind === 'greaterThan') return [array, { greaterThan: Math.floor(rand() * (top + 1)) - Math.floor(top / 2) }];\n  return [array, { mod: pick([1, 2, 3, 7, -4, small ? 5 : 97]) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[{"id":"1"},{"id":"1"},{"id":"2"}],{"get":"id"}],"expected":{"1":[{"id":"1"},{"id":"1"}],"2":[{"id":"2"}]}},
+    {"name":"Example 2","input":[[[1,2,3],[1,3,5],[1,5,9]],{"get":0}],"expected":{"1":[[1,2,3],[1,3,5],[1,5,9]]}},
+    {"name":"Example 3","input":[[1,2,3,4,5,6,7,8,9,10],{"greaterThan":5}],"expected":{"false":[1,2,3,4,5],"true":[6,7,8,9,10]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],"string"]},
+    {"name":"Test 2","input":[[1,2,3],"string"]},
+    {"name":"Test 3","input":[[1,"1",[1],true,"true",null,"null"],"string"]},
+    {"name":"Test 4","input":[["toString","constructor","toString","hasOwnProperty","valueOf"],"string"]},
+    {"name":"Test 5","input":[[{"id":"a","n":1},{"id":"b","n":2},{"id":"a","n":3},{"n":4}],{"get":"id"}]},
+    {"name":"Test 6","input":[[[2,1],[1,2],[],[2],[1]],{"get":0}]},
+    {"name":"Test 7","input":[[5,5,5,5],{"greaterThan":5}]},
+    {"name":"Test 8","input":[[-4,-3,-2,-1,0,1,2,3,4],{"mod":3}]},
+    {"name":"Test 9","input":[[10,9,8,7,6,5,4,3,2,1],{"greaterThan":0}]},
+    {"name":"Test 10","input":[[{"id":"2"},{"id":"10"},{"id":"1"},{"id":"10"}],{"get":"id"}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nEvery array inherits from `Array.prototype`, so a function stored there becomes a method of every array, and inside it `this` is the array it was called on. Grouping then takes one pass: compute each element's key and append the element to that key's list, creating the list the first time the key shows up. Appending in array order keeps each list in the original order for free. (The brute force first computes all keys, then, for each distinct key, filters the whole array again: correct, but O(n · number of keys).)\n\n## Approach\n\n1. Assign a regular `function` (not an arrow function) to `Array.prototype.groupBy`, so `this` is the array.\n2. Start with an empty object `groups`.\n3. For each `item` of `this`, compute `key = fn(item)`.\n4. If `groups` has no **own** property `key`, set it to a new empty list.\n5. Push `item` onto `groups[key]`, and return `groups` after the loop.\n\n## Example 1, step by step\n\n`array = [{id: \"1\"}, {id: \"1\"}, {id: \"2\"}]` and `fn` reads `id`.\n\n- First item: `key = \"1\"`, which `groups` lacks, so `groups[\"1\"] = []`; push the item.\n- Second item: `key = \"1\"` already exists; push it, so `groups[\"1\"]` holds two items.\n- Third item: `key = \"2\"` is new; create its list and push.\n- Return `{ \"1\": [{id: \"1\"}, {id: \"1\"}], \"2\": [{id: \"2\"}] }`.\n\n## Complexity\n\n- Time: O(n): one call of `fn` and O(1) average object work per element.\n- Space: O(n) for the lists, which together hold every element once.\n\n## Pitfalls\n\n- With an arrow function, `this` is not the array.\n- `if (!groups[key])` or `groups[key] ||= []` breaks on keys such as `\"toString\"` or `\"constructor\"`: `groups` inherits a function under that name, so no list is created and `push` fails. Check own properties with `Object.hasOwn` (or start from `Object.create(null)`).\n- Calling `fn` twice per element (once to test, once to store) is wasteful; compute the key once.\n- Sorting or reversing the lists: each group must keep the elements' original order.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `this` | the array that `groupBy` was called on |\n| `fn` | turns an element into its string key |\n| `groups` | the result: key → list of the elements with that key |\n| `item` | the current element |\n| `key` | `fn(item)`, the group `item` belongs to |",
+  "narration": {
+    "1": "Store a regular function on Array.prototype so every array gets groupBy and this is that array.",
+    "2": "groups will map each key to the list of elements that produced it.",
+    "3": "Visit the elements in array order, which keeps every group in that order too.",
+    "4": "Ask fn which group this element belongs to, once per element.",
+    "5": "Is this the first element with this key? Own properties only, so keys like \"toString\" work.",
+    "6": "Start an empty list for the new key.",
+    "8": "Append the element to its group.",
+    "10": "Every element has been placed; return the grouped object."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "number": 1596,
+  "title": "The Most Frequently Ordered Products for Each Customer",
+  "spec": "recalled",
+  "statement": "A shop keeps three tables:\n\n- `Customers(customer_id, name)`: one row per customer; `customer_id` is unique.\n- `Orders(order_id, order_date, customer_id, product_id)`: one row per order; `order_id` is unique. Every order names an existing customer and product, and a customer never orders the same product twice on the same day.\n- `Products(product_id, product_name, price)`: one row per product; `product_id` is unique.\n\nFor every customer who placed at least one order, find their **favourite** product(s): the product(s) they ordered the most times. When several products tie for that highest count, report every one of them. Customers without orders do not appear.\n\nReturn the columns `customer_id`, `product_id` and `product_name`, one row per customer and favourite product. Rows may come in any order.",
+  "constraints": [
+    "customer_id is unique in Customers",
+    "order_id is unique in Orders",
+    "product_id is unique in Products",
+    "Every order references an existing customer and product",
+    "(customer_id, product_id, order_date) is unique in Orders"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customers": [["customer_id","INT"],["name","VARCHAR(10)"]],
+    "Orders": [["order_id","INT"],["order_date","DATE"],["customer_id","INT"],["product_id","INT"]],
+    "Products": [["product_id","INT"],["product_name","VARCHAR(20)"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Customers = [], Orders = [], Products = [] }] = input;\n  const customers = new Set(), products = new Set(), orders = new Set(), daily = new Set();\n  for (const [id] of Customers) {\n    if (id === null) return 'Every customer needs a customer_id.';\n    if (customers.has(id)) return `customer_id ${id} appears twice in Customers.`;\n    customers.add(id);\n  }\n  for (const [id, name] of Products) {\n    if (id === null || name === null) return 'Every product needs a product_id and a product_name.';\n    if (products.has(id)) return `product_id ${id} appears twice in Products.`;\n    products.add(id);\n  }\n  for (const [id, date, customer, product] of Orders) {\n    if (id === null) return 'Every order needs an order_id.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `Order ${id} needs an order_date like 2020-08-01.`;\n    if (!customers.has(customer)) return `Order ${id} names an unknown customer.`;\n    if (!products.has(product)) return `Order ${id} names an unknown product.`;\n    const key = `${customer}/${product}/${date}`;\n    if (daily.has(key)) return `Customer ${customer} orders product ${product} twice on ${date}.`;\n    daily.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH counts AS (\n  SELECT customer_id, product_id, COUNT(*) AS times\n  FROM Orders\n  GROUP BY customer_id, product_id\n),\nranked AS (\n  SELECT\n    customer_id,\n    product_id,\n    RANK() OVER (\n      PARTITION BY customer_id\n      ORDER BY times DESC\n    ) AS place\n  FROM counts\n)\nSELECT r.customer_id, r.product_id, p.product_name\nFROM ranked AS r\nJOIN Products AS p\n  ON p.product_id = r.product_id\nWHERE r.place = 1;",
+  "brute": "SELECT tally.customer_id, tally.product_id, p.product_name\nFROM (\n  SELECT customer_id, product_id, COUNT(*) AS cnt\n  FROM Orders\n  GROUP BY customer_id, product_id\n) AS tally\nJOIN (\n  SELECT per.customer_id, MAX(per.cnt) AS best\n  FROM (\n    SELECT customer_id, product_id, COUNT(*) AS cnt\n    FROM Orders\n    GROUP BY customer_id, product_id\n  ) AS per\n  GROUP BY per.customer_id\n) AS top\n  ON top.customer_id = tally.customer_id AND top.best = tally.cnt\nJOIN Products AS p\n  ON p.product_id = tally.product_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Alice', 'Bob', 'Tom', 'Jerry', 'John', 'Mira'];\n  const goods = ['keyboard', 'mouse', 'screen', 'hard disk', 'cable', 'webcam'];\n  const customerCount = small ? Math.floor(rand() * 5) : 200;\n  const productCount = small ? 1 + Math.floor(rand() * 4) : 25;\n  const Customers = [], Products = [], Orders = [];\n  for (let id = 1; id <= customerCount; id++) Customers.push([id, pick(names)]);\n  for (let id = 1; id <= productCount; id++) Products.push([id, pick(goods), 10 * (1 + Math.floor(rand() * 60))]);\n  // Few products per customer in small sets, so counts tie often.\n  const days = Array.from({ length: small ? 5 : 120 }, (_, i) => new Date(Date.UTC(2020, 5, 1 + i)).toISOString().slice(0, 10));\n  const target = customerCount ? (small ? Math.floor(rand() * 9) : 2000) : 0;\n  const used = new Set();\n  for (let attempt = 0; Orders.length < target && attempt < target * 5; attempt++) {\n    const customer = 1 + Math.floor(rand() * customerCount);\n    // Large sets lean toward low product ids so favourites exist but ties still happen.\n    const product = 1 + Math.floor((small ? rand() : rand() * rand()) * productCount);\n    const date = pick(days);\n    const key = `${customer}/${product}/${date}`;\n    if (used.has(key)) continue;\n    used.add(key);\n    Orders.push([Orders.length + 1, date, customer, product]);\n  }\n  return [{ Customers, Orders, Products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customers":[[1,"Alice"],[2,"Bob"],[3,"Tom"],[4,"Jerry"],[5,"John"]],"Orders":[[1,"2020-07-31",1,1],[2,"2020-07-30",2,2],[3,"2020-08-29",3,3],[4,"2020-07-29",4,1],[5,"2020-06-10",1,2],[6,"2020-08-01",2,1],[7,"2020-08-01",3,3],[8,"2020-08-03",1,2],[9,"2020-08-07",2,3],[10,"2020-07-15",1,2]],"Products":[[1,"keyboard",120],[2,"mouse",80],[3,"screen",600],[4,"hard disk",450]]}],"expected":{"columns":["customer_id","product_id","product_name"],"rows":[[1,2,"mouse"],[2,1,"keyboard"],[2,2,"mouse"],[2,3,"screen"],[3,3,"screen"],[4,1,"keyboard"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customers":[[1,"Ana"]],"Orders":[],"Products":[[1,"mouse",80]]}]},
+    {"name":"Test 2","input":[{"Customers":[[1,"Ana"],[2,"Bo"]],"Orders":[[1,"2021-03-01",2,1]],"Products":[[1,"mouse",80],[2,"cable",5]]}]},
+    {"name":"Test 3","input":[{"Customers":[[1,"Ana"]],"Orders":[[1,"2020-01-01",1,1],[2,"2020-01-01",1,2],[3,"2020-01-01",1,3]],"Products":[[1,"mouse",80],[2,"cable",5],[3,"lamp",30]]}]},
+    {"name":"Test 4","input":[{"Customers":[[1,"Ana"]],"Orders":[[1,"2020-01-01",1,2],[2,"2020-01-02",1,2],[3,"2020-01-03",1,2],[4,"2020-01-01",1,1],[5,"2020-01-02",1,1]],"Products":[[1,"mouse",80],[2,"cable",5]]}]},
+    {"name":"Test 5","input":[{"Customers":[[1,"Ana"],[2,"Bo"],[3,"Cy"]],"Orders":[[1,"2020-02-01",1,1],[2,"2020-02-02",1,1],[3,"2020-02-01",2,2],[4,"2020-02-01",3,2],[5,"2020-02-02",3,2],[6,"2020-02-03",3,2]],"Products":[[1,"mouse",80],[2,"cable",5]]}]},
+    {"name":"Test 6","input":[{"Customers":[[1,"Ana"],[2,"Bo"]],"Orders":[[1,"2020-04-01",1,3],[2,"2020-04-02",1,3],[3,"2020-04-03",1,1],[4,"2020-04-01",2,1],[5,"2020-04-02",2,1],[6,"2020-04-03",2,2],[7,"2020-04-04",2,3]],"Products":[[1,"mouse",80],[2,"cable",5],[3,"lamp",30]]}]},
+    {"name":"Test 7","input":[{"Customers":[[7,"Ana"]],"Orders":[[1,"2020-05-01",7,4],[2,"2020-05-02",7,4],[3,"2020-05-01",7,5],[4,"2020-05-02",7,5],[5,"2020-05-03",7,6]],"Products":[[4,"desk",200],[5,"chair",90],[6,"shelf",70]]}]},
+    {"name":"Test 8","input":[{"Customers":[[1,"Ana"],[2,"Bo"],[3,"Cy"],[4,"Di"]],"Orders":[[1,"2020-06-01",1,1],[2,"2020-06-02",2,1],[3,"2020-06-03",3,1],[4,"2020-06-01",4,2],[5,"2020-06-02",4,2]],"Products":[[1,"mouse",80],[2,"cable",5],[3,"lamp",30]]}]},
+    {"name":"Test 9","input":[{"Customers":[[1,"Alice"],[2,"Bob"],[3,"Tom"],[4,"Jerry"],[5,"John"]],"Orders":[[1,"2020-07-31",1,1],[2,"2020-07-30",2,2],[3,"2020-08-29",3,3],[4,"2020-07-29",4,1],[5,"2020-06-10",1,2],[6,"2020-08-01",2,1],[7,"2020-08-01",3,3],[8,"2020-08-03",1,2],[9,"2020-08-07",2,3],[10,"2020-07-15",1,2],[11,"2020-08-02",2,3],[12,"2020-08-09",3,4],[13,"2020-08-10",3,4]],"Products":[[1,"keyboard",120],[2,"mouse",80],[3,"screen",600],[4,"hard disk",450]]}]},
+    {"name":"Test 10","input":[{"Customers":[[1,"Ana"],[2,"Bo"]],"Orders":[[1,"2020-09-01",1,10],[2,"2020-09-02",1,10],[3,"2020-09-03",1,10],[4,"2020-09-01",1,20],[5,"2020-09-02",1,20],[6,"2020-09-03",1,20],[7,"2020-09-04",1,30],[8,"2020-09-01",2,30]],"Products":[[10,"pen",2],[20,"ink",4],[30,"paper",6]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo questions are stacked here. First, how many times did each customer order each product? That is a plain `GROUP BY customer_id, product_id`. Second, which of a customer's products has the largest count? That is \"the top rows in each group\", and because ties must all be reported, `RANK()` (which gives equal counts the same rank) picks them. A final join adds the product's name.\n\n## Approach\n\n1. CTE `counts`: one row per (customer, product) pair with `times`, the number of orders.\n2. CTE `ranked`: `RANK() OVER (PARTITION BY customer_id ORDER BY times DESC)` gives each pair its `place` among the customer's products; every product with the top count gets place 1.\n3. Join `ranked` (alias `r`) to `Products` (alias `p`) for `product_name`, and keep `place = 1`. Customers without orders never appear in `counts`, so they drop out by themselves.\n\n## Example 1, step by step\n\n`counts` and `ranked` together:\n\n| customer_id | product_id | times | place |\n| --- | --- | --- | --- |\n| 1 | 2 | 3 | 1 |\n| 1 | 1 | 1 | 2 |\n| 2 | 1 | 1 | 1 |\n| 2 | 2 | 1 | 1 |\n| 2 | 3 | 1 | 1 |\n| 3 | 3 | 2 | 1 |\n| 4 | 1 | 1 | 1 |\n\nCustomer 1 bought the mouse three times, so it wins alone. Customer 2 bought three products once each, a three-way tie, so all three are reported. Customer 5 has no orders. Joining the place-1 rows with `Products` gives the six rows of the expected output.\n\n## Complexity\n\n- Time: O(O) to group the O orders, plus O(G log G) to rank the G customer-product pairs.\n- Space: O(G) for the two stages.\n\n## Pitfalls\n\n- `ROW_NUMBER()` keeps one product per customer and loses ties (customer 2 would get only one product).\n- Ranking without `PARTITION BY customer_id` compares counts across all customers, so only the overall top pairs survive.\n- `ORDER BY times` without `DESC` ranks the **least** ordered products first.\n- Taking `MAX(times)` per customer gives the count but not the product; it has to be joined back to `counts`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `counts` | each (customer, product) pair with its order count |\n| `times` | how many orders the customer placed for that product |\n| `ranked` | the same pairs with their `place` within the customer |\n| `place` | 1 for every product with the customer's highest count |\n| `r`, `p` | aliases of `ranked` and `Products` in the final query |",
+  "narration": {
+    "1": "The counts stage counts how many times each customer ordered each product.",
+    "4": "One group per customer and product pair.",
+    "6": "The ranked stage orders each customer's products by their counts.",
+    "10": "RANK gives equal counts the same place, so tied favourites all get place 1.",
+    "11": "Ranking restarts for every customer.",
+    "12": "The largest count comes first.",
+    "18": "The join supplies the product name.",
+    "20": "Keep only each customer's top-ranked products."
+  }
+}

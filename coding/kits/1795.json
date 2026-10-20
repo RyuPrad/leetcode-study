@@ -1,0 +1,50 @@
+{
+  "number": 1795,
+  "title": "Rearrange Products Table",
+  "spec": "leetcode",
+  "statement": "One wide table lists each product's price in three stores:\n\n- `Products(product_id, store1, store2, store3)`: one row per product; `product_id` is unique. Each `storeN` column holds the product's price in that store, or `null` when the store does not sell it.\n\nReshape the table into a long one with the columns `product_id`, `store` and `price`: one row for every (product, store) pair where the price is not `null`. `store` is the column's name as text (`'store1'`, `'store2'` or `'store3'`) and `price` is the value from that column. Pairs whose price is `null` are left out; a price of 0 is still a price. Rows may come in any order.",
+  "constraints": [
+    "product_id is unique in Products and never null",
+    "store1, store2 and store3 are prices, or null when the store does not carry the product"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Products": [["product_id","INT"],["store1","INT"],["store2","INT"],["store3","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Products = [] }] = input;\n  const ids = new Set();\n  for (const [id] of Products) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (ids.has(id)) return `product_id ${id} appears twice in Products.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT product_id, 'store1' AS store, store1 AS price\nFROM Products\nWHERE store1 IS NOT NULL\nUNION ALL\nSELECT product_id, 'store2' AS store, store2 AS price\nFROM Products\nWHERE store2 IS NOT NULL\nUNION ALL\nSELECT product_id, 'store3' AS store, store3 AS price\nFROM Products\nWHERE store3 IS NOT NULL;",
+  "brute": "SELECT product_id, store, price\nFROM (\n  SELECT p.product_id, s.store,\n    CASE s.store WHEN 'store1' THEN p.store1 WHEN 'store2' THEN p.store2 ELSE p.store3 END AS price\n  FROM Products AS p\n  CROSS JOIN (SELECT 'store1' AS store UNION ALL SELECT 'store2' UNION ALL SELECT 'store3') AS s\n) AS pairs\nWHERE price IS NOT NULL",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const prices = [0, 5, 70, 80, 95, 100, 105];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Small cases reuse a few prices and often leave stores empty; some products carry nothing at all.\n  const nullChance = small ? [0.15, 0.35, 0.6, 1][Math.floor(rand() * 4)] : 0.3;\n  const price = () => rand() < nullChance ? null : small ? prices[Math.floor(rand() * prices.length)] : Math.floor(rand() * 1000);\n  const Products = [];\n  let id = small ? Math.floor(rand() * 3) : 1;\n  for (let i = 0; i < count; i++) {\n    Products.push([id, price(), price(), price()]);\n    id += small ? 1 + Math.floor(rand() * 3) : 1;\n  }\n  return [{ Products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Products":[[0,95,100,105],[1,70,null,80]]}],"expected":{"columns":["product_id","store","price"],"rows":[[0,"store1",95],[0,"store2",100],[0,"store3",105],[1,"store1",70],[1,"store3",80]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Products":[]}]},
+    {"name":"Test 2","input":[{"Products":[[4,null,null,null]]}]},
+    {"name":"Test 3","input":[{"Products":[[7,10,20,30]]}]},
+    {"name":"Test 4","input":[{"Products":[[1,null,null,45],[2,null,60,null],[3,15,null,null]]}]},
+    {"name":"Test 5","input":[{"Products":[[1,0,null,0],[2,0,0,0]]}]},
+    {"name":"Test 6","input":[{"Products":[[1,50,50,50],[2,50,null,50]]}]},
+    {"name":"Test 7","input":[{"Products":[[10,12,null,9],[11,30,null,31],[12,8,null,null]]}]},
+    {"name":"Test 8","input":[{"Products":[[0,95,100,105],[1,70,null,80],[2,null,null,null],[3,null,5,null],[5,1,2,3]]}]},
+    {"name":"Test 9","input":[{"Products":[[1,null,0,null],[2,999,null,null],[3,null,null,null]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe input is \"wide\": the store is hidden in the column name. The output is \"long\": the store becomes a value in its own column. Each of the three store columns contributes its own slice of output rows, so the cleanest query handles one column at a time and stacks the three slices with `UNION ALL`. Inside each slice, a plain `WHERE storeN IS NOT NULL` drops the stores that do not sell the product.\n\n## Approach\n\n1. First slice: read `Products`, keep rows where `store1 IS NOT NULL`, and output `product_id`, the literal `'store1'` as `store`, and `store1` as `price`.\n2. Second slice: the same for `store2`.\n3. Third slice: the same for `store3`.\n4. Join the slices with `UNION ALL`. The column names come from the first `SELECT`, so its aliases `store` and `price` name the result.\n\n## Example 1, step by step\n\n- Slice `store1`: both products have a price, giving (0, store1, 95) and (1, store1, 70).\n- Slice `store2`: product 1 has `null` and is filtered out, leaving (0, store2, 100).\n- Slice `store3`: both qualify, giving (0, store3, 105) and (1, store3, 80).\n\nStacked together these are the five expected rows.\n\n## Complexity\n\n- Time: three scans of `Products`, O(P) for P products.\n- Space: O(P) for the result, at most 3·P rows.\n\n## Pitfalls\n\n- Forgetting the `IS NOT NULL` filter emits rows with a `null` price that must not appear.\n- Writing `WHERE store1` or `WHERE store1 > 0` drops a real price of 0 (Test 5); only `null` means unavailable.\n- `store1 = NULL` or `store1 != NULL` is never true; null checks need `IS NULL` / `IS NOT NULL`.\n- Aliasing only the later `SELECT`s does not help: `UNION` takes its column names from the first branch.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `'storeN' AS store` | a text literal naming the column the price came from |\n| `storeN AS price` | that column's value, renamed so all slices line up |\n| `WHERE storeN IS NOT NULL` | keeps only stores that carry the product |\n| `UNION ALL` | stacks the three slices without a needless duplicate check |",
+  "narration": {
+    "1": "The first slice turns column store1 into rows: the literal text names the store and the column value becomes price.",
+    "3": "Only products that store1 actually sells survive; a null price means not available.",
+    "4": "UNION ALL stacks the next slice under this one; no duplicates are possible because each slice has its own store name.",
+    "5": "The second slice repeats the pattern for store2, keeping the same output column order.",
+    "7": "Again, a null in store2 means the product is not sold there, so that pair is dropped.",
+    "9": "The third slice handles store3 the same way.",
+    "11": "The last filter removes store3 pairs whose price is null."
+  }
+}

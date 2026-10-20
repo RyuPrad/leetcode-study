@@ -1,0 +1,47 @@
+{
+  "number": 1527,
+  "title": "Patients With a Condition",
+  "spec": "leetcode",
+  "statement": "A hospital stores its patients in one table:\n\n- `Patients(patient_id, patient_name, conditions)`: `patient_id` is unique. `conditions` holds zero or more condition codes separated by single spaces; it is the empty string when there are none.\n\nA code means Type I Diabetes when the **code itself starts** with `DIAB1` (`DIAB100` and `DIAB1` qualify; `DIAB201` does not, and neither does `SADIAB100`, whose `DIAB1` sits in the middle of the code).\n\nReport the patients with at least one such code, with the columns `patient_id`, `patient_name` and `conditions` exactly as stored. Rows may come in any order.",
+  "constraints": [
+    "patient_id is unique in Patients",
+    "conditions is a space-separated list of codes, possibly empty"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Patients": [["patient_id","INT"],["patient_name","VARCHAR(30)"],["conditions","VARCHAR(100)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Patients = [] }] = input;\n  const ids = new Set();\n  for (const [id, , conditions] of Patients) {\n    if (id === null || ids.has(id)) return 'Every patient needs a unique patient_id.';\n    ids.add(id);\n    if (conditions === null || !/^([^ ]+( [^ ]+)*)?$/.test(conditions)) return `Patient ${id}'s conditions must be codes separated by single spaces.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT patient_id, patient_name, conditions\nFROM Patients\nWHERE REGEXP_LIKE(conditions, '^DIAB1')\n   OR REGEXP_LIKE(conditions, ' DIAB1');",
+  "brute": "SELECT patient_id, patient_name, conditions\nFROM Patients\nWHERE CONCAT(' ', conditions) LIKE '% DIAB1%'",
+  "generator": "function generate(rand, size) {\n  const codes = ['DIAB100', 'DIAB101', 'DIAB1', 'DIAB10X', 'DIAB201', 'DIAB2', 'DIAB', 'SADIAB100', 'XDIAB1', 'ACNE', 'COUGH', 'YFEV', 'MYOP'];\n  const names = ['Daniel', 'Alice', 'Bob', 'George', 'Alain', 'Mia', 'Omar', 'Lena'];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const Patients = [];\n  for (let id = 1; id <= count; id++) {\n    const parts = Array.from({ length: Math.floor(rand() * 4) }, () => codes[Math.floor(rand() * codes.length)]);\n    Patients.push([id, names[Math.floor(rand() * names.length)], parts.join(' ')]);\n  }\n  return [{ Patients }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Patients":[[1,"Daniel","YFEV COUGH"],[2,"Alice",""],[3,"Bob","DIAB100 MYOP"],[4,"George","ACNE DIAB100"],[5,"Alain","DIAB201"]]}],"expected":{"columns":["patient_id","patient_name","conditions"],"rows":[[3,"Bob","DIAB100 MYOP"],[4,"George","ACNE DIAB100"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Patients":[]}]},
+    {"name":"Test 2","input":[{"Patients":[[1,"Alice",""],[2,"Omar","COUGH"]]}]},
+    {"name":"Test 3","input":[{"Patients":[[7,"Mia","DIAB100"]]}]},
+    {"name":"Test 4","input":[{"Patients":[[1,"Bob","SADIAB100"],[2,"Lena","ACNE XDIAB1"],[3,"Omar","DIAB201"]]}]},
+    {"name":"Test 5","input":[{"Patients":[[1,"George","ACNE DIAB100"],[2,"Bob","SADIAB100 MYOP"]]}]},
+    {"name":"Test 6","input":[{"Patients":[[1,"Alain","DIAB201 DIAB100"],[2,"Mia","DIAB2 XDIAB1"],[3,"Lena","DIAB"]]}]},
+    {"name":"Test 7","input":[{"Patients":[[4,"Omar","DIAB1"],[5,"Lena","MYOP DIAB10X COUGH"],[6,"Daniel","YFEV DIAB1"]]}]},
+    {"name":"Test 8","input":[{"Patients":[[1,"Daniel","YFEV COUGH"],[2,"Alice",""],[3,"Bob","DIAB100 MYOP"],[4,"George","SADIAB100 DIAB101"],[5,"Alain","DIAB201"],[6,"Mia","ACNE DIAB"]]}]},
+    {"name":"Test 9","input":[{"Patients":[[10,"Lena","DIAB100 DIAB101"],[11,"Mia","COUGH DIAB100 ACNE"],[12,"Omar","DIAB101"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA qualifying code can sit anywhere in the list, but it must **begin** with `DIAB1`. In a space-separated list a code begins either at the very start of the string (the first code) or right after a space (any later code). So the test is \"`DIAB1` at the start of the string, or `DIAB1` just after a space\": two small regular expressions joined by `OR`. Searching for `DIAB1` anywhere is not enough: it would also hit codes like `SADIAB100`.\n\n## Approach\n\n1. Read every row of `Patients`.\n2. Keep a row when `REGEXP_LIKE(conditions, '^DIAB1')` holds: the anchor `^` ties `DIAB1` to the start of the string, so the first code qualifies.\n3. Or when `REGEXP_LIKE(conditions, ' DIAB1')` holds: a space directly before `DIAB1` means a later code starts with it.\n4. Return the three columns unchanged.\n\n## Example 1, step by step\n\n- Daniel, `YFEV COUGH`: no `DIAB1` at all, dropped.\n- Alice, empty string: nothing to match, dropped.\n- Bob, `DIAB100 MYOP`: `DIAB1` right at the start, so `'^DIAB1'` matches; kept.\n- George, `ACNE DIAB100`: `DIAB1` right after the space, so `' DIAB1'` matches; kept.\n- Alain, `DIAB201`: starts with `DIAB2`, dropped.\n\nThe result is Bob and George.\n\n## Complexity\n\n- Time: O(total length of `conditions`), one scan per row; no index can help a pattern like this.\n- Space: O(1) besides the result.\n\n## Pitfalls\n\n- `LIKE '%DIAB1%'` (or `REGEXP 'DIAB1'`) also matches codes that merely contain `DIAB1`, such as `SADIAB100`.\n- `LIKE 'DIAB1%'` alone misses a matching code that is not the first one, such as George's `ACNE DIAB100`.\n- Dropping either half of the `OR` loses patients: the first test sees only the first code, the second only later codes. (A single test works on `CONCAT(' ', conditions)`, where every code follows a space.)\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `Patients` | the only table; every output row is one of its rows |\n| `REGEXP_LIKE(conditions, ...)` | 1 when the pattern occurs somewhere in `conditions` |\n| `'^DIAB1'` | the first code starts with `DIAB1` |\n| `' DIAB1'` | some later code (after a space) starts with `DIAB1` |",
+  "narration": {
+    "1": "The output keeps the three columns of each matching patient unchanged.",
+    "2": "Every patient row is a candidate.",
+    "3": "The anchor ^ accepts DIAB1 only at the very start of the string, so the first code qualifies.",
+    "4": "A space right before DIAB1 means a later code starts with it; DIAB1 inside a code such as SADIAB100 matches neither test."
+  }
+}

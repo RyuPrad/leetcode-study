@@ -1,0 +1,56 @@
+{
+  "number": 1511,
+  "title": "Customer Order Frequency",
+  "spec": "recalled",
+  "statement": "A store keeps three tables:\n\n- `Customers(customer_id, name, country)`: one row per customer; `customer_id` is unique.\n- `Product(product_id, description, price)`: one row per product; `product_id` is unique and `price` is the cost of one unit.\n- `Orders(order_id, customer_id, product_id, order_date, quantity)`: one row per order; `order_id` is unique. The customer bought `quantity` units of the product on `order_date`. Every `customer_id` and `product_id` exists in its table.\n\nThe amount spent on an order is `quantity * price`. Report the customers who spent **at least 100** in total in **June 2020** and also at least 100 in total in **July 2020** (each month on its own). Output the columns `customer_id` and `name`. Rows may come in any order.",
+  "constraints": [
+    "customer_id is unique in Customers",
+    "product_id is unique in Product",
+    "order_id is unique in Orders",
+    "Every Orders.customer_id and Orders.product_id exists in its table",
+    "quantity >= 1 and price >= 0",
+    "order_date is a date YYYY-MM-DD"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customers": [["customer_id","INT"],["name","VARCHAR(30)"],["country","VARCHAR(30)"]],
+    "Product": [["product_id","INT"],["description","VARCHAR(30)"],["price","INT"]],
+    "Orders": [["order_id","INT"],["customer_id","INT"],["product_id","INT"],["order_date","DATE"],["quantity","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Customers = [], Product = [], Orders = [] }] = input;\n  const customers = new Set(), products = new Set(), orders = new Set();\n  for (const [id, name] of Customers) {\n    if (id === null || name === null) return 'Every customer needs a customer_id and a name.';\n    if (customers.has(id)) return `customer_id ${id} appears twice in Customers.`;\n    customers.add(id);\n  }\n  for (const [id, , price] of Product) {\n    if (id === null || price === null) return 'Every product needs a product_id and a price.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    if (price < 0) return 'price cannot be negative.';\n    products.add(id);\n  }\n  for (const [id, customer, product, date, quantity] of Orders) {\n    if (id === null || customer === null || product === null || date === null || quantity === null) return 'Orders values cannot be null.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (!customers.has(customer)) return `Order ${id} names unknown customer ${customer}.`;\n    if (!products.has(product)) return `Order ${id} names unknown product ${product}.`;\n    if (quantity < 1) return 'quantity must be at least 1.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `order_date ${date} is not YYYY-MM-DD.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH spend AS (\n  SELECT\n    o.customer_id,\n    SUM(IF(DATE_FORMAT(o.order_date, '%Y-%m') = '2020-06', o.quantity * p.price, 0)) AS june,\n    SUM(IF(DATE_FORMAT(o.order_date, '%Y-%m') = '2020-07', o.quantity * p.price, 0)) AS july\n  FROM Orders AS o\n  JOIN Product AS p\n    ON p.product_id = o.product_id\n  GROUP BY o.customer_id\n)\nSELECT c.customer_id, c.name\nFROM Customers AS c\nJOIN spend AS s\n  ON s.customer_id = c.customer_id\nWHERE s.june >= 100\n  AND s.july >= 100;",
+  "brute": "SELECT c.customer_id, c.name\nFROM Customers c\nWHERE (\n    SELECT IFNULL(SUM(o.quantity * p.price), 0) FROM Orders o, Product p\n    WHERE p.product_id = o.product_id AND o.customer_id = c.customer_id\n      AND o.order_date BETWEEN '2020-06-01' AND '2020-06-30'\n  ) >= 100\n  AND (\n    SELECT IFNULL(SUM(o.quantity * p.price), 0) FROM Orders o, Product p\n    WHERE p.product_id = o.product_id AND o.customer_id = c.customer_id\n      AND o.order_date BETWEEN '2020-07-01' AND '2020-07-31'\n  ) >= 100",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const names = ['Winston', 'Jonathan', 'Moustafa', 'Ana', 'Ravi', 'Sofia'];\n  const countries = ['USA', 'Peru', 'Egypt', 'India'];\n  const prices = [0, 2, 10, 45, 50, 60, 100, 300];\n  const customerCount = small ? pick(5) : 400, productCount = small ? pick(5) : 100;\n  const Customers = [], Product = [], Orders = [];\n  for (let id = 1; id <= customerCount; id++) Customers.push([id, names[pick(names.length)], countries[pick(countries.length)]]);\n  for (let id = 1; id <= productCount; id++) Product.push([id * 10, `Item ${id}`, prices[pick(prices.length)]]);\n  const smallDates = ['2020-05-31', '2020-06-01', '2020-06-15', '2020-06-30', '2020-07-01', '2020-07-20', '2020-07-31', '2020-08-01', '2019-06-10', '2021-07-10'];\n  const day = k => new Date(Date.UTC(2020, 3, 1) + k * 86400000).toISOString().slice(0, 10);\n  const orderCount = customerCount && productCount ? (small ? pick(9) : 2000) : 0;\n  for (let id = 1; id <= orderCount; id++) {\n    const date = small ? smallDates[pick(smallDates.length)] : rand() < 0.1 ? `${2019 + 2 * pick(2)}-0${6 + pick(2)}-1${pick(10)}` : day(pick(180));\n    Orders.push([id, 1 + pick(customerCount), 10 * (1 + pick(productCount)), date, 1 + pick(3)]);\n  }\n  return [{ Customers, Product, Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customers":[[1,"Winston","USA"],[2,"Jonathan","Peru"],[3,"Moustafa","Egypt"]],"Product":[[10,"LC Phone",300],[20,"LC T-Shirt",10],[30,"LC Book",45],[40,"LC Keychain",2]],"Orders":[[1,1,10,"2020-06-10",1],[2,1,20,"2020-07-01",1],[3,1,30,"2020-07-08",2],[4,2,10,"2020-06-15",2],[5,2,40,"2020-07-01",10],[6,3,20,"2020-06-24",2],[7,3,30,"2020-06-25",2],[9,3,30,"2020-05-08",3]]}],"expected":{"columns":["customer_id","name"],"rows":[[1,"Winston"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customers":[],"Product":[],"Orders":[]}]},
+    {"name":"Test 2","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"]],"Product":[[10,"Lamp",50]],"Orders":[[1,1,10,"2020-06-03",2],[2,1,10,"2020-07-03",2],[3,2,10,"2020-06-03",2],[4,2,10,"2020-07-03",1]]}]},
+    {"name":"Test 3","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"],[3,"Sofia","Peru"]],"Product":[[10,"Phone",300],[20,"Book",60]],"Orders":[[1,1,10,"2020-06-10",1],[2,2,10,"2020-07-10",1],[3,3,10,"2020-06-11",1],[4,3,20,"2020-07-11",1]]}]},
+    {"name":"Test 4","input":[{"Customers":[[1,"Ana","USA"]],"Product":[[10,"Pen",10],[20,"Book",45]],"Orders":[[1,1,10,"2020-06-01",3],[2,1,20,"2020-06-09",1],[3,1,20,"2020-06-20",1],[4,1,10,"2020-07-05",2],[5,1,20,"2020-07-06",2]]}]},
+    {"name":"Test 5","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"]],"Product":[[10,"Phone",300]],"Orders":[[1,1,10,"2019-06-10",1],[2,1,10,"2020-07-10",1],[3,2,10,"2020-06-10",1],[4,2,10,"2021-07-10",1],[5,2,10,"2020-08-10",1]]}]},
+    {"name":"Test 6","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"]],"Product":[[10,"Phone",300]],"Orders":[[1,1,10,"2020-06-30",1],[2,1,10,"2020-07-31",1],[3,2,10,"2020-05-31",1],[4,2,10,"2020-07-01",1],[5,2,10,"2020-08-01",1]]}]},
+    {"name":"Test 7","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"]],"Product":[[10,"Chair",60],[20,"Clip",1]],"Orders":[[1,1,10,"2020-06-05",2],[2,1,10,"2020-07-05",2],[3,2,20,"2020-06-05",150],[4,2,20,"2020-07-05",99]]}]},
+    {"name":"Test 8","input":[{"Customers":[[1,"Ana","USA"],[2,"Ana","Peru"],[3,"Sofia","Egypt"]],"Product":[[10,"Desk",100],[20,"Gift",0]],"Orders":[[1,1,10,"2020-06-02",1],[2,1,10,"2020-07-02",1],[3,2,10,"2020-06-03",1],[4,2,10,"2020-07-03",1],[5,3,20,"2020-06-03",3],[6,3,20,"2020-07-03",3]]}]},
+    {"name":"Test 9","input":[{"Customers":[[1,"Ana","USA"],[2,"Ravi","India"]],"Product":[[10,"Desk",100]],"Orders":[[1,1,10,"2020-06-02",1],[2,1,10,"2020-06-12",1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach customer needs two separate totals, one for June 2020 and one for July 2020, and both must reach 100. A combined total is not enough: 300 in June and nothing in July fails. Grouping the orders by customer and summing the spend **conditionally** on the month computes both totals in one pass; joining `Product` supplies the price needed for `quantity * price`.\n\n## Approach\n\n1. In the CTE `spend`, join `Orders` (`o`) to `Product` (`p`) so each order knows its unit price.\n2. Group by `customer_id` and compute `june`: the sum of `quantity * price` over orders whose month is `'2020-06'` (0 for other months), and `july` the same way for `'2020-07'`.\n3. Join `Customers` (`c`) to `spend` (`s`) to pick up each name.\n4. Keep customers with `june >= 100` and `july >= 100`.\n\n## Example 1, step by step\n\n`spend` holds:\n\n- Winston (1): June = 1 · 300 = 300; July = 1 · 10 + 2 · 45 = 100.\n- Jonathan (2): June = 2 · 300 = 600; July = 10 · 2 = 20.\n- Moustafa (3): June = 2 · 10 + 2 · 45 = 110; July = 0 (his May order does not count).\n\nOnly Winston reaches 100 in both months, so the result is `(1, Winston)`.\n\n## Complexity\n\n- Time: O(O + P + C) for O orders, P products and C customers with hash joins and grouping.\n- Space: O(C) for one `spend` row per customer who ordered.\n\n## Pitfalls\n\n- Summing `quantity` or `price` alone instead of their product gives the wrong spend.\n- A single condition on the combined June and July total (`>= 200`) accepts customers who spent everything in one month.\n- `MONTH(order_date) = 6` without the year also counts June of other years.\n- The threshold is inclusive: exactly 100 qualifies, so use `>=`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `o` | `Orders`, one row per purchase |\n| `p` | `Product`, supplying the unit `price` |\n| `spend` | per customer, `june` and `july` totals of `quantity * price` |\n| `c` | `Customers`, supplying `name` |\n| `s` | the `spend` row of each customer |",
+  "narration": {
+    "1": "The spend CTE computes each customer's June and July totals.",
+    "4": "Only orders dated in June 2020 add their quantity times price to the June total.",
+    "5": "The July total is built the same way from orders dated in July 2020.",
+    "7": "Joining Product gives every order the unit price it needs.",
+    "9": "Grouping by customer turns all their orders into one row with both totals.",
+    "13": "Joining Customers brings in the name of each customer who placed orders.",
+    "15": "A customer qualifies only when each month separately reaches 100."
+  }
+}

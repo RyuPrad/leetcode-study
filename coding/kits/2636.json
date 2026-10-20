@@ -1,0 +1,70 @@
+{
+  "number": 2636,
+  "title": "Promise Pool",
+  "spec": "recalled",
+  "statement": "Write `promisePool(functions, n)`, an `async` function that runs the asynchronous functions in the array `functions` with **at most `n` of them in progress** at any moment. Each `functions[i]` takes no arguments and returns a promise: calling it starts its work, and it stays in progress until that promise resolves.\n\nStart the functions in index order. Right away, start as many as the limit `n` allows; then, each time a running promise resolves, immediately start the next function that has not been started yet, if there is one. The promise returned by `promisePool` resolves as soon as every function's promise has resolved (at once when `functions` is empty); the value it resolves with does not matter. No promise ever rejects.\n\nEach case describes `functions` as a list of delays: `functions[i]` returns a promise that resolves `functions[i]` ms after it is called. The answer is `[times, total]`, where `times[i]` is the moment (in ms from the start) at which the promise of `functions[i]` resolved, or `null` if it never did, and `total` is the moment the promise of `promisePool` resolved.",
+  "constraints": [
+    "0 <= functions.length <= 10",
+    "1 <= n <= 10",
+    "Each functions[i] resolves after an integer delay from 0 to 1000 ms"
+  ],
+  "signature": "List<Object> promisePool(int[] functions, int n)",
+  "entry": "promisePool",
+  "kind": "function",
+  "parameters": [
+    "functions",
+    "n"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [functions, n] = input;\n  if (!Array.isArray(functions) || functions.length > 10) return 'Give at most 10 functions.';\n  if (!functions.every(delay => Number.isInteger(delay) && delay >= 0 && delay <= 1000)) return 'Each function is a delay: an integer from 0 to 1000 ms.';\n  if (!Number.isInteger(n) || n < 1 || n > 10) return 'n must be an integer from 1 to 10.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [delays, n] = input, start = Date.now();\n  const times = delays.map(() => null), started = delays.map(() => false);\n  const functions = delays.map((delay, i) => () => {\n    if (started[i]) throw new Error(`functions[${i}] was called a second time; start each function once.`);\n    started[i] = true;\n    kit.trace(`functions[${i}] starts; it takes ${delay} ms`);\n    return new Promise((resolve) => setTimeout(() => {\n      times[i] = Date.now() - start;\n      kit.trace(`functions[${i}] resolves`);\n      resolve();\n    }, delay));\n  });\n  kit.trace(`promisePool(functions, ${n}) is called`);\n  const pool = solve(functions, n);\n  if (!pool || typeof pool.then !== 'function') throw new Error('promisePool must return a promise.');\n  return pool.then(() => {\n    const total = Date.now() - start;\n    kit.trace('The promise of promisePool resolves');\n    return [times, total];\n  });\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Array<() => Promise<any>>} functions\n * @param {number} n the most functions in progress at once\n * @return {Promise<any>}\n */\nasync function promisePool(functions, n) {\n  // Write your code here.\n}\n",
+    "typescript": "type F = () => Promise<any>;\n\nasync function promisePool(functions: F[], n: number): Promise<any> {\n  // Write your code here.\n}\n"
+  },
+  "api": "promisePool(functions: (() => Promise<any>)[], n: number): Promise<any>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "async function promisePool(functions, n) {\n  let nextIndex = 0;\n  async function worker() {\n    while (nextIndex < functions.length) {\n      const index = nextIndex;\n      nextIndex++;\n      await functions[index]();\n    }\n  }\n  const workers = [];\n  const poolSize = Math.min(n, functions.length);\n  for (let i = 0; i < poolSize; i++) {\n    workers.push(worker());\n  }\n  await Promise.all(workers);\n}",
+  "brute": "async function promisePool(functions, n) {\n  // Keep the set of running promises; when it is full, wait for any one of them before starting the next.\n  const running = new Set();\n  for (const fn of functions) {\n    if (running.size === n) await Promise.race(running);\n    const promise = fn().then(() => running.delete(promise));\n    running.add(promise);\n  }\n  await Promise.all(running);\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 6) : 10;\n  // Small delays are multiples of 10, so several promises often resolve at the same moment.\n  const functions = Array.from({ length: count }, () => (small ? 10 * Math.floor(rand() * 11) : Math.floor(rand() * 1001)));\n  const n = 1 + Math.floor(rand() * (small ? 4 : 10));\n  return [functions, n];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[300,400,200],2],"expected":[[300,400,500],500]},
+    {"name":"Example 2","input":[[300,400,200],5],"expected":[[300,400,200],400]},
+    {"name":"Example 3","input":[[300,400,200],1],"expected":[[300,700,900],900]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],1]},
+    {"name":"Test 2","input":[[0],1]},
+    {"name":"Test 3","input":[[100],10]},
+    {"name":"Test 4","input":[[50,50,50,50],2]},
+    {"name":"Test 5","input":[[100,10,10,10],1]},
+    {"name":"Test 6","input":[[100,10,10,10],2]},
+    {"name":"Test 7","input":[[10,20,30,40,50,60,70,80,90,100],3]},
+    {"name":"Test 8","input":[[1000,0,0,1000],2]},
+    {"name":"Test 9","input":[[300,400,200,100,500],10]},
+    {"name":"Test 10","input":[[5,4,3,2,1],1]},
+    {"name":"Test 11","input":[[200,100,300,100,200,100],3]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nThink of the pool as `n` **workers**. Each worker repeatedly takes the next function that nobody has started, calls it, and waits for its promise before taking another. With `n` workers there are never more than `n` promises in progress, and a slot is refilled the moment its promise resolves, because that worker's `await` resumes right then. The pool is finished when every worker has run out of functions, which `Promise.all` on the workers detects. (The brute force keeps a set of running promises instead and, when the set is full, waits with `Promise.race` for any one of them before starting the next.)\n\n## Approach\n\n1. Keep `nextIndex`, the index of the next function to start, shared by all workers.\n2. A `worker` loops while `nextIndex < functions.length`: it claims `index = nextIndex`, advances `nextIndex`, calls `functions[index]()` and awaits its promise.\n3. Start `poolSize = min(n, functions.length)` workers and collect their promises in `workers`.\n4. `await Promise.all(workers)`: it resolves when the last worker finishes, that is, when the last function's promise has resolved.\n\nClaiming and advancing happen before the `await`, with no pause in between, so two workers can never take the same index.\n\n## Example 1, step by step\n\nDelays `[300, 400, 200]`, `n = 2`.\n\n- At 0 ms two workers start: the first calls `functions[0]` (300 ms) and the second `functions[1]` (400 ms); `nextIndex` is now 2.\n- At 300 ms `functions[0]` resolves. The first worker wakes up, claims index 2, and `functions[2]` (200 ms) starts.\n- At 400 ms `functions[1]` resolves; the second worker finds no function left and finishes.\n- At 500 ms `functions[2]` resolves, the first worker finishes, and `Promise.all` resolves. The answer is `[[300, 400, 500], 500]`.\n\n## Complexity\n\n- Time: O(k) work for k functions plus O(n) to start the workers; the waiting lasts as long as the schedule itself.\n- Space: O(min(n, k)) for the workers.\n\n## Pitfalls\n\n- Starting in batches (run `n`, wait for **all** of them, run the next `n`) leaves slots empty. In Example 1 that gives `[[300, 400, 600], 600]`.\n- Calling every function first and only then limiting the waiting does not limit anything: a call is what starts the work.\n- Forgetting the empty case: with no functions, the pool must still resolve, at time 0.\n- With threads, a pool is a semaphore with `n` permits; in JavaScript one thread runs everything, so a shared counter is safe as long as it is read and advanced without an `await` in between.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `nextIndex` | index of the next function no worker has started |\n| `worker` | loop that keeps one pool slot busy |\n| `index` | the function a worker has just claimed |\n| `workers` | the promises of the running workers |\n| `poolSize` | how many workers to start: `min(n, functions.length)` |",
+  "narration": {
+    "1": "promisePool is async, so it hands the caller a promise that resolves when the body finishes.",
+    "2": "nextIndex is shared by all workers: the next function that nobody has started.",
+    "3": "A worker keeps one slot of the pool busy.",
+    "4": "While some function has not been started, this worker takes the next one.",
+    "5": "Claim the index before awaiting, so no other worker can take the same function.",
+    "6": "Advance the shared index for the other workers.",
+    "7": "Calling the function starts it; the worker waits here until its promise resolves, then loops to refill its slot.",
+    "11": "No more than n workers, and no more workers than there are functions.",
+    "12": "Start the workers one after another, all at time 0.",
+    "13": "Calling worker() runs it until its first await and returns its promise.",
+    "15": "The pool is done when every worker has run out of functions, so wait for all of them."
+  }
+}

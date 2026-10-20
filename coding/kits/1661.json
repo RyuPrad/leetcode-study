@@ -1,0 +1,54 @@
+{
+  "number": 1661,
+  "title": "Average Time of Process per Machine",
+  "spec": "leetcode",
+  "statement": "One table logs when machines start and finish their processes:\n\n- `Activity(machine_id, process_id, activity_type, timestamp)`: `activity_type` is `'start'` or `'end'`, and `timestamp` is a time in seconds (a float). `(machine_id, process_id, activity_type)` is unique, so each process of a machine has exactly one `'start'` row and one `'end'` row, and its start is never later than its end. Process ids are per machine: process 0 of machine 1 is a different process from process 0 of machine 2.\n\nA process takes its `'end'` timestamp minus its `'start'` timestamp. For each machine, report `processing_time`: the total time of all its processes divided by how many processes it ran, rounded to 3 decimal places.\n\nReturn the columns `machine_id` and `processing_time`, one row per machine, in any order.",
+  "constraints": [
+    "(machine_id, process_id, activity_type) is unique in Activity",
+    "activity_type is 'start' or 'end'",
+    "Every (machine_id, process_id) pair has both a 'start' and an 'end' row",
+    "start timestamp <= end timestamp for every process"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activity": [["machine_id","INT"],["process_id","INT"],["activity_type","ENUM('start', 'end')"],["timestamp","FLOAT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activity = [] }] = input;\n  const rows = new Map();\n  for (const [machine, process, type, time] of Activity) {\n    if (machine === null || process === null || time === null) return 'Every row needs a machine_id, a process_id and a timestamp.';\n    if (type !== 'start' && type !== 'end') return `activity_type ${type} is not start or end.`;\n    const key = `${machine}/${process}`;\n    const pair = rows.get(key) ?? {};\n    if (pair[type] !== undefined) return `Machine ${machine} has two ${type} rows for process ${process}.`;\n    pair[type] = time;\n    rows.set(key, pair);\n  }\n  for (const [key, pair] of rows) {\n    if (pair.start === undefined || pair.end === undefined) return `Process ${key} needs both a start and an end row.`;\n    if (pair.start > pair.end) return `Process ${key} ends before it starts.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s.machine_id,\n  ROUND(AVG(e.timestamp - s.timestamp), 3) AS processing_time\nFROM Activity AS s\nJOIN Activity AS e\n  ON e.machine_id = s.machine_id\n AND e.process_id = s.process_id\n AND e.activity_type = 'end'\nWHERE s.activity_type = 'start'\nGROUP BY s.machine_id;",
+  "brute": "SELECT machine_id,\n  ROUND(SUM(CASE WHEN activity_type = 'end' THEN timestamp ELSE -timestamp END)\n        / COUNT(DISTINCT process_id), 3) AS processing_time\nFROM Activity\nGROUP BY machine_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  // Small cases hold at most 4 processes (8 rows); large ones 1,000 processes over 50 machines.\n  const processCount = small ? Math.floor(rand() * 5) : 1000;\n  const machineCount = small ? 1 + Math.floor(rand() * 3) : 50;\n  const byMachine = new Map();\n  for (let i = 0; i < processCount; i++) {\n    const machine = small ? Math.floor(rand() * machineCount) * 2 : i % machineCount;\n    const spans = byMachine.get(machine) ?? [];\n    byMachine.set(machine, spans);\n    // Times are whole thousandths of a second; process ids restart on every machine, so they collide across machines.\n    const start = Math.floor(rand() * (small ? 6000 : 1000000));\n    const length = rand() < 0.15 ? 0 : Math.floor(rand() * (small ? 3000 : 50000));\n    spans.push([spans.length, start, length]);\n  }\n  const Activity = [];\n  for (const [machine, spans] of byMachine) {\n    // An average exactly halfway between two thousandths would make rounding depend on float noise; lengthen one process.\n    const total = spans.reduce((sum, [, , length]) => sum + length, 0);\n    if (2 * (total % spans.length) === spans.length) spans[0][2] += 1;\n    for (const [process, start, length] of spans) {\n      Activity.push([machine, process, 'start', start / 1000], [machine, process, 'end', (start + length) / 1000]);\n    }\n  }\n  for (let i = Activity.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Activity[i], Activity[j]] = [Activity[j], Activity[i]]; }\n  return [{ Activity }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activity":[[0,0,"start",0.712],[0,0,"end",1.52],[0,1,"start",3.14],[0,1,"end",4.12],[1,0,"start",0.55],[1,0,"end",1.55],[1,1,"start",0.43],[1,1,"end",1.42],[2,0,"start",4.1],[2,0,"end",4.512],[2,1,"start",2.5],[2,1,"end",5]]}],"expected":{"columns":["machine_id","processing_time"],"rows":[[0,0.894],[1,0.995],[2,1.456]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activity":[[4,1,"start",2.5],[4,1,"end",2.5]]}]},
+    {"name":"Test 2","input":[{"Activity":[[1,1,"end",1.42],[0,1,"end",4.12],[2,0,"end",4.512],[1,0,"start",0.55],[0,0,"start",0.712],[2,1,"start",2.5],[0,1,"start",3.14],[1,1,"start",0.43],[2,0,"start",4.1],[0,0,"end",1.52],[2,1,"end",5],[1,0,"end",1.55]]}]},
+    {"name":"Test 3","input":[{"Activity":[[5,1,"start",0],[5,1,"end",1],[5,2,"start",2],[5,2,"end",3],[5,3,"start",1.5],[5,3,"end",3.5]]}]},
+    {"name":"Test 4","input":[{"Activity":[[0,0,"start",0.1],[0,0,"end",0.2],[0,1,"start",0.3],[0,1,"end",0.5],[0,2,"start",0.6],[0,2,"end",0.9],[0,3,"start",1],[0,3,"end",1.46]]}]},
+    {"name":"Test 5","input":[{"Activity":[[0,0,"start",0.1],[0,0,"end",0.4],[1,0,"start",5],[1,0,"end",5.9],[1,1,"start",0.2],[1,1,"end",0.8]]}]},
+    {"name":"Test 6","input":[{"Activity":[[2,0,"start",1],[2,0,"end",1.5],[2,1,"start",2],[2,1,"end",2.5],[2,2,"start",3],[2,2,"end",4]]}]},
+    {"name":"Test 7","input":[{"Activity":[[9,1,"start",1000.25],[9,1,"end",1003.75],[9,2,"start",999.999],[9,2,"end",1000.001]]}]},
+    {"name":"Test 8","input":[{"Activity":[[3,0,"start",1],[3,0,"end",1.1],[3,1,"start",2],[3,1,"end",2.333],[3,2,"start",3],[3,2,"end",3.5],[7,0,"start",0],[7,0,"end",10]]}]},
+    {"name":"Test 9","input":[{"Activity":[[6,4,"end",8.25],[6,4,"start",8],[8,4,"start",1],[8,4,"end",1],[6,9,"start",0.125],[6,9,"end",0.751]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA process's duration needs two rows at once, its `'start'` row and its `'end'` row, but SQL looks at one row at a time. Joining `Activity` to itself puts the two rows of the same process side by side: one copy supplies starts, the other supplies ends. After that, each joined row is one process with its duration, and the per-machine average is a plain `AVG`.\n\n## Approach\n\n1. Take `Activity` as `s` and keep only `'start'` rows (the `WHERE` clause).\n2. Join a second copy `e` on the same `machine_id` **and** `process_id`, restricted to `'end'` rows. Each start row meets exactly one end row, so every process appears once.\n3. `GROUP BY s.machine_id` and average `e.timestamp - s.timestamp` over the machine's processes.\n4. `ROUND(..., 3)` gives `processing_time`.\n\n## Example 1, step by step\n\n- Machine 0: process 0 pairs 0.712 with 1.520 (0.808), process 1 pairs 3.140 with 4.120 (0.980); the average is 1.788 / 2 = 0.894.\n- Machine 1: 1.550 − 0.550 = 1.000 and 1.420 − 0.430 = 0.990; average 0.995.\n- Machine 2: 4.512 − 4.100 = 0.412 and 5.000 − 2.500 = 2.500; average 1.456.\n\n## Complexity\n\n- Time: O(N log N) for N activity rows with a hash or sorted join on `(machine_id, process_id)`, plus O(N) to group.\n- Space: O(N / 2) joined rows, one per process.\n\n## Pitfalls\n\n- Joining on `process_id` alone pairs a start on one machine with ends on other machines that reuse the same process id.\n- Forgetting `e.activity_type = 'end'` also pairs each start with itself, adding zero-length \"processes\" that halve the average.\n- `SUM(end) - SUM(start)` divided by `COUNT(*)` divides by rows, which is twice the number of processes.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Activity` rows of type `'start'` |\n| `e` | the matching `'end'` row of the same machine and process |\n| `e.timestamp - s.timestamp` | one process's running time |\n| `processing_time` | the machine's average running time, 3 decimals |",
+  "narration": {
+    "1": "Each output row is one machine.",
+    "2": "Its processing time is the average end-minus-start time over its processes, rounded to three decimals.",
+    "3": "The first copy of Activity, s, supplies start rows.",
+    "4": "A self-join brings in a second copy, e, so a start and its end sit in one row.",
+    "5": "The end must belong to the same machine as the start ...",
+    "6": "... and to the same process on that machine.",
+    "7": "Only end rows are used from the second copy, so a start is never paired with itself.",
+    "8": "Only start rows are used from the first copy, giving exactly one joined row per process.",
+    "9": "Grouping by machine lets AVG run over that machine's processes."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "number": 1613,
+  "title": "Find the Missing IDs",
+  "spec": "recalled",
+  "statement": "One table lists customers:\n\n- `Customers(customer_id, customer_name)`: one row per customer; `customer_id` is unique and lies between 1 and 100. Names may repeat.\n\nAn id is **missing** when it lies in the range from 1 up to the largest `customer_id` in the table, inclusive, but no customer has it. Report every missing id in a single column named `ids`, ordered by `ids` ascending. When the table is empty there is no range, so nothing is reported.",
+  "constraints": [
+    "customer_id is unique in Customers",
+    "1 <= customer_id <= 100",
+    "customer_name may repeat"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customers": [["customer_id","INT"],["customer_name","VARCHAR(20)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Customers = [] }] = input;\n  const seen = new Set();\n  for (const [id] of Customers) {\n    if (id === null) return 'Every customer needs a customer_id.';\n    if (!Number.isInteger(id) || id < 1 || id > 100) return `customer_id ${id} is outside 1..100.`;\n    if (seen.has(id)) return `customer_id ${id} appears twice.`;\n    seen.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE bounds AS (\n  SELECT MAX(customer_id) AS max_id\n  FROM Customers\n),\nseq AS (\n  SELECT 1 AS ids\n  FROM bounds\n  WHERE max_id >= 1\n  UNION ALL\n  SELECT s.ids + 1\n  FROM seq AS s\n  JOIN bounds AS b\n    ON s.ids < b.max_id\n)\nSELECT s.ids\nFROM seq AS s\nWHERE s.ids NOT IN (SELECT customer_id FROM Customers)\nORDER BY s.ids;",
+  "brute": "SELECT n.ids\nFROM (\n  SELECT tens.d * 10 + ones.d + 1 AS ids\n  FROM (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4\n        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS tens\n  CROSS JOIN (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4\n        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS ones\n) AS n\nLEFT JOIN Customers AS c\n  ON c.customer_id = n.ids\nWHERE c.customer_id IS NULL\n  AND n.ids < (SELECT MAX(customer_id) FROM Customers)\nORDER BY n.ids",
+  "generator": "function generate(rand, size) {\n  const names = ['Alice', 'Bob', 'Charlie', 'Dana', 'Eve', 'Femi'];\n  const small = size === 'small';\n  // Small tables draw from 1..12 (sometimes one far id); large ones fill most of 1..100.\n  const pool = [];\n  const top = small ? 12 : 100;\n  for (let id = 1; id <= top; id++) pool.push(id);\n  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const count = small ? Math.floor(rand() * 9) : 60 + Math.floor(rand() * 41);\n  const ids = pool.slice(0, count);\n  if (small && ids.length && rand() < 0.2) ids[0] = 90 + Math.floor(rand() * 11);\n  const unique = [...new Set(ids)];\n  const Customers = unique.map(id => [id, names[Math.floor(rand() * names.length)]]);\n  return [{ Customers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customers":[[1,"Alice"],[4,"Bob"],[5,"Charlie"]]}],"expected":{"columns":["ids"],"rows":[[2],[3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customers":[]}]},
+    {"name":"Test 2","input":[{"Customers":[[1,"Alice"]]}]},
+    {"name":"Test 3","input":[{"Customers":[[5,"Bob"]]}]},
+    {"name":"Test 4","input":[{"Customers":[[3,"Dana"],[1,"Eve"],[2,"Femi"],[4,"Bob"]]}]},
+    {"name":"Test 5","input":[{"Customers":[[2,"Ann"],[3,"Ann"]]}]},
+    {"name":"Test 6","input":[{"Customers":[[7,"Eve"],[3,"Bob"],[1,"Alice"]]}]},
+    {"name":"Test 7","input":[{"Customers":[[100,"Zed"]]}]},
+    {"name":"Test 8","input":[{"Customers":[[1,"Alice"],[2,"Bob"],[100,"Zed"],[50,"Mia"],[99,"Kai"]]}]},
+    {"name":"Test 9","input":[{"Customers":[[9,"Lee"],[10,"Lee"],[12,"Kim"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe missing ids are not rows of any table, so a query cannot simply filter for them: it first has to **produce** every candidate id from 1 to the largest `customer_id`, then keep the candidates nobody owns. A recursive CTE is the standard way to generate such a run of numbers in MySQL, and a `NOT IN` subquery removes the ids that are taken.\n\n## Approach\n\n1. `bounds`: one row holding `max_id`, the largest `customer_id` (null when the table is empty).\n2. `seq`: a recursive CTE. Its anchor emits `1` only when `max_id >= 1`; each recursive step adds `ids + 1` while the current value is below `max_id`, so it stops exactly at `max_id`.\n3. The final `SELECT` keeps the values of `seq` that do not appear in `Customers` and sorts them ascending.\n\n## Example 1, step by step\n\n- `bounds` holds `max_id = 5` (Charlie).\n- `seq` starts at 1 and grows to 2, 3, 4, 5; at 5 the join condition `5 < 5` fails, so recursion ends.\n- Ids 1, 4 and 5 belong to Alice, Bob and Charlie, so `NOT IN` drops them.\n- The result is `ids` = 2 and 3, already in ascending order.\n\n## Complexity\n\n- Time: O(M · log N) for M = max `customer_id` (at most 100) and N customers, one membership test per generated id.\n- Space: O(M) for the generated sequence.\n\n## Pitfalls\n\n- An anchor of `SELECT 1` with no condition still emits 1 when the table is empty; the `max_id >= 1` guard prevents that phantom row.\n- Generating up to a fixed 100 instead of the table's maximum reports ids above the largest customer, which are not missing.\n- Starting the sequence at 0 reports a 0 that was never in range.\n- `NOT IN` is safe here because `customer_id` is never null; with a nullable column, `NOT EXISTS` would be needed.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `bounds` | one row, `max_id` = largest customer id |\n| `b` | `bounds` joined inside the recursive step |\n| `seq` | every integer from 1 to `max_id`, in column `ids` |\n| `s` | a row of `seq` (the current number) |\n| `NOT IN (SELECT customer_id ...)` | removes ids some customer already has |",
+  "narration": {
+    "1": "The bounds CTE finds the top of the range once; RECURSIVE lets a later CTE refer to itself.",
+    "2": "MAX(customer_id) is the largest id, or null when there are no customers.",
+    "5": "The seq CTE will hold every integer from 1 up to max_id.",
+    "6": "The anchor row starts the sequence at 1.",
+    "8": "The anchor only fires when a maximum exists, so an empty table generates nothing.",
+    "10": "Each recursive step produces the next integer.",
+    "13": "Recursion continues only while the current value is below max_id, so the last value is max_id itself.",
+    "17": "A subquery drops every generated id that some customer already owns.",
+    "18": "The missing ids are listed in ascending order, as required."
+  }
+}

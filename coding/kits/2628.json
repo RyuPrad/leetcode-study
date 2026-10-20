@@ -1,0 +1,61 @@
+{
+  "number": 2628,
+  "title": "JSON Deep Equal",
+  "spec": "recalled",
+  "statement": "Write `areDeeplyEqual(o1, o2)`, which returns `true` when the two values `o1` and `o2` are **deeply equal** and `false` otherwise. Both values are the output of `JSON.parse`, so each one is `null`, a boolean, a number, a string, an array or a plain object, and arrays and objects may contain any of these.\n\nTwo values are deeply equal when one of these holds:\n\n- They are equal under `===`. This covers equal numbers, strings and booleans, and `null` with `null`.\n- Both are arrays of the same length, and at every index the two elements are deeply equal. The order of elements matters.\n- Both are objects that are not arrays, they have exactly the same set of keys, and for every key the two values are deeply equal. The order in which the keys appear does not matter.\n\nIn every other case they are not deeply equal: values of different types (the number `1` and the string `\"1\"`), an array and an object (even `[1]` and `{\"0\": 1}`), or objects whose sets of keys differ.\n\nSolve it without a library deep-equality helper such as lodash's `_.isEqual`.",
+  "constraints": [
+    "o1 and o2 are valid JSON values, as produced by JSON.parse",
+    "1 <= JSON.stringify(o1).length <= 10^5",
+    "1 <= JSON.stringify(o2).length <= 10^5",
+    "o1 and o2 are nested at most 10 levels deep (LeetCode allows 1000)"
+  ],
+  "signature": "boolean areDeeplyEqual(Object o1, Object o2)",
+  "entry": "areDeeplyEqual",
+  "kind": "function",
+  "parameters": [
+    "o1",
+    "o2"
+  ],
+  "validator": "function validate(input) {\n  for (const value of input) {\n    if (value === undefined) return 'o1 and o2 must be JSON values.';\n    if (JSON.stringify(value).length > 100000) return 'Keep each value under 100,000 characters of JSON.';\n    // An array or object is one level deep, plus the depth of its deepest member.\n    const stack = [[value, 1]];\n    while (stack.length) {\n      const [item, depth] = stack.pop();\n      if (item === null || typeof item !== 'object') continue;\n      if (depth > 10) return 'Keep o1 and o2 at most 10 levels deep.';\n      for (const child of Object.values(item)) stack.push([child, depth + 1]);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function areDeeplyEqual(o1, o2) {\n  if (o1 === o2) {\n    return true;\n  }\n  if (o1 === null || o2 === null || typeof o1 !== 'object' || typeof o2 !== 'object') {\n    return false;\n  }\n  if (Array.isArray(o1) !== Array.isArray(o2)) {\n    return false;\n  }\n  const keys1 = Object.keys(o1);\n  const keys2 = Object.keys(o2);\n  if (keys1.length !== keys2.length) {\n    return false;\n  }\n  for (const key of keys1) {\n    if (!Object.hasOwn(o2, key) || !areDeeplyEqual(o1[key], o2[key])) {\n      return false;\n    }\n  }\n  return true;\n}",
+  "brute": "function areDeeplyEqual(o1, o2) {\n  // Write each value as text in one fixed form: arrays in order, object keys sorted. Equal values give equal text.\n  const canonical = (value) => {\n    if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';\n    if (value !== null && typeof value === 'object') {\n      return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';\n    }\n    return JSON.stringify(value);\n  };\n  return canonical(o1) === canonical(o2);\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['x', 'y', 'z', 'L', 'id', 'name', 'a', 'b'];\n  let budget = small ? 12 : 4000;\n  const primitive = () => {\n    const roll = rand();\n    if (roll < 0.4) return Math.floor(rand() * 7) - 3;\n    if (roll < 0.7) return pick(['', 'a', 'b', '1', '0', 'null']);\n    if (roll < 0.85) return rand() < 0.5;\n    return null;\n  };\n  // A random value with at most 3 (small) or 8 (large) levels of nesting.\n  const value = (depth) => {\n    budget--;\n    const stop = depth === 0 ? (small ? 0.1 : 0) : small ? 0.45 : 0.6;\n    if (depth >= (small ? 3 : 8) || budget <= 0 || rand() < stop) return primitive();\n    const length = depth === 0 && !small ? 150 : Math.floor(rand() * (small ? 4 : 8));\n    if (rand() < 0.5) return Array.from({ length }, () => value(depth + 1));\n    const object = {};\n    for (let i = 0; i < length; i++) object[pick(names) + (small ? '' : Math.floor(rand() * 20))] = value(depth + 1);\n    return object;\n  };\n  // A deep copy whose objects list their keys in a shuffled order.\n  const copy = (item) => {\n    if (Array.isArray(item)) return item.map(copy);\n    if (item === null || typeof item !== 'object') return item;\n    const keys = Object.keys(item), out = {};\n    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }\n    for (const key of keys) out[key] = copy(item[key]);\n    return out;\n  };\n  // A small change to one value, usually one that breaks deep equality.\n  const changed = (old) => {\n    const roll = rand();\n    if (Array.isArray(old)) {\n      if (roll < 0.4) return Object.assign({}, old);\n      if (roll < 0.7 || old.length < 2) return [...old, primitive()];\n      return [...old].reverse();\n    }\n    if (old !== null && typeof old === 'object') {\n      const keys = Object.keys(old), out = Object.assign({}, old);\n      if (keys.length && roll < 0.4) { delete out[pick(keys)]; return out; }\n      if (roll < 0.7) { out.extra = primitive(); return out; }\n      return Object.values(old);\n    }\n    if (typeof old === 'number') return roll < 0.6 ? String(old) : old + 1;\n    if (typeof old === 'string') return old !== '' && roll < 0.5 && String(Number(old)) === old ? Number(old) : old + 'x';\n    if (typeof old === 'boolean') return roll < 0.5 ? !old : Number(old);\n    return pick([{}, [], 0, false, 'null']);\n  };\n  const o1 = value(0);\n  let o2 = copy(o1);\n  // Half of the pairs get one change somewhere, often deep inside.\n  if (rand() < 0.5) {\n    const slots = [];\n    const walk = (item) => { if (item !== null && typeof item === 'object') for (const key of Object.keys(item)) { slots.push([item, key]); walk(item[key]); } };\n    walk(o2);\n    if (slots.length && rand() < 0.85) { const [parent, key] = pick(slots); parent[key] = changed(parent[key]); }\n    else o2 = changed(o2);\n  }\n  return rand() < 0.5 ? [o1, o2] : [o2, o1];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"x":1,"y":2},{"x":1,"y":2}],"expected":true},
+    {"name":"Example 2","input":[{"y":2,"x":1},{"x":1,"y":2}],"expected":true},
+    {"name":"Example 3","input":[{"x":null,"L":[1,2,3]},{"x":null,"L":["1","2","3"]}],"expected":false},
+    {"name":"Example 4","input":[true,false],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[null,null]},
+    {"name":"Test 3","input":["1",1]},
+    {"name":"Test 4","input":[[],{}]},
+    {"name":"Test 5","input":[[1,2],{"0":1,"1":2}]},
+    {"name":"Test 6","input":[{},{}]},
+    {"name":"Test 7","input":[[1,[2,3]],[1,[3,2]]]},
+    {"name":"Test 8","input":[{"a":{"b":{"c":[null,false]}}},{"a":{"b":{"c":[null,false]}}}]},
+    {"name":"Test 9","input":[{"a":1},{"a":1,"b":null}]},
+    {"name":"Test 10","input":[{"k":null},{"j":null}]},
+    {"name":"Test 11","input":[0,false]},
+    {"name":"Test 12","input":[{"list":[{"id":1,"tags":["x"]},{"id":2,"tags":[]}]},{"list":[{"tags":["x"],"id":1},{"tags":[],"id":2}]}]},
+    {"name":"Test 13","generate":{"seed":1,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA JSON value is either a primitive (`null`, a boolean, a number, a string) or a container (an array or an object) holding more JSON values. Primitives are deeply equal exactly when `===` says so. Two containers are deeply equal when they are the same kind of container, hold the same keys (for arrays the keys are the indices `0` to `length - 1`), and the values under each key are deeply equal, which is the same question one level down. So the check is a recursive walk over both values at once. (The brute force turns each value into a canonical string, with arrays in order and object keys sorted, and compares the two strings.)\n\n## Approach\n\n1. If `o1 === o2`, return `true`; this settles every pair of equal primitives.\n2. If either value is `null` or not an object, return `false`: they are different primitives, or a primitive and a container.\n3. If one is an array and the other is not, return `false`.\n4. Take `keys1` and `keys2`. If their counts differ, return `false`.\n5. For each `key` of `keys1`: if `o2` lacks it, or the values under it are not deeply equal (recursive call), return `false`.\n6. Return `true`.\n\n## Example 1, step by step\n\n`o1 = {\"x\": 1, \"y\": 2}` and `o2 = {\"x\": 1, \"y\": 2}` are two different objects.\n\n- `o1 === o2` is `false`, since they are separate objects; both are non-null objects and neither is an array.\n- `keys1` is `[\"x\", \"y\"]` and `keys2` is `[\"x\", \"y\"]`: 2 keys each.\n- `key = \"x\"`: `o2` has it, and `areDeeplyEqual(1, 1)` returns `true` at the `===` check.\n- `key = \"y\"`: likewise `areDeeplyEqual(2, 2)` is `true`.\n- No key failed, so the answer is `true`.\n\n## Complexity\n\n- Time: O(N), where N is the number of values (primitives and containers) in `o1` and `o2` together: each pair is compared at most once, and each key is listed and looked up once.\n- Space: O(D + K) for recursion depth D and the key lists of the containers being compared.\n\n## Pitfalls\n\n- `typeof null` is `\"object\"`, so test for `null` before reading keys.\n- Arrays are objects too: `[1]` and `{\"0\": 1}` have the same keys, so `Array.isArray` must decide.\n- `JSON.stringify(o1) === JSON.stringify(o2)` fails Example 2, because the keys are written in a different order.\n- Checking only that every key of `o1` is in `o2` accepts `{\"a\": 1}` and `{\"a\": 1, \"b\": null}`; compare the key counts too. Use `Object.hasOwn`, since `key in o2` also finds inherited names such as `\"toString\"`.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `o1`, `o2` | the two values being compared at this level |\n| `keys1`, `keys2` | their own keys (indices for arrays) |\n| `key` | the key whose two values are compared next |",
+  "narration": {
+    "1": "areDeeplyEqual compares two JSON values and calls itself for the values inside containers.",
+    "2": "Identical primitives, or the very same object, are equal at once.",
+    "5": "If either side is null or a primitive, the === check above already failed, so they differ.",
+    "8": "An array never equals a plain object, even with the same keys.",
+    "11": "Object.keys gives the own keys; for an array these are its indices.",
+    "13": "Different numbers of keys mean different shapes.",
+    "16": "Check every key of o1 against o2.",
+    "17": "o2 must have the key itself, and the two values under it must be deeply equal.",
+    "21": "Every key matched, so the two values are deeply equal."
+  }
+}

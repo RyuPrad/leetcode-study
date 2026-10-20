@@ -1,0 +1,53 @@
+{
+  "number": 1715,
+  "title": "Count Apples and Oranges",
+  "spec": "recalled",
+  "statement": "Fruit is packed in boxes, and a box may also hold a chest with more fruit inside:\n\n- `Boxes(box_id, chest_id, apple_count, orange_count)`: one row per box; `box_id` is unique. `apple_count` and `orange_count` are the loose fruit in the box. `chest_id` names the chest the box holds, or is `null` when the box holds no chest. Several boxes may name the same chest.\n- `Chests(chest_id, apple_count, orange_count)`: one row per chest; `chest_id` is unique. The counts are the fruit inside that chest.\n\nEvery non-null `Boxes.chest_id` exists in `Chests`, and `Boxes` has at least one row. A chest that no box names is not inside any box.\n\nCount all the fruit inside the boxes: each box contributes its own apples and oranges plus, when it holds a chest, that chest's apples and oranges (a chest named by two boxes counts once for each box). Report a single row with the columns `apple_count` (total apples) and `orange_count` (total oranges).",
+  "constraints": [
+    "box_id is unique in Boxes; chest_id is unique in Chests",
+    "Boxes.chest_id is null or exists in Chests; several boxes may name the same chest",
+    "All fruit counts are non-negative integers",
+    "Boxes has at least one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Boxes": [["box_id","INT"],["chest_id","INT"],["apple_count","INT"],["orange_count","INT"]],
+    "Chests": [["chest_id","INT"],["apple_count","INT"],["orange_count","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Boxes = [], Chests = [] }] = input;\n  if (Boxes.length === 0) return 'Boxes needs at least one box.';\n  const chests = new Set(), boxes = new Set();\n  for (const [id, apples, oranges] of Chests) {\n    if (id === null) return 'Every chest needs a chest_id.';\n    if (chests.has(id)) return `chest_id ${id} appears twice in Chests.`;\n    chests.add(id);\n    if (apples === null || oranges === null || apples < 0 || oranges < 0) return `Chest ${id} needs non-negative fruit counts.`;\n  }\n  for (const [id, chest, apples, oranges] of Boxes) {\n    if (id === null) return 'Every box needs a box_id.';\n    if (boxes.has(id)) return `box_id ${id} appears twice in Boxes.`;\n    boxes.add(id);\n    if (chest !== null && !chests.has(chest)) return `Box ${id} names chest ${chest}, which is not in Chests.`;\n    if (apples === null || oranges === null || apples < 0 || oranges < 0) return `Box ${id} needs non-negative fruit counts.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH box_totals AS (\n  SELECT b.box_id,\n         b.apple_count + IFNULL(c.apple_count, 0) AS apples,\n         b.orange_count + IFNULL(c.orange_count, 0) AS oranges\n  FROM Boxes AS b\n  LEFT JOIN Chests AS c\n    ON c.chest_id = b.chest_id\n)\nSELECT SUM(apples) AS apple_count,\n       SUM(oranges) AS orange_count\nFROM box_totals;",
+  "brute": "SELECT SUM(contents.apples) AS apple_count,\n       SUM(contents.oranges) AS orange_count\nFROM (\n  SELECT apple_count AS apples, orange_count AS oranges FROM Boxes\n  UNION ALL\n  SELECT c.apple_count, c.orange_count\n  FROM Boxes AS b, Chests AS c\n  WHERE c.chest_id = b.chest_id\n) AS contents",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const chestCount = small ? Math.floor(rand() * 6) : 500, boxCount = small ? 1 + Math.floor(rand() * 8) : 2000;\n  const fruit = () => (small ? Math.floor(rand() * 21) : Math.floor(rand() * 1001));\n  const Chests = [], ids = [];\n  for (let id = 1; ids.length < chestCount; id++) if (!small || rand() < 0.6) { ids.push(id); Chests.push([id, fruit(), fruit()]); }\n  const Boxes = [];\n  for (let i = 0; i < boxCount; i++) {\n    // Some boxes hold no chest; the rest pick any chest, so chests can repeat or go unused.\n    const chest = ids.length && rand() < 0.65 ? ids[Math.floor(rand() * ids.length)] : null;\n    Boxes.push([small ? 2 * i + 1 + Math.floor(rand() * 2) : i + 1, chest, fruit(), fruit()]);\n  }\n  return [{ Boxes, Chests }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Boxes":[[2,null,6,15],[18,14,4,15],[19,3,8,4],[12,2,19,20],[20,6,12,9],[8,6,9,9],[3,14,16,7]],"Chests":[[6,5,6],[14,20,10],[2,8,8],[3,19,4],[16,19,19]]}],"expected":{"columns":["apple_count","orange_count"],"rows":[[151,123]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Boxes":[[1,null,3,4]],"Chests":[]}]},
+    {"name":"Test 2","input":[{"Boxes":[[1,7,3,4]],"Chests":[[7,10,20]]}]},
+    {"name":"Test 3","input":[{"Boxes":[[1,null,2,2],[2,null,5,1]],"Chests":[[1,50,50],[2,60,60]]}]},
+    {"name":"Test 4","input":[{"Boxes":[[1,4,1,1],[2,4,2,2],[3,4,3,3]],"Chests":[[4,10,100]]}]},
+    {"name":"Test 5","input":[{"Boxes":[[1,null,6,0],[2,3,0,9],[3,5,1,1]],"Chests":[[3,7,2],[5,0,0],[8,30,30]]}]},
+    {"name":"Test 6","input":[{"Boxes":[[1,1,0,0],[2,null,0,0]],"Chests":[[1,0,0]]}]},
+    {"name":"Test 7","input":[{"Boxes":[[10,2,5,5],[11,null,8,3],[12,1,0,4],[13,null,9,9]],"Chests":[[1,6,0],[2,4,12]]}]},
+    {"name":"Test 8","input":[{"Boxes":[[2,null,6,15],[18,14,4,15],[19,3,8,4],[12,2,19,20],[20,6,12,9],[8,6,9,9],[3,14,16,7],[5,16,1,1]],"Chests":[[6,5,6],[14,20,10],[2,8,8],[3,19,4],[16,19,19],[9,100,100]]}]},
+    {"name":"Test 9","input":[{"Boxes":[[1,2,1000,999],[2,2,998,1000]],"Chests":[[2,1000,1000],[3,1,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach box holds its own loose fruit and possibly one chest. So the fruit \"inside a box\" is the box's counts plus, when `chest_id` is set, the counts of that chest. Attach each box's chest with a **left join** (boxes without a chest must stay), treat a missing chest as zero fruit, and add everything up.\n\n## Approach\n\n1. CTE `box_totals`: `Boxes` (alias `b`) `LEFT JOIN Chests` (alias `c`) on `chest_id`. Every box keeps exactly one row; a box without a chest gets nulls in `c`.\n2. In the same CTE, `apples = b.apple_count + IFNULL(c.apple_count, 0)` and likewise `oranges`, the fruit inside that one box.\n3. The final `SELECT` sums `apples` and `oranges` over all boxes and names them `apple_count` and `orange_count`.\n\n## Example 1, step by step\n\n`box_totals`:\n\n| box_id | chest | apples | oranges |\n| --- | --- | --- | --- |\n| 2 | none | 6 | 15 |\n| 18 | 14 (20, 10) | 24 | 25 |\n| 19 | 3 (19, 4) | 27 | 8 |\n| 12 | 2 (8, 8) | 27 | 28 |\n| 20 | 6 (5, 6) | 17 | 15 |\n| 8 | 6 (5, 6) | 14 | 15 |\n| 3 | 14 (20, 10) | 36 | 17 |\n\nChests 6 and 14 sit in two boxes each and count twice; chest 16 is in no box and never joins. The sums are 6 + 24 + 27 + 27 + 17 + 14 + 36 = 151 apples and 15 + 25 + 8 + 28 + 15 + 15 + 17 = 123 oranges.\n\n## Complexity\n\n- Time: O(B + C) with a hash or index on `Chests.chest_id` for B boxes and C chests, then one pass to sum.\n- Space: O(B) for `box_totals`.\n\n## Pitfalls\n\n- An inner join drops boxes without a chest, losing their loose fruit.\n- Without `IFNULL`, `b.apple_count + c.apple_count` is null for chestless boxes and `SUM` silently skips them.\n- Summing the whole `Chests` table counts chests that sit in no box and counts shared chests only once.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `b` | `Boxes`, one row per box, all of which must count |\n| `c` | `Chests`, the chest the box holds (nulls when it holds none) |\n| `box_totals` | each box's fruit: its own plus its chest's |\n| `apples`, `oranges` | the fruit in one box |\n| `apple_count`, `orange_count` | the totals over all boxes |",
+  "narration": {
+    "1": "The CTE box_totals works out how much fruit sits in each box.",
+    "3": "A box's apples are its loose apples plus its chest's apples, with IFNULL turning a missing chest into zero.",
+    "4": "Oranges are computed the same way.",
+    "6": "A left join keeps boxes that hold no chest; their chest columns come back null.",
+    "7": "Each box is matched to the chest it names; a chest in two boxes joins to both.",
+    "9": "Summing over all boxes gives the total apples.",
+    "11": "Reading from box_totals means every box counts exactly once, with its chest included."
+  }
+}

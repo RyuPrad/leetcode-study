@@ -1,0 +1,56 @@
+{
+  "number": 1623,
+  "title": "All Valid Triplets That Can Represent a Country",
+  "spec": "recalled",
+  "statement": "Three schools each list their students in a table of the same shape:\n\n- `SchoolA(student_id, student_name)`, `SchoolB(student_id, student_name)` and `SchoolC(student_id, student_name)`: one row per student of that school; `student_id` is unique within each table, but the same id or name may appear in more than one school.\n\nA country is represented by a team of three: one student from `SchoolA`, one from `SchoolB` and one from `SchoolC`. A team is valid only when its three members have three **different** `student_id` values and three **different** `student_name` values. List every valid team with the columns `member_A`, `member_B` and `member_C`, holding the names of the members chosen from `SchoolA`, `SchoolB` and `SchoolC`. Rows may come in any order.",
+  "constraints": [
+    "student_id is unique within each of SchoolA, SchoolB and SchoolC",
+    "No column is null",
+    "Names compare without regard to case, as in MySQL"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "SchoolA": [["student_id","INT"],["student_name","VARCHAR(20)"]],
+    "SchoolB": [["student_id","INT"],["student_name","VARCHAR(20)"]],
+    "SchoolC": [["student_id","INT"],["student_name","VARCHAR(20)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [tables] = input;\n  for (const name of ['SchoolA', 'SchoolB', 'SchoolC']) {\n    const seen = new Set();\n    for (const [id, student] of tables[name] ?? []) {\n      if (id === null || student === null) return `${name} rows may not contain null.`;\n      if (seen.has(id)) return `student_id ${id} appears twice in ${name}.`;\n      seen.add(id);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT a.student_name AS member_A,\n  b.student_name AS member_B,\n  c.student_name AS member_C\nFROM SchoolA AS a\nJOIN SchoolB AS b\n  ON b.student_id <> a.student_id\n  AND b.student_name <> a.student_name\nJOIN SchoolC AS c\n  ON c.student_id NOT IN (a.student_id, b.student_id)\n  AND c.student_name NOT IN (a.student_name, b.student_name);",
+  "brute": "SELECT a.student_name AS member_A, b.student_name AS member_B, c.student_name AS member_C\nFROM SchoolA AS a\nCROSS JOIN SchoolB AS b\nCROSS JOIN SchoolC AS c\nWHERE NOT (a.student_id = b.student_id OR a.student_id = c.student_id OR b.student_id = c.student_id)\n  AND NOT (a.student_name = b.student_name OR a.student_name = c.student_name OR b.student_name = c.student_name)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const names = ['Alice', 'Bob', 'Tom', 'Jerry', 'Mia', 'Noah', 'Olga', 'Pablo', 'Quinn', 'Rosa', 'Sam', 'Tina'];\n  const pool = small ? names.slice(0, 5) : names;\n  const idRange = small ? 6 : 40;\n  const school = () => {\n    const count = small ? Math.floor(rand() * 5) : 20;\n    const ids = new Set(), rows = [];\n    while (rows.length < count) {\n      const id = 1 + Math.floor(rand() * idRange);\n      if (ids.has(id)) continue;\n      ids.add(id);\n      rows.push([id, pool[Math.floor(rand() * pool.length)]]);\n    }\n    return rows;\n  };\n  return [{ SchoolA: school(), SchoolB: school(), SchoolC: school() }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"SchoolA":[[1,"Alice"],[2,"Bob"]],"SchoolB":[[3,"Tom"]],"SchoolC":[[3,"Tom"],[2,"Jerry"],[10,"Alice"]]}],"expected":{"columns":["member_A","member_B","member_C"],"rows":[["Alice","Tom","Jerry"],["Bob","Tom","Alice"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"SchoolA":[],"SchoolB":[[1,"Tom"]],"SchoolC":[[2,"Jerry"]]}]},
+    {"name":"Test 2","input":[{"SchoolA":[[1,"Alice"]],"SchoolB":[[2,"Bob"]],"SchoolC":[[3,"Tom"]]}]},
+    {"name":"Test 3","input":[{"SchoolA":[[1,"Alice"]],"SchoolB":[[2,"Bob"]],"SchoolC":[[3,"Alice"]]}]},
+    {"name":"Test 4","input":[{"SchoolA":[[1,"Alice"]],"SchoolB":[[2,"Bob"]],"SchoolC":[[2,"Tom"]]}]},
+    {"name":"Test 5","input":[{"SchoolA":[[4,"Alice"]],"SchoolB":[[2,"Bob"]],"SchoolC":[[4,"Tom"]]}]},
+    {"name":"Test 6","input":[{"SchoolA":[[1,"Alice"]],"SchoolB":[[2,"Alice"]],"SchoolC":[[3,"Tom"]]}]},
+    {"name":"Test 7","input":[{"SchoolA":[[1,"Alice"],[2,"Bob"]],"SchoolB":[[3,"Tom"],[4,"Jerry"]],"SchoolC":[[5,"Mia"],[6,"Noah"]]}]},
+    {"name":"Test 8","input":[{"SchoolA":[[7,"Tom"]],"SchoolB":[[7,"Tom"]],"SchoolC":[[7,"Tom"],[8,"Mia"]]}]},
+    {"name":"Test 9","input":[{"SchoolA":[[1,"Alice"],[2,"Alice"]],"SchoolB":[[3,"Bob"]],"SchoolC":[[4,"Tom"],[1,"Jerry"]]}]},
+    {"name":"Test 10","input":[{"SchoolA":[[1,"Alice"],[2,"Bob"],[3,"Tom"]],"SchoolB":[[1,"Bob"],[4,"Jerry"],[5,"Alice"]],"SchoolC":[[2,"Jerry"],[5,"Mia"],[6,"Tom"]]}]},
+    {"name":"Test 11","input":[{"SchoolA":[[1,"Alice"]],"SchoolB":[[2,"Bob"]],"SchoolC":[]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA team is one row from each school, so the candidate teams are all combinations of the three tables. Rather than building every combination and filtering afterwards, each **join condition** can reject clashes as soon as a new member is added: B must differ from A, and C must differ from both A and B, in id and in name.\n\n## Approach\n\n1. Start from `SchoolA` (alias `a`).\n2. `JOIN SchoolB` (alias `b`) on `b.student_id <> a.student_id` and `b.student_name <> a.student_name`, keeping only pairs that do not clash.\n3. `JOIN SchoolC` (alias `c`) on `c.student_id NOT IN (a.student_id, b.student_id)` and `c.student_name NOT IN (a.student_name, b.student_name)`.\n4. Select the three names as `member_A`, `member_B` and `member_C`.\n\n## Example 1, step by step\n\n- A–B pairs: (Alice 1, Tom 3) and (Bob 2, Tom 3); both have different ids and names.\n- For (Alice, Tom): Tom 3 from C repeats id 3 and the name Tom; Alice 10 repeats the name Alice; Jerry 2 is fine. Team: Alice, Tom, Jerry.\n- For (Bob, Tom): Tom 3 clashes again; Jerry 2 shares id 2 with Bob; Alice 10 is fine. Team: Bob, Tom, Alice.\n\n## Complexity\n\n- Time: O(A · B · C) in the worst case, since every combination may be valid and must be output.\n- Space: O(A · B · C) for the result in that worst case.\n\n## Pitfalls\n\n- Checking only the neighbouring pairs (A with B, B with C) misses a clash between A and C; all three pairs must differ.\n- Both rules matter: different ids **and** different names. Dropping either one admits teams such as Bob 2 with Jerry 2.\n- Writing the C conditions as `c.student_id <> a.student_id OR c.student_id <> b.student_id` is still true when C clashes with only one of them, so the clash slips through; each pair needs its own `AND`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a` | the member from `SchoolA` |\n| `b` | the member from `SchoolB`, already different from `a` |\n| `c` | the member from `SchoolC`, different from both `a` and `b` |\n| `member_A`, `member_B`, `member_C` | the three chosen names |",
+  "narration": {
+    "1": "The output columns are the names of the three chosen members, one per school.",
+    "4": "Every student of SchoolA starts a possible team.",
+    "5": "Pair each A student with SchoolB students, but only those that do not clash.",
+    "6": "The SchoolB member must have a different id from the SchoolA member ...",
+    "7": "... and a different name, so the pair is already valid.",
+    "8": "Add a SchoolC student to every surviving pair.",
+    "9": "Their id must differ from both earlier members.",
+    "10": "Their name must also differ from both, which completes a valid team."
+  }
+}

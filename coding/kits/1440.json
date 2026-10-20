@@ -1,0 +1,52 @@
+{
+  "number": 1440,
+  "title": "Evaluate Boolean Expression",
+  "spec": "recalled",
+  "statement": "Two tables describe integer variables and comparisons between them:\n\n- `Variables(name, value)`: one row per variable; `name` is unique and `value` is its integer value.\n- `Expressions(left_operand, operator, right_operand)`: one comparison per row; the whole triple is unique. `operator` is one of `'>'`, `'<'` and `'='`, and both operands are names that appear in `Variables`.\n\nEvaluate every expression by comparing the **values** of its two variables with its operator. Report each row of `Expressions` with the columns `left_operand`, `operator`, `right_operand` and `value`, where `value` is the text `'true'` when the comparison holds and `'false'` otherwise. Rows may come in any order.",
+  "constraints": [
+    "name is unique in Variables",
+    "(left_operand, operator, right_operand) is unique in Expressions",
+    "operator is one of '>', '<', '='",
+    "Every operand is a name in Variables"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Variables": [["name","VARCHAR(3)"],["value","INT"]],
+    "Expressions": [["left_operand","VARCHAR(3)"],["operator","ENUM('>', '<', '=')"],["right_operand","VARCHAR(3)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Variables = [], Expressions = [] }] = input;\n  const names = new Set(), triples = new Set();\n  for (const [name, value] of Variables) {\n    if (name === null || value === null) return 'Every variable needs a name and a value.';\n    if (names.has(name.toLowerCase())) return `Variable ${name} appears twice.`;\n    names.add(name.toLowerCase());\n  }\n  for (const [left, op, right] of Expressions) {\n    if (!['>', '<', '='].includes(op)) return \"operator must be '>', '<' or '='.\";\n    if (left === null || right === null || !names.has(left.toLowerCase()) || !names.has(right.toLowerCase())) return 'Every operand must be a variable in Variables.';\n    const key = `${left.toLowerCase()} ${op} ${right.toLowerCase()}`;\n    if (triples.has(key)) return `Expression ${key} appears twice.`;\n    triples.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT e.left_operand, e.operator, e.right_operand,\n  CASE\n    WHEN e.operator = '>' AND l.value > r.value THEN 'true'\n    WHEN e.operator = '<' AND l.value < r.value THEN 'true'\n    WHEN e.operator = '=' AND l.value = r.value THEN 'true'\n    ELSE 'false'\n  END AS value\nFROM Expressions AS e\nJOIN Variables AS l\n  ON l.name = e.left_operand\nJOIN Variables AS r\n  ON r.name = e.right_operand;",
+  "brute": "SELECT left_operand, operator, right_operand,\n  IF((operator = '>' AND lv > rv) OR (operator = '<' AND lv < rv) OR (operator = '=' AND lv = rv), 'true', 'false') AS value\nFROM (\n  SELECT x.left_operand, x.operator, x.right_operand,\n    (SELECT v.value FROM Variables AS v WHERE v.name = x.left_operand) AS lv,\n    (SELECT v.value FROM Variables AS v WHERE v.name = x.right_operand) AS rv\n  FROM Expressions AS x\n) AS t",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  let pool = small ? ['x', 'y', 'z', 'a', 'b'] : [];\n  if (!small) {\n    for (const c of letters) pool.push(c);\n    for (const c of letters) for (const d of letters) pool.push(c + d);\n  }\n  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const count = small ? Math.floor(rand() * 5) : 300;\n  const values = [-3, 0, 5, 5, 66, 77];\n  const Variables = pool.slice(0, count).map(name => [name, small ? values[Math.floor(rand() * values.length)] : Math.floor(rand() * 41) - 20]);\n  const Expressions = [], seen = new Set(), ops = ['>', '<', '='];\n  const wanted = !Variables.length ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  for (let tries = 0; Expressions.length < wanted && tries < wanted * 10; tries++) {\n    const left = Variables[Math.floor(rand() * Variables.length)][0], right = Variables[Math.floor(rand() * Variables.length)][0];\n    const op = ops[Math.floor(rand() * 3)], key = `${left} ${op} ${right}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Expressions.push([left, op, right]);\n  }\n  return [{ Variables, Expressions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Variables":[["x",66],["y",77]],"Expressions":[["x",">","y"],["x","<","y"],["x","=","y"],["y",">","x"],["y","<","x"],["x","=","x"]]}],"expected":{"columns":["left_operand","operator","right_operand","value"],"rows":[["x",">","y","false"],["x","<","y","true"],["x","=","y","false"],["y",">","x","true"],["y","<","x","false"],["x","=","x","true"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Variables":[["x",1]],"Expressions":[]}]},
+    {"name":"Test 2","input":[{"Variables":[["x",7]],"Expressions":[["x","=","x"],["x","<","x"],["x",">","x"]]}]},
+    {"name":"Test 3","input":[{"Variables":[["a",5],["b",5]],"Expressions":[["a","=","b"],["a","<","b"],["b",">","a"]]}]},
+    {"name":"Test 4","input":[{"Variables":[["a",10],["b",2]],"Expressions":[["a","<","b"],["a",">","b"],["b","<","a"]]}]},
+    {"name":"Test 5","input":[{"Variables":[["m",-4],["n",0],["p",3]],"Expressions":[["m","<","n"],["n","<","p"],["p",">","m"],["m","=","p"]]}]},
+    {"name":"Test 6","input":[{"Variables":[["x",9],["y",10],["z",100]],"Expressions":[["x","<","y"],["z",">","x"],["y","<","z"]]}]},
+    {"name":"Test 7","input":[{"Variables":[["aa",1],["b",2],["ccc",3],["d",4]],"Expressions":[["aa",">","ccc"],["d",">","b"],["b","=","b"]]}]},
+    {"name":"Test 8","input":[{"Variables":[["x",66],["y",77],["z",77]],"Expressions":[["y","=","z"],["z",">","x"],["x",">","z"],["y","<","z"]]}]},
+    {"name":"Test 9","input":[{"Variables":[["p",1],["q",2]],"Expressions":[["p",">","q"],["q","<","p"],["p","=","q"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAn expression only stores variable **names**; to compare it needs the two **values**. Joining `Variables` twice, once for the left operand and once for the right, puts both values on the expression's row. A `CASE` then applies whichever operator the row holds and writes `'true'` or `'false'`.\n\n## Approach\n\n1. Read `Expressions` as `e`.\n2. `JOIN Variables AS l` on `l.name = e.left_operand` to fetch the left value.\n3. `JOIN Variables AS r` on `r.name = e.right_operand` to fetch the right value. Every operand exists, so inner joins lose nothing, and names are unique, so no row is repeated.\n4. The `CASE` returns `'true'` when the row's operator holds for `l.value` and `r.value`, and `'false'` otherwise; it is named `value`.\n\n## Example 1, step by step\n\nWith `x = 66` and `y = 77`, the joins give each expression the pair (left value, right value):\n\n- `x > y`: 66 > 77 fails, `'false'`; `x < y`: 66 < 77, `'true'`; `x = y`: `'false'`.\n- `y > x`: 77 > 66, `'true'`; `y < x`: `'false'`.\n- `x = x`: both sides are 66, `'true'`.\n\n## Complexity\n\n- Time: O(E + V) for E expressions and V variables with a hash or index on `name` (its key).\n- Space: O(E) for the result.\n\n## Pitfalls\n\n- Comparing the operand names (`e.left_operand < e.right_operand`) compares text, not values: `a < b` is true by name even when `a = 10` and `b = 2`.\n- Using one join for both operands (or one alias twice) gives both sides the same value.\n- The answer is the text `'true'`/`'false'`, not 1/0.\n- A `CASE` whose branches test only the values, without checking the operator, mixes up the three comparisons.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `e` | `Expressions`, one output row per comparison |\n| `l` | the `Variables` row of the left operand |\n| `r` | the `Variables` row of the right operand |\n| `value` | `'true'` or `'false'`, the evaluated comparison |",
+  "narration": {
+    "1": "Output the expression as stored, followed by its evaluated result.",
+    "2": "The CASE picks the branch for the row's operator and compares the two looked-up values.",
+    "6": "Any expression whose comparison does not hold is false.",
+    "8": "Each row of Expressions is evaluated once.",
+    "9": "The first copy of Variables, aliased l, supplies the value of the left operand.",
+    "11": "A second copy, aliased r, supplies the value of the right operand."
+  }
+}

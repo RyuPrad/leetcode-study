@@ -1,0 +1,55 @@
+{
+  "number": 1398,
+  "title": "Customers Who Bought Products A and B but Not C",
+  "spec": "recalled",
+  "statement": "Two tables describe a store's customers and their orders:\n\n- `Customers(customer_id, customer_name)`: one row per customer; `customer_id` is unique. Names may repeat.\n- `Orders(order_id, customer_id, product_name)`: one row per order; `order_id` is unique and `customer_id` always exists in `Customers`. A customer may order the same product several times.\n\nThe store wants to recommend product `\"C\"` to people who already bought both `\"A\"` and `\"B\"`. Report every customer who has at least one order of `\"A\"`, at least one order of `\"B\"`, and **no** order of `\"C\"`, with the columns `customer_id` and `customer_name`. Order the rows by `customer_id` ascending.",
+  "constraints": [
+    "customer_id is unique in Customers",
+    "order_id is unique in Orders",
+    "Every Orders.customer_id exists in Customers",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Customers": [["customer_id","INT"],["customer_name","VARCHAR(30)"]],
+    "Orders": [["order_id","INT"],["customer_id","INT"],["product_name","VARCHAR(30)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Customers = [], Orders = [] }] = input;\n  const customers = new Set(), orders = new Set();\n  for (const [id, name] of Customers) {\n    if (id === null || name === null) return 'Customers rows may not contain null.';\n    if (customers.has(id)) return `customer_id ${id} appears twice in Customers.`;\n    customers.add(id);\n  }\n  for (const [id, customer, product] of Orders) {\n    if (id === null || customer === null || product === null) return 'Orders rows may not contain null.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    if (!customers.has(customer)) return `Order ${id} names unknown customer ${customer}.`;\n    orders.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH purchases AS (\n  SELECT customer_id,\n    SUM(product_name = 'A') AS bought_a,\n    SUM(product_name = 'B') AS bought_b,\n    SUM(product_name = 'C') AS bought_c\n  FROM Orders\n  GROUP BY customer_id\n)\nSELECT c.customer_id, c.customer_name\nFROM Customers AS c\nJOIN purchases AS p\n  ON p.customer_id = c.customer_id\nWHERE p.bought_a > 0\n  AND p.bought_b > 0\n  AND p.bought_c = 0\nORDER BY c.customer_id;",
+  "brute": "SELECT c.customer_id, c.customer_name\nFROM Customers AS c\nWHERE EXISTS (SELECT 1 FROM Orders AS o WHERE o.customer_id = c.customer_id AND o.product_name = 'A')\n  AND EXISTS (SELECT 1 FROM Orders AS o WHERE o.customer_id = c.customer_id AND o.product_name = 'B')\n  AND NOT EXISTS (SELECT 1 FROM Orders AS o WHERE o.customer_id = c.customer_id AND o.product_name = 'C')\nORDER BY c.customer_id",
+  "generator": "function generate(rand, size) {\n  const names = ['Daniel', 'Diana', 'Elizabeth', 'Jhon', 'Mia', 'Omar'];\n  const small = size === 'small';\n  const products = small ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E'];\n  const count = small ? Math.floor(rand() * 6) : 600;\n  const ids = Array.from({ length: count }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Customers = ids.map((id) => [id, names[Math.floor(rand() * names.length)]]);\n  const Orders = [];\n  const orderCount = count === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  for (let i = 0; i < orderCount; i++) {\n    // Products A and B are common so that many customers have both; C is rarer.\n    const r = rand();\n    const product = r < 0.35 ? 'A' : r < 0.7 ? 'B' : products[2 + Math.floor(rand() * (products.length - 2))];\n    Orders.push([(i + 1) * 10, ids[Math.floor(rand() * (small ? Math.min(count, 3) : count))], product]);\n  }\n  return [{ Customers, Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Customers":[[1,"Daniel"],[2,"Diana"],[3,"Elizabeth"],[4,"Jhon"]],"Orders":[[10,1,"A"],[20,1,"B"],[30,1,"D"],[40,1,"C"],[50,2,"A"],[60,3,"A"],[70,3,"B"],[80,3,"D"],[90,4,"C"]]}],"expected":{"columns":["customer_id","customer_name"],"rows":[[3,"Elizabeth"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Customers":[],"Orders":[]}]},
+    {"name":"Test 2","input":[{"Customers":[[1,"Mia"],[2,"Omar"]],"Orders":[]}]},
+    {"name":"Test 3","input":[{"Customers":[[7,"Mia"]],"Orders":[[1,7,"B"],[2,7,"A"]]}]},
+    {"name":"Test 4","input":[{"Customers":[[7,"Mia"]],"Orders":[[1,7,"A"],[2,7,"B"],[3,7,"C"]]}]},
+    {"name":"Test 5","input":[{"Customers":[[1,"Diana"],[2,"Omar"]],"Orders":[[1,1,"A"],[2,1,"A"],[3,2,"A"],[4,2,"A"],[5,2,"B"],[6,2,"B"]]}]},
+    {"name":"Test 6","input":[{"Customers":[[5,"Jhon"],[2,"Mia"],[9,"Daniel"],[1,"Omar"]],"Orders":[[10,9,"A"],[11,9,"B"],[12,2,"B"],[13,2,"A"],[14,5,"A"],[15,5,"B"],[16,1,"A"]]}]},
+    {"name":"Test 7","input":[{"Customers":[[1,"Daniel"],[2,"Diana"],[3,"Jhon"]],"Orders":[[1,1,"B"],[2,1,"C"],[3,2,"A"],[4,2,"B"],[5,2,"D"],[6,3,"A"],[7,3,"C"]]}]},
+    {"name":"Test 8","input":[{"Customers":[[1,"Mia"],[2,"Mia"],[3,"Mia"]],"Orders":[[1,1,"A"],[2,1,"B"],[3,2,"A"],[4,2,"B"],[5,3,"B"]]}]},
+    {"name":"Test 9","input":[{"Customers":[[1,"Omar"],[2,"Diana"]],"Orders":[[1,1,"AB"],[2,1,"D"],[3,2,"C"],[4,2,"A"],[5,2,"B"],[6,2,"C"]]}]},
+    {"name":"Test 10","input":[{"Customers":[[3,"Elizabeth"],[1,"Daniel"],[4,"Jhon"],[2,"Diana"]],"Orders":[[1,4,"A"],[2,4,"B"],[3,3,"A"],[4,3,"B"],[5,1,"C"],[6,2,"B"],[7,2,"A"],[8,1,"A"],[9,1,"B"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe three conditions are about a customer's whole order history, not about any single order: no one row can be both \"A\" and \"B\". So the orders are first grouped per customer, and each group is summarised by how many times it contains \"A\", \"B\" and \"C\". In MySQL a comparison such as `product_name = 'A'` is 1 or 0, so `SUM` over it counts the matching orders. A customer qualifies when the first two counts are positive and the third is zero. Joining those summaries to `Customers` supplies the name.\n\n## Approach\n\n1. `purchases`: group `Orders` by `customer_id` and count the orders of each product as `bought_a`, `bought_b` and `bought_c`.\n2. Join `Customers` (`c`) to `purchases` (`p`) on `customer_id` to get the names.\n3. Keep rows with `bought_a > 0`, `bought_b > 0` and `bought_c = 0`.\n4. Order by `customer_id`.\n\n## Example 1, step by step\n\n- `purchases`: customer 1 → (1, 1, 1), customer 2 → (1, 0, 0), customer 3 → (1, 1, 0), customer 4 → (0, 0, 1), as (`bought_a`, `bought_b`, `bought_c`). The \"D\" orders count toward none of them.\n- Customer 1 bought \"C\", customer 2 never bought \"B\", and customer 4 bought neither \"A\" nor \"B\"; all three fail the filter.\n- Customer 3 (Elizabeth) passes, giving the single row `3, Elizabeth`.\n\n## Complexity\n\n- Time: O(O + C log C) for O orders and C customers: one grouping pass over `Orders`, a join on `customer_id`, then the sort.\n- Space: O(C) for the per-customer counts.\n\n## Pitfalls\n\n- A row-level filter such as `WHERE product_name IN ('A', 'B') AND product_name <> 'C'` looks at one order at a time and cannot see that the same customer also bought \"C\".\n- `COUNT(DISTINCT product_name) = 2` over all products fails as soon as the customer also bought something else, like \"D\".\n- Repeat orders of \"A\" make its count 2 or more; test `> 0`, not `= 1`.\n- The result must be sorted by `customer_id`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `purchases` | one row per customer who ordered anything, with three product counts |\n| `bought_a`, `bought_b`, `bought_c` | how many of that customer's orders were \"A\", \"B\" or \"C\" |\n| `c` | a row of `Customers`, for the name |\n| `p` | that customer's row of `purchases` |",
+  "narration": {
+    "1": "The first stage summarises each customer's orders.",
+    "3": "Each comparison is 1 for an order of A and 0 otherwise, so the sum counts A orders.",
+    "7": "Grouping by customer_id gives one summary row per customer who ordered anything.",
+    "11": "Join each summary to its customer to get the name.",
+    "13": "Keep customers with at least one A order...",
+    "14": "...and at least one B order...",
+    "15": "...but no C order at all.",
+    "16": "The problem asks for the rows in customer_id order."
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "number": 1065,
+  "title": "Index Pairs of a String",
+  "spec": "recalled",
+  "statement": "Find every place where one of the strings in `words` appears inside `text`. Each appearance is reported as a pair `[i, j]` of indices such that the slice of `text` from position `i` through position `j` (both included) equals some word. Overlapping appearances all count, and one start index may begin several different words.\n\nReturn the list of all such pairs sorted by `i`, and by `j` when two pairs share the same `i`. Return an empty list when no word appears.",
+  "constraints": [
+    "1 <= text.length <= 100",
+    "1 <= words.length <= 20",
+    "1 <= words[i].length <= 50",
+    "text and every words[i] contain only lowercase English letters",
+    "All strings in words are distinct"
+  ],
+  "signature": "int[][] indexPairs(String text, String[] words)",
+  "entry": "indexPairs",
+  "kind": "function",
+  "parameters": [
+    "text",
+    "words"
+  ],
+  "validator": "function validate([text, words]) {\n  if (typeof text !== 'string' || text.length < 1 || text.length > 100) return 'text has 1 to 100 characters.';\n  if (!/^[a-z]+$/.test(text)) return 'text contains only lowercase letters.';\n  if (!Array.isArray(words) || words.length < 1 || words.length > 20) return 'words has 1 to 20 strings.';\n  for (const word of words) {\n    if (typeof word !== 'string' || word.length < 1 || word.length > 50) return 'Each word has 1 to 50 characters.';\n    if (!/^[a-z]+$/.test(word)) return 'Words contain only lowercase letters.';\n  }\n  if (new Set(words).size !== words.length) return 'The words must be distinct.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function indexPairs(text, words) {\n  const root = { next: new Map(), isWord: false };\n  for (const word of words) {\n    let node = root;\n    for (const ch of word) {\n      if (!node.next.has(ch)) {\n        node.next.set(ch, { next: new Map(), isWord: false });\n      }\n      node = node.next.get(ch);\n    }\n    node.isWord = true;\n  }\n\n  const pairs = [];\n  for (let i = 0; i < text.length; i++) {\n    let node = root;\n    for (let j = i; j < text.length; j++) {\n      node = node.next.get(text[j]);\n      if (node === undefined) {\n        break;\n      }\n      if (node.isWord) {\n        pairs.push([i, j]);\n      }\n    }\n  }\n  return pairs;\n}",
+  "brute": "function indexPairs(text, words) {\n  const found = [];\n  for (const word of words) {\n    let at = text.indexOf(word);\n    while (at !== -1) {\n      found.push([at, at + word.length - 1]);\n      at = text.indexOf(word, at + 1);\n    }\n  }\n  return found.sort((a, b) => a[0] - b[0] || a[1] - b[1]);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const alphabet = rand() < 0.7 ? 'ab' : 'abc';\n  const randomWord = len => Array.from({ length: len }, () => alphabet[pick(alphabet.length)]).join('');\n  const textLength = size === 'large' ? 90 + pick(11) : 1 + pick(12);\n  const text = randomWord(textLength);\n  const count = size === 'large' ? 20 : 1 + pick(5);\n  const maxLength = size === 'large' ? 50 : 5;\n  const words = new Set();\n  let tries = 0;\n  while (words.size < count && tries++ < 1000) {\n    if (rand() < 0.6) {\n      const start = pick(text.length);\n      const len = 1 + pick(Math.min(maxLength, text.length - start));\n      words.add(text.slice(start, start + len));\n    } else {\n      words.add(randomWord(1 + pick(maxLength)));\n    }\n  }\n  return [text, [...words]];\n}",
+  "examples": [
+    {"name":"Example 1","input":["thestoryofleetcodeandme",["story","fleet","leetcode"]],"expected":[[3,7],[9,13],[10,17]]},
+    {"name":"Example 2","input":["ababa",["aba","ab"]],"expected":[[0,1],[0,2],[2,3],[2,4]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a",["a"]]},
+    {"name":"Test 2","input":["a",["b"]]},
+    {"name":"Test 3","input":["aaaa",["a","aa","aaa","aaaa"]]},
+    {"name":"Test 4","input":["abc",["abcd","bcd"]]},
+    {"name":"Test 5","input":["abcabc",["abc","bca","cab","c"]]},
+    {"name":"Test 6","input":["leetcode",["leet","code","leetcode","e"]]},
+    {"name":"Test 7","input":["zzzzz",["zz","z"]]},
+    {"name":"Test 8","input":["xyz",["xyz","yz","x","z","xy","y"]]},
+    {"name":"Test 9","input":["ababab",["ba","bab","b"]]},
+    {"name":"Test 10","input":["mississippi",["is","ss","issi","ppi","i","sip"]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe direct method searches `text` once for every word, then sorts all the matches. A trie (prefix tree) turns this around: store all the words in one tree, then from each start index `i` walk forward through `text` and through the tree together. Every node that ends a word gives a pair, and the walk stops as soon as no word continues with the next letter. Because `i` grows in the outer loop and `j` in the inner one, the pairs come out already sorted.\n\n## Approach\n\n1. Build the trie: each node has a `next` map from letter to child and an `isWord` flag.\n2. Insert every word, creating missing children, and set `isWord` on the node of its last letter.\n3. For each start `i`, set `node` to the root and move `j` from `i` to the end of `text`.\n4. Step to the child for `text[j]`; if it does not exist, no word starts with `text[i..j]`, so stop this start.\n5. If the node ends a word, add `[i, j]` to `pairs`.\n6. Return `pairs`.\n\n## Example 1, step by step\n\nThe trie holds `story`, `fleet` and `leetcode`. Starts `0` to `2` (`t`, `h`, `e`) have no child under the root. At `i = 3` the letters `s, t, o, r, y` follow the tree to the end of `story`, giving `[3, 7]`. At `i = 9` the walk spells `fleet` (`[9, 13]`), and at `i = 10` it spells `leetcode` (`[10, 17]`). The result is `[[3,7],[9,13],[10,17]]`.\n\n## Complexity\n\n- Time: O(W + n · L): building costs the total word length W, and each of the n starts walks at most L letters, the longest word length.\n- Space: O(W) for the trie, plus the output.\n\n## Pitfalls\n\n- Matches can overlap and share a start (`\"ab\"` and `\"aba\"` both at 0); do not stop at the first word found.\n- Keep walking after a match: a longer word may continue past it.\n- If you collect matches word by word, sort them by start and then by end before returning.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `root` | the empty-prefix node of the trie |\n| `node` | the current trie node |\n| `ch` | a letter of the word being inserted |\n| `i`, `j` | start and current end index in `text` |\n| `pairs` | the index pairs found, in sorted order |",
+  "narration": {
+    "2": "Create the trie root; each node maps letters to children and remembers whether a word ends there.",
+    "3": "Insert the words one at a time.",
+    "4": "Start each insertion at the root.",
+    "6": "If no child exists for this letter yet...",
+    "7": "...create a fresh node for it.",
+    "9": "Move down to the child for this letter.",
+    "11": "The last letter's node marks the end of a whole word.",
+    "14": "Collect the answer pairs here.",
+    "15": "Try every position of text as a start index.",
+    "16": "Begin the walk at the root of the trie.",
+    "17": "Extend the end index one letter at a time.",
+    "18": "Follow the edge for the next letter of text.",
+    "19": "No word continues with this letter...",
+    "20": "...so no longer match starts at i; move to the next start.",
+    "22": "The slice text[i..j] is a whole word.",
+    "23": "Record it; i then j increase, so pairs stay sorted.",
+    "27": "Return all pairs in sorted order."
+  }
+}

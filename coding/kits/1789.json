@@ -1,0 +1,50 @@
+{
+  "number": 1789,
+  "title": "Primary Department for Each Employee",
+  "spec": "leetcode",
+  "statement": "One table records department memberships:\n\n- `Employee(employee_id, department_id, primary_flag)`: one row per department an employee belongs to; the pair `(employee_id, department_id)` is unique. `primary_flag` is `'Y'` or `'N'`.\n- An employee in two or more departments has exactly one row flagged `'Y'`, marking their primary department. An employee in a single department has that row flagged `'N'`.\n\nReport every employee once with their primary department: the `'Y'` row's department for employees in several departments, and the only department for employees in one. Output the columns `employee_id` and `department_id`. Rows may come in any order.",
+  "constraints": [
+    "(employee_id, department_id) is unique in Employee",
+    "primary_flag is one of 'Y', 'N'",
+    "An employee with several departments has exactly one 'Y' row",
+    "An employee with one department has primary_flag 'N'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employee": [["employee_id","INT"],["department_id","INT"],["primary_flag","ENUM('Y', 'N')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employee = [] }] = input;\n  const pairs = new Set(), rows = new Map(), yes = new Map();\n  for (const [emp, dept, flag] of Employee) {\n    if (emp === null || dept === null) return 'employee_id and department_id may not be null.';\n    if (flag !== 'Y' && flag !== 'N') return `primary_flag must be 'Y' or 'N', not ${flag}.`;\n    const key = `${emp}|${dept}`;\n    if (pairs.has(key)) return `Employee ${emp} is in department ${dept} twice.`;\n    pairs.add(key);\n    rows.set(emp, (rows.get(emp) ?? 0) + 1);\n    yes.set(emp, (yes.get(emp) ?? 0) + (flag === 'Y' ? 1 : 0));\n  }\n  for (const [emp, count] of rows) {\n    if (count === 1 && yes.get(emp) !== 0) return `Employee ${emp} has one department, so its flag must be 'N'.`;\n    if (count > 1 && yes.get(emp) !== 1) return `Employee ${emp} has several departments and needs exactly one 'Y'.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH single_dept AS (\n  SELECT employee_id\n  FROM Employee\n  GROUP BY employee_id\n  HAVING COUNT(*) = 1\n)\nSELECT employee_id, department_id\nFROM Employee\nWHERE primary_flag = 'Y'\n   OR employee_id IN (SELECT employee_id FROM single_dept);",
+  "brute": "SELECT e.employee_id, e.department_id\nFROM Employee AS e\nWHERE e.primary_flag = 'Y'\nUNION\nSELECT e.employee_id, e.department_id\nFROM Employee AS e\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Employee AS other\n  WHERE other.employee_id = e.employee_id\n    AND other.department_id <> e.department_id\n)",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const limit = small ? pick(9) : 2000;\n  const depts = small ? 4 : 20;\n  const Employee = [];\n  for (let emp = 1 + pick(3); Employee.length < limit; emp += 1 + (small ? pick(3) : 0)) {\n    // Choose 1 to 3 (small) or 1 to 4 (large) distinct departments, trimmed to the row budget.\n    const want = Math.min(1 + pick(small ? 3 : 4), limit - Employee.length);\n    const chosen = new Set();\n    while (chosen.size < want) chosen.add(1 + pick(depts));\n    const list = [...chosen];\n    const primary = list.length > 1 ? pick(list.length) : -1;\n    list.forEach((dept, i) => Employee.push([emp, dept, i === primary ? 'Y' : 'N']));\n  }\n  for (let i = Employee.length - 1; i > 0; i--) { const j = pick(i + 1); [Employee[i], Employee[j]] = [Employee[j], Employee[i]]; }\n  return [{ Employee }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employee":[[1,1,"N"],[2,1,"Y"],[2,2,"N"],[3,3,"N"],[4,2,"N"],[4,3,"Y"],[4,4,"N"]]}],"expected":{"columns":["employee_id","department_id"],"rows":[[1,1],[2,1],[3,3],[4,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employee":[]}]},
+    {"name":"Test 2","input":[{"Employee":[[7,3,"N"]]}]},
+    {"name":"Test 3","input":[{"Employee":[[7,3,"N"],[7,5,"Y"]]}]},
+    {"name":"Test 4","input":[{"Employee":[[1,1,"N"],[2,1,"N"],[3,2,"N"]]}]},
+    {"name":"Test 5","input":[{"Employee":[[1,1,"Y"],[1,2,"N"],[2,1,"N"],[2,2,"Y"],[3,4,"N"],[3,5,"N"],[3,6,"Y"]]}]},
+    {"name":"Test 6","input":[{"Employee":[[10,2,"N"],[11,2,"Y"],[11,9,"N"],[12,9,"N"]]}]},
+    {"name":"Test 7","input":[{"Employee":[[5,1,"N"],[5,2,"N"],[5,3,"N"],[5,4,"Y"],[6,4,"N"]]}]},
+    {"name":"Test 8","input":[{"Employee":[[3,8,"Y"],[1,8,"N"],[3,7,"N"],[2,7,"N"],[2,8,"Y"]]}]},
+    {"name":"Test 9","input":[{"Employee":[[100,1,"N"],[200,1,"N"],[200,2,"Y"],[300,3,"N"],[400,3,"N"],[400,4,"Y"],[400,5,"N"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach employee falls into exactly one of two cases. If they belong to several departments, the answer is the row flagged `'Y'`. If they belong to just one department, that row is flagged `'N'` but is still the answer. So a row belongs in the result when it is flagged `'Y'` **or** its employee has only one row. The second test needs a fact about the whole employee, not the row, which is what a grouped subquery provides: count each employee's rows and keep those with a count of 1.\n\n## Approach\n\n1. CTE `single_dept`: group `Employee` by `employee_id` and keep the ids whose group has `COUNT(*) = 1`.\n2. Scan `Employee` again and keep a row when `primary_flag = 'Y'`.\n3. Also keep it when its `employee_id` is in `single_dept`.\n4. Select `employee_id` and `department_id` from the kept rows.\n\n## Example 1, step by step\n\n- Row counts per employee: 1 → 1, 2 → 2, 3 → 1, 4 → 3. So `single_dept` holds employees 1 and 3.\n- Rows flagged `'Y'`: (2, 1) and (4, 3).\n- Rows of employees in `single_dept`: (1, 1) and (3, 3).\n- Together they give (1, 1), (2, 1), (3, 3), (4, 3), one row per employee.\n\n## Complexity\n\n- Time: O(n) with hashing for n rows: one grouped pass to build `single_dept`, one pass to filter.\n- Space: O(e) for the e employee ids in `single_dept`.\n\n## Pitfalls\n\n- `WHERE primary_flag = 'Y'` alone loses every single-department employee (1 and 3 in Example 1).\n- Grouping the outer query by `employee_id` to apply the count leaves `department_id` undefined for multi-department employees (MySQL's `ONLY_FULL_GROUP_BY` rejects it); the count belongs in a separate subquery.\n- Using `AND` instead of `OR` returns nothing, because a single department is never flagged `'Y'`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `single_dept` | ids of employees who belong to exactly one department |\n| `primary_flag = 'Y'` | the chosen primary row of a multi-department employee |\n| `employee_id IN (...)` | the only row of a single-department employee |",
+  "narration": {
+    "1": "The CTE single_dept collects the employees who belong to only one department.",
+    "4": "Grouping by employee puts all of an employee's memberships in one group.",
+    "5": "A group with a single row means the employee has exactly one department.",
+    "9": "Rows flagged Y are the chosen primary department of multi-department employees.",
+    "10": "The OR also keeps the only row of each single-department employee, whose flag is N."
+  }
+}

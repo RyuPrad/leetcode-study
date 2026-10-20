@@ -1,0 +1,60 @@
+{
+  "number": 1120,
+  "title": "Maximum Average Subtree",
+  "spec": "recalled",
+  "statement": "You are given the `root` of a binary tree. For any node, its **subtree** is that node together with all of its descendants, and the subtree's **average** is the sum of those nodes' values divided by how many nodes there are.\n\nReturn the largest average over the subtrees of all nodes in the tree (the whole tree counts as the root's subtree). Answers within `10^-5` of the true value are accepted.",
+  "constraints": [
+    "The tree has between 1 and 10^4 nodes",
+    "0 <= Node.val <= 10^5"
+  ],
+  "signature": "double maximumAverageSubtree(TreeNode root)",
+  "entry": "maximumAverageSubtree",
+  "kind": "function",
+  "parameters": [
+    "root"
+  ],
+  "compare": "float",
+  "validator": "function validate([root]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs at least 1 node.';\n  let slots = 1;\n  for (let i = 0; i < root.length; i++) {\n    if (i >= slots) return 'The list has entries after the last possible child.';\n    if (root[i] !== null) slots += 2;\n  }\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10000 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < 0 || v > 100000)) return 'Every node value is an integer from 0 to 100000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumAverageSubtree(root) {\n  let best = 0;\n\n  const visit = (node) => {\n    if (node === null) {\n      return [0, 0];\n    }\n    const [leftSum, leftCount] = visit(node.left);\n    const [rightSum, rightCount] = visit(node.right);\n    const sum = leftSum + rightSum + node.val;\n    const count = leftCount + rightCount + 1;\n    best = Math.max(best, sum / count);\n    return [sum, count];\n  };\n\n  visit(root);\n  return best;\n}",
+  "brute": "function maximumAverageSubtree(root) {\n  // Collect every node, then add up each node's subtree separately with its own walk.\n  const all = [];\n  const pending = [root];\n  while (pending.length) {\n    const node = pending.pop();\n    if (!node) continue;\n    all.push(node);\n    pending.push(node.left, node.right);\n  }\n  let answer = -1;\n  for (const top of all) {\n    let total = 0;\n    let size = 0;\n    const walk = [top];\n    while (walk.length) {\n      const node = walk.pop();\n      if (!node) continue;\n      total += node.val;\n      size += 1;\n      walk.push(node.left, node.right);\n    }\n    if (total / size > answer) answer = total / size;\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 900 + Math.floor(rand() * 80) : 1 + Math.floor(rand() * 10);\n  const mode = rand();\n  const constant = Math.floor(rand() * 100001);\n  // Values span the full range, a narrow range (many ties), or are all equal.\n  const value = () => large || mode < 0.35 ? Math.floor(rand() * 100001) : mode < 0.85 ? Math.floor(rand() * 11) : constant;\n  // Some trees start with a long downward chain, which makes deep recursion.\n  const chain = large ? (rand() < 0.4 ? 100 + Math.floor(rand() * 400) : 1) : (rand() < 0.25 ? n : 1);\n  const nodes = [{ val: value(), left: null, right: null }];\n  for (let i = 1; i < chain; i++) {\n    nodes[i - 1][rand() < 0.5 ? 'left' : 'right'] = i;\n    nodes.push({ val: value(), left: null, right: null });\n  }\n  const slots = [[chain - 1, 'left'], [chain - 1, 'right']];\n  for (let i = chain; i < n; i++) {\n    const k = Math.floor(rand() * slots.length);\n    const [parent, side] = slots[k];\n    slots[k] = slots[slots.length - 1];\n    slots.pop();\n    nodes[parent][side] = i;\n    nodes.push({ val: value(), left: null, right: null });\n    slots.push([i, 'left'], [i, 'right']);\n  }\n  // Level-order serialisation with null for missing children, trailing nulls removed.\n  const out = [];\n  const queue = [0];\n  for (let q = 0; q < queue.length; q++) {\n    if (queue[q] === null) { out.push(null); continue; }\n    const node = nodes[queue[q]];\n    out.push(node.val);\n    queue.push(node.left, node.right);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  return [out];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[5,6,1]],"expected":6},
+    {"name":"Example 2","input":[[0,null,1]],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7]]},
+    {"name":"Test 2","input":[[0]]},
+    {"name":"Test 3","input":[[1,2,3,4,5,6,7]]},
+    {"name":"Test 4","input":[[100000,0,0]]},
+    {"name":"Test 5","input":[[3,3,3,3,3]]},
+    {"name":"Test 6","input":[[9,1,2]]},
+    {"name":"Test 7","input":[[2,10,null,7,8]]},
+    {"name":"Test 8","input":[[0,0,0,null,0,null,0]]},
+    {"name":"Test 9","input":[[1,null,100000,null,99999]]},
+    {"name":"Test 10","input":[[4,8,1,2,null,6,3,null,5,0,9,null,null,7]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAveraging each subtree separately repeats work: a node's subtree is visited again for every ancestor, which is O(n²) on a long chain. But a subtree's average only needs two numbers, its sum and its node count, and both can be built from the children's sums and counts. A post-order DFS computes them bottom-up, so every subtree's average is known after one visit per node.\n\n## Approach\n\n1. Keep `best`, the largest average seen so far (values are never negative, so 0 is a safe start).\n2. `visit(node)` returns `[sum, count]` for the subtree at `node`; an empty child returns `[0, 0]`.\n3. For a real node, visit both children first, then add their sums and counts plus the node itself.\n4. Divide `sum` by `count` to get this subtree's average and update `best`.\n5. Return `[sum, count]` so the parent can build its own totals; after `visit(root)`, return `best`.\n\n## Example 1, step by step\n\nThe tree is `5` with children `6` and `1`. Visiting `6` gives `sum = 6`, `count = 1`, average `6`, so `best = 6`. Visiting `1` gives average `1`, which does not beat it. At the root, `sum = 6 + 1 + 5 = 12` and `count = 3`, average `4`. The answer stays `6`.\n\n## Complexity\n\n- Time: O(n): each node is visited once and does constant work.\n- Space: O(h) for the recursion, where `h` is the tree's height (up to n on a chain).\n\n## Pitfalls\n\n- In Java or C, `sum / count` on integers truncates; convert to a floating-point type before dividing.\n- Averages do not combine directly: the parent's average needs the children's sums and counts, not their averages.\n- A single leaf is a subtree too, so the answer is at least the largest leaf value.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `best` | largest subtree average found so far |\n| `visit` | post-order helper returning a subtree's sum and node count |\n| `leftSum`, `leftCount` | totals for the left child's subtree |\n| `rightSum`, `rightCount` | totals for the right child's subtree |\n| `sum`, `count` | totals for the current node's subtree |",
+  "narration": {
+    "2": "Track the largest average found; values are never negative, so 0 is a safe start.",
+    "4": "The helper returns the sum and node count of the subtree rooted at node.",
+    "5": "An empty child adds nothing...",
+    "6": "...so it contributes a sum of 0 and a count of 0.",
+    "8": "Get the left subtree's totals first (post-order).",
+    "9": "Then get the right subtree's totals.",
+    "10": "This subtree's sum is both children's sums plus the node's own value.",
+    "11": "Its size is both children's counts plus this node.",
+    "12": "This subtree's average is sum / count; keep it if it is the best so far.",
+    "13": "Hand the totals up so the parent can compute its own average.",
+    "16": "Start the walk at the root, which visits every subtree once.",
+    "17": "Every subtree has been averaged; return the largest."
+  }
+}

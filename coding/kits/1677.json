@@ -1,0 +1,55 @@
+{
+  "number": 1677,
+  "title": "Product's Worth Over Invoices",
+  "spec": "recalled",
+  "statement": "Two tables describe products and the invoices issued for them:\n\n- `Product(product_id, name)`: one row per product; `product_id` is unique, and `name` is a unique string of lowercase English letters.\n- `Invoice(invoice_id, product_id, rest, paid, canceled, refunded)`: one row per invoice; `invoice_id` is unique and `product_id` names a product in `Product`. The four amounts are non-negative integers: what is still due (`rest`), what was paid, what was canceled and what was refunded on that invoice.\n\nFor **every** product, report its `name` and the totals of each amount over all of its invoices, in the columns `name`, `rest`, `paid`, `canceled` and `refunded`. A product with no invoices still appears, with `0` in all four totals. Order the rows by `name` ascending.",
+  "constraints": [
+    "product_id is unique in Product",
+    "Product names are unique and consist of lowercase English letters",
+    "invoice_id is unique in Invoice",
+    "Every Invoice.product_id exists in Product",
+    "rest, paid, canceled and refunded are non-negative integers; no column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Product": [["product_id","INT"],["name","VARCHAR(15)"]],
+    "Invoice": [["invoice_id","INT"],["product_id","INT"],["rest","INT"],["paid","INT"],["canceled","INT"],["refunded","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Product = [], Invoice = [] }] = input;\n  const products = new Set(), names = new Set(), invoices = new Set();\n  for (const [id, name] of Product) {\n    if (id === null || name === null) return 'Product rows may not contain null.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    if (!/^[a-z]+$/.test(name)) return `Product name ${name} must be lowercase letters.`;\n    if (names.has(name)) return `Product name ${name} appears twice.`;\n    products.add(id);\n    names.add(name);\n  }\n  for (const row of Invoice) {\n    if (row.some((v) => v === null)) return 'Invoice rows may not contain null.';\n    if (invoices.has(row[0])) return `invoice_id ${row[0]} appears twice in Invoice.`;\n    if (!products.has(row[1])) return `Invoice ${row[0]} names unknown product ${row[1]}.`;\n    if (row.slice(2).some((v) => v < 0)) return `Invoice ${row[0]} has a negative amount.`;\n    invoices.add(row[0]);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  p.name,\n  IFNULL(SUM(i.rest), 0) AS rest,\n  IFNULL(SUM(i.paid), 0) AS paid,\n  IFNULL(SUM(i.canceled), 0) AS canceled,\n  IFNULL(SUM(i.refunded), 0) AS refunded\nFROM Product AS p\nLEFT JOIN Invoice AS i\n  ON i.product_id = p.product_id\nGROUP BY p.product_id, p.name\nORDER BY p.name;",
+  "brute": "SELECT\n  p.name,\n  (SELECT COALESCE(SUM(x.rest), 0) FROM Invoice AS x WHERE x.product_id = p.product_id) AS rest,\n  (SELECT COALESCE(SUM(x.paid), 0) FROM Invoice AS x WHERE x.product_id = p.product_id) AS paid,\n  (SELECT COALESCE(SUM(x.canceled), 0) FROM Invoice AS x WHERE x.product_id = p.product_id) AS canceled,\n  (SELECT COALESCE(SUM(x.refunded), 0) FROM Invoice AS x WHERE x.product_id = p.product_id) AS refunded\nFROM Product AS p\nORDER BY p.name",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const Product = [], Invoice = [];\n  if (small) {\n    const pool = ['ham', 'bacon', 'eggs', 'milk', 'tea', 'jam', 'corn', 'rice'];\n    const ids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];\n    const count = pick(5);\n    for (let k = 0; k < count; k++) {\n      // Draw a fresh id and a fresh name, so ids and names are in unrelated orders.\n      const id = ids.splice(pick(ids.length), 1)[0];\n      const name = pool.splice(pick(pool.length), 1)[0];\n      Product.push([id, name]);\n    }\n    const invoices = Product.length === 0 ? 0 : pick(9);\n    const used = new Set();\n    for (let k = 0; k < invoices; k++) {\n      let id = 1 + pick(40);\n      while (used.has(id)) id = 1 + pick(40);\n      used.add(id);\n      const amount = () => (rand() < 0.3 ? 0 : pick(6));\n      Invoice.push([id, Product[pick(Product.length)][0], amount(), amount(), amount(), amount()]);\n    }\n  } else {\n    const letters = 'abcdefghijklmnopqrstuvwxyz';\n    const count = 300;\n    for (let id = 1; id <= count; id++) {\n      // A unique letter string per id, scrambled so name order differs from id order.\n      let n = (id * 7919) % 17576, name = '';\n      for (let d = 0; d < 3; d++) { name = letters[n % 26] + name; n = Math.floor(n / 26); }\n      Product.push([id, 'p' + name]);\n    }\n    for (let id = 1; id <= 2000; id++) {\n      // Products 1..250 get the invoices; the rest have none.\n      Invoice.push([id, 1 + pick(250), pick(100), pick(100), pick(100), pick(100)]);\n    }\n  }\n  return [{ Product, Invoice }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Product":[[0,"ham"],[1,"bacon"]],"Invoice":[[23,0,2,0,5,0],[12,0,0,4,0,3],[1,1,1,1,0,1],[2,1,1,0,1,1],[3,1,0,1,1,1],[4,1,1,1,1,0]]}],"expected":{"columns":["name","rest","paid","canceled","refunded"],"rows":[["bacon",3,3,3,3],["ham",2,4,5,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Product":[],"Invoice":[]}]},
+    {"name":"Test 2","input":[{"Product":[[1,"tea"]],"Invoice":[]}]},
+    {"name":"Test 3","input":[{"Product":[[1,"tea"]],"Invoice":[[7,1,3,2,1,4]]}]},
+    {"name":"Test 4","input":[{"Product":[[1,"milk"],[2,"corn"],[3,"jam"]],"Invoice":[[1,1,1,1,1,1],[2,2,2,2,2,2],[3,3,3,3,3,3]]}]},
+    {"name":"Test 5","input":[{"Product":[[5,"rice"],[6,"eggs"],[7,"ham"]],"Invoice":[[10,6,4,0,0,1],[11,6,1,5,2,0]]}]},
+    {"name":"Test 6","input":[{"Product":[[1,"bacon"],[2,"tea"]],"Invoice":[[1,1,0,0,0,0],[2,1,0,0,0,0],[3,2,0,9,0,0]]}]},
+    {"name":"Test 7","input":[{"Product":[[9,"aa"],[3,"b"],[4,"ab"],[1,"a"]],"Invoice":[[1,3,5,0,0,0],[2,1,0,5,0,0],[3,9,0,0,5,0],[4,4,0,0,0,5]]}]},
+    {"name":"Test 8","input":[{"Product":[[2,"jam"]],"Invoice":[[1,2,1,0,0,0],[2,2,2,0,1,0],[3,2,3,1,0,0],[4,2,4,0,0,2],[5,2,5,1,1,1]]}]},
+    {"name":"Test 9","input":[{"Product":[[0,"ham"],[1,"bacon"],[2,"milk"]],"Invoice":[[23,0,2,0,5,0],[12,0,0,4,0,3],[1,1,1,1,0,1],[2,1,1,0,1,1]]}]},
+    {"name":"Test 10","input":[{"Product":[[4,"corn"],[3,"eggs"],[2,"rice"],[1,"tea"]],"Invoice":[[5,1,10,20,30,40],[6,4,40,30,20,10],[7,1,1,1,1,1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row is one product with four column-wise sums over its invoices, which is a join followed by a grouping. The catch is the word **every**: a product without invoices must still appear. An inner join would drop it, so `Product` is the left side of a **left join**. For such a product the joined invoice columns are all `null`, and `SUM` over nothing but nulls is `null`, so each total is wrapped in `IFNULL(..., 0)` to show `0` instead.\n\n## Approach\n\n1. Read `Product` as `p`, the table whose rows must all survive.\n2. `LEFT JOIN Invoice` as `i` on matching `product_id`, giving one row per invoice of each product, or one null-filled row for a product with no invoice.\n3. `GROUP BY p.product_id, p.name` to fold those rows back to one per product.\n4. Select `p.name` and the four sums, each turned from `null` into `0` with `IFNULL`.\n5. `ORDER BY p.name`.\n\n## Example 1, step by step\n\n- `ham` (id 0) joins invoices 23 and 12: rest 2 + 0 = 2, paid 0 + 4 = 4, canceled 5 + 0 = 5, refunded 0 + 3 = 3.\n- `bacon` (id 1) joins invoices 1 to 4: rest 1 + 1 + 0 + 1 = 3, paid 1 + 0 + 1 + 1 = 3, canceled 0 + 1 + 1 + 1 = 3, refunded 1 + 1 + 1 + 0 = 3.\n- Sorting by name puts `bacon` before `ham`, although its id is larger.\n\n## Complexity\n\n- Time: O(P + I) with hashing for P products and I invoices, plus O(P log P) to sort by name.\n- Space: O(P) for the groups.\n\n## Pitfalls\n\n- An inner `JOIN` loses products that have no invoices; they must appear with zeros.\n- Without `IFNULL` those products show `null` totals instead of `0`.\n- `COUNT` counts invoices rather than adding the amounts.\n- Ordering by `product_id` gives the wrong order whenever ids and names are sorted differently, as in the example.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Product`, one output row per product |\n| `i` | `Invoice`, joined when `product_id` matches, null when none does |\n| `IFNULL(SUM(i.rest), 0)` | total still due, `0` for a product with no invoices |\n| `GROUP BY p.product_id, p.name` | one group per product |",
+  "narration": {
+    "2": "The product name is the first output column.",
+    "3": "Add up what is still due; IFNULL turns the null sum of a product without invoices into 0.",
+    "7": "Product is the left table, so every product produces a row.",
+    "8": "A left join keeps products with no invoice, filling the Invoice columns with null.",
+    "9": "Invoices are matched to their product by product_id.",
+    "10": "One group per product folds its invoices into the four sums.",
+    "11": "Rows come out sorted by product name, as the problem asks."
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "number": 1468,
+  "title": "Calculate Salaries",
+  "spec": "recalled",
+  "statement": "One table lists every employee's salary before tax:\n\n- `Salaries(company_id, employee_id, employee_name, salary)`: one row per employee of a company; the pair `(company_id, employee_id)` is unique, so the same `employee_id` can appear in several companies.\n\nEach company has a single tax rate, chosen by the **highest** salary paid inside that company:\n\n- 0% when that highest salary is below 1000,\n- 24% when it lies between 1000 and 10000, both ends included,\n- 49% when it is above 10000.\n\nReport every employee with the columns `company_id`, `employee_id`, `employee_name` and `salary`, where `salary` is the salary after the company's tax is taken off, rounded to the nearest whole number (halves round up). Rows may come in any order.",
+  "constraints": [
+    "(company_id, employee_id) is unique in Salaries",
+    "salary is a non-negative integer",
+    "The tax rate depends on the company's maximum salary: < 1000 → 0%, 1000..10000 → 24%, > 10000 → 49%"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salaries": [["company_id","INT"],["employee_id","INT"],["employee_name","VARCHAR(13)"],["salary","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Salaries = [] }] = input;\n  const seen = new Set();\n  for (const [company, employee, , salary] of Salaries) {\n    if (company === null || employee === null) return 'Every row needs a company_id and an employee_id.';\n    const key = `${company}/${employee}`;\n    if (seen.has(key)) return `Employee ${employee} appears twice in company ${company}.`;\n    seen.add(key);\n    if (salary === null || salary < 0) return 'Every salary must be a non-negative number.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH company_max AS (\n  SELECT company_id, employee_id, employee_name, salary,\n         MAX(salary) OVER (PARTITION BY company_id) AS max_salary\n  FROM Salaries\n),\ntaxed AS (\n  SELECT company_id, employee_id, employee_name, salary,\n         CASE\n           WHEN max_salary < 1000 THEN 0\n           WHEN max_salary <= 10000 THEN 24\n           ELSE 49\n         END AS tax_percent\n  FROM company_max\n)\nSELECT company_id, employee_id, employee_name,\n       ROUND(salary * (100 - tax_percent) / 100) AS salary\nFROM taxed;",
+  "brute": "SELECT s.company_id, s.employee_id, s.employee_name,\n       ROUND(s.salary * CASE\n         WHEN m.top < 1000 THEN 100\n         WHEN m.top > 10000 THEN 51\n         ELSE 76\n       END / 100) AS salary\nFROM Salaries AS s\nJOIN (SELECT company_id, MAX(salary) AS top FROM Salaries GROUP BY company_id) AS m\n  ON m.company_id = s.company_id",
+  "generator": "function generate(rand, size) {\n  const names = ['Tony', 'Pronub', 'Tyrrox', 'Pam', 'Bassem', 'Hermione', 'Bocaben', 'Ognjen', 'Nyancat', 'Kim'];\n  // Salaries near the bracket edges and amounts whose taxed value ends in .5 (50, 150, 10050).\n  const pool = [0, 50, 150, 300, 999, 1000, 2200, 7777, 9999, 10000, 10001, 10050, 21300];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const companies = size === 'small' ? Math.floor(rand() * 4) : 250;\n  const Salaries = [];\n  for (let company = 1; company <= companies; company++) {\n    const count = size === 'small' ? Math.floor(rand() * 4) : 8;\n    const ids = [];\n    while (ids.length < count) { const id = 1 + Math.floor(rand() * (size === 'small' ? 6 : 50)); if (!ids.includes(id)) ids.push(id); }\n    for (const id of ids) {\n      const salary = rand() < 0.7 ? pick(pool) : Math.floor(rand() * 25000);\n      Salaries.push([company, id, pick(names), salary]);\n    }\n  }\n  return [{ Salaries: Salaries.slice(0, size === 'small' ? 8 : 2000) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salaries":[[1,1,"Tony",2000],[1,2,"Pronub",21300],[1,3,"Tyrrox",10800],[2,1,"Pam",300],[2,7,"Bassem",450],[2,9,"Hermione",700],[3,7,"Bocaben",100],[3,2,"Ognjen",2200],[3,13,"Nyancat",3300],[3,15,"Morninngcat",7777]]}],"expected":{"columns":["company_id","employee_id","employee_name","salary"],"rows":[[1,1,"Tony",1020],[1,2,"Pronub",10863],[1,3,"Tyrrox",5508],[2,1,"Pam",300],[2,7,"Bassem",450],[2,9,"Hermione",700],[3,7,"Bocaben",76],[3,2,"Ognjen",1672],[3,13,"Nyancat",2508],[3,15,"Morninngcat",5911]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salaries":[]}]},
+    {"name":"Test 2","input":[{"Salaries":[[1,1,"Ana",999],[1,2,"Ben",10]]}]},
+    {"name":"Test 3","input":[{"Salaries":[[1,1,"Ana",1000],[1,2,"Ben",500]]}]},
+    {"name":"Test 4","input":[{"Salaries":[[4,3,"Cleo",10000],[4,8,"Dan",250]]}]},
+    {"name":"Test 5","input":[{"Salaries":[[2,1,"Eve",10001],[2,2,"Finn",100]]}]},
+    {"name":"Test 6","input":[{"Salaries":[[1,1,"Gus",10050],[1,2,"Hana",150],[1,3,"Ivo",50]]}]},
+    {"name":"Test 7","input":[{"Salaries":[[1,1,"Jo",800],[2,1,"Jo",1200],[3,1,"Jo",12000]]}]},
+    {"name":"Test 8","input":[{"Salaries":[[5,1,"Kai",30000],[5,2,"Lia",900],[5,3,"Max",5000],[6,1,"Ned",999],[6,4,"Ola",0]]}]},
+    {"name":"Test 9","input":[{"Salaries":[[7,2,"Pia",7777],[7,5,"Quin",333],[8,2,"Ray",1001],[8,9,"Sue",1001]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe tax rate belongs to the company, not to the employee: a clerk earning 300 is taxed at 49% if anyone in the same company earns more than 10000. So every row first needs its company's maximum salary next to it. A window function `MAX(salary) OVER (PARTITION BY company_id)` attaches that maximum to each row without collapsing the rows, which a plain `GROUP BY` would do.\n\n## Approach\n\n1. `company_max`: keep every employee row and add `max_salary`, the largest salary in the same company.\n2. `taxed`: turn `max_salary` into a whole-number `tax_percent` of 0, 24 or 49 with a `CASE`, testing the brackets from the lowest up.\n3. Final `SELECT`: keep `(100 - tax_percent)` percent of the salary and `ROUND` it to an integer, naming the result `salary` again.\n\n## Example 1, step by step\n\n- Company 1: `max_salary = 21300` (above 10000), so `tax_percent = 49`. Tony keeps 2000 · 51 / 100 = 1020, Pronub 10863, Tyrrox 5508.\n- Company 2: `max_salary = 700` (below 1000), so `tax_percent = 0`. Pam, Bassem and Hermione keep 300, 450 and 700.\n- Company 3: `max_salary = 7777` (inside 1000..10000), so `tax_percent = 24`. Bocaben keeps 76, Ognjen 1672, Nyancat 2508, and Morninngcat 7777 · 76 / 100 = 5910.52, which rounds to 5911.\n\n## Complexity\n\n- Time: O(n log n) for n rows, to partition the rows by company for the window; the rest is one pass.\n- Space: O(n) for the intermediate tables.\n\n## Pitfalls\n\n- Choosing the rate from each employee's own salary instead of the company's maximum taxes low earners in rich companies too lightly.\n- The middle bracket includes both 1000 and 10000; writing `< 10000` or `<= 1000` for the neighbours shifts those exact maxima into the wrong rate.\n- Truncating instead of rounding (`FLOOR`, integer casts) turns 5910.52 into 5910 and 76.5 into 76.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `company_max` | every employee row plus `max_salary`, the company's top salary |\n| `max_salary` | `MAX(salary)` over the rows sharing `company_id` |\n| `taxed` | every employee row with its company's `tax_percent` |\n| `tax_percent` | 0, 24 or 49, chosen from `max_salary` |\n| `salary` (output) | the salary after tax, rounded to an integer |",
+  "narration": {
+    "1": "The first stage keeps every employee and adds the company-wide figure the tax depends on.",
+    "3": "The window MAX looks at all rows of the same company, so each row learns its company's top salary without being grouped away.",
+    "6": "The second stage turns that top salary into a tax rate.",
+    "9": "A company whose highest salary is below 1000 pays no tax.",
+    "10": "Otherwise a top salary of at most 10000 (1000 and 10000 included) means a 24% rate.",
+    "11": "Any company paying someone more than 10000 is taxed at 49%.",
+    "16": "Each employee keeps (100 - tax_percent) percent of the salary, rounded to the nearest integer."
+  }
+}

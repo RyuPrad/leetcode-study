@@ -1,0 +1,73 @@
+{
+  "number": 2637,
+  "title": "Promise Time Limit",
+  "spec": "leetcode",
+  "statement": "Write `timeLimit(fn, t)`. The argument `fn` is an asynchronous function (calling it gives back a promise), and `t` is a time budget in milliseconds. Return a new function that takes any arguments, calls `fn` with them, and hands back a promise that is bound by a deadline `t` ms after the call:\n\n- If the promise from `fn` settles before the deadline, yours settles the same way: it resolves with the same value, or rejects with the same reason.\n- If the deadline comes first, yours rejects with the plain string `\"Time Limit Exceeded\"` (not an `Error` object).\n\nEach case describes `fn` as JSON. With `{ t, compute }`, `fn` waits `t` ms (not at all when `t` is `0`) and then resolves with `compute` applied to its arguments: `\"square\"` is the first argument times itself, `\"sum\"` is the total of all arguments (`0` when there are none). With `{ t, throws }`, it waits the same way and then rejects with the value `throws`. The judge calls your limited function once with the arguments in `inputs` and answers `{ resolved, time }` or `{ rejected, time }`: how your promise settled, and how many milliseconds after the call. A positive delay of `fn` never equals `t`, so the two never finish at the same moment.",
+  "constraints": [
+    "0 <= t <= 1000",
+    "0 <= inputs.length <= 10",
+    "-1000 <= inputs[i] <= 1000",
+    "fn is { t, compute } with compute \"square\" or \"sum\", or { t, throws } with throws a string of 1 to 30 characters",
+    "0 <= fn.t <= 1000",
+    "compute \"square\" comes with at least one input",
+    "fn.t !== t whenever fn.t > 0"
+  ],
+  "signature": "Object timeLimit(Object fn, int[] inputs, int t)",
+  "entry": "timeLimit",
+  "kind": "function",
+  "parameters": [
+    "fn",
+    "inputs",
+    "t"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [fn, inputs, t] = input;\n  if (!Number.isInteger(t) || t < 0 || t > 1000) return 't must be an integer from 0 to 1000.';\n  if (!Array.isArray(inputs) || inputs.length > 10 || !inputs.every((x) => Number.isInteger(x) && x >= -1000 && x <= 1000)) return 'inputs must be at most 10 integers from -1000 to 1000.';\n  if (!fn || typeof fn !== 'object' || Array.isArray(fn)) return 'fn must be an object such as { \"t\": 100, \"compute\": \"square\" }.';\n  if (!Number.isInteger(fn.t) || fn.t < 0 || fn.t > 1000) return 'fn.t must be an integer from 0 to 1000.';\n  const keys = Object.keys(fn).sort().join(',');\n  if (keys === 't,throws') {\n    if (typeof fn.throws !== 'string' || fn.throws.length < 1 || fn.throws.length > 30) return 'fn.throws must be a string of 1 to 30 characters.';\n  } else if (keys === 'compute,t') {\n    if (fn.compute !== 'square' && fn.compute !== 'sum') return 'fn.compute must be \"square\" or \"sum\".';\n    if (fn.compute === 'square' && inputs.length === 0) return '\"square\" needs at least one input.';\n  } else return 'fn must have t and exactly one of compute or throws.';\n  if (fn.t > 0 && fn.t === t) return 'Pick an fn.t different from t, so the result does not depend on a tie.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [spec, inputs, t] = input;\n  const fn = async (...args) => {\n    kit.trace(`fn(${args.join(', ')}) starts`);\n    if (spec.t > 0) await new Promise((resolve) => setTimeout(resolve, spec.t));\n    if (spec.throws !== undefined) {\n      kit.trace(`fn rejects with \"${spec.throws}\"`);\n      throw spec.throws;\n    }\n    const value = spec.compute === 'square' ? args[0] * args[0] : args.reduce((sum, x) => sum + x, 0);\n    kit.trace(`fn resolves with ${value}`);\n    return value;\n  };\n  const limited = solve(fn, t);\n  if (typeof limited !== 'function') throw new Error('timeLimit must return a function.');\n  const start = Date.now();\n  kit.trace(`limited(${inputs.join(', ')}) is called with a limit of ${t} ms`);\n  const promise = limited(...inputs);\n  if (!promise || typeof promise.then !== 'function') throw new Error('The limited function must return a promise.');\n  return promise.then((value) => {\n    const time = Date.now() - start;\n    kit.trace(`The limited promise resolves with ${JSON.stringify(value)}`);\n    return { resolved: value, time };\n  }, (error) => {\n    const time = Date.now() - start;\n    const rejected = error instanceof Error ? String(error) : error;\n    kit.trace(`The limited promise rejects with ${JSON.stringify(rejected)}`);\n    return { rejected, time };\n  });\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn an async function\n * @param {number} t the time budget in milliseconds\n * @return {Function} an async function with the same arguments\n */\nfunction timeLimit(fn, t) {\n  // Write your code here.\n  return async function (...args) {\n  };\n}\n",
+    "typescript": "type AsyncFn = (...args: number[]) => Promise<unknown>;\n\nfunction timeLimit(fn: AsyncFn, t: number): AsyncFn {\n  // Write your code here.\n  return async function (...args) {\n  };\n}\n"
+  },
+  "api": "timeLimit(fn: (...args: number[]) => Promise<unknown>, t: number): (...args: number[]) => Promise<unknown>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function timeLimit(fn, t) {\n  return function (...args) {\n    return new Promise((resolve, reject) => {\n      const timer = setTimeout(() => reject('Time Limit Exceeded'), t);\n      fn(...args).then((value) => {\n        clearTimeout(timer);\n        resolve(value);\n      }, (error) => {\n        clearTimeout(timer);\n        reject(error);\n      });\n    });\n  };\n}",
+  "brute": "function timeLimit(fn, t) {\n  return async function (...args) {\n    const deadline = new Promise((resolve, reject) => {\n      setTimeout(() => reject('Time Limit Exceeded'), t);\n    });\n    return Promise.race([fn(...args), deadline]);\n  };\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (max) => Math.floor(rand() * (max + 1));\n  const range = size === 'small' ? 200 : 1000;\n  const t = rand() < 0.1 ? 0 : pick(range);\n  let delay = rand() < 0.15 ? 0 : pick(range);\n  if (delay > 0 && delay === t) delay = t - 1;\n  const count = size === 'small' ? pick(4) : 5 + pick(5);\n  const spread = size === 'small' ? 20 : 1000;\n  const inputs = Array.from({ length: count }, () => pick(2 * spread) - spread);\n  const roll = rand();\n  let fn;\n  if (roll < 0.25) fn = { t: delay, throws: ['Error', 'Bad input', 'Network down'][pick(2)] };\n  else if (roll < 0.6 && count > 0) fn = { t: delay, compute: 'square' };\n  else fn = { t: delay, compute: 'sum' };\n  return [fn, inputs, t];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"t":100,"compute":"square"},[5],50],"expected":{"rejected":"Time Limit Exceeded","time":50}},
+    {"name":"Example 2","input":[{"t":100,"compute":"square"},[5],150],"expected":{"resolved":25,"time":100}},
+    {"name":"Example 3","input":[{"t":120,"compute":"sum"},[5,10],150],"expected":{"resolved":15,"time":120}},
+    {"name":"Example 4","input":[{"t":0,"throws":"Error"},[],1000],"expected":{"rejected":"Error","time":0}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"t":0,"compute":"sum"},[],0]},
+    {"name":"Test 2","input":[{"t":1,"compute":"sum"},[3,4],0]},
+    {"name":"Test 3","input":[{"t":999,"compute":"square"},[-7],1000]},
+    {"name":"Test 4","input":[{"t":1000,"compute":"square"},[12],999]},
+    {"name":"Test 5","input":[{"t":200,"throws":"Bad input"},[1],300]},
+    {"name":"Test 6","input":[{"t":300,"throws":"Bad input"},[1],200]},
+    {"name":"Test 7","input":[{"t":0,"throws":"Oops"},[],0]},
+    {"name":"Test 8","input":[{"t":40,"compute":"sum"},[1,-2,3,-4,5,-6,7,-8,9,-10],41]},
+    {"name":"Test 9","input":[{"t":0,"compute":"square"},[-1000,999],10]},
+    {"name":"Test 10","input":[{"t":60,"compute":"sum"},[1000,1000,1000],59]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nTwo things race after each call: the promise from `fn` and a deadline `t` ms away. Whichever finishes first decides how the returned promise settles. A promise settles only once, and any later `resolve` or `reject` call on it is silently ignored, so both racers may simply call `resolve` or `reject` and the first one wins. (The brute force says the same thing with `Promise.race`, racing `fn`'s promise against a promise that rejects when a timer fires.)\n\n## Approach\n\n1. `timeLimit` returns a function that gathers its arguments into `args`.\n2. That function returns a new promise. Inside it, start a timer of `t` ms that calls `reject('Time Limit Exceeded')`, and keep its id in `timer`.\n3. Call `fn(...args)` and attach two handlers to its promise.\n4. On success, cancel the timer and `resolve(value)`. On failure, cancel the timer and `reject(error)` with the same reason.\n5. If the timer fires first, the promise is already rejected, and the late handler's call does nothing.\n\n## Example 1, step by step\n\n`fn` waits 100 ms and resolves with `n * n`; `inputs = [5]`, `t = 50`.\n\n- At 0 ms `limited(5)` is called. The timer is set for 50 ms, and `fn(5)` starts; its promise would resolve with 25 at 100 ms.\n- At 50 ms the timer fires and the promise rejects with `\"Time Limit Exceeded\"`. The answer is `{ rejected: \"Time Limit Exceeded\", time: 50 }`.\n- At 100 ms `fn`'s promise resolves; the handler calls `clearTimeout` and `resolve(25)`, which change nothing now.\n\n## Complexity\n\n- Time: O(1) extra work per call, on top of `fn` itself.\n- Space: O(1): one timer and one promise per call.\n\n## Pitfalls\n\n- Rejecting with `new Error('Time Limit Exceeded')`: the reason must be the plain string.\n- Starting the timer inside `timeLimit` instead of inside each call: every call gets its own deadline, measured from that call.\n- Dropping `fn`'s rejection: if `fn` fails before the deadline, its reason must come through unchanged.\n- Leaving the timer running after `fn` wins does not change the answer, but it keeps a useless timer alive; `clearTimeout` tidies it up.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `fn`, `t` | the async function to limit and its time budget in ms |\n| `args` | the arguments of this call, passed on to `fn` |\n| `timer` | id of the deadline timer, cancelled when `fn` settles first |\n| `resolve`, `reject` | settle the returned promise; only the first call counts |\n| `value`, `error` | what `fn`'s promise resolved or rejected with |",
+  "narration": {
+    "1": "timeLimit wraps fn and returns the limited function.",
+    "2": "Each call of the limited function collects its arguments.",
+    "3": "The call hands back a new promise that will be settled by whichever racer finishes first.",
+    "4": "Start the deadline: after t ms, reject with the string \"Time Limit Exceeded\".",
+    "5": "Start fn with the same arguments and wait for its promise.",
+    "6": "fn finished in time, so the deadline is no longer needed.",
+    "7": "Resolve with fn's value; if the deadline already fired, this call is ignored.",
+    "9": "fn failed in time: cancel the deadline as well.",
+    "10": "Pass fn's rejection reason through unchanged."
+  }
+}

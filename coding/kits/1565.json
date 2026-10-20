@@ -1,0 +1,51 @@
+{
+  "number": 1565,
+  "title": "Unique Orders and Customers Per Month",
+  "spec": "recalled",
+  "statement": "One table lists a shop's orders:\n\n- `Orders(order_id, order_date, customer_id, invoice)`: one row per order; `order_id` is unique and `invoice` is the order's amount in dollars.\n\nOnly orders with an `invoice` **strictly greater than 20** count. For each calendar month that has at least one such order, report:\n\n- `month`: the month as text in the form `YYYY-MM` (for example `2020-09`); the same month in different years is a different month,\n- `order_count`: how many counted orders were placed that month,\n- `customer_count`: how many different customers placed counted orders that month.\n\nMonths with no order above 20 are not reported. Rows may come in any order.",
+  "constraints": [
+    "order_id is unique in Orders",
+    "order_date, customer_id and invoice are never null",
+    "An order counts only when invoice > 20"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Orders": [["order_id","INT"],["order_date","DATE"],["customer_id","INT"],["invoice","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Orders = [] }] = input;\n  const seen = new Set();\n  for (const [id, date, customer, invoice] of Orders) {\n    if (id === null) return 'Every order needs an order_id.';\n    if (seen.has(id)) return `order_id ${id} appears twice in Orders.`;\n    seen.add(id);\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `Order ${id} needs an order_date like 2020-09-15.`;\n    if (customer === null || invoice === null) return `Order ${id} needs a customer_id and an invoice.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  DATE_FORMAT(order_date, '%Y-%m') AS month,\n  COUNT(order_id) AS order_count,\n  COUNT(DISTINCT customer_id) AS customer_count\nFROM Orders\nWHERE invoice > 20\nGROUP BY month;",
+  "brute": "SELECT\n  m.month,\n  (SELECT COUNT(*)\n   FROM Orders AS o\n   WHERE LEFT(o.order_date, 7) = m.month AND o.invoice > 20) AS order_count,\n  (SELECT COUNT(*)\n   FROM (SELECT DISTINCT customer_id, LEFT(order_date, 7) AS ym\n         FROM Orders\n         WHERE invoice > 20) AS buyers\n   WHERE buyers.ym = m.month) AS customer_count\nFROM (SELECT DISTINCT LEFT(order_date, 7) AS month\n      FROM Orders\n      WHERE invoice > 20) AS m",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  // Small sets use few months and customers so groups collide; 2020-01 and 2021-01 share a month number.\n  const months = small ? ['2020-01', '2020-02', '2021-01'] : Array.from({ length: 30 }, (_, i) => `${2019 + Math.floor(i / 12)}-${String(1 + i % 12).padStart(2, '0')}`);\n  const invoices = [5, 10, 15, 19, 20, 20, 21, 30, 55, 77, 90];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const customers = small ? 3 : 400;\n  const Orders = [];\n  for (let id = 1; id <= count; id++) {\n    const day = String(1 + Math.floor(rand() * 28)).padStart(2, '0');\n    const invoice = small ? pick(invoices) : Math.floor(rand() * 100);\n    Orders.push([id, `${pick(months)}-${day}`, 1 + Math.floor(rand() * customers), invoice]);\n  }\n  return [{ Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Orders":[[1,"2020-09-15",1,30],[2,"2020-09-17",2,90],[3,"2020-10-06",3,20],[4,"2020-10-20",3,21],[5,"2020-11-10",1,10],[6,"2020-11-21",2,15],[7,"2020-12-01",4,55],[8,"2020-12-03",4,77],[9,"2021-01-07",3,31],[10,"2021-01-15",2,20]]}],"expected":{"columns":["month","order_count","customer_count"],"rows":[["2020-09",2,2],["2020-10",1,1],["2020-12",2,1],["2021-01",1,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Orders":[]}]},
+    {"name":"Test 2","input":[{"Orders":[[1,"2020-03-04",1,20],[2,"2020-03-09",2,5],[3,"2020-04-01",1,0]]}]},
+    {"name":"Test 3","input":[{"Orders":[[7,"2022-06-30",9,21]]}]},
+    {"name":"Test 4","input":[{"Orders":[[1,"2020-05-01",4,40],[2,"2020-05-11",4,25],[3,"2020-05-31",4,99],[4,"2020-05-20",4,3]]}]},
+    {"name":"Test 5","input":[{"Orders":[[1,"2020-01-10",1,50],[2,"2021-01-10",1,60],[3,"2021-01-12",2,70],[4,"2019-01-31",3,80]]}]},
+    {"name":"Test 6","input":[{"Orders":[[1,"2020-01-31",1,30],[2,"2020-02-01",1,30],[3,"2020-02-29",2,30],[4,"2020-03-01",2,20]]}]},
+    {"name":"Test 7","input":[{"Orders":[[1,"2020-07-02",1,10],[2,"2020-07-03",1,50],[3,"2020-07-04",2,15],[4,"2020-07-05",3,18],[5,"2020-07-06",4,22]]}]},
+    {"name":"Test 8","input":[{"Orders":[[1,"2020-08-01",1,21],[2,"2020-09-01",2,20],[3,"2020-09-15",3,19],[4,"2020-10-01",1,100],[5,"2020-10-02",2,1]]}]},
+    {"name":"Test 9","input":[{"Orders":[[1,"2020-11-03",1,30],[2,"2020-11-03",2,30],[3,"2020-11-03",3,30],[4,"2020-12-24",1,45],[5,"2020-12-25",2,45],[6,"2020-12-26",1,45]]}]},
+    {"name":"Test 10","input":[{"Orders":[[1,"2020-09-15",1,30],[2,"2020-09-17",2,90],[3,"2020-10-06",3,20],[4,"2020-10-20",3,21],[5,"2020-11-10",1,10],[6,"2020-11-21",2,15],[7,"2020-12-01",4,55],[8,"2020-12-03",4,77],[9,"2021-01-07",3,31],[10,"2021-01-15",2,20],[11,"2020-11-30",5,21],[12,"2021-01-31",3,500]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo things decide the answer: which orders count (invoice above 20) and which month an order falls in. Filter first, then group the surviving orders by their `YYYY-MM` text. Inside a group, counting rows gives the orders and counting distinct customer ids gives the customers. Because the filter runs before grouping, a month whose orders are all 20 or less never forms a group, so it is not reported.\n\n## Approach\n\n1. `WHERE invoice > 20` keeps only the orders that count.\n2. `DATE_FORMAT(order_date, '%Y-%m')` turns each date into its month label, named `month`.\n3. `GROUP BY month` makes one group per month label.\n4. `COUNT(order_id)` is the number of counted orders, and `COUNT(DISTINCT customer_id)` is the number of different buyers in that month.\n\n## Example 1, step by step\n\nAfter the filter, orders 3 (invoice 20), 5, 6 (November) and 10 (invoice 20) are gone. Grouping the rest:\n\n| month | orders kept | customers |\n| --- | --- | --- |\n| 2020-09 | 1, 2 | 1, 2 |\n| 2020-10 | 4 | 3 |\n| 2020-12 | 7, 8 | 4 |\n| 2021-01 | 9 | 3 |\n\nSo the counts are `(2, 2)`, `(1, 1)`, `(2, 1)` and `(1, 1)`. November has no row because neither of its orders passes the filter.\n\n## Complexity\n\n- Time: O(N) to scan the N orders, plus the grouping (O(N log N) if the database sorts).\n- Space: O(M + C) for M month groups and the distinct customers tracked in them.\n\n## Pitfalls\n\n- `invoice >= 20` wrongly counts orders of exactly 20 (orders 3 and 10 in the example).\n- Grouping by `MONTH(order_date)` merges January 2020 and January 2021; the label needs the year.\n- Counting with `SUM(invoice > 20)` over all orders instead of filtering in `WHERE` still creates groups for months with nothing to count, and `COUNT(DISTINCT customer_id)` then includes customers whose orders do not qualify.\n- `COUNT(customer_id)` without `DISTINCT` counts a repeat buyer once per order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `month` | the order date as `YYYY-MM`, the grouping key |\n| `order_count` | number of orders above 20 in that month |\n| `customer_count` | number of different customers with such orders that month |",
+  "narration": {
+    "2": "Format each date as year and month, so January 2020 and January 2021 stay apart.",
+    "3": "Every surviving row is one counted order.",
+    "4": "DISTINCT counts a customer once however many orders they placed that month.",
+    "6": "Drop orders of 20 or less before grouping, so months without qualifying orders never appear.",
+    "7": "One group, and one output row, per month label."
+  }
+}

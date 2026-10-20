@@ -1,0 +1,49 @@
+{
+  "number": 1777,
+  "title": "Product's Price for Each Store",
+  "spec": "recalled",
+  "statement": "One table holds prices in long form:\n\n- `Products(product_id, store, price)`: one row per product per store that sells it, giving the price there. `store` is one of `'store1'`, `'store2'`, `'store3'`, and the pair `(product_id, store)` is unique. A product need not be sold in every store.\n\nTurn this into a wide table with one row per product that appears in `Products`, with the columns `product_id`, `store1`, `store2` and `store3`. Each store column holds the product's price in that store, or `null` when the store does not sell the product. Rows may come in any order.",
+  "constraints": [
+    "(product_id, store) is unique in Products",
+    "store is one of 'store1', 'store2', 'store3'",
+    "price is a non-negative integer and never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Products": [["product_id","INT"],["store","ENUM('store1', 'store2', 'store3')"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Products = [] }] = input;\n  const stores = ['store1', 'store2', 'store3'], seen = new Set();\n  for (const [id, store, price] of Products) {\n    if (id === null || price === null) return 'product_id and price may not be null.';\n    if (!stores.includes(store)) return `store must be store1, store2 or store3, not ${store}.`;\n    if (price < 0) return `Price ${price} is negative.`;\n    const key = `${id}|${store}`;\n    if (seen.has(key)) return `Product ${id} has two prices in ${store}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  product_id,\n  SUM(IF(store = 'store1', price, NULL)) AS store1,\n  SUM(IF(store = 'store2', price, NULL)) AS store2,\n  SUM(IF(store = 'store3', price, NULL)) AS store3\nFROM Products\nGROUP BY product_id;",
+  "brute": "SELECT ids.product_id, s1.price AS store1, s2.price AS store2, s3.price AS store3\nFROM (SELECT DISTINCT product_id FROM Products) AS ids\nLEFT JOIN Products AS s1\n  ON s1.product_id = ids.product_id AND s1.store = 'store1'\nLEFT JOIN Products AS s2\n  ON s2.product_id = ids.product_id AND s2.store = 'store2'\nLEFT JOIN Products AS s3\n  ON s3.product_id = ids.product_id AND s3.store = 'store3'",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (n) => Math.floor(rand() * n);\n  const stores = ['store1', 'store2', 'store3'];\n  const prices = [0, 50, 70, 80, 95, 100, 105];\n  const limit = small ? pick(9) : 2000;\n  const Products = [];\n  for (let id = small ? pick(3) : 1; Products.length < limit; id += small ? 1 + pick(3) : 1) {\n    // Each product is sold in a non-empty random subset of the stores.\n    let mask = 0;\n    while (mask === 0) mask = pick(8);\n    for (let s = 0; s < 3 && Products.length < limit; s++) {\n      if (mask & (1 << s)) Products.push([id, stores[s], small ? prices[pick(prices.length)] : pick(1000)]);\n    }\n  }\n  for (let i = Products.length - 1; i > 0; i--) { const j = pick(i + 1); [Products[i], Products[j]] = [Products[j], Products[i]]; }\n  return [{ Products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Products":[[0,"store1",95],[0,"store3",105],[0,"store2",100],[1,"store1",70],[1,"store3",80]]}],"expected":{"columns":["product_id","store1","store2","store3"],"rows":[[0,95,100,105],[1,70,null,80]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Products":[]}]},
+    {"name":"Test 2","input":[{"Products":[[5,"store2",40]]}]},
+    {"name":"Test 3","input":[{"Products":[[1,"store3",30],[1,"store1",10],[1,"store2",20]]}]},
+    {"name":"Test 4","input":[{"Products":[[1,"store1",0],[2,"store3",0]]}]},
+    {"name":"Test 5","input":[{"Products":[[1,"store1",15],[2,"store2",25],[3,"store3",35]]}]},
+    {"name":"Test 6","input":[{"Products":[[4,"store1",60],[4,"store2",60],[4,"store3",60],[9,"store2",60]]}]},
+    {"name":"Test 7","input":[{"Products":[[10,"store2",12],[10,"store3",13],[11,"store1",21],[11,"store3",23],[12,"store1",31],[12,"store2",32]]}]},
+    {"name":"Test 8","input":[{"Products":[[3,"store3",999],[2,"store3",1],[1,"store3",500],[2,"store1",7]]}]},
+    {"name":"Test 9","input":[{"Products":[[0,"store1",95],[0,"store2",100],[1,"store2",70],[1,"store3",80],[2,"store1",0],[2,"store2",0],[2,"store3",0]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe input is \"long\": one row per (product, store). The output is \"wide\": one row per product, with one column per store. Pivoting a known, fixed set of values into columns is a grouping problem. Group by `product_id`, then for each store column aggregate an expression that equals the price on that store's row and `NULL` on every other row. Aggregates skip `NULL`, so each column sees exactly one value (the price) or none (giving `NULL`).\n\n## Approach\n\n1. Read `Products` and `GROUP BY product_id`, so each group holds one product's rows (one to three of them).\n2. For `store1`, compute `IF(store = 'store1', price, NULL)` on every row and take its `SUM`; only the store1 row contributes.\n3. Repeat for `store2` and `store3`.\n4. A product missing from a store has no non-null value in that column, and `SUM` over only nulls is `NULL`, as required.\n\n## Example 1, step by step\n\n- Product 0 has rows store1 = 95, store3 = 105, store2 = 100. The three IF columns pick 95, 100 and 105 respectively, giving `(0, 95, 100, 105)`.\n- Product 1 has rows store1 = 70 and store3 = 80. The store2 column sees only nulls, so the row is `(1, 70, null, 80)`.\n\n## Complexity\n\n- Time: O(n) with hash grouping for n price rows.\n- Space: O(p) for p distinct products.\n\n## Pitfalls\n\n- `IF(store = 'store1', price, 0)` (or `ELSE 0`) reports 0 for a missing store instead of `null`, and cannot be told apart from a real price of 0.\n- Leaving out `GROUP BY` collapses all products into one row; grouping by `store` as well keeps the long shape.\n- `MAX` works as well as `SUM` here because each group has at most one row per store; `COUNT` does not.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY product_id` | one output row per product |\n| `store1` | the product's price in store1, or null |\n| `store2` | the product's price in store2, or null |\n| `store3` | the product's price in store3, or null |",
+  "narration": {
+    "2": "The product id is the group key and the first output column.",
+    "3": "Only the store1 row passes its price through; SUM ignores the nulls from other stores, and is null when no store1 row exists.",
+    "4": "The same conditional sum fills the store2 column.",
+    "5": "A third conditional sum fills the store3 column.",
+    "7": "Grouping by product turns each product's one to three rows into a single wide row."
+  }
+}

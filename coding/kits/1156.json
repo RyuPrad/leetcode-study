@@ -1,0 +1,62 @@
+{
+  "number": 1156,
+  "title": "Swap For Longest Repeated Character Substring",
+  "spec": "leetcode",
+  "statement": "You may pick two positions of the string `text` and exchange the characters stored there, at most once (doing nothing is also allowed). After that, look for the longest contiguous block of `text` in which every character is the same letter. Return the greatest length such a block can reach.",
+  "constraints": [
+    "1 <= text.length <= 2 * 10^4",
+    "text contains only lowercase English letters"
+  ],
+  "signature": "int maxRepOpt1(String text)",
+  "entry": "maxRepOpt1",
+  "kind": "function",
+  "parameters": [
+    "text"
+  ],
+  "validator": "function validate([text]) {\n  if (typeof text !== 'string' || text.length < 1 || text.length > 20000) return 'text needs 1 to 2 * 10^4 letters.';\n  if (!/^[a-z]+$/.test(text)) return 'text uses lowercase English letters only.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxRepOpt1(text) {\n  const total = new Map();\n  for (const letter of text) {\n    total.set(letter, (total.get(letter) ?? 0) + 1);\n  }\n  // Split text into runs: [letter, length] for each block of one repeated letter.\n  const runs = [];\n  let start = 0;\n  for (let i = 1; i <= text.length; i++) {\n    if (i === text.length || text[i] !== text[start]) {\n      runs.push([text[start], i - start]);\n      start = i;\n    }\n  }\n  let best = 0;\n  for (let i = 0; i < runs.length; i++) {\n    const [letter, length] = runs[i];\n    // Extend the run by one copy of its letter taken from somewhere else, if one exists.\n    best = Math.max(best, Math.min(length + 1, total.get(letter)));\n    // Two runs of the same letter with one other letter between them can be merged.\n    if (i + 2 < runs.length && runs[i + 1][1] === 1 && runs[i + 2][0] === letter) {\n      const merged = length + runs[i + 2][1];\n      best = Math.max(best, Math.min(merged + 1, total.get(letter)));\n    }\n  }\n  return best;\n}",
+  "brute": "function maxRepOpt1(text) {\n  const longest = chars => {\n    let top = 0, streak = 0;\n    for (let k = 0; k < chars.length; k++) {\n      streak = k > 0 && chars[k] === chars[k - 1] ? streak + 1 : 1;\n      top = Math.max(top, streak);\n    }\n    return top;\n  };\n  const chars = text.split('');\n  let best = longest(chars);\n  // Try every possible swap and measure the result.\n  for (let a = 0; a < chars.length; a++) {\n    for (let b = a + 1; b < chars.length; b++) {\n      [chars[a], chars[b]] = [chars[b], chars[a]];\n      best = Math.max(best, longest(chars));\n      [chars[a], chars[b]] = [chars[b], chars[a]];\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  if (size === 'small') {\n    const alphabet = 'abc'.slice(0, 1 + pick(3));\n    const n = 1 + pick(12);\n    let text = '';\n    while (text.length < n) {\n      // Runs of one letter, often broken by a single different letter.\n      const letter = alphabet[pick(alphabet.length)];\n      text += letter.repeat(1 + pick(rand() < 0.5 ? 1 : 4));\n    }\n    return [text.slice(0, n)];\n  }\n  const alphabet = 'abcdefghijklmnopqrstuvwxyz'.slice(0, 2 + pick(5));\n  const n = 10000;\n  let text = '';\n  while (text.length < n) {\n    const letter = alphabet[pick(alphabet.length)];\n    text += letter.repeat(1 + pick(rand() < 0.5 ? 2 : 40));\n  }\n  return [text.slice(0, n)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["ababa"],"expected":3},
+    {"name":"Example 2","input":["aaabaaa"],"expected":6},
+    {"name":"Example 3","input":["aaaaa"],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["abcdef"]},
+    {"name":"Test 3","input":["aaabbaaa"]},
+    {"name":"Test 4","input":["aabaa"]},
+    {"name":"Test 5","input":["aabaac"]},
+    {"name":"Test 6","input":["bbaababbba"]},
+    {"name":"Test 7","input":["bbabbbbbaaba"]},
+    {"name":"Test 8","input":["abaaaaabbbbbaa"]},
+    {"name":"Test 9","input":["abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]},
+    {"name":"Test 10","input":["zzzyzzzyzzz"]},
+    {"name":"Test 11","input":["babbab"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every swap and rescanning the string is O(n³). Instead, think about what one swap can achieve for a letter `x`. It can bring one extra `x` next to a block of `x`s, growing it by one. Or, when two blocks of `x` are separated by exactly one other letter, it can replace that letter with an `x` and merge the blocks. Either way the result can never exceed the total number of `x`s in the whole string, because a swap only moves letters around.\n\nSo compress the string into runs (letter, length), count every letter, and check those two cases for each run.\n\n## Approach\n\n1. Count each letter of `text` in `total`.\n2. Walk `text` and record each block of equal letters as `[letter, length]` in `runs`.\n3. For every run, candidate one is `length + 1` (one more copy brought in), capped at `total.get(letter)`.\n4. If the next run has length 1 and the run after it has the same `letter`, candidate two is `merged + 1`, where `merged` is the two runs' lengths added, again capped at `total.get(letter)`.\n5. Return the largest candidate in `best`.\n\nThe cap handles the case with no spare copy: then the swap must take a letter from one of the runs themselves, and the result is just the letter's total.\n\n## Example 1, step by step\n\n`text = \"ababa\"`: `total` is a → 3, b → 2, and `runs` is a1, b1, a1, b1, a1.\n\n- Run 0 (a, 1): candidate one is `min(2, 3) = 2`. Run 1 is a single b and run 2 is a, so `merged = 2` and candidate two is `min(3, 3) = 3`.\n- Run 1 (b, 1): `min(2, 2) = 2`; merging with run 3 gives `min(3, 2) = 2`, since only two b's exist.\n- The remaining runs give at most 3 again.\n\nThe answer is `3`.\n\n## Complexity\n\n- Time: O(n): one pass to count, one to build `runs`, one over `runs`.\n- Space: O(n) for `runs` in the worst case (alternating letters); `total` holds at most 26 entries.\n\n## Pitfalls\n\n- Forgetting the cap: in `\"aaabaaa\"` there is no third block of a, so the merged answer is 6, not 7.\n- Merging is only possible when the gap is exactly one character; `\"aaabbaaa\"` gives 4, not 7.\n- Without a merge, a run can still grow by one using a copy from far away: `\"aabcaa\"` gives 3.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | how many times each letter appears in `text` |\n| `runs` | the blocks of equal letters, as `[letter, length]` |\n| `start` | index where the current block began |\n| `letter`, `length` | the current run's letter and size |\n| `merged` | combined length of two runs split by one other letter |\n| `best` | the longest block found so far |",
+  "narration": {
+    "2": "Count how many copies of each letter exist; no swap can make a block longer than that.",
+    "3": "Visit every letter of text once.",
+    "9": "Scan the string, going one step past the end to close the last run.",
+    "10": "A run ends at the end of the string or where the letter changes.",
+    "11": "Record the finished run's letter and length.",
+    "12": "The next run begins here.",
+    "16": "Look at each run in turn.",
+    "17": "Unpack the run's letter and its length.",
+    "19": "Bring in one more copy of the letter, but never more copies than exist.",
+    "21": "Is the next run a single other letter, followed by a run of the same letter?",
+    "22": "Then swapping out that single letter joins the two runs.",
+    "23": "The joined block may also gain one spare copy, again capped by the total.",
+    "26": "best holds the longest block any single swap can build."
+  }
+}

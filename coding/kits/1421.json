@@ -1,0 +1,50 @@
+{
+  "number": 1421,
+  "title": "NPV Queries",
+  "spec": "recalled",
+  "statement": "Two tables hold net present values and lookups against them:\n\n- `NPV(id, year, npv)`: the net present value `npv` of inventory `id` in `year`; `(id, year)` is unique.\n- `Queries(id, year)`: one lookup per row; `(id, year)` is unique.\n\nFor every row of `Queries`, report the columns `id`, `year` and `npv`, where `npv` is the value stored in `NPV` for the same `id` **and** `year`. When `NPV` has no row for that pair, report `npv = 0`. Rows may come in any order.",
+  "constraints": [
+    "(id, year) is unique in NPV",
+    "(id, year) is unique in Queries",
+    "npv is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "NPV": [["id","INT"],["year","INT"],["npv","INT"]],
+    "Queries": [["id","INT"],["year","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ NPV = [], Queries = [] }] = input;\n  const values = new Set(), lookups = new Set();\n  for (const [id, year, npv] of NPV) {\n    if (id === null || year === null || npv === null) return 'Every NPV row needs an id, a year and an npv.';\n    if (values.has(`${id}/${year}`)) return `(${id}, ${year}) appears twice in NPV.`;\n    values.add(`${id}/${year}`);\n  }\n  for (const [id, year] of Queries) {\n    if (id === null || year === null) return 'Every query needs an id and a year.';\n    if (lookups.has(`${id}/${year}`)) return `(${id}, ${year}) appears twice in Queries.`;\n    lookups.add(`${id}/${year}`);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT q.id, q.year, IFNULL(n.npv, 0) AS npv\nFROM Queries AS q\nLEFT JOIN NPV AS n\n  ON n.id = q.id\n AND n.year = q.year;",
+  "brute": "SELECT id, year,\n  COALESCE((SELECT NPV.npv FROM NPV WHERE NPV.id = Queries.id AND NPV.year = Queries.year), 0) AS npv\nFROM Queries",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const ids = small ? 4 : 100, years = small ? 3 : 30, first = small ? 2018 : 2000;\n  const pairs = [];\n  for (let id = 1; id <= ids; id++) for (let y = 0; y < years; y++) pairs.push([id, first + y]);\n  const sample = count => {\n    const pool = pairs.slice();\n    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    return pool.slice(0, count);\n  };\n  const values = [0, 21, 40, 100, 113];\n  const NPV = sample(small ? Math.floor(rand() * 9) : 2000).map(([id, year]) => [id, year, small ? values[Math.floor(rand() * values.length)] : Math.floor(rand() * 1000)]);\n  const Queries = sample(small ? Math.floor(rand() * 9) : 2000).map(([id, year]) => [id, year]);\n  return [{ NPV, Queries }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"NPV":[[1,2018,100],[7,2020,30],[13,2019,40],[1,2019,113],[2,2008,121],[3,2009,21],[11,2020,99],[7,2019,0]],"Queries":[[1,2019],[2,2008],[3,2009],[7,2018],[7,2019],[7,2020],[13,2019]]}],"expected":{"columns":["id","year","npv"],"rows":[[1,2019,113],[2,2008,121],[3,2009,21],[7,2018,0],[7,2019,0],[7,2020,30],[13,2019,40]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"NPV":[[1,2020,50]],"Queries":[]}]},
+    {"name":"Test 2","input":[{"NPV":[],"Queries":[[1,2020],[2,2021]]}]},
+    {"name":"Test 3","input":[{"NPV":[[1,2020,50],[2,2021,75]],"Queries":[[1,2020],[2,2021]]}]},
+    {"name":"Test 4","input":[{"NPV":[[1,2019,10],[1,2020,20],[1,2021,30]],"Queries":[[1,2020]]}]},
+    {"name":"Test 5","input":[{"NPV":[[1,2019,10],[2,2020,20]],"Queries":[[1,2020],[2,2019]]}]},
+    {"name":"Test 6","input":[{"NPV":[[4,2018,0],[5,2018,7]],"Queries":[[4,2018],[5,2018],[6,2018]]}]},
+    {"name":"Test 7","input":[{"NPV":[[3,2010,88]],"Queries":[[3,2010]]}]},
+    {"name":"Test 8","input":[{"NPV":[[1,2018,5],[1,2019,6],[2,2018,7],[2,2019,8]],"Queries":[[1,2019],[2,2018],[3,2018],[1,2017]]}]},
+    {"name":"Test 9","input":[{"NPV":[[9,2001,400],[8,2001,300]],"Queries":[[9,2001],[9,2002],[8,2002],[8,2001]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach query is a lookup by the pair `(id, year)`. Every query must be answered, found or not, so `Queries` drives the result and `NPV` is attached with a **left join** on both columns. A query with no match gets nulls from `NPV`, and `IFNULL` turns the missing value into 0.\n\n## Approach\n\n1. Read `Queries` as `q`: one output row per query.\n2. `LEFT JOIN NPV` as `n` on `n.id = q.id AND n.year = q.year`. Because `(id, year)` is unique in `NPV`, each query matches at most one row, so no duplicates appear.\n3. Select `q.id`, `q.year` and `IFNULL(n.npv, 0) AS npv`.\n\n## Example 1, step by step\n\n- `(1, 2019)` finds 113, `(2, 2008)` finds 121, `(3, 2009)` finds 21 and `(13, 2019)` finds 40.\n- `(7, 2020)` finds 30, and `(7, 2019)` finds a stored value of 0.\n- `(7, 2018)` has no row in `NPV` (inventory 7 only has 2019 and 2020), so `n.npv` is null and the answer is 0.\n- `NPV` rows `(1, 2018)` and `(11, 2020)` are never queried and do not appear.\n\n## Complexity\n\n- Time: O(Q + N) for Q queries and N values with a hash or index on `(id, year)` (it is the key of `NPV`).\n- Space: O(Q) for the result.\n\n## Pitfalls\n\n- An inner join drops queries that have no stored value instead of reporting 0.\n- Joining on `id` alone pairs a query with every year of that inventory and repeats rows.\n- Leaving out `IFNULL` reports `null` instead of 0 for missing pairs.\n- Selecting `n.id` and `n.year` instead of `q.id` and `q.year` gives nulls on unmatched queries.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `q` | `Queries`, one output row per lookup |\n| `n` | `NPV`, joined on both `id` and `year`; null when the pair is missing |\n| `npv` | the stored value, or 0 when nothing matched |",
+  "narration": {
+    "1": "Output each query's id and year with its value, using 0 when the left join found nothing.",
+    "2": "Queries is the left table, so every lookup produces exactly one row.",
+    "3": "A left join attaches the stored value and keeps queries that have none.",
+    "4": "A stored value matches only when its inventory id equals the query's id.",
+    "5": "The year must match too; with the id it forms NPV's unique key, so at most one row matches."
+  }
+}
