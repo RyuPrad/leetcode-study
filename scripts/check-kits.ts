@@ -113,6 +113,8 @@ async function check(number: number): Promise<string[]> {
     const hooks = { started: () => {}, running: () => {}, frame: (frame: unknown, paused: boolean) => { frames.push(frame); if (frames.length >= WALKTHROUGH_FRAME_LIMIT) { truncated = true; controller.stop(); return; } if (paused) queueMicrotask(() => controller.command('into')); } };
     controller = new DebugController(hooks);
     const result = await debugEvaluate(asyncModule, problem, problem.reference, problem.examples[0], controller, hooks);
+    // As in the app, a recording cut by the debugger's time limit keeps its steps; how far it gets depends on the machine.
+    if (result.timedOut && frames.length) truncated = true;
     if (!truncated && result.error) errors.push(`The walkthrough fails on ${problem.examples[0].name}: ${result.error}`);
     if (frames.length < 2) errors.push('The walkthrough recorded fewer than 2 steps.');
   } catch (error) { if (!truncated) errors.push(`The walkthrough fails: ${error}`); }

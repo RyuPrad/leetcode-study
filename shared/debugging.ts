@@ -15,7 +15,7 @@ export type DebugEvent =
   | { type: 'running'; sessionId: string }
   | { type: 'finished'; sessionId: string; actual?: Json; expected?: Json; accepted?: boolean; error?: string; logs: string[]; durationMs: number }
   | { type: 'recorded'; sessionId: string; frames: VisualizationFrame[]; truncated: boolean; actual?: Json; error?: string; logs: string[]; executableLines: number[] };
-/** Frames a walkthrough records before it stops and reports a truncated run. */
+/** Frames a walkthrough records before it stops and reports a truncated run; reaching DEBUG_TIME_LIMIT also truncates it. */
 export const WALKTHROUGH_FRAME_LIMIT = 2000;
 export const DEBUG_TIME_LIMIT = 10000;
 export const DEBUG_HISTORY_LIMIT = 5000;

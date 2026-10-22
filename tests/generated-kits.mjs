@@ -2,7 +2,7 @@
 // Walkthrough recorded from the reference solution with stepping and a seekable timeline, and the Code
 // tab's local judge accepting the reference; then an SQL kit's example tables, its walkthrough of the
 // reference query's stages, and its MySQL judge; then an events kit's timeline walkthrough in virtual time
-// and its judge awaiting promises and timers.
+// and its judge awaiting promises and timers; and a walkthrough cut short at its step limit.
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -19,13 +19,15 @@ const read = e => JSON.parse(fs.readFileSync(path.join(ROOT, KITS_PATH, `${e.num
 const record = read(entry);
 const sqlEntry = kits.find(e => read(e).kind === 'sql'), sqlRecord = sqlEntry && read(sqlEntry);
 const eventsEntry = kits.find(e => read(e).io?.events), eventsRecord = eventsEntry && read(eventsEntry);
+// Kit 681's reference takes more than the 2,000 recorded steps on its first example.
+const longEntry = kits.find(e => e.number === 681), longRecord = longEntry && read(longEntry);
 fs.mkdirSync(path.join(ROOT, 'test-results'), {recursive: true});
 // The built renderer (npm run build) with the desktop bridge replaced by an in-page stand-in that serves
 // this kit as main serves it and keeps submissions in memory. Workers and WebAssembly load as they do in the app.
 const renderer = path.join(ROOT, 'dist/renderer');
 assert.ok(fs.existsSync(path.join(renderer, 'index.html')), 'Run npm run build first.');
 const fixtures = {'/fixture/catalog.json': JSON.stringify(catalog)};
-for (const kit of [record, sqlRecord, eventsRecord].filter(Boolean)) fixtures[`/fixture/kits/${kit.number}.json`] = JSON.stringify(kit);
+for (const kit of [record, sqlRecord, eventsRecord, longRecord].filter(Boolean)) fixtures[`/fixture/kits/${kit.number}.json`] = JSON.stringify(kit);
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png'};
 const server = http.createServer((request, response) => {
   const url = decodeURIComponent(new URL(request.url, 'http://x').pathname);
@@ -176,6 +178,17 @@ try {
     assert.equal(eventsSubmission.result.verdict, 'Accepted', JSON.stringify(eventsSubmission.result.cases?.find(c => c.verdict !== 'Accepted')));
     assert.equal(eventsSubmission.result.total, eventsRecord.examples.length + eventsRecord.tests.length);
     report.events = `Events kit ${eventsEntry.number}: a ${traceSteps}-step timeline walkthrough in virtual time, and Submit accepts the reference on ${eventsSubmission.result.total} cases, generated ones included`;
+  }
+  // A walkthrough cut short (by its step or time limit) says where it stops instead of reporting an answer.
+  if (longEntry) {
+    await open(longEntry);
+    await page.getByRole('tab', {name: 'Walkthrough'}).click();
+    await page.waitForFunction(() => /^Step 1 of \d+ \(first steps only\)$/.test(document.querySelector('.walkthrough-toolbar .debug-status')?.textContent ?? ''), null, {timeout: 60000});
+    const steps = Number((await page.locator('.walkthrough-toolbar .debug-status').textContent()).match(/of (\d+)/)[1]);
+    await page.getByRole('slider', {name: 'Walkthrough timeline'}).fill(String(steps - 1));
+    await page.waitForFunction(() => document.querySelector('.walkthrough-narration')?.textContent?.includes('stops here'));
+    assert.equal((await page.locator('.walkthrough-narration p').textContent()).trim(), `The walkthrough stops here: it recorded the first ${steps} steps.`);
+    report.truncated = `kit ${longEntry.number}: a walkthrough cut at ${steps} steps says where it stops`;
   }
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(ROOT, 'test-results/generated-kits.json'), JSON.stringify({passed: true, kit: entry.number, ...report}, null, 2));

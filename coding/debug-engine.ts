@@ -46,6 +46,7 @@ export class DebugController {
   stop(){this.stopped=true;this.presentResolve?.();this.resume?.();this.resume=undefined;}
   activeMs(){return this.used+(this.paused?0:Math.max(0,performance.now()-this.segment));}
   interrupted(){return this.stopped||this.activeMs()>DEBUG_TIME_LIMIT;}
+  timedOut(){return !this.stopped&&this.activeMs()>DEBUG_TIME_LIMIT;}
   start(){this.segment=performance.now();}
   skipInterval(){return this.motion==='continue'&&!this.breakpoints.size&&!this.pauseRequested?256:0;}
   decision(site:{line:number;kind:string},depth:number,index:number){
@@ -77,7 +78,7 @@ export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:Coding
   const invalid=validateInput(problem,test.input);if(invalid)throw new Error(invalid);
   const transformed=instrument(source,language);hooks.started(transformed.executableLines);
   const runtime=module.newRuntime();runtime.setMemoryLimit(64*1024*1024);runtime.setMaxStackSize(1024*1024);runtime.setInterruptHandler(()=>controller.interrupted());
-  const vm=runtime.newContext(),logs:string[]=[];let actual:Json|undefined,error:string|undefined,logBytes=0;
+  const vm=runtime.newContext(),logs:string[]=[];let actual:Json|undefined,error:string|undefined,logBytes=0,timedOut=false;
   const decision=vm.newFunction('__studyDecision',(site,depth,index)=>vm.newNumber(controller.decision(transformed.sites[vm.getNumber(site)],vm.getNumber(depth),vm.getNumber(index))?1:controller.skipInterval()));
   vm.setProp(vm.global,'__studyDecision',decision);decision.dispose();
   const pause=vm.newAsyncifiedFunction('__studyPause',async handle=>{const frame=JSON.parse(vm.getString(handle)) as VisualizationFrame;frame.logs=[...logs];await controller.checkpointFrame(frame);return vm.undefined;});vm.setProp(vm.global,'__studyPause',pause);pause.dispose();
@@ -92,7 +93,7 @@ export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:Coding
     if(adapterScript(problem))await evaluate(adapterScript(problem),'adapter.js');
     const output=await evaluate(`__studyDebugger.enable(); (()=>{const value=(${executeCase.toString()})(${problem.number},${JSON.stringify(test.input)},${problem.entry},${problem.number===297?'deserialize':'undefined'},${JSON.stringify(caseSpec(problem))});const text=JSON.stringify(value);if(typeof text!=='string')throw new Error('Return a JSON-compatible value.');if(text.length>262144)throw new Error('Output exceeds 256 KiB.');return text;})()`,'judge.js');
     if(output!==undefined)actual=JSON.parse(output);
-  }catch(e){error=controller.interrupted()?'Debugging exceeded 10 seconds of active execution. Paused time is excluded.':String(e).replace(/^Error: /,'').slice(0,8000);}
+  }catch(e){timedOut=controller.timedOut();error=controller.interrupted()?'Debugging exceeded 10 seconds of active execution. Paused time is excluded.':String(e).replace(/^Error: /,'').slice(0,8000);}
   finally{
     vm.dispose();
     // quickjs-emscripten 0.32 deletes the runtime callback registry before
@@ -103,5 +104,5 @@ export async function debugEvaluate(module:QuickJSAsyncWASMModule,problem:Coding
     callbacks.deleteRuntime=(pointer:number)=>{freed=pointer;};
     try{runtime.dispose();}finally{callbacks.deleteRuntime=remove;if(freed!==undefined)remove.call(callbacks,freed);}
   }
-  return {actual,error,logs,durationMs:Math.round(controller.activeMs())};
+  return {actual,error,logs,durationMs:Math.round(controller.activeMs()),timedOut};
 }

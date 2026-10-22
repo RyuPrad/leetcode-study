@@ -72,7 +72,7 @@ export default function WalkthroughWorkspace({ problem, narration = {}, active }
     </div>
     <section className="walkthrough-narration" aria-live="polite" aria-label="What this step does">
       {line !== undefined && <span className="walkthrough-line">Line {line}</span>}
-      <p>{finished && recording && !recording.error ? <>Finished. The solution returns <code>{JSON.stringify(recording.actual)}</code>{test.expected !== undefined && <> (expected <code>{JSON.stringify(test.expected)}</code>)</>}.</> : note ?? (frame ? 'The highlighted line runs next. Watch the variables and diagrams change.' : recording?.error ?? 'Recording every step of the reference solution…')}</p>
+      <p>{finished && recording?.truncated ? `The walkthrough stops here: it recorded the first ${frames.length} steps.` : finished && recording && !recording.error ? <>Finished. The solution returns <code>{JSON.stringify(recording.actual)}</code>{test.expected !== undefined && <> (expected <code>{JSON.stringify(test.expected)}</code>)</>}.</> : note ?? (frame ? 'The highlighted line runs next. Watch the variables and diagrams change.' : recording?.error ?? 'Recording every step of the reference solution…')}</p>
     </section>
     <PanelWorkspace view="debug" onInteraction={() => setPlaying(false)}>
       {frame ? <FrameView key={`${problem.id}:${session.current}`} frame={frame} previousFrame={frames[cursor - 1]} operationFrame={frame} moment={2}/> : <div className="viz-empty">{recording?.error ?? 'Recording the walkthrough…'}</div>}

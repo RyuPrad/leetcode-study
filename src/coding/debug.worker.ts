@@ -26,6 +26,8 @@ self.onmessage=async({data}:MessageEvent<DebugCommand>)=>{
     try{
       const module=await newQuickJSAsyncWASMModuleFromVariant(newVariant(RELEASE_ASYNC,{wasmLocation:asyncWasm}));
       const result=await debugEvaluate(module,data.problem,data.source,data.test,recorder,hooks,data.language);
+      // A recording cut by the time limit keeps the steps it reached, like one cut by the step limit.
+      if(result.timedOut&&frames.length)truncated=true;
       send({type:'recorded',sessionId,frames,truncated,actual:result.actual,...(truncated||!result.error?{}:{error:result.error}),logs:result.logs,executableLines:lines});
     }catch(error){send({type:'recorded',sessionId,frames,truncated,...(truncated?{}:{error:String(error).replace(/^Error: /,'').slice(0,8000)}),logs:[],executableLines:lines});}
     return;

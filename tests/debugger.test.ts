@@ -170,9 +170,9 @@ test('Continue retains the last local values even when execution finishes betwee
 });
 
 test('debug VM enforces its own memory and active-time limits',{timeout:60000},async()=>{
-  for(const [source,expected] of [['function twoSum(){const giant=new Array(30000000).fill(0);return [0,1];}',/memory/i],['function twoSum(){while(true){}}',/10 seconds of active execution/]] as const){
+  for(const [source,expected,timedOut] of [['function twoSum(){const giant=new Array(30000000).fill(0);return [0,1];}',/memory/i,false],['function twoSum(){while(true){}}',/10 seconds of active execution/,true]] as const){
     let controller:DebugController;const hooks={started:()=>{},running:()=>{},frame:()=>queueMicrotask(()=>controller.command('continue'))};controller=new DebugController(hooks);
-    const result=await debugEvaluate(await newQuickJSAsyncWASMModule(),problem,source,problem.examples[0],controller,hooks);assert.match(result.error||'',expected);
+    const result=await debugEvaluate(await newQuickJSAsyncWASMModule(),problem,source,problem.examples[0],controller,hooks);assert.match(result.error||'',expected);assert.equal(result.timedOut,timedOut);
   }
 });
 
