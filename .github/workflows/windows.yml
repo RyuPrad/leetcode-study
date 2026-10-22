@@ -5,10 +5,38 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# A newer push to the same branch supersedes the runs still going for older commits.
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  # The installer, built alongside the full validation so it is ready in minutes.
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/cache@v4
+        with:
+          path: toolchains/.downloads
+          key: toolchains-${{ hashFiles('scripts/fetch-toolchains.mjs') }}
+      - run: npm run setup
+      - run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LeetCode-Study-Windows-x64
+          path: release/*Setup.exe
+          if-no-files-found: error
   build:
     runs-on: windows-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,14 +91,6 @@ jobs:
       - run: npm run check:debugger
       - run: npm run test:debugger
       - run: npm run test:guided:desktop
-      - run: npm run dist:win
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: LeetCode-Study-Windows-x64
-          path: release/*Setup.exe
-          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

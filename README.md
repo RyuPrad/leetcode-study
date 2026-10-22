@@ -156,7 +156,7 @@ npm run test:all -- --jobs=12 --desktop-jobs=1
 
 Suites that spread their own work (`test:visualizers`, `test:lessons`, `test:guided`, `test:code-languages`, `check:native`, `check:solutions` and others) size themselves the same way when run alone; set `STUDY_TEST_WORKERS=N` to fix the number of pages or processes.
 
-The installer is written to `release/`. The Windows CI workflow runs validation and uploads an installer artifact; it does not publish releases. `npm start` launches the most recent build.
+The installer is written to `release/`. The Windows CI workflow builds the installer in one job, ready a few minutes after a push, and runs the full validation in a parallel job; it uploads the installer as an artifact and does not publish releases. `npm start` launches the most recent build.
 
 ## Project structure
 
