@@ -27,7 +27,8 @@ try {
   // Unknown kits are refused by main.
   assert.match(await page.evaluate(() => window.study.loadKit('leetcode:1').then(() => 'loaded', e => String(e))), /Unknown study kit/);
   const open = async kit => {
-    await page.getByRole('button', { name: /^All LeetCode \d+$/ }).first().click();
+    // By its title: on a small screen, such as a CI runner's 1024x768, the Code tab shows the sidebar as icons only.
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByTitle('All LeetCode problems').click();
     await page.getByRole('searchbox', { name: 'Search problems' }).fill(String(kit.number));
     await page.getByRole('button', { name: `Open ${kit.title}`, exact: true }).click();
     await page.locator('.kit-notes').waitFor();
