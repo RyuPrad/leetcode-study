@@ -1,7 +1,8 @@
 // Verifies generated study kits (coding/kits/<n>.json) by running them:
 // - the record's structure (coding/kits.ts kitErrors) and every case against the typed contract and validator;
 // - the reference solves every example with LeetCode's stated answer and runs every test;
-// - an independent brute force agrees with the reference on every case and on random inputs from the generator;
+// - an independent brute force agrees with the reference on every case except large generated ones, and on random
+//   small inputs from the generator;
 // - a wrong solution is rejected, the walkthrough records, and the TypeScript/Java/C starters generate.
 // SQL kits run the same checks with sql.js: the reference query against LeetCode's example tables, an independent
 // second query against it on every case and generated table set, and each common table expression of the walkthrough.
@@ -47,6 +48,9 @@ async function check(number: number): Promise<string[]> {
   let cases: CodeCase[];
   try { cases = expandCases(sync, problem, [...problem.examples, ...problem.tests]); } catch (error) { return [...errors, String(error)]; }
   const generatedNames = new Set(problem.tests.filter(t => t.generate).map(t => t.name));
+  // A brute force is written for small inputs: on a large one it may time out, run out of memory or overflow,
+  // depending on the machine's speed, so large generated tests are checked by the reference alone.
+  const largeNames = new Set(problem.tests.filter(t => t.generate?.size === 'large').map(t => t.name));
   if (problem.kind === 'sql') return [...errors, ...checkSql(record, problem, cases)];
   if (problem.tests.length < 8) errors.push(`Only ${problem.tests.length} tests; write at least 8.`);
   const outputs: Json[] = [];
@@ -58,9 +62,9 @@ async function check(number: number): Promise<string[]> {
     outputs.push(run.actual as Json);
     if (test.expected !== undefined && !accepted(sync, problem, test.input, run.actual, test.expected)) errors.push(`The reference answers ${show(run.actual)} on ${test.name}, but the stated answer is ${show(test.expected)}.`);
     if (problem.compare === 'checker' && !accepted(sync, problem, test.input, run.actual, run.actual)) errors.push(`The checker rejects the reference's own answer on ${test.name}.`);
-    if (record.brute) {
+    if (record.brute && !largeNames.has(test.name)) {
       const brute = evaluate(sync, problem, record.brute, test.input, 10000);
-      // A generated large test may be beyond the brute force, as generated inputs are in the fuzzing below.
+      // A small generated test may still be beyond the brute force, as generated inputs are in the fuzzing below.
       if (brute.verdict === 'Time limit exceeded' && generatedNames.has(test.name)) continue;
       if (brute.verdict !== 'Accepted') errors.push(`The brute force fails ${test.name}: ${brute.verdict} ${brute.error ?? ''}`.trim());
       else if (!accepted(sync, problem, test.input, brute.actual, run.actual)) errors.push(`Brute force ${show(brute.actual)} and reference ${show(run.actual)} disagree on ${test.name} ${show(test.input)}.`);
