@@ -1,0 +1,50 @@
+{
+  "number": 3053,
+  "title": "Classifying Triangles by Lengths",
+  "spec": "recalled",
+  "statement": "One table holds candidate triangles:\n\n- `Triangles(A, B, C)`: one row per set of three side lengths; the triple `(A, B, C)` is unique and every length is a positive integer.\n\nFor **every** row output one value in a column named `triangle_type`, chosen by these rules in this order:\n\n1. `Not A Triangle` if the three lengths cannot close into a triangle, that is, some side is greater than **or equal to** the sum of the other two. This wins even when sides are equal (`2, 2, 4` is not a triangle).\n2. `Equilateral` if all three sides are equal.\n3. `Isosceles` if exactly two sides are equal.\n4. `Scalene` if all three sides differ.\n\nThe strings must match exactly, including capitals and spaces. Rows may come in any order.",
+  "constraints": [
+    "(A, B, C) is unique in Triangles",
+    "A, B and C are positive integers, never null",
+    "A degenerate triple such as 1, 2, 3 (one side equal to the sum of the others) is Not A Triangle"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Triangles": [["A","INT"],["B","INT"],["C","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Triangles = [] }] = input;\n  const seen = new Set();\n  for (const [a, b, c] of Triangles) {\n    if (a === null || b === null || c === null) return 'A, B and C are required.';\n    if (a <= 0 || b <= 0 || c <= 0) return 'Side lengths must be positive.';\n    const key = `${a},${b},${c}`;\n    if (seen.has(key)) return `The triple (${key}) appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  CASE\n    WHEN A + B <= C OR A + C <= B OR B + C <= A THEN 'Not A Triangle'\n    WHEN A = B AND B = C THEN 'Equilateral'\n    WHEN A = B OR B = C OR A = C THEN 'Isosceles'\n    ELSE 'Scalene'\n  END AS triangle_type\nFROM Triangles;",
+  "brute": "SELECT 'Not A Triangle' AS triangle_type\nFROM Triangles\nWHERE 2 * GREATEST(A, B, C) >= A + B + C\nUNION ALL\nSELECT 'Equilateral'\nFROM Triangles\nWHERE 2 * GREATEST(A, B, C) < A + B + C AND A = B AND B = C\nUNION ALL\nSELECT 'Isosceles'\nFROM Triangles\nWHERE 2 * GREATEST(A, B, C) < A + B + C\n  AND (A = B) + (B = C) + (A = C) = 1\nUNION ALL\nSELECT 'Scalene'\nFROM Triangles\nWHERE 2 * GREATEST(A, B, C) < A + B + C AND A <> B AND B <> C AND A <> C",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const count = size === 'small' ? pick(9) : 2000;\n  const top = size === 'small' ? 8 : 60;\n  const seen = new Set(), Triangles = [];\n  let attempts = 0;\n  while (Triangles.length < count && attempts < count * 20) {\n    attempts++;\n    const a = 1 + pick(top), b = 1 + pick(top), c = 1 + pick(top);\n    const shape = pick(4);\n    // Mix equal-sided shapes in on purpose, since random triples rarely repeat a side.\n    let row;\n    if (shape === 0) row = [a, a, a];\n    else if (shape === 1) row = [[a, a, b], [a, b, a], [b, a, a]][pick(3)];\n    else if (shape === 2) row = [a, b, a + b - pick(2)].sort(() => rand() - 0.5);\n    else row = [a, b, c];\n    if (row.some(v => v <= 0)) continue;\n    const key = row.join(',');\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Triangles.push(row);\n  }\n  return [{ Triangles }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Triangles":[[20,20,23],[20,20,20],[20,21,22],[13,14,30]]}],"expected":{"columns":["triangle_type"],"rows":[["Isosceles"],["Equilateral"],["Scalene"],["Not A Triangle"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Triangles":[]}]},
+    {"name":"Test 2","input":[{"Triangles":[[5,5,5]]}]},
+    {"name":"Test 3","input":[{"Triangles":[[2,3,5],[1,1,2],[5,2,3]]}]},
+    {"name":"Test 4","input":[{"Triangles":[[4,4,7],[7,4,4],[4,7,4]]}]},
+    {"name":"Test 5","input":[{"Triangles":[[3,4,5],[5,12,13],[10,4,5]]}]},
+    {"name":"Test 6","input":[{"Triangles":[[30,13,14],[13,30,14],[13,14,30],[14,13,26]]}]},
+    {"name":"Test 7","input":[{"Triangles":[[2,2,5],[2,5,2],[5,2,2],[2,2,3]]}]},
+    {"name":"Test 8","input":[{"Triangles":[[1000,1000,1999],[1000,1000,2000],[999,1000,1001],[1,1,1],[1000,1000,1000]]}]},
+    {"name":"Test 9","input":[{"Triangles":[[6,6,6],[6,6,11],[6,6,12],[6,7,12],[6,7,13],[7,6,6]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row is classified on its own, so no joins or grouping are needed: one `CASE` expression per row does all the work. The only subtlety is the **order** of the checks. Three lengths with two equal sides may still fail to form a triangle (`2, 2, 5`), so the \"is it a triangle at all\" test has to come first. A `CASE` returns the first branch whose condition is true, which gives exactly that priority.\n\n## Approach\n\n1. `WHEN A + B <= C OR A + C <= B OR B + C <= A`: if any side is at least the sum of the other two, the sides cannot meet, so the answer is `Not A Triangle`.\n2. `WHEN A = B AND B = C`: every remaining row is a real triangle; all sides equal gives `Equilateral`.\n3. `WHEN A = B OR B = C OR A = C`: equilateral rows were already taken, so any equal pair now means exactly two equal sides, `Isosceles`.\n4. `ELSE 'Scalene'`: nothing is equal.\n5. Name the expression `triangle_type`.\n\n## Example 1, step by step\n\n- `20, 20, 23`: 20 + 20 = 40 > 23, a triangle; not all equal; A = B, so **Isosceles**.\n- `20, 20, 20`: a triangle with all sides equal, **Equilateral**.\n- `20, 21, 22`: every pair sums past the third side; no two sides equal, **Scalene**.\n- `13, 14, 30`: 13 + 14 = 27 <= 30, so **Not A Triangle**.\n\n## Complexity\n\n- Time: O(T), a constant amount of work for each of the T rows.\n- Space: O(T) for the result.\n\n## Pitfalls\n\n- Testing the equal-side branches before the triangle inequality labels `2, 2, 5` as Isosceles.\n- Using `<` instead of `<=`: `1, 2, 3` collapses into a straight line and is not a triangle.\n- Checking only `A + B <= C`: the longest side can be any of the three columns, so all three sums are needed.\n- Misspelling the labels: the expected value is `Not A Triangle` with capital A and T.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `CASE ... END` | picks the first matching label for the row |\n| `triangle_type` | the output column holding that label |\n| `A`, `B`, `C` | the three side lengths of the row |",
+  "narration": {
+    "2": "Start a CASE expression; it returns the label of the first branch whose condition holds.",
+    "3": "First rule out impossible triangles: some side is at least as long as the other two together.",
+    "4": "Among real triangles, three equal sides make an equilateral triangle.",
+    "5": "Equilateral rows are already taken, so any equal pair here means exactly two equal sides.",
+    "6": "Whatever is left has three different sides.",
+    "7": "Name the result column triangle_type, as the problem asks."
+  }
+}

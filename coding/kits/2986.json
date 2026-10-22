@@ -1,0 +1,54 @@
+{
+  "number": 2986,
+  "title": "Find Third Transaction",
+  "spec": "recalled",
+  "statement": "A payment service records what each user spends:\n\n- `Transactions(user_id, spend, transaction_date)`: one row per transaction. `(user_id, transaction_date)` is unique, so a user's transactions have a strict time order. `spend` is a decimal amount with 2 decimal places; `transaction_date` is a datetime such as `'2023-11-18 13:49:42'`.\n\nPut each user's transactions in chronological order by `transaction_date`. A user is reported when they have at least three transactions and the **third** one spends strictly more than **each** of the two before it (an equal amount does not count).\n\nFor each such user report `user_id`, `third_transaction_spend` (the third transaction's `spend`) and `third_transaction_date` (its `transaction_date`). Transactions after the third play no part. Order the rows by `user_id` ascending.",
+  "constraints": [
+    "(user_id, transaction_date) is unique in Transactions",
+    "spend is between 0 and 999.99 with at most 2 decimal places, never null",
+    "transaction_date is a full datetime 'YYYY-MM-DD HH:MM:SS'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Transactions": [["user_id","INT"],["spend","DECIMAL(5, 2)"],["transaction_date","DATETIME"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Transactions = [] }] = input;\n  const seen = new Set();\n  for (const [user, spend, date] of Transactions) {\n    if (user === null) return 'user_id cannot be null.';\n    if (typeof spend !== 'number' || spend < 0 || spend > 999.99 || Math.abs(Math.round(spend * 100) - spend * 100) > 1e-6) return `spend ${spend} must be 0 to 999.99 with 2 decimals.`;\n    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2} ([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$/.test(date)) return `transaction_date ${date} is not a datetime.`;\n    const key = `${user}|${date}`;\n    if (seen.has(key)) return `User ${user} has two transactions at ${date}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH numbered AS (\n  SELECT\n    user_id,\n    spend,\n    transaction_date,\n    ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY transaction_date) AS position,\n    LAG(spend, 1) OVER (PARTITION BY user_id ORDER BY transaction_date) AS previous_spend,\n    LAG(spend, 2) OVER (PARTITION BY user_id ORDER BY transaction_date) AS second_previous_spend\n  FROM Transactions\n)\nSELECT\n  user_id,\n  spend AS third_transaction_spend,\n  transaction_date AS third_transaction_date\nFROM numbered\nWHERE position = 3\n  AND spend > previous_spend\n  AND spend > second_previous_spend\nORDER BY user_id;",
+  "brute": "SELECT t.user_id, t.spend AS third_transaction_spend, t.transaction_date AS third_transaction_date\nFROM Transactions AS t\nWHERE (SELECT COUNT(*) FROM Transactions AS e WHERE e.user_id = t.user_id AND e.transaction_date < t.transaction_date) = 2\n  AND NOT EXISTS (\n    SELECT 1\n    FROM Transactions AS e\n    WHERE e.user_id = t.user_id AND e.transaction_date < t.transaction_date AND e.spend >= t.spend\n  )\nORDER BY t.user_id",
+  "generator": "function generate(rand, size) {\n  const two = n => String(n).padStart(2, '0');\n  const small = size === 'small';\n  // Small cases reuse a few amounts so equal spends happen; large ones draw any cent value.\n  const amounts = [7, 13.89, 37.33, 49.78, 65.56, 96, 100.44];\n  const users = small ? 4 : 400;\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Transactions = [], seen = new Set();\n  while (Transactions.length < count) {\n    const user = 1 + Math.floor(rand() * users);\n    const date = `2023-11-${two(1 + Math.floor(rand() * (small ? 4 : 30)))} ${two(Math.floor(rand() * 24))}:${two(Math.floor(rand() * 60))}:${two(Math.floor(rand() * 60))}`;\n    const key = `${user}|${date}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    const spend = small ? amounts[Math.floor(rand() * amounts.length)] : Math.floor(rand() * 100000) / 100;\n    Transactions.push([user, spend, date]);\n  }\n  return [{ Transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Transactions":[[1,65.56,"2023-11-18 13:49:42"],[1,96,"2023-11-30 02:47:26"],[1,7.44,"2023-11-02 12:15:23"],[1,49.78,"2023-11-12 00:13:46"],[2,40.89,"2023-11-21 04:39:15"],[2,100.44,"2023-11-20 07:39:34"],[3,37.33,"2023-11-03 06:22:02"],[3,13.89,"2023-11-11 16:00:14"],[3,7,"2023-11-29 22:32:36"]]}],"expected":{"columns":["user_id","third_transaction_spend","third_transaction_date"],"rows":[[1,65.56,"2023-11-18 13:49:42"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Transactions":[]}]},
+    {"name":"Test 2","input":[{"Transactions":[[5,10,"2023-11-01 08:00:00"],[5,20,"2023-11-02 08:00:00"],[5,30,"2023-11-03 08:00:00"]]}]},
+    {"name":"Test 3","input":[{"Transactions":[[2,10,"2023-11-01 08:00:00"],[2,500,"2023-11-02 08:00:00"]]}]},
+    {"name":"Test 4","input":[{"Transactions":[[1,20,"2023-11-01 08:00:00"],[1,10,"2023-11-02 08:00:00"],[1,20,"2023-11-03 08:00:00"],[2,15.5,"2023-11-01 09:00:00"],[2,15.5,"2023-11-02 09:00:00"],[2,15.51,"2023-11-03 09:00:00"]]}]},
+    {"name":"Test 5","input":[{"Transactions":[[3,90,"2023-11-20 10:00:00"],[3,5,"2023-11-01 10:00:00"],[3,60,"2023-11-15 10:00:00"],[3,8,"2023-11-10 10:00:00"]]}]},
+    {"name":"Test 6","input":[{"Transactions":[[4,30,"2023-11-01 10:00:00"],[4,40,"2023-11-02 10:00:00"],[4,35,"2023-11-03 10:00:00"],[4,99,"2023-11-04 10:00:00"],[4,120,"2023-11-05 10:00:00"]]}]},
+    {"name":"Test 7","input":[{"Transactions":[[6,50,"2023-11-01 10:00:00"],[6,20,"2023-11-02 10:00:00"],[6,30,"2023-11-03 10:00:00"],[7,50,"2023-11-01 10:00:00"],[7,20,"2023-11-02 10:00:00"],[7,60,"2023-11-03 10:00:00"]]}]},
+    {"name":"Test 8","input":[{"Transactions":[[9,1,"2023-11-01 10:00:00"],[9,2,"2023-11-02 10:00:00"],[9,3,"2023-11-03 10:00:00"],[4,0,"2023-11-05 10:00:00"],[4,0.01,"2023-11-06 10:00:00"],[4,999.99,"2023-11-07 10:00:00"],[7,3,"2023-11-01 10:00:00"],[7,2,"2023-11-02 10:00:00"],[7,1,"2023-11-03 10:00:00"]]}]},
+    {"name":"Test 9","input":[{"Transactions":[[1,12.5,"2023-11-05 23:59:59"],[1,11,"2023-11-05 00:00:00"],[1,40,"2023-11-05 12:30:00"],[2,70,"2023-11-05 12:30:00"],[2,80,"2023-11-05 12:30:01"],[2,90,"2023-11-05 12:30:02"]]}]},
+    {"name":"Test 10","input":[{"Transactions":[[8,100.44,"2023-11-20 07:39:34"],[8,40.89,"2023-11-21 04:39:15"],[8,100.45,"2023-11-22 04:39:15"],[8,3,"2023-11-23 04:39:15"],[10,37.33,"2023-11-03 06:22:02"],[10,13.89,"2023-11-11 16:00:14"],[10,7,"2023-11-29 22:32:36"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"The third transaction\" only makes sense once each user's rows are numbered by time, and \"more than the two before it\" needs those two earlier amounts on the same row. Window functions give both in one pass: `ROW_NUMBER()` numbers each user's transactions chronologically, and `LAG(spend, 1)` and `LAG(spend, 2)` copy the previous two amounts onto every row. The answer is then a plain filter on row 3.\n\n## Approach\n\n1. CTE `numbered`: for every transaction, compute `position` with `ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY transaction_date)`, and `previous_spend` and `second_previous_spend` with `LAG` over the same window.\n2. Keep rows with `position = 3` whose `spend` beats both lagged amounts.\n3. Rename the columns to `third_transaction_spend` and `third_transaction_date`, and sort by `user_id`.\n\n## Example 1, step by step\n\n- User 1 in time order: 7.44 (11-02), 49.78 (11-12), 65.56 (11-18), 96 (11-30). The row at position 3 has spend 65.56 with `previous_spend = 49.78` and `second_previous_spend = 7.44`; 65.56 beats both, so it is kept.\n- User 2 has only two transactions, so no row reaches position 3.\n- User 3 in time order: 37.33, 13.89, 7. The third spend 7 is below both, so it is dropped.\n\nThe result is `(1, 65.56, 2023-11-18 13:49:42)`.\n\n## Complexity\n\n- Time: O(n log n) to sort the n transactions inside their user partitions; the filter is one pass.\n- Space: O(n) for the numbered rows.\n\n## Pitfalls\n\n- Numbering by insertion order or by `spend` instead of `transaction_date` picks the wrong \"third\" row.\n- Comparing only with the immediately previous amount reports 50, 20, 30, where the third is not above the first.\n- `>=` instead of `>` accepts a third amount that only ties an earlier one.\n- Checking whether *any* later transaction beats the earlier ones ignores that only the third counts.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `numbered` | every transaction with its chronological position and the two earlier amounts |\n| `position` | 1 for a user's first transaction, 2 for the second, and so on |\n| `previous_spend` | the spend one transaction earlier (null on the first) |\n| `second_previous_spend` | the spend two transactions earlier (null on the first two) |",
+  "narration": {
+    "1": "The CTE numbered annotates each transaction with its place in the user's history.",
+    "6": "ROW_NUMBER counts each user's transactions in time order, starting at 1.",
+    "7": "LAG(spend, 1) brings the amount of the transaction just before onto this row.",
+    "8": "LAG(spend, 2) brings the amount from two transactions back.",
+    "16": "Only the third transaction of each user is a candidate.",
+    "17": "It must spend strictly more than the transaction right before it.",
+    "18": "It must also spend strictly more than the first transaction.",
+    "19": "List the qualifying users by user_id ascending."
+  }
+}

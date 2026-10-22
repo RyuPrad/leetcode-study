@@ -1,0 +1,48 @@
+{
+  "number": 2990,
+  "title": "Loan Types",
+  "spec": "recalled",
+  "statement": "One table records the loans users have taken:\n\n- `Loans(loan_id, user_id, loan_type)`: one row per loan; `loan_id` is unique. `loan_type` is a label such as `'Mortgage'`, `'Refinance'`, `'AutoLoan'` or `'Inschool'`. A user may hold any number of loans, including several of the same type.\n\nReport every user who holds **at least one** `'Refinance'` loan **and at least one** `'Mortgage'` loan. Each such user appears once, in a single column `user_id`. Order the rows by `user_id` ascending.",
+  "constraints": [
+    "loan_id is unique in Loans",
+    "a user can have several loans of the same type"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Loans": [["loan_id","INT"],["user_id","INT"],["loan_type","VARCHAR(40)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Loans = [] }] = input;\n  const ids = new Set();\n  for (const [id, user, type] of Loans) {\n    if (id === null || user === null || type === null) return 'Every loan needs a loan_id, a user_id and a loan_type.';\n    if (ids.has(id)) return `loan_id ${id} appears twice.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT user_id\nFROM Loans\nGROUP BY user_id\nHAVING SUM(loan_type = 'Refinance') > 0\n  AND SUM(loan_type = 'Mortgage') > 0\nORDER BY user_id;",
+  "brute": "SELECT DISTINCT r.user_id\nFROM Loans AS r\nWHERE r.loan_type = 'Refinance'\n  AND EXISTS (\n    SELECT 1\n    FROM Loans AS m\n    WHERE m.user_id = r.user_id\n      AND m.loan_type = 'Mortgage'\n  )\nORDER BY r.user_id",
+  "generator": "function generate(rand, size) {\n  const types = ['Mortgage', 'Refinance', 'AutoLoan', 'Inschool', 'Personal'];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const users = size === 'small' ? 4 : 600;\n  // Loan ids increase with random gaps, so they are unique; a shuffle then mixes their order.\n  const Loans = [];\n  let id = 0;\n  for (let i = 0; i < count; i++) Loans.push([id += 1 + Math.floor(rand() * 50), 101 + Math.floor(rand() * users), types[Math.floor(rand() * types.length)]]);\n  for (let i = Loans.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Loans[i], Loans[j]] = [Loans[j], Loans[i]]; }\n  return [{ Loans }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Loans":[[683,101,"Mortgage"],[218,101,"AutoLoan"],[802,101,"Inschool"],[593,102,"Mortgage"],[138,102,"Refinance"],[294,102,"Inschool"],[308,103,"Refinance"],[389,104,"Mortgage"]]}],"expected":{"columns":["user_id"],"rows":[[102]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Loans":[]}]},
+    {"name":"Test 2","input":[{"Loans":[[1,7,"Refinance"]]}]},
+    {"name":"Test 3","input":[{"Loans":[[1,7,"Refinance"],[2,7,"Mortgage"]]}]},
+    {"name":"Test 4","input":[{"Loans":[[1,5,"Mortgage"],[2,5,"Refinance"],[3,5,"Mortgage"],[4,5,"Refinance"],[5,6,"Mortgage"]]}]},
+    {"name":"Test 5","input":[{"Loans":[[1,1,"Refinance"],[2,2,"Mortgage"],[3,3,"Refinance"],[4,4,"Mortgage"]]}]},
+    {"name":"Test 6","input":[{"Loans":[[10,305,"Mortgage"],[11,305,"Refinance"],[12,120,"Refinance"],[13,120,"AutoLoan"],[14,120,"Mortgage"],[15,207,"Refinance"],[16,207,"Mortgage"],[17,150,"Inschool"]]}]},
+    {"name":"Test 7","input":[{"Loans":[[1,1,"Mortgage"],[2,1,"Mortgage"],[3,2,"Refinance"],[4,2,"Refinance"],[5,3,"Refinance"],[6,3,"Mortgage"]]}]},
+    {"name":"Test 8","input":[{"Loans":[[1,9,"AutoLoan"],[2,9,"Inschool"],[3,8,"Personal"],[4,8,"AutoLoan"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about each user as a whole, not about single loans: no one row can show that a user has both types. Collapse the loans into one group per user and ask two questions of each group: does it contain a `'Refinance'` row, and does it contain a `'Mortgage'` row?\n\n## Approach\n\n1. `GROUP BY user_id` so each user becomes one group, which also makes every `user_id` appear at most once.\n2. In `HAVING`, `loan_type = 'Refinance'` is 1 on a refinance row and 0 otherwise, so `SUM(...)` counts the user's refinance loans; require it to be positive.\n3. Require the same of `SUM(loan_type = 'Mortgage')`.\n4. `ORDER BY user_id` for ascending order.\n\n## Example 1, step by step\n\n- User 101: Mortgage, AutoLoan, Inschool. Refinance count 0, so the user is dropped.\n- User 102: Mortgage, Refinance, Inschool. Both counts are 1, so the user is kept.\n- User 103: Refinance only; user 104: Mortgage only. Both are dropped.\n\nThe result is the single row `102`.\n\n## Complexity\n\n- Time: O(L log L) for L loans, for the grouping (O(L) with hashing).\n- Space: O(U) for U users' groups.\n\n## Pitfalls\n\n- `WHERE loan_type = 'Refinance' AND loan_type = 'Mortgage'` can never be true on one row; the condition must look across a user's rows.\n- `WHERE loan_type IN ('Refinance', 'Mortgage') ... HAVING COUNT(*) >= 2` also accepts a user with two mortgages and no refinance (user 1 in Test 7).\n- Without grouping or `DISTINCT`, a user with several matching loans is reported several times (Test 4).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY user_id` | one group per user, holding all of their loans |\n| `SUM(loan_type = 'Refinance')` | how many refinance loans the user has |\n| `SUM(loan_type = 'Mortgage')` | how many mortgage loans the user has |",
+  "narration": {
+    "1": "Each output row is one user id.",
+    "3": "Group all loans of a user together so the two conditions can look across their rows.",
+    "4": "A comparison is 1 when true, so the sum counts the user's refinance loans; at least one is needed.",
+    "5": "Likewise the user needs at least one mortgage.",
+    "6": "Users are listed in ascending id order."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 2362,
+  "title": "Generate the Invoice",
+  "spec": "recalled",
+  "statement": "Two tables describe a shop's sales:\n\n- `Products(product_id, price)`: one row per product; `product_id` is unique and `price` is the cost of one unit.\n- `Purchases(invoice_id, product_id, quantity)`: one line of an invoice, saying how many units of a product it bought. `(invoice_id, product_id)` is unique, and every `product_id` exists in `Products`.\n\nAn invoice's **total** is the sum of `quantity * price` over its lines. Find the invoice with the largest total; when several invoices share the largest total, take the one with the smallest `invoice_id`.\n\nReport that invoice's lines, one row per line, with the columns `product_id`, `quantity` and `price`, where `price` is the line's cost (`quantity` times the product's unit price). If there are no purchases, report nothing. Rows may come in any order.",
+  "constraints": [
+    "product_id is unique in Products",
+    "(invoice_id, product_id) is unique in Purchases",
+    "every Purchases.product_id exists in Products",
+    "price and quantity are positive"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Products": [["product_id","INT"],["price","INT"]],
+    "Purchases": [["invoice_id","INT"],["product_id","INT"],["quantity","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Products = [], Purchases = [] }] = input;\n  const products = new Set(), lines = new Set();\n  for (const [id, price] of Products) {\n    if (id === null || price === null) return 'product_id and price are required.';\n    if (products.has(id)) return `product_id ${id} appears twice in Products.`;\n    products.add(id);\n    if (price <= 0) return 'price must be positive.';\n  }\n  for (const [invoice, product, quantity] of Purchases) {\n    if (invoice === null || product === null || quantity === null) return 'Purchases values are required.';\n    if (!products.has(product)) return `Purchases names product ${product}, which is not in Products.`;\n    const key = `${invoice}|${product}`;\n    if (lines.has(key)) return `Invoice ${invoice} lists product ${product} twice.`;\n    lines.add(key);\n    if (quantity <= 0) return 'quantity must be positive.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH line_items AS (\n  SELECT pu.invoice_id, pu.product_id, pu.quantity, pu.quantity * pr.price AS price\n  FROM Purchases AS pu\n  JOIN Products AS pr\n    ON pr.product_id = pu.product_id\n),\ntop_invoice AS (\n  SELECT invoice_id\n  FROM line_items\n  GROUP BY invoice_id\n  ORDER BY SUM(price) DESC, invoice_id\n  LIMIT 1\n)\nSELECT li.product_id, li.quantity, li.price\nFROM line_items AS li\nJOIN top_invoice AS t\n  ON t.invoice_id = li.invoice_id;",
+  "brute": "SELECT\n  p.product_id,\n  p.quantity,\n  p.quantity * (SELECT price FROM Products WHERE Products.product_id = p.product_id) AS price\nFROM Purchases AS p\nWHERE p.invoice_id = (\n  SELECT MIN(t.invoice_id)\n  FROM (SELECT x.invoice_id, SUM(x.quantity * y.price) AS total\n        FROM Purchases AS x, Products AS y\n        WHERE y.product_id = x.product_id\n        GROUP BY x.invoice_id) AS t\n  WHERE t.total = (SELECT MAX(u.total)\n                   FROM (SELECT SUM(x.quantity * y.price) AS total\n                         FROM Purchases AS x, Products AS y\n                         WHERE y.product_id = x.product_id\n                         GROUP BY x.invoice_id) AS u)\n)",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Products = [], Purchases = [];\n  if (size === 'small') {\n    // Round prices and small quantities make equal invoice totals common.\n    const prices = [50, 100, 100, 200, 300];\n    for (let id = 1; id <= 4; id++) if (rand() < 0.75) Products.push([id, prices[pick(prices.length)]]);\n    const quantities = [1, 1, 2, 2, 3, 4, 10];\n    const seen = new Set(), rows = pick(9);\n    for (let tries = 0; Products.length && Purchases.length < rows && tries < 40; tries++) {\n      const invoice = 1 + pick(5), product = Products[pick(Products.length)][0];\n      if (seen.has(`${invoice}|${product}`)) continue;\n      seen.add(`${invoice}|${product}`);\n      Purchases.push([invoice, product, quantities[pick(quantities.length)]]);\n    }\n  } else {\n    for (let id = 1; id <= 400; id++) Products.push([id, 1 + pick(50)]);\n    const seen = new Set();\n    while (Purchases.length < 2000) {\n      const invoice = 1 + pick(500), product = 1 + pick(400);\n      if (seen.has(`${invoice}|${product}`)) continue;\n      seen.add(`${invoice}|${product}`);\n      Purchases.push([invoice, product, 1 + pick(20)]);\n    }\n  }\n  return [{ Products, Purchases }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Products":[[1,100],[2,200]],"Purchases":[[1,1,2],[3,2,1],[2,2,3],[2,1,4],[4,1,10]]}],"expected":{"columns":["product_id","quantity","price"],"rows":[[2,3,600],[1,4,400]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Products":[[1,100],[2,50]],"Purchases":[]}]},
+    {"name":"Test 2","input":[{"Products":[[7,30]],"Purchases":[[4,7,3]]}]},
+    {"name":"Test 3","input":[{"Products":[[1,10],[2,25],[3,40],[4,99]],"Purchases":[[1,1,5],[1,2,2],[2,3,3],[2,1,1],[2,2,1],[3,2,4]]}]},
+    {"name":"Test 4","input":[{"Products":[[1,100],[2,200]],"Purchases":[[5,2,2],[3,1,4],[6,1,1]]}]},
+    {"name":"Test 5","input":[{"Products":[[1,5],[2,500]],"Purchases":[[1,1,50],[2,2,1]]}]},
+    {"name":"Test 6","input":[{"Products":[[1,10],[2,20],[3,30],[4,300]],"Purchases":[[1,1,1],[1,2,1],[1,3,1],[2,4,1]]}]},
+    {"name":"Test 7","input":[{"Products":[[1,500],[2,300],[3,300]],"Purchases":[[1,1,1],[2,2,1],[2,3,1]]}]},
+    {"name":"Test 8","input":[{"Products":[[1,100],[2,50]],"Purchases":[[9,1,1],[8,2,2],[7,1,1],[10,2,2]]}]},
+    {"name":"Test 9","input":[{"Products":[[1,20],[2,30],[3,60]],"Purchases":[[12,3,2],[10,1,3],[10,2,2],[7,1,3],[7,3,1],[12,1,1],[7,2,1]]}]},
+    {"name":"Test 10","input":[{"Products":[[1,100],[2,200],[3,1]],"Purchases":[[1,3,10],[2,3,7],[2,1,1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is built from two different grains. Choosing the invoice is an invoice-level question (whose total is largest), but the output lists line-level rows. So first price every line, then sum lines per invoice to pick a winner, and finally go back to the lines of that one invoice. Sorting the invoice totals by total descending and `invoice_id` ascending puts the right invoice first, ties included.\n\n## Approach\n\n1. CTE `line_items`: join `Purchases` to `Products` and compute each line's cost `quantity * price`, named `price`.\n2. CTE `top_invoice`: group `line_items` by `invoice_id`, order by `SUM(price) DESC, invoice_id` and keep the first row with `LIMIT 1`.\n3. Join `line_items` back to `top_invoice` on `invoice_id` and select `product_id`, `quantity`, `price`.\n\n## Example 1, step by step\n\n- `line_items`: invoice 1 has (product 1, 2 units, 200); invoice 3 has (2, 1, 200); invoice 2 has (2, 3, 600) and (1, 4, 400); invoice 4 has (1, 10, 1000).\n- Totals: invoice 1 is 200, invoice 2 is 1000, invoice 3 is 200, invoice 4 is 1000.\n- Ordered by total descending then id: invoice 2 (1000), invoice 4 (1000), ... so `top_invoice` is invoice 2.\n- Its lines are `(2, 3, 600)` and `(1, 4, 400)`.\n\n## Complexity\n\n- Time: O(L) to price the L purchase lines through the `product_id` key, plus O(I log I) to sort I invoice totals.\n- Space: O(L) for `line_items`.\n\n## Pitfalls\n\n- Without `invoice_id` as the second sort key, a tie for the largest total returns whichever invoice the database meets first.\n- Summing `quantity` alone, or taking the most expensive single line, picks the wrong invoice; the total is the sum of line costs.\n- The output `price` is the line's cost, not the product's unit price.\n- `ORDER BY ... LIMIT 1` on the line rows themselves returns one line, not the whole invoice; the limit belongs on the grouped totals.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pu`, `pr` | a purchase line and its product |\n| `line_items` | every purchase line with its cost as `price` |\n| `top_invoice` | the single `invoice_id` with the largest total, smallest id on ties |\n| `li`, `t` | rows of `line_items` and `top_invoice` in the final join |",
+  "narration": {
+    "1": "Stage one, line_items, prices every purchase line.",
+    "2": "A line costs its quantity times the unit price; that cost is the output column price.",
+    "4": "Join each purchase to its product to read the unit price.",
+    "7": "Stage two, top_invoice, works per invoice to choose the winner.",
+    "10": "Group the priced lines so SUM(price) is each invoice's total.",
+    "11": "Largest total first, and the smaller invoice_id first among equal totals.",
+    "12": "Keep only the first invoice in that order.",
+    "16": "Joining back to top_invoice keeps only the lines of the chosen invoice."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "number": 1597,
+  "title": "Build Binary Expression Tree From Infix Expression",
+  "spec": "recalled",
+  "statement": "The string `s` is an arithmetic expression made of single-digit operands, the binary operators `+`, `-`, `*` and `/`, and parentheses. Build a binary expression tree for it and return the root. In such a tree every leaf holds one digit, and every other node holds an operator and has exactly two children: it stands for its operator applied to the value of its left subtree and the value of its right subtree.\n\nA returned tree is correct when both of these hold:\n\n- An in-order walk (left subtree, then the node, then the right subtree) lists exactly the characters of `s` with all parentheses deleted, so operands and operators keep their order.\n- The tree describes the same calculation as `s` read with the usual order of operations: parenthesized parts first, then `*` and `/`, then `+` and `-`, with operators of equal rank applied from left to right. \"The same\" means the two give equal results for any numbers placed in the operand positions, using exact (not integer) division.\n\nOften several trees qualify (a run of additions can be grouped either way), and any of them is accepted.\n\nCreate nodes with `new TreeNode(val, left, right)`, where `val` is a one-character string such as `\"7\"` or `\"*\"` (LeetCode calls this class `Node`; the TypeScript type lists `val` as a number, but store the character). Your returned tree is shown in level order, with `null` for a missing child.",
+  "constraints": [
+    "1 <= s.length <= 100",
+    "s contains only digits and the characters '+', '-', '*', '/', '(' and ')'",
+    "Every operand is a single digit",
+    "s is a well-formed expression: parentheses are balanced and never empty, and every operator has an operand or parenthesized group on each side"
+  ],
+  "signature": "TreeNode expTree(String s)",
+  "entry": "expTree",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [s] = input;\n  if (!Array.isArray(actual) || actual.length === 0 || typeof actual[0] !== 'string') return false;\n  // Rebuild the tree from its level-order list.\n  const root = { val: actual[0], left: null, right: null };\n  const queue = [root];\n  let i = 1;\n  for (let q = 0; q < queue.length && i < actual.length; q++) {\n    for (const side of ['left', 'right']) {\n      if (i < actual.length && actual[i] !== null) {\n        if (typeof actual[i] !== 'string') return false;\n        queue[q][side] = { val: actual[i], left: null, right: null };\n        queue.push(queue[q][side]);\n      }\n      i++;\n    }\n  }\n  if (i < actual.length) return false;\n  // Leaves are digits; every operator node has two children.\n  for (const node of queue) {\n    const leaf = !node.left && !node.right;\n    if (/^[0-9]$/.test(node.val) ? !leaf : !/^[-+*/]$/.test(node.val) || !node.left || !node.right) return false;\n  }\n  // The in-order walk must spell s without its parentheses.\n  const order = [];\n  const walk = node => { if (node) { walk(node.left); order.push(node); walk(node.right); } };\n  walk(root);\n  if (order.map(node => node.val).join('') !== s.replace(/[()]/g, '')) return false;\n  // Compare the tree with s as formulas: give the operands pseudo-random values and evaluate both modulo a prime.\n  const P = 67108859;\n  const inverse = a => { let result = 1, base = a, e = P - 2; while (e > 0) { if (e & 1) result = result * base % P; base = base * base % P; e = Math.floor(e / 2); } return result; };\n  const apply = (op, a, b) => {\n    if (Number.isNaN(a) || Number.isNaN(b)) return NaN;\n    if (op === '+') return (a + b) % P;\n    if (op === '-') return (a - b + P) % P;\n    if (op === '*') return a * b % P;\n    return b === 0 ? NaN : a * inverse(b) % P;\n  };\n  const leaves = order.filter(node => !node.left);\n  let compared = 0;\n  for (let trial = 1; trial <= 4; trial++) {\n    let seed = trial * 7919;\n    const values = leaves.map(() => { seed = (seed * 48271) % 2147483647; return seed % P; });\n    const index = new Map(leaves.map((node, k) => [node, k]));\n    const evalTree = node => node.left ? apply(node.val, evalTree(node.left), evalTree(node.right)) : values[index.get(node)];\n    // Evaluate s itself with the usual precedence, operands numbered left to right.\n    let pos = 0;\n    let operand = 0;\n    const factor = () => {\n      if (s[pos] === '(') { pos++; const value = sum(); pos++; return value; }\n      pos++;\n      return values[operand++];\n    };\n    const product = () => { let value = factor(); while (s[pos] === '*' || s[pos] === '/') { const op = s[pos++]; value = apply(op, value, factor()); } return value; };\n    const sum = () => { let value = product(); while (s[pos] === '+' || s[pos] === '-') { const op = s[pos++]; value = apply(op, value, product()); } return value; };\n    const want = sum();\n    const got = evalTree(root);\n    if (Number.isNaN(want) || Number.isNaN(got)) continue;\n    if (want !== got) return false;\n    compared++;\n  }\n  return compared >= 2;\n}",
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 100) return 's must have 1 to 100 characters.';\n  if (!/^[0-9+\\-*/()]+$/.test(s)) return 's may contain only digits, + - * / and parentheses.';\n  // A small recursive-descent parse: expression = term (operator term)*, term = digit or ( expression ).\n  let pos = 0;\n  const term = () => {\n    if (s[pos] === '(') { pos++; if (!expression() || s[pos] !== ')') return false; pos++; return true; }\n    if (pos < s.length && s[pos] >= '0' && s[pos] <= '9') { pos++; return true; }\n    return false;\n  };\n  const expression = () => {\n    if (!term()) return false;\n    while (pos < s.length && '+-*/'.includes(s[pos])) { pos++; if (!term()) return false; }\n    return true;\n  };\n  if (!expression() || pos !== s.length) return 's must be a well-formed expression of single digits, operators and balanced, non-empty parentheses.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [s] = input;\n  const root = solve(s);\n  if (!root || typeof root !== 'object') throw new Error('Return the root node of the expression tree.');\n  // Show values as the one-character strings the tree should hold.\n  return kit.fromTree(root).map(value => (value === null ? null : String(value)));\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function expTree(s) {\n  const rank = { '(': 0, '+': 1, '-': 1, '*': 2, '/': 2 };\n  const nodes = [];\n  const ops = [];\n  const combine = () => {\n    const right = nodes.pop();\n    const left = nodes.pop();\n    nodes.push(new TreeNode(ops.pop(), left, right));\n  };\n\n  for (const ch of s) {\n    if (ch >= '0' && ch <= '9') {\n      nodes.push(new TreeNode(ch));\n    } else if (ch === '(') {\n      ops.push(ch);\n    } else if (ch === ')') {\n      while (ops[ops.length - 1] !== '(') {\n        combine();\n      }\n      ops.pop();\n    } else {\n      while (ops.length > 0 && rank[ops[ops.length - 1]] >= rank[ch]) {\n        combine();\n      }\n      ops.push(ch);\n    }\n  }\n  while (ops.length > 0) {\n    combine();\n  }\n  return nodes[0];\n}",
+  "brute": "function expTree(s) {\n  // Split recursively at the operator applied last: the rightmost + or - outside all parentheses,\n  // or failing that the rightmost * or /; strip parentheses that wrap the whole piece.\n  const build = (from, to) => {\n    while (s[from] === '(') {\n      let depth = 0;\n      let closes = -1;\n      for (let k = from; k < to; k++) {\n        if (s[k] === '(') depth++;\n        if (s[k] === ')') depth--;\n        if (depth === 0) { closes = k; break; }\n      }\n      if (closes !== to - 1) break;\n      from++;\n      to--;\n    }\n    if (to - from === 1) return new TreeNode(s[from]);\n    for (const group of ['+-', '*/']) {\n      let depth = 0;\n      for (let k = to - 1; k >= from; k--) {\n        if (s[k] === ')') depth++;\n        else if (s[k] === '(') depth--;\n        else if (depth === 0 && group.includes(s[k])) return new TreeNode(s[k], build(from, k), build(k + 1, to));\n      }\n    }\n    return null;\n  };\n  return build(0, s.length);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const pool = ['+-*/', '-', '/', '-*', '+/', '+-*/'][pick(6)];\n  const expression = depth => {\n    const terms = 1 + pick(large ? 6 : 3);\n    let text = '';\n    for (let t = 0; t < terms; t++) {\n      if (t > 0) text += pool[pick(pool.length)];\n      text += depth < (large ? 4 : 2) && rand() < 0.3 ? `(${expression(depth + 1)})` : String(pick(10));\n    }\n    return text;\n  };\n  for (;;) {\n    const s = expression(0);\n    if (large ? s.length >= 70 && s.length <= 100 : s.length <= 15) return [s];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["3*4-2*5"],"expected":["-","*","*","3","4","2","5"]},
+    {"name":"Example 2","input":["2-3/(5*2)+1"],"expected":["+","-","1","2","/",null,null,null,null,"3","*",null,null,"5","2"]},
+    {"name":"Example 3","input":["1+2+3+4+5"],"expected":["+","+","5","+","4",null,null,"+","3",null,null,"1","2"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["7"]},
+    {"name":"Test 2","input":["((4))"]},
+    {"name":"Test 3","input":["9-5-3"]},
+    {"name":"Test 4","input":["8/4/2"]},
+    {"name":"Test 5","input":["1+2*3"]},
+    {"name":"Test 6","input":["(1+2)*3"]},
+    {"name":"Test 7","input":["9-(8-(7-6))"]},
+    {"name":"Test 8","input":["0*1+0"]},
+    {"name":"Test 9","input":["6/(3-3)+2"]},
+    {"name":"Test 10","input":["1*2+3*4-5/6*7-8"]},
+    {"name":"Test 11","input":["((1-2)*(3+4))/((5-6)/(7*8))"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAn operator should become a node only once both of its operands are complete subtrees, and whether an operand is complete depends on what comes next: in `3*4-2` the `*` can be built as soon as `-` arrives, but in `3-4*2` the `-` must wait for `4*2`. Two stacks capture this, as in the shunting-yard algorithm: one holds finished subtrees, the other holds operators still waiting. A brute-force alternative splits the string at the operator applied last (the rightmost `+`/`-` outside parentheses, else the rightmost `*`/`/`) and recurses, which costs O(n²).\n\n## Approach\n\n1. Give each operator a `rank`: `+` and `-` are 1, `*` and `/` are 2, and `(` is 0 so nothing pops past it.\n2. `combine` pops two subtrees from `nodes` (right first) and one operator from `ops`, and pushes the new node.\n3. A digit becomes a leaf on `nodes`; `(` goes onto `ops`.\n4. On `)`, combine until the matching `(` is on top, then discard it.\n5. On an operator, first combine every waiting operator of equal or higher rank (equal too, so equal ranks group left to right), then push it.\n6. After the scan, combine whatever operators remain; the single subtree left is the root.\n\n## Example 1, step by step\n\n`s = \"3*4-2*5\"`. `3` and `4` become leaves with `*` waiting. When `-` arrives, `*` has a higher rank, so `combine` builds `3*4` and `-` waits. `2` and `5` become leaves and the second `*` waits above `-`, since `-` ranks lower. At the end `combine` builds `2*5`, then `-` joins `3*4` and `2*5`, giving `[-,*,*,3,4,2,5]` in level order.\n\n## Complexity\n\n- Time: O(n): each character is pushed and popped at most once.\n- Space: O(n) for the two stacks and the tree.\n\n## Pitfalls\n\n- Pop the right operand first; swapping them breaks `-` and `/`.\n- Combine on equal rank as well, or `9-5-3` turns into `9-(5-3)`.\n- Stop at `(` when closing a group, and remove it from `ops` afterwards.\n- Leaf and operator values are one-character strings, not numbers.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rank` | precedence of each operator; `(` is lowest |\n| `nodes` | stack of finished subtrees |\n| `ops` | stack of operators and `(` still waiting |\n| `combine` | builds one operator node from the stack tops |\n| `ch` | the current character of `s` |",
+  "narration": {
+    "2": "Multiplication and division bind tighter than addition and subtraction; ( ranks lowest so no operator is built past it.",
+    "3": "Finished subtrees wait here.",
+    "4": "Operators that still lack their right operand wait here.",
+    "5": "combine turns the top operator and the top two subtrees into one node.",
+    "6": "The right operand was finished last, so it is on top.",
+    "8": "Build the operator node and push it back as a finished subtree.",
+    "11": "Scan the expression one character at a time.",
+    "12": "A digit is an operand...",
+    "13": "...so it becomes a leaf right away.",
+    "14": "An opening parenthesis starts a group...",
+    "15": "...and waits on the operator stack as a barrier.",
+    "16": "A closing parenthesis ends the group:",
+    "17": "build every operator inside the group, back to its (.",
+    "20": "Then throw the ( away.",
+    "22": "An operator arrives: anything waiting with equal or higher rank must be applied first.",
+    "23": "Build that earlier operator now, which keeps left-to-right order for equal ranks.",
+    "25": "Now this operator waits for its right operand.",
+    "28": "The input is used up; build the operators still waiting.",
+    "31": "One subtree remains: the root of the whole expression."
+  }
+}

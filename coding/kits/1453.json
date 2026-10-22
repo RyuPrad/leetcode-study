@@ -1,0 +1,66 @@
+{
+  "number": 1453,
+  "title": "Maximum Number of Darts Inside of a Circular Dartboard",
+  "spec": "leetcode",
+  "statement": "Several darts are stuck in a huge wall; `darts[i] = [x_i, y_i]` gives the position of dart `i`, and no two darts share a position. You may hang a circular dartboard of radius `r` anywhere on the wall (its center does not have to be at integer coordinates).\n\nA dart counts as on the board when its distance from the board's center is at most `r`, so darts exactly on the rim count. Return the largest number of darts that one placement of the board can cover.",
+  "constraints": [
+    "1 <= darts.length <= 100",
+    "darts[i].length == 2",
+    "-10^4 <= x_i, y_i <= 10^4",
+    "All darts are at distinct positions",
+    "1 <= r <= 5000"
+  ],
+  "signature": "int numPoints(int[][] darts, int r)",
+  "entry": "numPoints",
+  "kind": "function",
+  "parameters": [
+    "darts",
+    "r"
+  ],
+  "validator": "function validate([darts, r]) {\n  if (!Array.isArray(darts) || darts.length < 1 || darts.length > 100) return 'darts needs 1 to 100 positions.';\n  const seen = new Set();\n  for (const p of darts) {\n    if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isInteger)) return 'Each dart is a pair [x, y] of integers.';\n    if (p.some(v => v < -10000 || v > 10000)) return 'Each coordinate is between -10000 and 10000.';\n    const key = p[0] + ',' + p[1];\n    if (seen.has(key)) return 'All darts must be at different positions.';\n    seen.add(key);\n  }\n  if (!Number.isInteger(r) || r < 1 || r > 5000) return 'r is an integer between 1 and 5000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numPoints(darts, r) {\n  const n = darts.length;\n  const eps = 1e-7;\n  let best = 1;\n\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      const [x1, y1] = darts[i];\n      const [x2, y2] = darts[j];\n      const dx = x2 - x1;\n      const dy = y2 - y1;\n      const distSq = dx * dx + dy * dy;\n      if (distSq > 4 * r * r) {\n        continue;\n      }\n      const dist = Math.sqrt(distSq);\n      const h = Math.sqrt(r * r - distSq / 4);\n      const midX = (x1 + x2) / 2;\n      const midY = (y1 + y2) / 2;\n      for (const side of [1, -1]) {\n        const cx = midX - side * h * dy / dist;\n        const cy = midY + side * h * dx / dist;\n        let count = 0;\n        for (const [x, y] of darts) {\n          if (Math.hypot(x - cx, y - cy) <= r + eps) {\n            count++;\n          }\n        }\n        best = Math.max(best, count);\n      }\n    }\n  }\n  return best;\n}",
+  "brute": "function numPoints(darts, r) {\n  // Candidate centers: every dart itself, and every point at distance exactly r from two darts,\n  // found with angles instead of the perpendicular-offset formula.\n  const centers = darts.map(([x, y]) => [x, y]);\n  for (const [ax, ay] of darts)\n    for (const [bx, by] of darts) {\n      if (ax === bx && ay === by) continue;\n      const d = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);\n      if (d > 2 * r) continue;\n      const theta = Math.atan2(by - ay, bx - ax);\n      const phi = Math.acos(Math.min(1, d / (2 * r)));\n      centers.push([ax + r * Math.cos(theta + phi), ay + r * Math.sin(theta + phi)]);\n    }\n  let answer = 0;\n  for (const [cx, cy] of centers) {\n    const covered = darts.filter(([x, y]) => (x - cx) ** 2 + (y - cy) ** 2 <= (r + 1e-7) ** 2).length;\n    answer = Math.max(answer, covered);\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  // Rejects inputs where a dart lies within a hair of some candidate rim without being on it,\n  // so any reasonable floating-point tolerance gives the same answer.\n  const clear = (darts, r) => {\n    for (let i = 0; i < darts.length; i++)\n      for (let j = i + 1; j < darts.length; j++) {\n        const [x1, y1] = darts[i], [x2, y2] = darts[j];\n        const dx = x2 - x1, dy = y2 - y1, dsq = dx * dx + dy * dy;\n        if (dsq > 4 * r * r) continue;\n        const d = Math.sqrt(dsq), h = Math.sqrt(r * r - dsq / 4);\n        for (const s of [1, -1]) {\n          const cx = (x1 + x2) / 2 - s * h * dy / d, cy = (y1 + y2) / 2 + s * h * dx / d;\n          for (const [x, y] of darts) {\n            const gap = Math.abs(Math.hypot(x - cx, y - cy) - r);\n            if (gap > 1e-11 && gap < 2e-5) return false;\n          }\n        }\n      }\n    return true;\n  };\n  for (;;) {\n    let n, r, span, clusters;\n    if (size === 'large') {\n      n = int(90, 100);\n      r = rand() < 0.3 ? int(1, 50) : int(50, 5000);\n      span = Math.min(10000, Math.max(8, Math.floor(r * (0.6 + rand() * 4))));\n      clusters = int(0, 4);\n    } else {\n      n = int(1, 8);\n      r = int(1, 4);\n      span = int(2, 6);\n      clusters = int(0, 2);\n    }\n    const ox = int(-(10000 - span), 10000 - span), oy = int(-(10000 - span), 10000 - span);\n    const centers = Array.from({ length: clusters }, () => [int(-span, span), int(-span, span)]);\n    const seen = new Set();\n    const darts = [];\n    let tries = 0;\n    while (darts.length < n && tries++ < 100000) {\n      let x, y;\n      if (centers.length && rand() < 0.7) {\n        const [cx, cy] = centers[int(0, centers.length - 1)];\n        const w = Math.max(1, Math.floor(r * 1.2));\n        x = Math.max(-span, Math.min(span, cx + int(-w, w)));\n        y = Math.max(-span, Math.min(span, cy + int(-w, w)));\n      } else {\n        x = int(-span, span);\n        y = int(-span, span);\n      }\n      const key = (x + ox) + ',' + (y + oy);\n      if (seen.has(key)) continue;\n      seen.add(key);\n      darts.push([x + ox, y + oy]);\n    }\n    if (darts.length >= 1 && clear(darts, r)) return [darts, r];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[-2,0],[2,0],[0,2],[0,-2]],2],"expected":4},
+    {"name":"Example 2","input":[[[-3,0],[3,0],[2,6],[5,4],[0,9],[7,8]],5],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0]],1]},
+    {"name":"Test 2","input":[[[0,0],[10,0]],1]},
+    {"name":"Test 3","input":[[[0,0],[2,0]],1]},
+    {"name":"Test 4","input":[[[0,0],[3,0],[100,100]],1]},
+    {"name":"Test 5","input":[[[-10000,-10000],[10000,10000],[-10000,10000],[10000,-10000]],5000]},
+    {"name":"Test 6","input":[[[1,2],[3,5],[1,-1],[2,3],[4,1],[1,3]],2]},
+    {"name":"Test 7","input":[[[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0]],2]},
+    {"name":"Test 8","input":[[[3,4],[-3,4],[3,-4],[-3,-4],[5,0],[0,5],[-5,0],[0,-5],[0,0]],5]},
+    {"name":"Test 9","input":[[[0,0],[0,1],[1,0],[1,1],[10,10],[10,11],[11,10],[11,11],[12,12]],1]},
+    {"name":"Test 10","input":[[[4,5],[-4,0],[-4,4],[5,-2],[-5,3],[0,1],[3,-3],[-1,-4],[2,2],[-2,-1]],3]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTake any placement that covers the most darts. Slide the board until a covered dart touches the rim, then rotate it around that dart until a second covered dart touches the rim; nothing falls off along the way. So unless only one dart can be covered, some optimal board has **two darts on its rim**. Two points at distance at most `2r` lie on the rim of exactly two circles of radius `r` (one when the distance is exactly `2r`), so trying every pair and counting darts for each of its two centers finds the answer.\n\n## Approach\n\n1. Start `best` at 1: a board centered on any dart covers it.\n2. For each pair `i < j`, compute the squared distance `distSq`. If it exceeds `(2r)²`, no board of radius `r` has both on its rim; skip.\n3. Otherwise the centers sit on the perpendicular bisector, at distance `h = sqrt(r² - distSq / 4)` from the midpoint `(midX, midY)`, on either `side`.\n4. For each center `(cx, cy)`, count the darts with distance at most `r + eps`; `eps` absorbs rounding error for darts that sit exactly on the rim.\n5. Keep the largest `count` in `best` and return it.\n\n## Example 1, step by step\n\n`darts = [[-2,0],[2,0],[0,2],[0,-2]]`, `r = 2`. The pair `(-2,0)`, `(2,0)` has `distSq = 16 = (2r)²`, so `h = 0` and both sides give the center `(0, 0)`. Every dart is at distance exactly 2 from it, so `count = 4` and `best = 4`. No board can cover more than all four darts, so the answer is `4`.\n\n## Complexity\n\n- Time: O(n³): O(n²) pairs, two centers each, and an O(n) count per center.\n- Space: O(1) beyond the input.\n\n## Pitfalls\n\n- Darts on the rim count, and floating-point centers make their distances like `1.9999999999` or `2.0000000001`; compare with a small tolerance.\n- Compare squared distances with integers for the `2r` test so the pair at exactly `2r` is not lost to rounding.\n- Remember the answer is at least 1 even when no pair fits in a board.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `best` | most darts covered by any center tried so far |\n| `i`, `j` | the two darts that will lie on the rim |\n| `dx`, `dy`, `distSq`, `dist` | offset between the two darts, its squared length and length |\n| `h` | distance from the pair's midpoint to each candidate center |\n| `midX`, `midY` | midpoint of the two darts |\n| `side` | which of the two centers (left or right of the pair) |\n| `cx`, `cy` | the candidate center |\n| `count` | darts covered by the board at `(cx, cy)` |\n| `eps` | rounding tolerance for darts on the rim |",
+  "narration": {
+    "3": "A tiny tolerance so darts exactly on the rim still count despite rounding.",
+    "4": "A board centered on any one dart covers at least that dart.",
+    "6": "Pick the first dart that will lie on the board's rim.",
+    "7": "Pick a second dart, after the first, to lie on the rim too.",
+    "12": "Squared distance between the two darts, computed exactly in integers.",
+    "13": "Farther apart than the board's diameter: no board of radius r touches both.",
+    "16": "The real distance between the two darts.",
+    "17": "How far each center sits from the midpoint, along the perpendicular bisector (Pythagoras).",
+    "20": "Try the center on each side of the line through the two darts.",
+    "21": "Move from the midpoint by h along the unit perpendicular (-dy, dx) / dist.",
+    "24": "Look at every dart for this candidate board.",
+    "25": "Is the dart within r of the center, allowing for rounding?",
+    "29": "Keep the best count over all candidate boards.",
+    "33": "Some optimal board has two darts on its rim, so best is the answer."
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "number": 2669,
+  "title": "Count Artist Occurrences On Spotify Ranking List",
+  "spec": "recalled",
+  "statement": "One table holds the entries of a Spotify ranking list:\n\n- `Spotify(id, track_name, artist)`: one row per entry; `id` is the primary key. The same artist can appear in many entries, and the same track name can appear more than once.\n\nFor each artist, count how many entries of the list belong to them. Report the columns `artist` and `occurrences`, one row per artist.\n\nOrder the rows by `occurrences` from largest to smallest; artists with the same count are ordered by `artist` alphabetically.",
+  "constraints": [
+    "id is unique in Spotify",
+    "track_name and artist are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Spotify": [["id","INT"],["track_name","VARCHAR(100)"],["artist","VARCHAR(100)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Spotify = [] }] = input;\n  const ids = new Set();\n  for (const [id, track, artist] of Spotify) {\n    if (id === null || track === null || artist === null) return 'id, track_name and artist are required.';\n    if (ids.has(id)) return `id ${id} appears twice in Spotify.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT artist, COUNT(*) AS occurrences\nFROM Spotify\nGROUP BY artist\nORDER BY occurrences DESC, artist ASC;",
+  "brute": "SELECT DISTINCT s.artist,\n  (SELECT COUNT(*) FROM Spotify AS t WHERE t.artist = s.artist) AS occurrences\nFROM Spotify AS s\nORDER BY occurrences DESC, artist",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const tracks = ['Happier', 'Shape of You', 'Hello', \"I'm the One\", 'Young Dumb & Broke', 'Chandelier', 'Halo'];\n  let artists;\n  if (size === 'small') {\n    // A few artists, so counts collide and the alphabetical tie-break matters.\n    const pool = ['Sia', 'Ed Sheeran', 'DJ Khalid', 'Adele', 'Beyonce', 'Zara Larsson'];\n    artists = pool.slice(0, 1 + pick(pool.length));\n  } else {\n    const first = ['Ada', 'Ben', 'Cleo', 'Dua', 'Eli', 'Finn', 'Gia', 'Hal', 'Ivy', 'Jo', 'Kai', 'Lia'];\n    const last = ['Moss', 'Nash', 'Ortiz', 'Park', 'Quinn', 'Reyes', 'Stone', 'Tate', 'Vale', 'Wren'];\n    artists = first.flatMap(a => last.map(b => `${a} ${b}`));\n  }\n  const count = size === 'small' ? pick(9) : 2000;\n  const ids = new Set();\n  while (ids.size < count) ids.add(1 + pick(size === 'small' ? 50 : 1000000));\n  const Spotify = [...ids].map(id => [id, tracks[pick(tracks.length)], artists[pick(artists.length)]]);\n  return [{ Spotify }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Spotify":[[303651,"Heart Won't Forget","Ed Sheeran"],[1046089,"Shape of you","Sia"],[33445,"I'm the one","DJ Khalid"],[811266,"Young Dumb & Broke","DJ Khalid"],[505727,"Happier","Ed Sheeran"]]}],"expected":{"columns":["artist","occurrences"],"rows":[["DJ Khalid",2],["Ed Sheeran",2],["Sia",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Spotify":[]}]},
+    {"name":"Test 2","input":[{"Spotify":[[7,"Hello","Adele"]]}]},
+    {"name":"Test 3","input":[{"Spotify":[[1,"Hello","Adele"],[2,"Skyfall","Adele"],[3,"Easy on Me","Adele"]]}]},
+    {"name":"Test 4","input":[{"Spotify":[[1,"Halo","Zara Larsson"],[2,"Halo","Sia"],[3,"Halo","Beyonce"],[4,"Halo","Adele"]]}]},
+    {"name":"Test 5","input":[{"Spotify":[[10,"Lush Life","Zara Larsson"],[11,"Ruin My Life","Zara Larsson"],[12,"Hello","Adele"],[13,"Chandelier","Sia"],[14,"Elastic Heart","Sia"],[15,"Unstoppable","Sia"]]}]},
+    {"name":"Test 6","input":[{"Spotify":[[1,"Happier","Ed Sheeran"],[2,"Happier","Ed Sheeran"],[3,"Perfect","Ed Sheeran"],[4,"Hello","Adele"],[5,"Skyfall","Adele"]]}]},
+    {"name":"Test 7","input":[{"Spotify":[[5,"Wild Thoughts","DJ Khalid"],[4,"Halo","Beyonce"],[3,"Formation","Beyonce"],[2,"Hello","Adele"],[1,"Easy on Me","Adele"]]}]},
+    {"name":"Test 8","input":[{"Spotify":[[100,"Chandelier","Sia"],[200,"Chandelier","Sia"],[300,"Shape of You","Ed Sheeran"],[400,"Wild Thoughts","DJ Khalid"],[500,"Halo","Beyonce"],[600,"Formation","Beyonce"],[700,"Lush Life","Zara Larsson"]]}]},
+    {"name":"Test 9","input":[{"Spotify":[[1,"Hello","Adele"],[2,"Shape of You","Ed Sheeran"],[3,"Perfect","Ed Sheeran"],[4,"Photograph","Ed Sheeran"],[5,"Skyfall","Adele"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCounting rows per artist is the textbook use of `GROUP BY`: every distinct `artist` value becomes one group, and `COUNT(*)` tells how many ranking entries fell into it. The only extra work is the two-level sort.\n\n## Approach\n\n1. Read every entry from `Spotify`.\n2. `GROUP BY artist` collects the entries of each artist into one group.\n3. `COUNT(*) AS occurrences` counts the rows in each group; select it next to `artist`.\n4. `ORDER BY occurrences DESC, artist ASC` puts the most frequent artists first and breaks ties alphabetically.\n\n## Example 1, step by step\n\n- Grouping by artist gives: Ed Sheeran {303651, 505727}, Sia {1046089}, DJ Khalid {33445, 811266}.\n- Counting gives Ed Sheeran 2, Sia 1, DJ Khalid 2.\n- Sorting by count descending puts the two artists with 2 first; between them, `DJ Khalid` comes before `Ed Sheeran` alphabetically. Sia, with 1, comes last.\n- Result: `(DJ Khalid, 2)`, `(Ed Sheeran, 2)`, `(Sia, 1)`.\n\n## Complexity\n\n- Time: O(S) to group S entries with hashing, plus O(A log A) to sort the A artists.\n- Space: O(A) for the groups and the result.\n\n## Pitfalls\n\n- Leaving out the `artist` tie-break returns tied artists in whatever order the database meets them, which may not be alphabetical.\n- `COUNT(DISTINCT track_name)` undercounts an artist whose track appears in two entries; every entry counts.\n- Sorting by `occurrences` ascending, or only by `artist`, gives the wrong row order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY artist` | one group per artist |\n| `occurrences` | `COUNT(*)`, the number of entries in the artist's group |\n| `ORDER BY occurrences DESC, artist ASC` | most entries first, ties by name |",
+  "narration": {
+    "1": "Each output row is one artist with the number of ranking entries that belong to them.",
+    "2": "Every entry of the ranking list is read.",
+    "3": "Entries are grouped by artist, so COUNT(*) counts one artist at a time.",
+    "4": "The most frequent artists come first, and artists with equal counts are sorted by name."
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "number": 2891,
+  "title": "Method Chaining",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `animals`, and invites a single chained expression; here the DataFrame is a table and you answer with one MySQL query.\n\n- `animals(name, species, age, weight)`: one row per animal. `name` and `species` are text; `age` and `weight` are integers, and `weight` is in kilograms. No two animals share a weight.\n\nReport the animals whose `weight` is **strictly greater than 100**. The result has a single column, `name`. An animal weighing exactly 100 is left out.\n\nOrder the rows from the heaviest animal to the lightest (`weight` descending).",
+  "constraints": [
+    "age and weight are non-negative integers and never null",
+    "No two animals have the same weight, so the order is unique",
+    "Names may repeat across animals"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "animals": [["name","VARCHAR"],["species","VARCHAR"],["age","INT"],["weight","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ animals = [] }] = input;\n  const weights = new Set();\n  for (const [, , age, weight] of animals) {\n    if (age === null || weight === null) return 'age and weight cannot be null.';\n    if (age < 0 || weight < 0) return 'age and weight cannot be negative.';\n    if (weights.has(weight)) return `Two animals weigh ${weight}; weights must be distinct.`;\n    weights.add(weight);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT name\nFROM animals\nWHERE weight > 100\nORDER BY weight DESC;",
+  "brute": "SELECT a.name\nFROM animals AS a\nWHERE NOT a.weight <= 100\nORDER BY (SELECT COUNT(*) FROM animals AS heavier WHERE heavier.weight > a.weight)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Tatiana', 'Khaled', 'Alex', 'Jonathan', 'Stefan', 'Tommy', 'Rex'];\n  const species = ['Snake', 'Giraffe', 'Leopard', 'Monkey', 'Bear', 'Panda'];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  // Small cases draw weights near the 100 boundary; large ones from a wide range. Weights stay distinct.\n  const pool = [];\n  if (size === 'small') for (const w of [0, 41, 50, 99, 100, 101, 102, 328, 349, 463, 464, 500]) pool.push(w);\n  else for (let w = 0; w <= 6000; w++) pool.push(w);\n  for (let i = pool.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [pool[i], pool[j]] = [pool[j], pool[i]];\n  }\n  const animals = [];\n  for (let i = 0; i < count; i++) animals.push([pick(names), pick(species), Math.floor(rand() * 101), pool[i]]);\n  return [{ animals }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"animals":[["Tatiana","Snake",98,464],["Khaled","Giraffe",50,41],["Alex","Leopard",6,328],["Jonathan","Monkey",45,463],["Stefan","Bear",100,50],["Tommy","Panda",26,349]]}],"expected":{"columns":["name"],"rows":[["Tatiana"],["Jonathan"],["Tommy"],["Alex"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"animals":[]}]},
+    {"name":"Test 2","input":[{"animals":[["Stefan","Bear",100,100]]}]},
+    {"name":"Test 3","input":[{"animals":[["Rex","Bear",3,101]]}]},
+    {"name":"Test 4","input":[{"animals":[["Khaled","Giraffe",50,41],["Stefan","Bear",100,50],["Tommy","Panda",26,99],["Alex","Leopard",6,0]]}]},
+    {"name":"Test 5","input":[{"animals":[["Alex","Leopard",6,150],["Tommy","Panda",26,200],["Rex","Bear",9,250],["Tatiana","Snake",98,300]]}]},
+    {"name":"Test 6","input":[{"animals":[["Khaled","Giraffe",50,99],["Stefan","Bear",100,100],["Tommy","Panda",26,101],["Alex","Leopard",6,102]]}]},
+    {"name":"Test 7","input":[{"animals":[["Rex","Snake",4,120],["Rex","Bear",12,480],["Rex","Monkey",7,60],["Alex","Panda",3,300]]}]},
+    {"name":"Test 8","input":[{"animals":[["Jonathan","Monkey",45,463],["Tatiana","Snake",98,464],["Stefan","Bear",100,465],["Khaled","Giraffe",50,101],["Alex","Leopard",6,99]]}]},
+    {"name":"Test 9","input":[{"animals":[["Tommy","Panda",0,5000],["Khaled","Giraffe",1,1],["Alex","Leopard",120,1000]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe pandas version is a chain: keep the heavy rows, sort them, keep one column, roughly `animals[animals['weight'] > 100].sort_values('weight', ascending=False)[['name']]`. A SQL query is already that chain written in clause order: `WHERE` filters, `ORDER BY` sorts, and `SELECT` picks the column. Sorting may use `weight` even though it is not in the output.\n\n## Approach\n\n1. `SELECT name`: the only output column.\n2. `FROM animals`: read every animal.\n3. `WHERE weight > 100`: keep the strictly heavier ones; 100 itself fails the test.\n4. `ORDER BY weight DESC`: heaviest first. Weights are distinct, so the order is fully determined.\n\n## Example 1, step by step\n\n- Weights: Tatiana 464, Khaled 41, Alex 328, Jonathan 463, Stefan 50, Tommy 349.\n- `WHERE weight > 100` keeps Tatiana (464), Alex (328), Jonathan (463) and Tommy (349); Khaled and Stefan drop out.\n- `ORDER BY weight DESC` lines them up as 464, 463, 349, 328.\n- Projecting `name` gives Tatiana, Jonathan, Tommy, Alex.\n\n## Complexity\n\n- Time: O(n) for the filter plus O(k log k) to sort the k animals that pass, for n animals.\n- Space: O(k) for the sorted result.\n\n## Pitfalls\n\n- `weight >= 100` lets an animal of exactly 100 kg through; the bound is strict.\n- Forgetting `DESC` sorts lightest first, and the result is checked row by row in order.\n- Selecting `*` or adding `weight` to the output gives extra columns; only `name` is expected.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `animals` | the input table, one row per animal |\n| `WHERE weight > 100` | the filter step of the chain |\n| `ORDER BY weight DESC` | the sort step, on a column not shown in the output |\n| `name` | the single reported column |",
+  "narration": {
+    "1": "Report only the name column, as the output asks.",
+    "2": "Read every animal from the animals table.",
+    "3": "Keep animals strictly heavier than 100 kg; exactly 100 is excluded.",
+    "4": "Sort the survivors from heaviest to lightest; sorting may use a column that is not selected."
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "number": 2993,
+  "title": "Friday Purchases I",
+  "spec": "recalled",
+  "statement": "One table records purchases made in November 2023:\n\n- `Purchases(user_id, purchase_date, amount_spend)`: one row per purchase; the triple `(user_id, purchase_date, amount_spend)` is unique. Every `purchase_date` lies between `2023-11-01` and `2023-11-30`, and `amount_spend` is a positive whole number.\n\nNovember 1, 2023 is a Wednesday, so the month's Fridays are the 3rd, 10th, 17th and 24th, falling in weeks 1, 2, 3 and 4 of the month (week `k` covers days `7k-6` to `7k`). For every Friday on which at least one purchase was made, report `week_of_month` (1 to 4), `purchase_date` and `total_amount`, the sum of `amount_spend` over all of that day's purchases by all users. Fridays without purchases are not listed. Order the rows by `week_of_month` ascending.",
+  "constraints": [
+    "(user_id, purchase_date, amount_spend) is unique in Purchases",
+    "purchase_date is between 2023-11-01 and 2023-11-30",
+    "amount_spend > 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Purchases": [["user_id","INT"],["purchase_date","DATE"],["amount_spend","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Purchases = [] }] = input;\n  const seen = new Set();\n  for (const [user, date, amount] of Purchases) {\n    if (user === null || date === null || amount === null) return 'Every purchase needs a user_id, a purchase_date and an amount_spend.';\n    if (!/^2023-11-(0[1-9]|[12]\\d|30)$/.test(date)) return `purchase_date ${date} is not in November 2023.`;\n    if (amount <= 0) return 'amount_spend must be positive.';\n    const key = `${user}|${date}|${amount}`;\n    if (seen.has(key)) return `(${user}, ${date}, ${amount}) appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  CEIL(DAY(purchase_date) / 7) AS week_of_month,\n  purchase_date,\n  SUM(amount_spend) AS total_amount\nFROM Purchases\nWHERE DAYNAME(purchase_date) = 'Friday'\nGROUP BY purchase_date\nORDER BY week_of_month;",
+  "brute": "SELECT DISTINCT\n  FLOOR((DAY(p.purchase_date) - 1) / 7) + 1 AS week_of_month,\n  p.purchase_date,\n  (SELECT SUM(q.amount_spend) FROM Purchases AS q WHERE q.purchase_date = p.purchase_date) AS total_amount\nFROM Purchases AS p\nWHERE WEEKDAY(p.purchase_date) = 4\nORDER BY week_of_month",
+  "generator": "function generate(rand, size) {\n  const fridays = [3, 10, 17, 24], near = [2, 3, 4, 9, 10, 11, 16, 17, 18, 23, 24, 25, 30, 1];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const users = size === 'small' ? 5 : 400;\n  const seen = new Set(), Purchases = [];\n  for (let i = 0; i < count; i++) {\n    // Small sets favour Fridays and the days around them; large sets use any November day.\n    const r = rand();\n    const day = size === 'small' ? (r < 0.5 ? fridays[Math.floor(rand() * 4)] : near[Math.floor(rand() * near.length)]) : 1 + Math.floor(r * 30);\n    const user = 1 + Math.floor(rand() * users);\n    const amount = size === 'small' ? 100 * (1 + Math.floor(rand() * 20)) : 1 + Math.floor(rand() * 12000);\n    const date = `2023-11-${String(day).padStart(2, '0')}`, key = `${user}|${date}|${amount}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Purchases.push([user, date, amount]);\n  }\n  return [{ Purchases }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Purchases":[[11,"2023-11-07",1126],[15,"2023-11-30",7473],[17,"2023-11-14",2414],[12,"2023-11-24",9692],[8,"2023-11-03",5117],[1,"2023-11-16",5241],[10,"2023-11-12",8266],[13,"2023-11-24",12000]]}],"expected":{"columns":["week_of_month","purchase_date","total_amount"],"rows":[[1,"2023-11-03",5117],[4,"2023-11-24",21692]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Purchases":[]}]},
+    {"name":"Test 2","input":[{"Purchases":[[1,"2023-11-02",500],[2,"2023-11-04",700],[3,"2023-11-11",900]]}]},
+    {"name":"Test 3","input":[{"Purchases":[[4,"2023-11-17",250]]}]},
+    {"name":"Test 4","input":[{"Purchases":[[1,"2023-11-24",40],[2,"2023-11-17",30],[3,"2023-11-10",20],[4,"2023-11-03",10],[5,"2023-11-24",4]]}]},
+    {"name":"Test 5","input":[{"Purchases":[[7,"2023-11-10",300],[7,"2023-11-10",200],[8,"2023-11-10",300]]}]},
+    {"name":"Test 6","input":[{"Purchases":[[1,"2023-11-01",100],[2,"2023-11-23",200],[3,"2023-11-24",300],[4,"2023-11-25",400],[5,"2023-11-30",500]]}]},
+    {"name":"Test 7","input":[{"Purchases":[[1,"2023-11-03",1000],[1,"2023-11-07",2000],[2,"2023-11-14",3000],[2,"2023-11-24",4000],[3,"2023-11-24",1000],[3,"2023-11-09",5000]]}]},
+    {"name":"Test 8","input":[{"Purchases":[[9,"2023-11-16",800],[9,"2023-11-18",800],[9,"2023-11-17",800],[6,"2023-11-17",800],[5,"2023-11-10",1]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row is one Friday, so the work is: keep only the purchases made on a Friday, collapse them into one group per date, and add up the amounts. The week number follows from the day of the month: days 1 to 7 are week 1, days 8 to 14 week 2, and so on, which is `CEIL(day / 7)`.\n\n## Approach\n\n1. `WHERE DAYNAME(purchase_date) = 'Friday'` keeps the Friday purchases only.\n2. `GROUP BY purchase_date` makes one group per Friday, across all users.\n3. `SUM(amount_spend)` gives the day's `total_amount`.\n4. `CEIL(DAY(purchase_date) / 7)` turns the day of the month into `week_of_month`; it depends only on the grouped date, so it is valid in the select list.\n5. `ORDER BY week_of_month`. Fridays with no purchases never form a group, so they are absent.\n\n## Example 1, step by step\n\n- Fridays in the data: `2023-11-03` (user 8, 5117) and `2023-11-24` (user 12, 9692; user 13, 12000). The other six rows fall on Tuesdays, Thursdays and a Sunday and are filtered out.\n- Groups: `2023-11-03` sums to 5117 and `2023-11-24` to 9692 + 12000 = 21692.\n- Weeks: `CEIL(3 / 7) = 1` and `CEIL(24 / 7) = 4`.\n- Result: `(1, 2023-11-03, 5117)` and `(4, 2023-11-24, 21692)`.\n\n## Complexity\n\n- Time: O(P) for P purchases to filter, plus grouping the Friday rows (at most four groups).\n- Space: O(1) beyond the at most four groups.\n\n## Pitfalls\n\n- MySQL's `DAYOFWEEK` numbers Sunday as 1, so Friday is 6, while `WEEKDAY` numbers Monday as 0, so Friday is 4; mixing them up selects Thursdays or Saturdays (Tests 6 and 8).\n- `DAY(purchase_date) DIV 7` gives 0 for the 3rd; the week needs rounding **up**.\n- Grouping by `user_id` as well splits a Friday into several rows; the total covers all users (Tests 5 and 7).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `DAYNAME(purchase_date)` | the weekday's name, `'Friday'` for the rows kept |\n| `week_of_month` | `CEIL(DAY(purchase_date) / 7)`, the week of November |\n| `total_amount` | `SUM(amount_spend)` over all purchases that Friday |",
+  "narration": {
+    "2": "The day of the month divided by 7 and rounded up is the week of the month.",
+    "4": "Add up every purchase made on that date, whichever user made it.",
+    "6": "Keep only the purchases made on a Friday.",
+    "7": "One group per Friday that has purchases; Fridays without purchases never appear.",
+    "8": "The problem asks for the weeks in ascending order."
+  }
+}

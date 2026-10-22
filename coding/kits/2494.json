@@ -1,0 +1,57 @@
+{
+  "number": 2494,
+  "title": "Merge Overlapping Events in the Same Hall",
+  "spec": "recalled",
+  "statement": "One table lists events and the hall each one used:\n\n- `HallEvents(hall_id, start_day, end_day)`: one row per event, which occupies its hall on every day from `start_day` to `end_day`, both included (`start_day <= end_day`). The table has no key and may hold the same row more than once.\n\nTwo events in the **same hall** overlap when they share at least one day; events that merely touch (one ends on the 17th, the next starts on the 18th) do not. Overlapping is chained: if A overlaps B and B overlaps C, all three belong to one merged event, even when A and C share no day. Events in different halls are never merged.\n\nReport every merged event as a row with the columns `hall_id`, `start_day` (the earliest start among its events) and `end_day` (the latest end among them). An event that overlaps nothing is reported unchanged, and duplicate rows count as one event. Rows may come in any order.",
+  "constraints": [
+    "HallEvents has no primary key and may contain duplicate rows",
+    "start_day <= end_day in every row",
+    "Dates are 'YYYY-MM-DD'",
+    "Two events overlap when they share at least one day"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "HallEvents": [["hall_id","INT"],["start_day","DATE"],["end_day","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ HallEvents = [] }] = input;\n  const date = /^\\d{4}-\\d{2}-\\d{2}$/;\n  for (const [hall, start, end] of HallEvents) {\n    if (hall === null) return 'Every event needs a hall_id.';\n    if (typeof start !== 'string' || !date.test(start) || typeof end !== 'string' || !date.test(end)) return 'start_day and end_day must be dates like 2023-01-13.';\n    if (start > end) return `An event in hall ${hall} ends (${end}) before it starts (${start}).`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH events AS (\n  SELECT DISTINCT hall_id, start_day, end_day\n  FROM HallEvents\n),\nflagged AS (\n  SELECT hall_id, start_day, end_day,\n    CASE\n      WHEN start_day <= MAX(end_day) OVER (\n        PARTITION BY hall_id ORDER BY start_day, end_day\n        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING\n      ) THEN 0\n      ELSE 1\n    END AS is_new\n  FROM events\n),\ngrouped AS (\n  SELECT hall_id, start_day, end_day,\n    SUM(is_new) OVER (\n      PARTITION BY hall_id ORDER BY start_day, end_day\n    ) AS block_id\n  FROM flagged\n)\nSELECT hall_id, MIN(start_day) AS start_day, MAX(end_day) AS end_day\nFROM grouped\nGROUP BY hall_id, block_id;",
+  "brute": "SELECT s.hall_id, s.start_day, MIN(e.end_day) AS end_day\nFROM (\n  SELECT DISTINCT a.hall_id, a.start_day\n  FROM HallEvents AS a\n  WHERE NOT EXISTS (\n    SELECT 1 FROM HallEvents AS b\n    WHERE b.hall_id = a.hall_id AND b.start_day < a.start_day AND b.end_day >= a.start_day\n  )\n) AS s\nJOIN (\n  SELECT DISTINCT a.hall_id, a.end_day\n  FROM HallEvents AS a\n  WHERE NOT EXISTS (\n    SELECT 1 FROM HallEvents AS b\n    WHERE b.hall_id = a.hall_id AND b.start_day <= a.end_day AND b.end_day > a.end_day\n  )\n) AS e\n  ON e.hall_id = s.hall_id AND e.end_day >= s.start_day\nGROUP BY s.hall_id, s.start_day",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = offset => new Date(Date.UTC(2022, 11, 20) + offset * 86400000).toISOString().slice(0, 10);\n  const count = small ? Math.floor(rand() * 9) : 1000;\n  const halls = small ? 3 : 100, span = small ? 16 : 120, longest = small ? 4 : 8;\n  const HallEvents = [];\n  while (HallEvents.length < count) {\n    // Now and then repeat an earlier row, since the table may hold duplicates.\n    if (HallEvents.length && rand() < 0.12) { HallEvents.push([...HallEvents[Math.floor(rand() * HallEvents.length)]]); continue; }\n    const start = Math.floor(rand() * span), length = Math.floor(rand() * (longest + 1));\n    HallEvents.push([1 + Math.floor(rand() * halls), day(start), day(start + length)]);\n  }\n  return [{ HallEvents }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"HallEvents":[[1,"2023-01-13","2023-01-14"],[1,"2023-01-14","2023-01-17"],[1,"2023-01-18","2023-01-25"],[2,"2022-12-09","2022-12-23"],[2,"2022-12-13","2022-12-17"],[3,"2022-12-01","2023-01-30"]]}],"expected":{"columns":["hall_id","start_day","end_day"],"rows":[[1,"2023-01-13","2023-01-17"],[1,"2023-01-18","2023-01-25"],[2,"2022-12-09","2022-12-23"],[3,"2022-12-01","2023-01-30"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"HallEvents":[]}]},
+    {"name":"Test 2","input":[{"HallEvents":[[4,"2023-03-01","2023-03-01"]]}]},
+    {"name":"Test 3","input":[{"HallEvents":[[1,"2023-01-01","2023-01-05"],[1,"2023-01-01","2023-01-05"],[1,"2023-01-01","2023-01-05"]]}]},
+    {"name":"Test 4","input":[{"HallEvents":[[1,"2023-01-01","2023-01-05"],[1,"2023-01-06","2023-01-09"],[1,"2023-01-09","2023-01-12"]]}]},
+    {"name":"Test 5","input":[{"HallEvents":[[1,"2023-01-01","2023-01-20"],[1,"2023-01-02","2023-01-03"],[1,"2023-01-10","2023-01-12"],[1,"2023-01-21","2023-01-22"]]}]},
+    {"name":"Test 6","input":[{"HallEvents":[[1,"2023-02-01","2023-02-04"],[2,"2023-02-03","2023-02-06"],[1,"2023-02-05","2023-02-08"],[2,"2023-02-01","2023-02-02"]]}]},
+    {"name":"Test 7","input":[{"HallEvents":[[3,"2023-05-05","2023-05-05"],[3,"2023-05-05","2023-05-07"],[3,"2023-05-08","2023-05-08"],[3,"2023-05-07","2023-05-07"]]}]},
+    {"name":"Test 8","input":[{"HallEvents":[[2,"2023-04-01","2023-04-03"],[2,"2023-04-03","2023-04-06"],[2,"2023-04-06","2023-04-09"],[2,"2023-04-11","2023-04-11"]]}]},
+    {"name":"Test 9","input":[{"HallEvents":[[5,"2022-12-28","2022-12-31"],[5,"2022-12-31","2023-01-02"],[5,"2023-01-03","2023-01-04"],[6,"2022-12-30","2023-01-01"]]}]},
+    {"name":"Test 10","input":[{"HallEvents":[[1,"2023-01-04","2023-01-06"],[1,"2023-01-01","2023-01-02"],[1,"2023-01-04","2023-01-06"],[1,"2023-01-01","2023-01-03"],[1,"2023-01-07","2023-01-07"]]}]},
+    {"name":"Test 11","input":[{"HallEvents":[[7,"2023-06-01","2023-06-30"],[7,"2023-06-10","2023-06-15"],[7,"2023-06-01","2023-06-02"],[8,"2023-06-01","2023-06-30"],[8,"2023-07-01","2023-07-31"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"small"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a gaps-and-islands problem. Sort a hall's events by start day and walk through them: an event joins the current merged block when it starts on or before the **latest end seen so far** in that hall; otherwise it opens a new block. Window functions do that walk in SQL: a running maximum of earlier ends decides whether a row opens a block, and a running sum of those openings numbers the blocks. Grouping by the block number then gives each merged event's first and last day.\n\n## Approach\n\n1. `events`: `SELECT DISTINCT` drops duplicate rows, so each hall's rows have a strict order by `(start_day, end_day)`.\n2. `flagged`: for each row, `MAX(end_day)` over the hall's **earlier** rows (`ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING`). If the row starts on or before that day it continues a block (`is_new = 0`); otherwise, or when there is no earlier row (the maximum is null), `is_new = 1`.\n3. `grouped`: the running `SUM(is_new)` per hall is the row's `block_id`; every row of one block gets the same number.\n4. Group by `hall_id` and `block_id`, reporting `MIN(start_day)` and `MAX(end_day)`.\n\n## Example 1, step by step\n\n`flagged` and `grouped`, hall by hall:\n\n- Hall 1: (01-13, 01-14) has no earlier row → `is_new = 1`, block 1. (01-14, 01-17) starts on 01-14, the latest earlier end → 0, block 1. (01-18, 01-25) starts after 01-17 → 1, block 2.\n- Hall 2: (12-09, 12-23) → 1, block 1. (12-13, 12-17) starts before 12-23 → 0, block 1.\n- Hall 3: one row → block 1.\n\nGrouping gives hall 1: 2023-01-13 to 2023-01-17 and 2023-01-18 to 2023-01-25; hall 2: 2022-12-09 to 2022-12-23; hall 3: 2022-12-01 to 2023-01-30.\n\n## Complexity\n\n- Time: O(n log n) for n rows, dominated by sorting each hall's rows for the windows.\n- Space: O(n) for the CTEs.\n\n## Pitfalls\n\n- Comparing with only the previous row's end (`LAG(end_day)`) fails when a long event contains short ones: if hall 2 also had an event from 12-20, `LAG` would compare it with 12-17 and open a new block, although the event from 12-09 runs until 12-23.\n- Touching is not overlapping: `start_day <= latest end` is right, `start_day <= latest end + 1 day` would merge 01-17 and 01-18.\n- Taking `MIN(start_day)` and `MAX(end_day)` per hall alone merges all of a hall's events, even separate blocks such as hall 1's two.\n- Forgetting `PARTITION BY hall_id` lets events in different halls merge.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `events` | the distinct events |\n| `flagged` | each event with `is_new`: 1 when it starts after every earlier end in its hall |\n| `is_new` | 1 for the first event of a merged block, else 0 |\n| `grouped` | each event with `block_id`, the running count of block starts in its hall |\n| `block_id` | the number of the merged block an event belongs to |",
+  "narration": {
+    "1": "The CTE events keeps one copy of each distinct event, so window orders have no ties.",
+    "5": "The CTE flagged decides, for each event, whether it opens a new merged block.",
+    "8": "MAX(end_day) over the hall's earlier rows is the latest day the current block reaches so far.",
+    "9": "Each hall is walked on its own, in order of start day and then end day.",
+    "10": "The frame stops one row before the current one, so only earlier events count.",
+    "11": "Starting on or before that day means the event shares a day with the block, so it is not new.",
+    "16": "The CTE grouped numbers the blocks with a running sum of the is_new flags.",
+    "23": "Each block reports its earliest start and latest end.",
+    "25": "Grouping by hall and block number collapses each merged block into one row."
+  }
+}

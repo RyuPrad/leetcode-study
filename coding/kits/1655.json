@@ -1,0 +1,72 @@
+{
+  "number": 1655,
+  "title": "Distribute Repeating Integers",
+  "spec": "leetcode",
+  "statement": "The array `nums` holds integers drawn from at most 50 distinct values, and `quantity[i]` is the order size of customer `i`. Decide whether the elements of `nums` can be handed out so that customer `i` receives exactly `quantity[i]` elements, all carrying one and the same value. Each element of `nums` goes to at most one customer, and elements nobody receives are allowed. Return `true` when such a distribution exists and `false` otherwise.",
+  "constraints": [
+    "n == nums.length",
+    "1 <= n <= 10^5",
+    "1 <= nums[i] <= 1000",
+    "m == quantity.length",
+    "1 <= m <= 10",
+    "1 <= quantity[i] <= 10^5",
+    "nums has at most 50 distinct values"
+  ],
+  "signature": "boolean canDistribute(int[] nums, int[] quantity)",
+  "entry": "canDistribute",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "quantity"
+  ],
+  "validator": "function validate([nums, quantity]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 100000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1000)) return 'Each value in nums is an integer from 1 to 1000.';\n  if (new Set(nums).size > 50) return 'nums may hold at most 50 distinct values.';\n  if (!Array.isArray(quantity) || quantity.length < 1 || quantity.length > 10) return 'quantity needs 1 to 10 orders.';\n  if (quantity.some(q => !Number.isInteger(q) || q < 1 || q > 100000)) return 'Each order is an integer from 1 to 100000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function canDistribute(nums, quantity) {\n  const counts = new Map();\n  for (const num of nums) {\n    counts.set(num, (counts.get(num) || 0) + 1);\n  }\n  const m = quantity.length;\n  const full = (1 << m) - 1;\n  const need = new Array(full + 1).fill(0);\n  for (let mask = 1; mask <= full; mask++) {\n    const low = mask & -mask;\n    const bit = 31 - Math.clz32(low);\n    need[mask] = need[mask ^ low] + quantity[bit];\n  }\n\n  let dp = new Array(full + 1).fill(false);\n  dp[0] = true;\n  for (const count of counts.values()) {\n    const next = dp.slice();\n    for (let mask = 0; mask <= full; mask++) {\n      if (!dp[mask]) continue;\n      const rest = full ^ mask;\n      for (let sub = rest; sub > 0; sub = (sub - 1) & rest) {\n        if (need[sub] <= count) {\n          next[mask | sub] = true;\n        }\n      }\n    }\n    dp = next;\n  }\n  return dp[full];\n}",
+  "brute": "function canDistribute(nums, quantity) {\n  const left = {};\n  for (const v of nums) left[v] = (left[v] || 0) + 1;\n  const values = Object.keys(left);\n  const place = (i) => {\n    if (i === quantity.length) return true;\n    for (const v of values) {\n      if (left[v] < quantity[i]) continue;\n      left[v] -= quantity[i];\n      const ok = place(i + 1);\n      left[v] += quantity[i];\n      if (ok) return true;\n    }\n    return false;\n  };\n  return place(0);\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    const n = int(1, 10);\n    const distinct = int(1, 4);\n    const nums = Array.from({ length: n }, () => int(1, distinct));\n    const quantity = Array.from({ length: int(1, 5) }, () => int(1, 4));\n    return [nums, quantity];\n  }\n  const shuffle = (list) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };\n  const pool = shuffle(Array.from({ length: 1000 }, (_, i) => i + 1));\n  if (rand() < 0.4) {\n    // Loose: 2,000 numbers over up to 50 values; the 10 orders are carved from the counts, so the answer is true.\n    const k = int(1, 50);\n    const counts = new Array(k).fill(0);\n    const nums = [];\n    for (let i = 0; i < 2000; i++) { const idx = Math.floor(rand() * rand() * k); counts[idx]++; nums.push(pool[idx]); }\n    const quantity = [];\n    for (let c = 0; c < 10; c++) {\n      const open = counts.map((r, i) => r > 0 ? i : -1).filter(i => i >= 0);\n      if (!open.length) { quantity.push(1); continue; }\n      const idx = open[Math.floor(rand() * open.length)];\n      const q = int(1, Math.min(counts[idx], 400));\n      counts[idx] -= q;\n      quantity.push(q);\n    }\n    return [nums, quantity];\n  }\n  // Tight: up to 10 values whose counts are split exactly into the 10 orders; moving one unit between orders usually breaks it.\n  const k = int(1, 10);\n  const cuts = new Set();\n  while (cuts.size < k - 1) cuts.add(int(1, 199) * 10);\n  const bounds = [0, ...[...cuts].sort((a, b) => a - b), 2000];\n  const counts = bounds.slice(1).map((b, i) => b - bounds[i]);\n  const owners = shuffle([...Array.from({ length: k }, (_, i) => i), ...Array.from({ length: 10 - k }, () => int(0, k - 1))]);\n  const quantity = [];\n  for (let v = 0; v < k; v++) {\n    const parts = owners.filter(o => o === v).length;\n    const marks = new Set();\n    while (marks.size < parts - 1) marks.add(int(1, counts[v] - 1));\n    const edges = [0, ...[...marks].sort((a, b) => a - b), counts[v]];\n    for (let i = 1; i < edges.length; i++) quantity.push(edges[i] - edges[i - 1]);\n  }\n  shuffle(quantity);\n  if (rand() < 0.6) {\n    const from = quantity.findIndex(q => q > 1);\n    let to = int(0, 9);\n    if (to === from) to = (to + 1) % 10;\n    if (from >= 0) { quantity[from]--; quantity[to]++; }\n  }\n  const nums = shuffle(counts.flatMap((c, v) => new Array(c).fill(pool[v])));\n  return [nums, quantity];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4],[2]],"expected":false},
+    {"name":"Example 2","input":[[1,2,3,3],[2]],"expected":true},
+    {"name":"Example 3","input":[[1,1,2,2],[2,2]],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],[1]]},
+    {"name":"Test 2","input":[[5],[2]]},
+    {"name":"Test 3","input":[[7,7,7,7,7],[1,1,1,1,1]]},
+    {"name":"Test 4","input":[[7,7,7,7,7],[2,2,2]]},
+    {"name":"Test 5","input":[[1,1,1,1,1,1,2,2,2,2],[4,3,3]]},
+    {"name":"Test 6","input":[[1,1,1,2,2,2,3,3,3],[2,2,2,2]]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,8,9,10],[1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 8","input":[[1,2,3,4,5,6,7,8,9],[1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 9","input":[[1000,1000,1000,1000,1,1,1,4,4,4],[2,2,3,3]]},
+    {"name":"Test 10","input":[[3,3,3,3,3,3,8,8,8,8,8],[5,6]]},
+    {"name":"Test 11","input":[[3,3,3,3,3,3,8,8,8,8,8],[6,6]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":7,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":21,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly how often each value appears matters, so first turn `nums` into a list of counts (at most 50 of them). Each customer is served by a single value, so the question becomes: can the `m` customers be split into groups, one group per value, where each group's total order fits within that value's count? Trying every customer-to-value assignment is up to 50^10 choices. With `m <= 10` customers, a set of customers fits in a bitmask, and a DP over \"which customers are already served\" handles each value once.\n\n## Approach\n\n1. Count each value's occurrences in `counts`.\n2. For every customer subset `mask`, precompute `need[mask]`, the sum of their orders, by removing the lowest set bit `low` and adding that customer's order.\n3. Let `dp[mask]` mean \"the customers in `mask` can all be served by the values processed so far\". Start with only `dp[0] = true`.\n4. For each value's `count`, copy `dp` into `next` (the value may serve nobody). From every reachable `mask`, enumerate each non-empty subset `sub` of the unserved customers `rest`; if `need[sub] <= count`, this value can serve all of `sub`, so mark `next[mask | sub]`.\n5. After all values, return `dp[full]`.\n\n## Example 1, step by step\n\n`nums = [1,2,3,4]`, `quantity = [2]`. Every value has `count = 1`, `full = 1` and `need[1] = 2`. For each value only `dp[0]` is reachable, its only subset is `sub = 1`, and `need[1] = 2 > 1`, so `dp[1]` is never set. The answer is `false`.\n\n## Complexity\n\n- Time: O(n + k·3^m), where `k <= 50` is the number of distinct values: for each value, the pairs (mask, subset of its complement) number 3^m.\n- Space: O(2^m) for `need`, `dp` and `next`.\n\n## Pitfalls\n\n- Greedy fails: giving the largest order to the largest count can strand smaller orders, e.g. counts `[6,4]` with orders `[4,3,3]` is `true` only by putting both 3s on the 6.\n- Read from `dp` but write to `next`, otherwise one value could be used twice for overlapping steps.\n- The subset loop `sub = (sub - 1) & rest` must stop before `0`; the empty subset is already covered by copying `dp`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `counts` | how many times each distinct value occurs |\n| `full` | bitmask with all `m` customers |\n| `need[mask]` | total quantity ordered by the customers in `mask` |\n| `dp[mask]` | whether the customers in `mask` can be served so far |\n| `next` | `dp` after also using the current value |\n| `rest`, `sub` | unserved customers, and the subset given the current value |",
+  "narration": {
+    "3": "Count how many times each value appears; only these counts matter.",
+    "7": "full is the bitmask that contains every customer.",
+    "9": "Build need[mask], the total order of the customers in mask, for every subset.",
+    "10": "Isolate the lowest customer bit of mask...",
+    "12": "...and add that customer's order to the total of the remaining customers.",
+    "15": "dp[mask] says whether the customers in mask can be served so far.",
+    "16": "Serving nobody is always possible.",
+    "17": "Handle the distinct values one at a time.",
+    "18": "Start next as a copy of dp: this value may serve no one.",
+    "20": "Skip customer sets that cannot be served yet.",
+    "21": "rest holds the customers that still need a value.",
+    "22": "Enumerate every non-empty subset of the unserved customers.",
+    "23": "Can this value's count cover the whole subset's orders?",
+    "24": "Then the customers in mask plus sub become servable.",
+    "28": "The new value is done; move on with the updated table.",
+    "30": "The answer is whether all customers can be served together."
+  }
+}

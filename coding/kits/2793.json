@@ -1,0 +1,53 @@
+{
+  "number": 2793,
+  "title": "Status of Flight Tickets",
+  "spec": "recalled",
+  "statement": "Two tables describe flights and the tickets booked on them:\n\n- `Flights(flight_id, capacity)`: one row per flight; `flight_id` is unique and `capacity` is the number of seats.\n- `Passengers(passenger_id, flight_id, booking_time)`: one row per booking; `passenger_id` is unique, `flight_id` always names a flight in `Flights`, and no two passengers of the same flight booked at the same `booking_time`.\n\nSeats are handed out in booking order: on each flight the earliest bookings get a seat until the flight is full, and every later booking goes on the waitlist. For every passenger, report `passenger_id` and `Status`, which is `'Confirmed'` if they got a seat and `'Waitlist'` otherwise. Order the rows by `passenger_id` ascending.",
+  "constraints": [
+    "flight_id is unique in Flights; capacity is a non-negative integer",
+    "passenger_id is unique in Passengers",
+    "Every Passengers.flight_id appears in Flights",
+    "(flight_id, booking_time) is unique in Passengers"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Flights": [["flight_id","INT"],["capacity","INT"]],
+    "Passengers": [["passenger_id","INT"],["flight_id","INT"],["booking_time","DATETIME"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Flights = [], Passengers = [] }] = input;\n  const flights = new Set(), passengers = new Set(), slots = new Set();\n  for (const [id, capacity] of Flights) {\n    if (id === null || capacity === null) return 'Flights cannot hold nulls.';\n    if (flights.has(id)) return `flight_id ${id} appears twice.`;\n    if (capacity < 0) return 'capacity cannot be negative.';\n    flights.add(id);\n  }\n  for (const [id, flight, time] of Passengers) {\n    if (id === null || flight === null || time === null) return 'Passengers cannot hold nulls.';\n    if (passengers.has(id)) return `passenger_id ${id} appears twice.`;\n    passengers.add(id);\n    if (!flights.has(flight)) return `Flight ${flight} is not in Flights.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(time)) return `${time} is not a datetime.`;\n    if (slots.has(`${flight}|${time}`)) return `Two bookings on flight ${flight} share ${time}.`;\n    slots.add(`${flight}|${time}`);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT p.passenger_id, f.capacity,\n    ROW_NUMBER() OVER (PARTITION BY p.flight_id ORDER BY p.booking_time) AS booking_rank\n  FROM Passengers AS p\n  JOIN Flights AS f\n    ON f.flight_id = p.flight_id\n)\nSELECT passenger_id, IF(booking_rank <= capacity, 'Confirmed', 'Waitlist') AS Status\nFROM ranked\nORDER BY passenger_id;",
+  "brute": "SELECT p.passenger_id,\n  CASE\n    WHEN (SELECT COUNT(*) FROM Passengers AS q WHERE q.flight_id = p.flight_id AND q.booking_time < p.booking_time)\n      < (SELECT f.capacity FROM Flights AS f WHERE f.flight_id = p.flight_id)\n    THEN 'Confirmed'\n    ELSE 'Waitlist'\n  END AS Status\nFROM Passengers AS p\nORDER BY p.passenger_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const flightCount = small ? 1 + Math.floor(rand() * 3) : 120;\n  const Flights = [];\n  for (let id = 1; id <= flightCount; id++) Flights.push([id, small ? Math.floor(rand() * 4) : 5 + Math.floor(rand() * 20)]);\n  const want = small ? Math.floor(rand() * 9) : 1900;\n  const pad = n => String(n).padStart(2, '0');\n  const used = new Set(), bookings = [];\n  for (let tries = 0; bookings.length < want && tries < want * 20; tries++) {\n    const flight = 1 + Math.floor(rand() * flightCount);\n    const day = small ? 9 + Math.floor(rand() * 2) : 1 + Math.floor(rand() * 20);\n    const hour = small ? 8 + Math.floor(rand() * 4) * 3 : Math.floor(rand() * 24);\n    const minute = small ? 0 : Math.floor(rand() * 60);\n    const time = `2023-07-${pad(day)} ${pad(hour)}:${pad(minute)}:00`;\n    if (used.has(`${flight}|${time}`)) continue;\n    used.add(`${flight}|${time}`);\n    bookings.push([flight, time]);\n  }\n  // Passenger ids are handed out in a shuffled order, so they say nothing about booking order.\n  const ids = bookings.map((_, i) => 101 + i);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Passengers = bookings.map(([flight, time], i) => [ids[i], flight, time]);\n  return [{ Flights, Passengers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Flights":[[1,2],[2,2],[3,1]],"Passengers":[[101,1,"2023-07-10 16:30:00"],[102,1,"2023-07-10 17:45:00"],[103,1,"2023-07-10 12:00:00"],[104,2,"2023-07-05 13:23:00"],[105,2,"2023-07-05 09:00:00"],[106,3,"2023-07-08 11:10:00"],[107,3,"2023-07-08 09:10:00"]]}],"expected":{"columns":["passenger_id","Status"],"rows":[[101,"Confirmed"],[102,"Waitlist"],[103,"Confirmed"],[104,"Confirmed"],[105,"Confirmed"],[106,"Waitlist"],[107,"Confirmed"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Flights":[[1,3],[2,1]],"Passengers":[]}]},
+    {"name":"Test 2","input":[{"Flights":[[1,1]],"Passengers":[[1,1,"2023-07-01 10:00:00"]]}]},
+    {"name":"Test 3","input":[{"Flights":[[4,3]],"Passengers":[[11,4,"2023-07-02 09:00:00"],[12,4,"2023-07-01 09:00:00"],[13,4,"2023-07-03 09:00:00"]]}]},
+    {"name":"Test 4","input":[{"Flights":[[1,2]],"Passengers":[[201,1,"2023-07-10 18:00:00"],[202,1,"2023-07-10 07:30:00"],[203,1,"2023-07-10 06:15:00"]]}]},
+    {"name":"Test 5","input":[{"Flights":[[9,0],[8,1]],"Passengers":[[1,9,"2023-07-04 08:00:00"],[2,9,"2023-07-04 09:00:00"],[3,8,"2023-07-04 10:00:00"]]}]},
+    {"name":"Test 6","input":[{"Flights":[[1,1],[2,1]],"Passengers":[[1,1,"2023-07-05 09:00:00"],[2,2,"2023-07-05 10:00:00"],[3,1,"2023-07-05 11:00:00"]]}]},
+    {"name":"Test 7","input":[{"Flights":[[5,1]],"Passengers":[[30,5,"2023-07-10 08:00:00"],[31,5,"2023-07-09 23:00:00"],[32,5,"2023-07-11 01:00:00"]]}]},
+    {"name":"Test 8","input":[{"Flights":[[1,5],[2,1],[3,2]],"Passengers":[[7,1,"2023-07-01 12:00:00"],[6,2,"2023-07-01 12:00:00"],[5,2,"2023-07-01 11:59:59"],[4,1,"2023-07-01 11:00:00"],[3,2,"2023-07-02 00:00:00"]]}]},
+    {"name":"Test 9","input":[{"Flights":[[10,2],[20,3],[30,1]],"Passengers":[[900,20,"2023-07-03 14:00:00"],[12,10,"2023-07-03 15:00:00"],[450,10,"2023-07-03 13:00:00"],[77,10,"2023-07-03 14:30:00"],[5,20,"2023-07-03 16:00:00"],[61,10,"2023-07-03 12:00:00"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA passenger gets a seat exactly when fewer than `capacity` people booked the same flight before them. Numbering each flight's bookings 1, 2, 3, ... in time order turns that into one comparison: booking number at most `capacity` means confirmed. A window function numbers the bookings per flight, and a join brings the flight's capacity next to each booking.\n\n## Approach\n\n1. `ranked`: join `Passengers` (`p`) to `Flights` (`f`) to read each booking's `capacity`, and compute `booking_rank = ROW_NUMBER()` partitioned by `p.flight_id` and ordered by `p.booking_time`.\n2. Turn the rank into the status: `IF(booking_rank <= capacity, 'Confirmed', 'Waitlist')`, named `Status`.\n3. Sort by `passenger_id`.\n\n## Example 1, step by step\n\n- Flight 1 (capacity 2): 103 at 12:00 gets rank 1, 101 at 16:30 rank 2, 102 at 17:45 rank 3. Ranks 1 and 2 fit, so 103 and 101 are confirmed and 102 waits.\n- Flight 2 (capacity 2): 105 at 09:00 rank 1, 104 at 13:23 rank 2; both confirmed.\n- Flight 3 (capacity 1): 107 at 09:10 rank 1 is confirmed; 106 at 11:10 rank 2 waits.\n- Sorted by id: 101 Confirmed, 102 Waitlist, 103 Confirmed, 104 Confirmed, 105 Confirmed, 106 Waitlist, 107 Confirmed.\n\n## Complexity\n\n- Time: O(P log P + F) for P passengers and F flights: the join and sorting each flight's bookings by time.\n- Space: O(P) for the numbered bookings.\n\n## Pitfalls\n\n- Forgetting `PARTITION BY flight_id`: bookings would be numbered across all flights, and a later flight's first passenger could land on the waitlist.\n- Numbering by `passenger_id` instead of `booking_time`: ids are not handed out in booking order (Example 1's 103 booked first).\n- Off by one: the passenger whose rank equals `capacity` takes the last seat, so the test is `<=`, not `<`.\n- A flight with `capacity = 0` puts every booking on the waitlist; the comparison handles it without a special case.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Passengers`, one row per booking |\n| `f` | `Flights`, joined to read the booking's `capacity` |\n| `ranked` | each passenger with `capacity` and `booking_rank` |\n| `booking_rank` | position of the booking among its flight's bookings by time |\n| `Status` | `'Confirmed'` when `booking_rank <= capacity`, else `'Waitlist'` |",
+  "narration": {
+    "1": "One stage numbers each flight's bookings and keeps the flight's capacity beside them.",
+    "3": "ROW_NUMBER restarts for every flight and counts bookings in time order.",
+    "4": "Start from the bookings: every passenger appears in the result.",
+    "5": "Join each booking to its flight to read the capacity.",
+    "8": "A booking whose position fits within the capacity gets a seat; the rest go on the waitlist.",
+    "10": "The problem asks for the rows sorted by passenger id."
+  }
+}

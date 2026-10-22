@@ -1,0 +1,52 @@
+{
+  "number": 2820,
+  "title": "Election Results",
+  "spec": "recalled",
+  "statement": "One table records the ballots of a city election:\n\n- `Votes(voter, candidate)`: each row says that `voter` chose `candidate`; `(voter, candidate)` is unique. A voter may choose several candidates. A voter who did not vote has a single row with `candidate` set to `null`.\n\nEvery voter holds exactly one vote, shared equally among the candidates they chose: someone who picked 2 candidates gives each of them 0.5, someone who picked 4 gives each 0.25. A candidate's total is the sum of the shares they received, and the winner is the candidate with the largest total.\n\nReport the winner in a single column `candidate`. When several candidates tie for the largest total, report all of them. Order the rows by `candidate` ascending. If nobody voted, the result is empty.",
+  "constraints": [
+    "(voter, candidate) is unique in Votes",
+    "A voter with a null candidate has no other rows",
+    "Each voter splits one vote equally among their chosen candidates"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Votes": [["voter","VARCHAR(30)"],["candidate","VARCHAR(30)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Votes = [] }] = input;\n  const pairs = new Set(), rows = new Map(), abstained = new Set();\n  for (const [voter, candidate] of Votes) {\n    if (voter === null) return 'Every row needs a voter.';\n    const key = `${String(voter).toLowerCase()}|${candidate === null ? '' : String(candidate).toLowerCase()}`;\n    if (pairs.has(key)) return `${voter} chooses ${candidate} twice.`;\n    pairs.add(key);\n    rows.set(voter, (rows.get(voter) ?? 0) + 1);\n    if (candidate === null) abstained.add(voter);\n  }\n  for (const voter of abstained) if (rows.get(voter) > 1) return `${voter} has a null row and other choices.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH shares AS (\n  SELECT voter, candidate,\n    1 / COUNT(*) OVER (PARTITION BY voter) AS share\n  FROM Votes\n  WHERE candidate IS NOT NULL\n),\ntotals AS (\n  SELECT candidate, SUM(share) AS total\n  FROM shares\n  GROUP BY candidate\n)\nSELECT candidate\nFROM totals\nWHERE total = (SELECT MAX(total) FROM totals)\nORDER BY candidate;",
+  "brute": "WITH ballots AS (\n  SELECT voter, COUNT(candidate) AS picks\n  FROM Votes\n  GROUP BY voter\n),\nscores AS (\n  SELECT v.candidate, SUM(1 / b.picks) AS score\n  FROM Votes AS v\n  JOIN ballots AS b ON b.voter = v.voter\n  WHERE v.candidate IS NOT NULL\n  GROUP BY v.candidate\n)\nSELECT s.candidate\nFROM scores AS s\nWHERE NOT EXISTS (SELECT 1 FROM scores AS o WHERE o.score > s.score)\nORDER BY s.candidate",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const voters = small ? ['Ann', 'Ben', 'Cal', 'Dee', 'Eve', 'Fay', 'Gus', 'Hal'] : Array.from({ length: 1200 }, (_, i) => `voter${i + 1}`);\n  const candidates = small ? ['Ann', 'Ryan', 'Kathy', 'Lena', 'Omar'] : Array.from({ length: 30 }, (_, i) => `cand${i + 1}`);\n  const limit = small ? pick(9) : 2000;\n  const Votes = [];\n  // Ballots name 1, 2 or 4 candidates, so every share (1, 0.5, 0.25) and every total is exact.\n  for (const voter of voters) {\n    if (rand() < 0.15) { if (Votes.length + 1 > limit) break; Votes.push([voter, null]); continue; }\n    const k = [1, 1, 2, 4][pick(4)];\n    if (Votes.length + k > limit) break;\n    const pool = candidates.slice();\n    for (let i = 0; i < k; i++) Votes.push([voter, pool.splice(pick(pool.length), 1)[0]]);\n  }\n  for (let i = Votes.length - 1; i > 0; i--) { const j = pick(i + 1); [Votes[i], Votes[j]] = [Votes[j], Votes[i]]; }\n  return [{ Votes }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Votes":[["Kathy",null],["Charles","Ryan"],["Charles","Christine"],["Charles","Kathy"],["Benjamin","Christine"],["Anthony","Ryan"],["Edward","Ryan"],["Terry",null],["Evelyn","Kathy"],["Arthur","Christine"]]}],"expected":{"columns":["candidate"],"rows":[["Christine"],["Ryan"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Votes":[]}]},
+    {"name":"Test 2","input":[{"Votes":[["Ann",null],["Ben",null]]}]},
+    {"name":"Test 3","input":[{"Votes":[["Ann","Omar"]]}]},
+    {"name":"Test 4","input":[{"Votes":[["Ann","Ryan"],["Ann","Lena"]]}]},
+    {"name":"Test 5","input":[{"Votes":[["V1","Amy"],["V2","Bob"],["V2","Cid"],["V3","Bob"],["V3","Dan"]]}]},
+    {"name":"Test 6","input":[{"Votes":[["V1","Amy"],["V2","Amy"],["V3","Bob"],["V3","Cid"],["V3","Dan"],["V3","Eli"],["V4","Bob"],["V4","Fay"]]}]},
+    {"name":"Test 7","input":[{"Votes":[["V1",null],["V2",null],["V3",null],["V4","Amy"],["V5","Amy"],["V6","Bob"]]}]},
+    {"name":"Test 8","input":[{"Votes":[["V1","Zed"],["V2","Moe"],["V3","Amy"]]}]},
+    {"name":"Test 9","input":[{"Votes":[["V1","Amy"],["V1","Bob"],["V1","Cid"],["V1","Dan"],["V2","Amy"],["V2","Bob"],["V3","Cid"],["V3","Eli"]]}]},
+    {"name":"Test 10","input":[{"Votes":[["Amy","Bob"],["Bob","Amy"],["Cid","Amy"],["Cid","Bob"],["Dan","Amy"],["Eli",null]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row of `Votes` is worth `1 / (number of rows of that voter)`, so the first job is to attach that share to every row. After that the election is plain aggregation: add up the shares per candidate, find the largest total, and keep every candidate who reaches it (keeping all of them handles ties for free).\n\n## Approach\n\n1. `shares`: drop abstentions with `WHERE candidate IS NOT NULL`, then `COUNT(*) OVER (PARTITION BY voter)` tells how many candidates each voter picked, and `1 / ...` is the share each of them receives. MySQL's `/` gives a fraction, not integer division.\n2. `totals`: `GROUP BY candidate` and `SUM(share)` gives each candidate's total.\n3. Keep the rows of `totals` whose `total` equals `(SELECT MAX(total) FROM totals)`, and sort by `candidate`.\n\n## Example 1, step by step\n\n- Kathy and Terry abstain (null), so they are filtered out.\n- Charles chose 3 candidates, so Ryan, Christine and Kathy each get 1/3 from him; Benjamin, Anthony, Edward, Evelyn and Arthur each chose one candidate and give a full 1.\n- `totals`: Ryan = 1/3 + 1 (Anthony) + 1 (Edward) = 2.33, Christine = 1/3 + 1 (Benjamin) + 1 (Arthur) = 2.33, Kathy = 1/3 + 1 (Evelyn) = 1.33.\n- The maximum is 2.33, reached by Christine and Ryan, which are reported in that order.\n\n## Complexity\n\n- Time: O(n log n) for n rows, for partitioning by voter and grouping by candidate.\n- Space: O(n) for the intermediate tables.\n\n## Pitfalls\n\n- Counting rows per candidate (`COUNT(*)`) ignores the split; in Test 5 that would crown Bob alone, but Amy's full vote ties Bob's two halves.\n- Leaving the null rows in lets `null` group as a \"candidate\" and possibly win; filter them out first.\n- Picking the winner with `ORDER BY total DESC LIMIT 1` loses tied winners.\n- Dividing in a database with integer division (not MySQL) turns every split share into 0.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `shares` | each non-null ballot row with the share it is worth |\n| `share` | `1 / number of candidates this voter chose` |\n| `totals` | one row per candidate with the sum of their shares |\n| `total` | a candidate's total votes |\n| `(SELECT MAX(total) FROM totals)` | the winning total, shared by every tied winner |",
+  "narration": {
+    "1": "The first stage gives every ballot row its share of the voter's single vote.",
+    "3": "The window counts how many candidates this voter chose, and 1 divided by that count is the share.",
+    "5": "Abstentions carry no vote, so null candidates are dropped before counting.",
+    "7": "The second stage adds up the shares each candidate received.",
+    "10": "One group per candidate turns the shares into a total.",
+    "14": "Only candidates whose total equals the largest total win, which keeps every tied winner.",
+    "15": "Winners are listed by name in ascending order."
+  }
+}

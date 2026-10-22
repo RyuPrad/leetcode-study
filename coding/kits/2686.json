@@ -1,0 +1,50 @@
+{
+  "number": 2686,
+  "title": "Immediate Food Delivery III",
+  "spec": "recalled",
+  "statement": "One table records food orders:\n\n- `Delivery(delivery_id, customer_id, order_date, customer_pref_delivery_date)`: one row per order; `delivery_id` is unique. The customer chose a preferred delivery date on or after the day they ordered.\n\nAn order is **immediate** when its `customer_pref_delivery_date` equals its `order_date`, and **scheduled** otherwise.\n\nFor every distinct `order_date`, report `order_date` and `immediate_percentage`: the percentage of that day's orders that are immediate (100 times immediate orders divided by all orders placed that day), rounded to 2 decimal places. Every order counts on its own, even when one customer orders several times a day. Order the rows by `order_date` ascending.",
+  "constraints": [
+    "delivery_id is unique in Delivery",
+    "customer_pref_delivery_date >= order_date",
+    "Dates are 'YYYY-MM-DD'"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Delivery": [["delivery_id","INT"],["customer_id","INT"],["order_date","DATE"],["customer_pref_delivery_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Delivery = [] }] = input;\n  const ids = new Set(), date = /^\\d{4}-\\d{2}-\\d{2}$/;\n  for (const [id, customer, ordered, preferred] of Delivery) {\n    if (id === null || customer === null) return 'Every order needs a delivery_id and a customer_id.';\n    if (ids.has(id)) return `delivery_id ${id} appears twice in Delivery.`;\n    ids.add(id);\n    if (typeof ordered !== 'string' || !date.test(ordered) || typeof preferred !== 'string' || !date.test(preferred)) return `Order ${id} needs dates like 2019-08-01.`;\n    if (preferred < ordered) return `Order ${id} prefers delivery before it was ordered.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT order_date,\n  ROUND(100 * SUM(order_date = customer_pref_delivery_date) / COUNT(*), 2) AS immediate_percentage\nFROM Delivery\nGROUP BY order_date\nORDER BY order_date;",
+  "brute": "SELECT d.order_date,\n  ROUND(\n    (SELECT COUNT(*) FROM Delivery AS i\n     WHERE i.order_date = d.order_date AND i.customer_pref_delivery_date = d.order_date) * 100\n    / (SELECT COUNT(*) FROM Delivery AS a WHERE a.order_date = d.order_date),\n    2\n  ) AS immediate_percentage\nFROM (SELECT DISTINCT order_date FROM Delivery) AS d\nORDER BY d.order_date",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = (base, offset) => new Date(Date.parse(`${base}T00:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);\n  const Delivery = [];\n  const add = order => {\n    const preferred = rand() < 0.5 ? order : day(order, 1 + Math.floor(rand() * 14));\n    Delivery.push([Delivery.length + 1, 1 + Math.floor(rand() * (small ? 4 : 300)), order, preferred]);\n  };\n  if (small) {\n    const dates = ['2019-08-01', '2019-08-02', '2019-12-31'];\n    const count = Math.floor(rand() * 9);\n    for (let i = 0; i < count; i++) add(dates[Math.floor(rand() * dates.length)]);\n  } else {\n    // Each day gets 1 to 20 orders, so a day's percentage has a short decimal expansion or a clear rounding.\n    for (let d = 0; d < 150 && Delivery.length < 2000; d++) {\n      const order = day('2019-01-01', d), count = 1 + Math.floor(rand() * 20);\n      for (let i = 0; i < count && Delivery.length < 2000; i++) add(order);\n    }\n    for (let i = Delivery.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Delivery[i], Delivery[j]] = [Delivery[j], Delivery[i]]; }\n  }\n  return [{ Delivery }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-02"],[2,2,"2019-08-01","2019-08-01"],[3,1,"2019-08-01","2019-08-01"],[4,3,"2019-08-02","2019-08-13"],[5,3,"2019-08-02","2019-08-02"],[6,2,"2019-08-02","2019-08-02"],[7,4,"2019-08-03","2019-08-03"],[8,1,"2019-08-03","2019-08-03"],[9,5,"2019-08-04","2019-08-18"],[10,2,"2019-08-04","2019-08-18"]]}],"expected":{"columns":["order_date","immediate_percentage"],"rows":[["2019-08-01",66.67],["2019-08-02",66.67],["2019-08-03",100],["2019-08-04",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Delivery":[]}]},
+    {"name":"Test 2","input":[{"Delivery":[[1,1,"2019-08-05","2019-08-05"]]}]},
+    {"name":"Test 3","input":[{"Delivery":[[1,1,"2019-08-05","2019-08-06"]]}]},
+    {"name":"Test 4","input":[{"Delivery":[[1,1,"2019-08-01","2019-08-01"],[2,2,"2019-08-01","2019-08-03"],[3,3,"2019-08-01","2019-08-09"]]}]},
+    {"name":"Test 5","input":[{"Delivery":[[1,1,"2019-08-09","2019-08-09"],[2,2,"2019-08-02","2019-08-04"],[3,3,"2019-08-05","2019-08-05"],[4,1,"2019-08-02","2019-08-02"]]}]},
+    {"name":"Test 6","input":[{"Delivery":[[1,7,"2019-08-01","2019-08-01"],[2,7,"2019-08-01","2019-08-02"],[3,8,"2019-08-01","2019-08-01"]]}]},
+    {"name":"Test 7","input":[{"Delivery":[[1,1,"2019-08-06","2019-08-06"],[2,2,"2019-08-06","2019-08-07"],[3,3,"2019-08-06","2019-08-08"],[4,4,"2019-08-06","2019-08-09"],[5,5,"2019-08-06","2019-08-10"],[6,6,"2019-08-06","2019-08-11"],[7,1,"2019-08-07","2019-08-07"],[8,2,"2019-08-07","2019-08-08"],[9,3,"2019-08-07","2019-08-09"],[10,4,"2019-08-07","2019-08-10"],[11,5,"2019-08-07","2019-08-11"],[12,6,"2019-08-07","2019-08-12"],[13,7,"2019-08-07","2019-08-13"]]}]},
+    {"name":"Test 8","input":[{"Delivery":[[1,1,"2019-12-31","2020-01-01"],[2,2,"2019-12-31","2019-12-31"],[3,3,"2020-01-01","2020-01-01"],[4,4,"2019-12-31","2020-01-02"]]}]},
+    {"name":"Test 9","input":[{"Delivery":[[1,1,"2019-08-03","2019-08-03"],[2,2,"2019-08-03","2019-08-03"],[3,3,"2019-08-03","2019-08-03"],[4,4,"2019-08-03","2019-08-03"],[5,5,"2019-08-03","2019-08-03"],[6,6,"2019-08-03","2019-08-08"],[7,7,"2019-08-03","2019-08-08"],[8,8,"2019-08-03","2019-08-08"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"small"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer has one row per order date, so it is a `GROUP BY order_date`. Within a group we need two counts: all orders, and the immediate ones. The comparison `order_date = customer_pref_delivery_date` is 1 when true and 0 when false, so summing it counts the immediate orders directly, and `COUNT(*)` counts them all.\n\n## Approach\n\n1. Group `Delivery` by `order_date`.\n2. `SUM(order_date = customer_pref_delivery_date)` counts the day's immediate orders; `COUNT(*)` counts every order of the day.\n3. Multiply by 100 before dividing, divide, and `ROUND(..., 2)` the percentage, named `immediate_percentage`.\n4. `ORDER BY order_date` for the ascending order.\n\n## Example 1, step by step\n\n- 2019-08-01: orders 1 (scheduled, wants 08-02), 2 and 3 (immediate) → 100 · 2 / 3 = 66.666… → 66.67\n- 2019-08-02: orders 4 (scheduled), 5 and 6 (immediate) → 66.67\n- 2019-08-03: orders 7 and 8, both immediate → 100.00\n- 2019-08-04: orders 9 and 10, both scheduled → 0.00\n\n## Complexity\n\n- Time: O(n log n) for n orders, to group them by date and sort the dates.\n- Space: O(d) for d distinct order dates.\n\n## Pitfalls\n\n- Counting customers instead of orders: a customer with one immediate and one scheduled order on the same day contributes one of each.\n- Forgetting the factor 100 reports a fraction like 0.67 instead of a percentage.\n- Under MySQL the division is exact, but in engines with integer division `100 * 2 / 3` would give 66, and `2 / 3 * 100` would give 0; multiply first or use a decimal.\n- The order by date is required; grouping alone does not guarantee it.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY order_date` | one group per day that has orders |\n| `SUM(order_date = customer_pref_delivery_date)` | the day's immediate orders, each comparison counting 1 or 0 |\n| `COUNT(*)` | all orders placed that day |\n| `immediate_percentage` | 100 times their ratio, rounded to 2 decimals |",
+  "narration": {
+    "1": "Each output row starts with the order date it summarizes.",
+    "2": "Immediate orders over all orders, times 100 and rounded to 2 decimals, is the day's percentage.",
+    "3": "Every order row is read; there is nothing to filter.",
+    "4": "Grouping by order_date gives one group per day.",
+    "5": "Days are listed from earliest to latest, as required."
+  }
+}

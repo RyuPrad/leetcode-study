@@ -1,0 +1,72 @@
+{
+  "number": 1516,
+  "title": "Move Sub-Tree of N-Ary Tree",
+  "spec": "recalled",
+  "statement": "You get `root`, the root of a tree in which a node may have any number of children, and two different nodes `p` and `q` of that tree. Every node has a unique integer `val` and an array `children` holding its child nodes from left to right. Move `p`, together with everything below it, so that it hangs from `q` as the **last** entry of `q.children`, and return the root of the tree afterwards. Three situations can occur:\n\n- `p` is already one of `q`'s children: change nothing, wherever it sits in that list.\n- `q` lies somewhere below `p`: moving `p` would cut the tree apart, so first unhook `q` (with its own subtree) from its parent, and put `q` in the exact slot that `p` occupied in `p`'s parent's `children`. If `p` was the root, `q` becomes the new root instead. Then append `p` to `q.children`.\n- Otherwise (`p` lies below `q`, or neither lies below the other): take `p` out of its parent's `children` and append it to `q.children`.\n\nEach case is written as `[root, p, q]`. `root` is the tree serialized breadth first: the root's value and a `null`, then, for every node in breadth-first order, its children's values followed by one `null` that closes the group (a leaf contributes only the `null`), with trailing `null`s left out. `p` and `q` are the values of the two nodes. Your function is called with the three node objects and returns the root node, which is shown in the same serialization. (The TypeScript starter types nodes as `_Node`, which does not list `children`; the objects still have it.)",
+  "constraints": [
+    "The tree has between 2 and 1000 nodes",
+    "Node values are unique integers",
+    "p and q are nodes of the tree",
+    "p != q"
+  ],
+  "signature": "Node moveSubTree(Node root, Node p, Node q)",
+  "entry": "moveSubTree",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "p",
+    "q"
+  ],
+  "validator": "function validate([root, p, q]) {\n  if (!Array.isArray(root) || root.length === 0) return 'root is a non-empty list of values with null closing each group of children.';\n  if (!Number.isSafeInteger(root[0])) return 'The array must start with the root value.';\n  if (root.length > 1 && root[1] !== null) return 'The root value must be followed by a null.';\n  const values = [root[0]];\n  let parent = 0;\n  let i = 2;\n  while (i < root.length) {\n    if (parent >= values.length) return 'Each group of children needs a parent node before it.';\n    while (i < root.length && root[i] !== null) {\n      if (!Number.isSafeInteger(root[i])) return 'Node values are integers.';\n      values.push(root[i]);\n      i++;\n    }\n    i++;\n    parent++;\n  }\n  if (values.length < 2 || values.length > 1000) return 'The tree has between 2 and 1000 nodes.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  if (!values.includes(p) || !values.includes(q)) return 'p and q must both be values in the tree.';\n  if (p === q) return 'p and q must be different nodes.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, p, q] = input;\n  class Node {\n    constructor(val, children = []) { this.val = val; this.children = children; }\n  }\n  // Rebuild the tree: after the root and its null, each group closed by a null belongs to the next node in breadth-first order.\n  const root = new Node(values[0]);\n  const nodes = [root];\n  let i = 2;\n  for (let head = 0; head < nodes.length && i < values.length; head++) {\n    while (i < values.length && values[i] !== null) {\n      const child = new Node(values[i]);\n      nodes[head].children.push(child);\n      nodes.push(child);\n      i++;\n    }\n    i++;\n  }\n  const result = solve(root, nodes.find(node => node.val === p), nodes.find(node => node.val === q));\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null || typeof result !== 'object') throw new Error('Return the root node of the tree.');\n  // Serialize the returned tree the same way, refusing anything that is not a tree.\n  const out = [result.val, null];\n  const order = [result];\n  const seen = new Set(order);\n  for (let k = 0; k < order.length; k++) {\n    if (!Array.isArray(order[k].children)) throw new Error('Every node needs a children array.');\n    for (const child of order[k].children) {\n      if (!child || typeof child !== 'object') throw new Error('children may only hold nodes.');\n      if (seen.has(child) || seen.size > nodes.length) throw new Error('The result must be a tree: no node may be reached twice.');\n      seen.add(child);\n      order.push(child);\n      out.push(child.val);\n    }\n    out.push(null);\n  }\n  while (out.length > 0 && out[out.length - 1] === null) out.pop();\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function moveSubTree(root, p, q) {\n  const parent = new Map([[root, null]]);\n  let qBelowP = false;\n\n  function dfs(node, insideP) {\n    if (node === q) {\n      qBelowP = insideP;\n    }\n    for (const child of node.children) {\n      parent.set(child, node);\n      dfs(child, insideP || child === p);\n    }\n  }\n\n  dfs(root, root === p);\n  const parentOfP = parent.get(p);\n  if (parentOfP === q) {\n    return root;\n  }\n  if (qBelowP) {\n    const parentOfQ = parent.get(q);\n    parentOfQ.children.splice(parentOfQ.children.indexOf(q), 1);\n    if (parentOfP === null) {\n      root = q;\n    } else {\n      parentOfP.children[parentOfP.children.indexOf(p)] = q;\n    }\n  } else {\n    parentOfP.children.splice(parentOfP.children.indexOf(p), 1);\n  }\n  q.children.push(p);\n  return root;\n}",
+  "brute": "function moveSubTree(root, p, q) {\n  // Edit plain lists of child values, then write them back onto the nodes.\n  const byValue = new Map();\n  const kids = new Map();\n  const stack = [root];\n  while (stack.length > 0) {\n    const node = stack.pop();\n    byValue.set(node.val, node);\n    kids.set(node.val, node.children.map(child => child.val));\n    for (const child of node.children) stack.push(child);\n  }\n  const parentOf = value => {\n    for (const [owner, list] of kids) if (list.includes(value)) return owner;\n    return null;\n  };\n  const P = p.val;\n  const Q = q.val;\n  let top = root.val;\n  if (parentOf(P) === Q) return root;\n  let below = false;\n  for (let up = parentOf(Q); up !== null; up = parentOf(up)) if (up === P) below = true;\n  const owner = parentOf(P);\n  if (below) {\n    const holder = parentOf(Q);\n    kids.set(holder, kids.get(holder).filter(v => v !== Q));\n    if (owner === null) top = Q;\n    else kids.set(owner, kids.get(owner).map(v => (v === P ? Q : v)));\n  } else {\n    kids.set(owner, kids.get(owner).filter(v => v !== P));\n  }\n  kids.get(Q).push(P);\n  for (const [value, list] of kids) byValue.get(value).children = list.map(v => byValue.get(v));\n  return byValue.get(top);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 850 + pick(100) : 2 + pick(9);\n  // Unique values: a shuffled run of distinct integers.\n  const pool = Array.from({ length: size === 'large' ? 2 * n : 3 * n }, (_, k) => k + 1);\n  for (let k = pool.length - 1; k > 0; k--) {\n    const j = pick(k + 1);\n    [pool[k], pool[j]] = [pool[j], pool[k]];\n  }\n  const shape = rand();\n  const nodes = [{ val: pool[0], children: [], parent: null }];\n  while (nodes.length < n) {\n    // Deep trees grow from recent nodes, wide trees from a few early ones, mixed trees from anywhere.\n    let parent;\n    if (shape < 0.3) parent = nodes[Math.max(0, nodes.length - 1 - pick(3))];\n    else if (shape < 0.5) parent = nodes[pick(Math.min(nodes.length, 4))];\n    else parent = nodes[pick(nodes.length)];\n    const child = { val: pool[nodes.length], children: [], parent };\n    parent.children.push(child);\n    nodes.push(child);\n  }\n  const values = [nodes[0].val, null];\n  const order = [nodes[0]];\n  for (let k = 0; k < order.length; k++) {\n    for (const child of order[k].children) {\n      order.push(child);\n      values.push(child.val);\n    }\n    values.push(null);\n  }\n  while (values[values.length - 1] === null) values.pop();\n  const below = node => {\n    const found = [];\n    const stack = [...node.children];\n    while (stack.length > 0) {\n      const next = stack.pop();\n      found.push(next);\n      stack.push(...next.children);\n    }\n    return found;\n  };\n  const mode = rand();\n  let p;\n  let q;\n  if (mode < 0.3) {\n    const owners = nodes.filter(node => node.children.length > 0);\n    p = owners[pick(owners.length)];\n    const under = below(p);\n    q = under[pick(under.length)];\n  } else if (mode < 0.45) {\n    p = nodes[1 + pick(n - 1)];\n    q = p.parent;\n  } else if (mode < 0.55) {\n    p = nodes[0];\n    q = nodes[1 + pick(n - 1)];\n  } else {\n    p = nodes[pick(n)];\n    q = nodes[pick(n)];\n    while (q === p) q = nodes[pick(n)];\n  }\n  return [values, p.val, q.val];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,null,2,3,null,4,5,null,6,null,7,8],4,1],"expected":[1,null,2,3,4,null,5,null,6,null,7,8]},
+    {"name":"Example 2","input":[[1,null,2,3,null,4,5,null,6,null,7,8],7,4],"expected":[1,null,2,3,null,4,5,null,6,null,7,8]},
+    {"name":"Example 3","input":[[1,null,2,3,null,4,5,null,6,null,7,8],3,8],"expected":[1,null,2,null,4,5,null,7,8,null,null,null,3,null,6]},
+    {"name":"Example 4","input":[[1,null,2,3,null,4],1,4],"expected":[4,null,1,null,2,3]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,null,2],2,1]},
+    {"name":"Test 2","input":[[1,null,2],1,2]},
+    {"name":"Test 3","input":[[1,null,2,3],2,3]},
+    {"name":"Test 4","input":[[1,null,2,null,3,null,4],4,1]},
+    {"name":"Test 5","input":[[1,null,2,null,3,null,4],2,4]},
+    {"name":"Test 6","input":[[1,null,2,3,4],2,1]},
+    {"name":"Test 7","input":[[10,null,20,30,null,40,50,null,60,null,70,80],10,40]},
+    {"name":"Test 8","input":[[1,null,2,3,null,4,5,null,6,null,7,8],2,7]},
+    {"name":"Test 9","input":[[1,null,2,3,null,4,5,null,6,null,7,8],1,2]},
+    {"name":"Test 10","input":[[5,null,3,8,null,1,null,9,2],9,3]},
+    {"name":"Test 11","input":[[5,null,3,8,6,null,1,null,9,2],3,1]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":41,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMoving a subtree only changes a few child lists, so all the work is in learning two facts about the tree: the parent of every node, and whether `q` sits below `p`. One depth-first pass collects both. After that the three situations are a handful of list edits: unhooking a node from its parent's `children`, putting a node into a slot, and appending `p` to `q.children`.\n\n## Approach\n\n1. Run `dfs` from `root`, recording each child's parent in `parent` (the root's parent is `null`). The flag `insideP` is true for `p` and every node below it, so when the search reaches `q` it stores that flag in `qBelowP`.\n2. If `parentOfP` is already `q`, return `root` untouched.\n3. If `qBelowP`, remove `q` from `parentOfQ.children`, then put `q` where `p` was in `parentOfP.children`, or make `q` the new `root` when `p` had no parent.\n4. Otherwise just remove `p` from `parentOfP.children`.\n5. Append `p` to `q.children` and return `root`.\n\n## Example 1, step by step\n\nThe tree is `1 → [2, 3]`, `2 → [4, 5]`, `3 → [6]`, `4 → [7, 8]`, with `p = 4` and `q = 1`. The search finds `parentOfP = 2`, and `q` (the root) is visited with `insideP = false`, so `qBelowP = false`. Node 2 is not `q`, so step 4 removes 4 from 2's children, leaving `2 → [5]`, and step 5 makes `1 → [2, 3, 4]`. Serialized: `[1,null,2,3,4,null,5,null,6,null,7,8]`.\n\n## Complexity\n\n- Time: O(n): one traversal, plus `indexOf` and `splice` on single child lists.\n- Space: O(n) for the parent map and the recursion stack on a deep tree.\n\n## Pitfalls\n\n- When `p` is already a child of `q`, do nothing, even if it is not `q`'s last child.\n- In the `q`-below-`p` case, detach `q` before appending `p`; otherwise `p` ends up inside its own subtree and the tree becomes a cycle.\n- `q` takes `p`'s exact position among its siblings, not the end of the list, and becomes the root when `p` was the root.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | map from each node to its parent (`null` for the root) |\n| `qBelowP` | whether `q` lies inside `p`'s subtree |\n| `insideP` | whether the node being visited is `p` or below it |\n| `parentOfP`, `parentOfQ` | the current parents of `p` and `q` |",
+  "narration": {
+    "2": "Map every node to its parent; the root has none.",
+    "5": "Visit node, knowing whether it is p or lies below p.",
+    "6": "Reaching q tells us which situation we are in.",
+    "7": "Remember whether q was found inside p's subtree.",
+    "9": "Look at each child in order.",
+    "10": "Record that this child hangs from node.",
+    "11": "Recurse; the flag turns on once we step onto p and stays on below it.",
+    "15": "Search the whole tree once, starting inside p only if the root is p.",
+    "16": "Look up p's current parent (null when p is the root).",
+    "17": "p is already q's child: the rules say leave the tree alone.",
+    "20": "q is below p, so moving p alone would detach the tree.",
+    "22": "Unhook q, with its subtree, from its old parent.",
+    "23": "p was the root...",
+    "24": "...so q becomes the new root.",
+    "26": "Otherwise q takes over p's exact slot among its siblings.",
+    "29": "q is not below p: just unhook p from its parent.",
+    "31": "Hang p, with its whole subtree, as q's last child.",
+    "32": "Return the root, which only changes when p was the old root."
+  }
+}

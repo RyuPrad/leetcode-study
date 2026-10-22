@@ -1,0 +1,47 @@
+{
+  "number": 2339,
+  "title": "All the Matches of the League",
+  "spec": "recalled",
+  "statement": "A league is described by a single table:\n\n- `Teams(team_name)`: one row per team; `team_name` is unique.\n\nEvery team plays every other team exactly twice: once as the home side and once as the away side. A team never plays itself.\n\nList every match of the season with the columns `home_team` and `away_team`. Rows may come in any order.",
+  "constraints": [
+    "team_name is unique in Teams",
+    "A team never plays against itself"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Teams": [["team_name","VARCHAR(50)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Teams = [] }] = input;\n  const names = new Set();\n  for (const [name] of Teams) {\n    if (name === null || name === '') return 'Every team needs a name.';\n    // Names compare without case, as in MySQL's default collation.\n    const key = name.toLowerCase();\n    if (names.has(key)) return `Team ${name} appears twice in Teams.`;\n    names.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT home.team_name AS home_team, away.team_name AS away_team\nFROM Teams AS home\nJOIN Teams AS away\n  ON away.team_name <> home.team_name;",
+  "brute": "SELECT a.team_name AS home_team, b.team_name AS away_team\nFROM Teams AS a, Teams AS b\nWHERE a.team_name < b.team_name\nUNION ALL\nSELECT b.team_name, a.team_name\nFROM Teams AS a, Teams AS b\nWHERE a.team_name < b.team_name",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 7) : 100;\n  const base = ['Leetcode FC', 'Ahly SC', 'Real Madrid', 'Al Ittihad', 'Ajax', 'Benfica', 'Celtic', 'Porto'];\n  const names = small ? base.slice() : Array.from({ length: count }, (_, i) => `Club ${i + 1}`);\n  for (let i = names.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [names[i], names[j]] = [names[j], names[i]]; }\n  return [{ Teams: names.slice(0, count).map(name => [name]) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Teams":[["Leetcode FC"],["Ahly SC"],["Real Madrid"]]}],"expected":{"columns":["home_team","away_team"],"rows":[["Real Madrid","Leetcode FC"],["Real Madrid","Ahly SC"],["Leetcode FC","Real Madrid"],["Leetcode FC","Ahly SC"],["Ahly SC","Real Madrid"],["Ahly SC","Leetcode FC"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Teams":[]}]},
+    {"name":"Test 2","input":[{"Teams":[["Ajax"]]}]},
+    {"name":"Test 3","input":[{"Teams":[["Ajax"],["Celtic"]]}]},
+    {"name":"Test 4","input":[{"Teams":[["Porto"],["Benfica"],["Ajax"]]}]},
+    {"name":"Test 5","input":[{"Teams":[["Leetcode FC"],["Ahly SC"],["Real Madrid"],["Al Ittihad"]]}]},
+    {"name":"Test 6","input":[{"Teams":[["Inter Miami CF"],["Inter"],["Internacional"]]}]},
+    {"name":"Test 7","input":[{"Teams":[["Celtic"],["Rangers"],["Hearts"],["Hibernian"],["Aberdeen"]]}]},
+    {"name":"Test 8","input":[{"Teams":[["A"],["B"],["C"],["D"],["E"],["F"],["G"],["H"]]}]},
+    {"name":"Test 9","input":[{"Teams":[["O'Higgins"],["Colo-Colo"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA match is an **ordered** pair of different teams: who plays at home and who travels. Pairing every row of `Teams` with every row of `Teams` (a self-join) produces all ordered pairs, including each team paired with itself; dropping those self-pairs leaves exactly the season's fixtures. Because the pair is ordered, (A, B) and (B, A) are both kept, which gives each pair of teams its two meetings.\n\n## Approach\n\n1. Read `Teams` twice: alias `home` for the home side and `away` for the visitors.\n2. Join them on `away.team_name <> home.team_name`, which pairs each team with every other team and never with itself.\n3. Select the two names as `home_team` and `away_team`.\n\n## Example 1, step by step\n\nWith three teams there are 3 × 3 = 9 ordered pairs. The three self-pairs (Leetcode FC vs Leetcode FC, and so on) fail the `<>` condition, leaving 6 matches:\n\n| home_team | away_team |\n| --- | --- |\n| Leetcode FC | Ahly SC |\n| Leetcode FC | Real Madrid |\n| Ahly SC | Leetcode FC |\n| Ahly SC | Real Madrid |\n| Real Madrid | Leetcode FC |\n| Real Madrid | Ahly SC |\n\n## Complexity\n\n- Time: O(n²) for n teams, which is unavoidable since the output has n · (n − 1) rows.\n- Space: O(n²) for the result.\n\n## Pitfalls\n\n- A plain `CROSS JOIN` without a condition also reports each team playing itself.\n- Using `<` instead of `<>` keeps only one of the two meetings of every pair.\n- Swapping the aliases in the select list still gives a correct set, but naming the columns anything other than `home_team` and `away_team` fails the check.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `home` | `Teams` as the home side of a match |\n| `away` | `Teams` as the visiting side |\n| `ON away.team_name <> home.team_name` | pairs each team with every other team, never itself |",
+  "narration": {
+    "1": "Name the two sides of each match home_team and away_team.",
+    "2": "The first copy of Teams supplies the home side.",
+    "3": "Join a second copy of Teams for the visiting side.",
+    "4": "Any two different teams form a match; requiring different names removes a team playing itself."
+  }
+}

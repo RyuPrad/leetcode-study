@@ -1,0 +1,74 @@
+{
+  "number": 1494,
+  "title": "Parallel Courses II",
+  "spec": "leetcode",
+  "statement": "There are `n` courses numbered `1` to `n`. Each entry `relations[i] = [prevCourse, nextCourse]` is a prerequisite: `prevCourse` must be finished in a semester strictly before the one in which `nextCourse` is taken. In a single semester you may take up to `k` courses, but only courses whose prerequisites were all completed in earlier semesters.\n\nReturn the fewest semesters needed to complete every course. The prerequisites never form a cycle, so finishing everything is always possible.",
+  "constraints": [
+    "1 <= n <= 15",
+    "1 <= k <= n",
+    "0 <= relations.length <= n * (n - 1) / 2",
+    "relations[i].length == 2",
+    "1 <= prevCourse, nextCourse <= n",
+    "prevCourse != nextCourse",
+    "All pairs [prevCourse, nextCourse] are distinct",
+    "The prerequisite graph is a directed acyclic graph"
+  ],
+  "signature": "int minNumberOfSemesters(int n, int[][] relations, int k)",
+  "entry": "minNumberOfSemesters",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "relations",
+    "k"
+  ],
+  "validator": "function validate([n, relations, k]) {\n  if (!Number.isInteger(n) || n < 1 || n > 15) return 'n is an integer between 1 and 15.';\n  if (!Number.isInteger(k) || k < 1 || k > n) return 'k is between 1 and n.';\n  if (!Array.isArray(relations) || relations.length > n * (n - 1) / 2) return 'relations has at most n * (n - 1) / 2 pairs.';\n  const seen = new Set();\n  const indegree = new Array(n + 1).fill(0);\n  const next = Array.from({ length: n + 1 }, () => []);\n  for (const pair of relations) {\n    if (!Array.isArray(pair) || pair.length !== 2) return 'Each relation is a pair [prevCourse, nextCourse].';\n    const [a, b] = pair;\n    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || a > n || b < 1 || b > n) return 'Courses are numbered 1 to n.';\n    if (a === b) return 'A course cannot be its own prerequisite.';\n    if (seen.has(a * 16 + b)) return 'Each relation may appear only once.';\n    seen.add(a * 16 + b);\n    next[a].push(b);\n    indegree[b]++;\n  }\n  const queue = [];\n  for (let c = 1; c <= n; c++) if (indegree[c] === 0) queue.push(c);\n  for (let q = 0; q < queue.length; q++) {\n    for (const b of next[queue[q]]) if (--indegree[b] === 0) queue.push(b);\n  }\n  if (queue.length !== n) return 'The prerequisites must not form a cycle.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minNumberOfSemesters(n, relations, k) {\n  const prereq = new Array(n).fill(0);\n  for (const [before, after] of relations) {\n    prereq[after - 1] |= 1 << (before - 1);\n  }\n\n  const full = (1 << n) - 1;\n  const bits = new Array(full + 1).fill(0);\n  for (let mask = 1; mask <= full; mask++) {\n    bits[mask] = bits[mask >> 1] + (mask & 1);\n  }\n\n  const dp = new Array(full + 1).fill(Infinity);\n  dp[0] = 0;\n  for (let mask = 0; mask < full; mask++) {\n    if (dp[mask] === Infinity) continue;\n    let ready = 0;\n    for (let course = 0; course < n; course++) {\n      const taken = (mask >> course) & 1;\n      if (!taken && (prereq[course] & mask) === prereq[course]) {\n        ready |= 1 << course;\n      }\n    }\n    if (bits[ready] <= k) {\n      dp[mask | ready] = Math.min(dp[mask | ready], dp[mask] + 1);\n      continue;\n    }\n    for (let pick = ready; pick > 0; pick = (pick - 1) & ready) {\n      if (bits[pick] === k) {\n        dp[mask | pick] = Math.min(dp[mask | pick], dp[mask] + 1);\n      }\n    }\n  }\n  return dp[full];\n}",
+  "brute": "function minNumberOfSemesters(n, relations, k) {\n  // Breadth-first search over sets of finished courses, trying every non-empty batch of at most k ready courses.\n  const need = Array.from({ length: n }, () => []);\n  for (const [a, b] of relations) need[b - 1].push(a - 1);\n  const goal = (1 << n) - 1;\n  const dist = new Map([[0, 0]]);\n  const queue = [0];\n  for (let q = 0; q < queue.length; q++) {\n    const done = queue[q];\n    const ready = [];\n    for (let c = 0; c < n; c++) {\n      if (!((done >> c) & 1) && need[c].every(p => (done >> p) & 1)) ready.push(c);\n    }\n    // Every batch of 1..k ready courses, built as combinations of the ready list.\n    let found = false;\n    const extend = (from, count, next) => {\n      if (found) return;\n      if (count > 0 && !dist.has(next)) {\n        dist.set(next, dist.get(done) + 1);\n        if (next === goal) { found = true; return; }\n        queue.push(next);\n      }\n      if (count === k) return;\n      for (let i = from; i < ready.length; i++) extend(i + 1, count + 1, next | (1 << ready[i]));\n    };\n    extend(0, 0, done);\n    if (found) return dist.get(goal);\n  }\n  return -1;\n}",
+  "generator": "function generate(rand, size) {\n  // Up to 13 courses keeps the O(3^n) worst case well inside the local time limit.\n  const n = size === 'large' ? 11 + Math.floor(rand() * 3) : 1 + Math.floor(rand() * 8);\n  const density = size === 'large' ? rand() * 0.3 : rand() * 0.6;\n  // A random order of the courses; edges only go forward in it, so the graph has no cycle.\n  const order = Array.from({ length: n }, (_, i) => i + 1);\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [order[i], order[j]] = [order[j], order[i]];\n  }\n  const relations = [];\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      if (rand() < density) relations.push([order[i], order[j]]);\n    }\n  }\n  for (let i = relations.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [relations[i], relations[j]] = [relations[j], relations[i]];\n  }\n  const k = 1 + Math.floor(rand() * n);\n  return [n, relations, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[4,[[2,1],[3,1],[1,4]],2],"expected":3},
+    {"name":"Example 2","input":[5,[[2,1],[3,1],[4,1],[1,5]],2],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[],1]},
+    {"name":"Test 2","input":[15,[[3,4],[1,2],[2,3],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,15]],2]},
+    {"name":"Test 3","input":[15,[],15]},
+    {"name":"Test 4","input":[5,[[1,2],[2,3],[3,4],[4,5]],3]},
+    {"name":"Test 5","input":[12,[],1]},
+    {"name":"Test 6","input":[12,[[1,2],[2,3],[4,5],[5,6],[7,8],[8,9],[10,11],[11,12]],3]},
+    {"name":"Test 7","input":[8,[[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8]],3]},
+    {"name":"Test 8","input":[6,[[2,5],[1,5],[3,5],[3,4],[3,6]],2]},
+    {"name":"Test 9","input":[5,[[1,5],[2,5],[3,5],[4,5]],4]},
+    {"name":"Test 10","input":[7,[[1,4],[2,4],[3,5],[5,6],[6,7]],2]},
+    {"name":"Test 11","input":[9,[[1,4],[2,4],[3,4],[4,5],[4,6],[4,7],[8,9]],3]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nPicking courses greedily (say, those with the longest chain behind them) fails on some graphs, and there are only 15 courses, so the whole state fits in a bitmask: the set of courses already finished. From a state, the courses you may take next are exactly the unfinished ones whose prerequisites are all inside the mask. A breadth-first search that tries every batch of up to `k` ready courses is correct but tries many useless small batches. Two observations cut that down: if at most `k` courses are ready, taking all of them is never worse; otherwise some best plan takes exactly `k` of them.\n\n## Approach\n\n1. Build `prereq[course]`, the bitmask of courses that must come before `course`.\n2. Precompute `bits[mask]`, the number of set bits of every mask.\n3. Let `dp[mask]` be the fewest semesters after which exactly the courses in `mask` are finished; `dp[0] = 0`, the rest `Infinity`.\n4. Visit masks in increasing order (a later state always has a larger mask). Skip unreachable ones. Build `ready`: unfinished courses with `(prereq[course] & mask) === prereq[course]`.\n5. If `bits[ready] <= k`, take all of them in one semester. Otherwise enumerate the submasks `pick` of `ready` with `pick = (pick - 1) & ready`, and use those with exactly `k` courses.\n6. Return `dp[full]`.\n\n## Example 1, step by step\n\n`n = 4`, `relations = [[2,1],[3,1],[1,4]]`, `k = 2`. Course 1 needs 2 and 3; course 4 needs 1.\n\n- `mask = 0`: courses 2 and 3 are ready (2 courses, not more than `k`), so take both: `dp[{2,3}] = 1`.\n- From `{2,3}`: only course 1 is ready, so `dp[{1,2,3}] = 2`.\n- From `{1,2,3}`: course 4 is ready, so `dp[{1,2,3,4}] = 3`.\n\nThe answer is `3`.\n\n## Complexity\n\n- Time: O(3^n + 2^n · n): over all masks, enumerating submasks of `ready` costs at most 3^n in total, and building `ready` costs n per mask.\n- Space: O(2^n) for `dp` and `bits`.\n\n## Pitfalls\n\n- Greedy rules, such as taking the lowest-numbered ready courses or those with the longest chain behind them, fail on some graphs; Test 10 defeats the first one.\n- Courses are numbered from 1, so shift by `course - 1` when building the masks.\n- A course is ready only when **all** its prerequisites are in `mask`, not just one: compare `prereq[course] & mask` with the whole `prereq[course]`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `prereq[course]` | bitmask of the course's prerequisites |\n| `full` | mask with all `n` courses finished |\n| `bits[mask]` | how many courses `mask` contains |\n| `dp[mask]` | fewest semesters to finish exactly `mask` |\n| `ready` | courses that can be taken next from `mask` |\n| `pick` | a batch of ready courses taken this semester |",
+  "narration": {
+    "2": "prereq[c] will be the bitmask of courses that must come before course c.",
+    "3": "Read each prerequisite pair.",
+    "4": "Add the earlier course's bit to the later course's mask (courses are 1-based).",
+    "7": "The mask with every course finished.",
+    "9": "Count the set bits of every mask once, reusing the count of the mask shifted right.",
+    "13": "dp[mask] is the fewest semesters after which exactly the courses in mask are done.",
+    "14": "Nothing is done before the first semester.",
+    "15": "Every next state has more bits, so a larger number; increasing order is a valid processing order.",
+    "16": "This set of finished courses cannot be reached; skip it.",
+    "18": "Find every course that can be taken next.",
+    "20": "Not yet taken, and every prerequisite is already in mask.",
+    "24": "At most k courses are ready: taking all of them now is never worse.",
+    "25": "One more semester reaches mask | ready.",
+    "28": "Too many are ready: walk every submask of ready.",
+    "29": "Only batches of exactly k courses need to be tried.",
+    "30": "Taking this batch reaches mask | pick one semester later.",
+    "34": "The fewest semesters to finish all courses."
+  }
+}

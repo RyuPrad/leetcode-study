@@ -1,0 +1,51 @@
+{
+  "number": 3055,
+  "title": "Top Percentile Fraud",
+  "spec": "recalled",
+  "statement": "One table holds insurance claims and how suspicious each one looks:\n\n- `Fraud(policy_id, state, fraud_score)`: one row per policy; `policy_id` is unique. `state` is the US state of the claim and `fraud_score` is a number from 0 to 1 with two decimals (higher means more likely fraud).\n\nFind the policies in the **top 5 percentile** of fraud scores within their own state. Inside each state, rank the policies by `fraud_score` from highest to lowest: the highest score has rank 1, equal scores share a rank, and the next lower score skips the shared positions. A policy's percent rank is\n\n`(rank - 1) / (number of policies in the state - 1)`,\n\nand it is 0 for a state with a single policy. A policy is reported when its percent rank is **at most 0.05**.\n\nReturn `policy_id`, `state` and `fraud_score`, ordered by `state` ascending, then `fraud_score` descending, then `policy_id` ascending.",
+  "constraints": [
+    "policy_id is unique in Fraud",
+    "state and fraud_score are never null",
+    "0 <= fraud_score <= 1, with two decimal places",
+    "Ties in fraud_score share a rank (RANK semantics)"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Fraud": [["policy_id","INT"],["state","VARCHAR(50)"],["fraud_score","DECIMAL(5, 2)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Fraud = [] }] = input;\n  const ids = new Set();\n  for (const [id, state, score] of Fraud) {\n    if (id === null || state === null || score === null) return 'policy_id, state and fraud_score are required.';\n    if (ids.has(id)) return `policy_id ${id} appears twice.`;\n    ids.add(id);\n    if (score < 0 || score > 1) return 'fraud_score must be between 0 and 1.';\n    if (Math.abs(score * 100 - Math.round(score * 100)) > 1e-9) return 'fraud_score has at most two decimals.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    policy_id,\n    state,\n    fraud_score,\n    PERCENT_RANK() OVER (PARTITION BY state ORDER BY fraud_score DESC) AS pct_rank\n  FROM Fraud\n)\nSELECT policy_id, state, fraud_score\nFROM ranked\nWHERE pct_rank <= 0.05\nORDER BY state, fraud_score DESC, policy_id;",
+  "brute": "SELECT f.policy_id, f.state, f.fraud_score\nFROM Fraud AS f\nWHERE 20 * (SELECT COUNT(*) FROM Fraud AS h WHERE h.state = f.state AND h.fraud_score > f.fraud_score)\n  <= (SELECT COUNT(*) FROM Fraud AS s WHERE s.state = f.state) - 1\nORDER BY f.state, f.fraud_score DESC, f.policy_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Fraud = [];\n  if (size === 'small') {\n    // Tiny states and few distinct scores: ties at the top and one-policy states are common.\n    const states = ['California', 'Texas', 'New York'];\n    const scores = [0.45, 0.77, 0.92, 0.98];\n    const count = pick(9);\n    for (let i = 0; i < count; i++) Fraud.push([1 + pick(3) + 3 * i, states[pick(states.length)], scores[pick(scores.length)]]);\n  } else {\n    // About 330 policies per state, so the top 5 percentile spans many ranks and ties around the cut.\n    const states = ['California', 'Florida', 'New York', 'Texas', 'Ohio', 'Nevada'];\n    for (let id = 1; id <= 2000; id++) Fraud.push([id, states[pick(states.length)], pick(101) / 100]);\n  }\n  return [{ Fraud }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Fraud":[[1,"California",0.92],[2,"California",0.68],[3,"California",0.17],[4,"New York",0.94],[5,"New York",0.81],[6,"New York",0.77],[7,"Texas",0.98],[8,"Texas",0.97],[9,"Texas",0.96],[10,"Florida",0.97],[11,"Florida",0.98],[12,"Florida",0.78],[13,"Florida",0.88],[14,"Florida",0.66]]}],"expected":{"columns":["policy_id","state","fraud_score"],"rows":[[1,"California",0.92],[11,"Florida",0.98],[4,"New York",0.94],[7,"Texas",0.98]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Fraud":[]}]},
+    {"name":"Test 2","input":[{"Fraud":[[5,"Ohio",0.12]]}]},
+    {"name":"Test 3","input":[{"Fraud":[[7,"Texas",0.9],[3,"Texas",0.9],[4,"Texas",0.5]]}]},
+    {"name":"Test 4","input":[{"Fraud":[[100,"Nevada",0.99],[101,"Nevada",0.98],[102,"Nevada",0.97],[103,"Nevada",0.96],[104,"Nevada",0.95],[105,"Nevada",0.94],[106,"Nevada",0.93],[107,"Nevada",0.92],[108,"Nevada",0.91],[109,"Nevada",0.9],[110,"Nevada",0.89],[111,"Nevada",0.88],[112,"Nevada",0.87],[113,"Nevada",0.86],[114,"Nevada",0.85],[115,"Nevada",0.84],[116,"Nevada",0.83],[117,"Nevada",0.82],[118,"Nevada",0.81],[119,"Nevada",0.8],[200,"Alaska",0.95],[201,"Alaska",0.94],[202,"Alaska",0.93],[203,"Alaska",0.92],[204,"Alaska",0.91],[205,"Alaska",0.9],[206,"Alaska",0.89],[207,"Alaska",0.88],[208,"Alaska",0.87],[209,"Alaska",0.86],[210,"Alaska",0.85],[211,"Alaska",0.84],[212,"Alaska",0.83],[213,"Alaska",0.82],[214,"Alaska",0.81],[215,"Alaska",0.8],[216,"Alaska",0.79],[217,"Alaska",0.78],[218,"Alaska",0.77],[219,"Alaska",0.76],[220,"Alaska",0.75]]}]},
+    {"name":"Test 5","input":[{"Fraud":[[1,"Utah",0.8],[2,"Utah",0.79],[3,"Utah",0.78],[4,"Utah",0.77],[5,"Utah",0.76],[6,"Utah",0.75],[7,"Utah",0.74],[8,"Utah",0.73],[9,"Utah",0.72],[10,"Utah",0.71],[11,"Utah",0.7],[12,"Utah",0.69],[13,"Utah",0.68],[14,"Utah",0.67],[15,"Utah",0.66],[16,"Utah",0.65],[17,"Utah",0.64],[18,"Utah",0.63],[19,"Utah",0.62],[20,"Utah",0.61],[21,"Utah",0.6],[22,"Utah",0.59],[23,"Utah",0.58],[24,"Utah",0.57],[25,"Utah",0.56],[26,"Utah",0.55],[27,"Utah",0.54],[28,"Utah",0.53],[29,"Utah",0.52],[30,"Utah",0.51],[31,"Utah",0.5],[32,"Utah",0.49],[33,"Utah",0.48],[34,"Utah",0.47],[35,"Utah",0.46],[36,"Utah",0.45],[37,"Utah",0.44],[38,"Utah",0.43],[39,"Utah",0.42],[40,"Utah",0.41],[41,"Utah",0.4]]}]},
+    {"name":"Test 6","input":[{"Fraud":[[9,"Texas",0.4],[2,"Alabama",0.3],[5,"Ohio",1],[1,"Maine",0],[8,"Florida",0.75]]}]},
+    {"name":"Test 7","input":[{"Fraud":[[50,"Iowa",0.99],[52,"Iowa",0.95],[51,"Iowa",0.95],[60,"Iowa",0.9],[61,"Iowa",0.89],[62,"Iowa",0.88],[63,"Iowa",0.87],[64,"Iowa",0.86],[65,"Iowa",0.85],[66,"Iowa",0.84],[67,"Iowa",0.83],[68,"Iowa",0.82],[69,"Iowa",0.81],[70,"Iowa",0.8],[71,"Iowa",0.79],[72,"Iowa",0.78],[73,"Iowa",0.77],[74,"Iowa",0.76],[75,"Iowa",0.75],[76,"Iowa",0.74],[77,"Iowa",0.73]]}]},
+    {"name":"Test 8","input":[{"Fraud":[[4,"Idaho",0.6],[2,"Idaho",0.6],[9,"Idaho",0.6],[1,"Idaho",0.6],[6,"Idaho",0.6],[3,"Kansas",0.2],[8,"Kansas",0.1]]}]},
+    {"name":"Test 9","input":[{"Fraud":[[30,"Oregon",0.97],[31,"Oregon",0.97],[40,"Oregon",0.96],[41,"Oregon",0.95],[42,"Oregon",0.94],[43,"Oregon",0.93],[44,"Oregon",0.92],[45,"Oregon",0.91],[46,"Oregon",0.9],[47,"Oregon",0.89],[48,"Oregon",0.88],[49,"Oregon",0.87],[50,"Oregon",0.86],[51,"Oregon",0.85],[52,"Oregon",0.84],[53,"Oregon",0.83],[54,"Oregon",0.82],[55,"Oregon",0.81],[56,"Oregon",0.8],[57,"Oregon",0.79],[58,"Oregon",0.78],[59,"Oregon",0.77]]}]},
+    {"name":"Test 10","input":[{"Fraud":[[1,"California",0.92],[2,"California",0.68],[3,"Texas",0.98],[4,"Texas",0.98],[5,"Texas",0.97],[6,"California",0.5]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Top 5 percentile within each state\" is a ranking question asked separately for each state, which is exactly what a window function with `PARTITION BY state` answers. `PERCENT_RANK()` computes `(rank - 1) / (rows in partition - 1)` directly, giving 0 for the highest score and 1 for the lowest, so the top 5 percentile is simply the rows whose value is at most 0.05.\n\n## Approach\n\n1. CTE `ranked`: for every policy compute `pct_rank` with `PERCENT_RANK() OVER (PARTITION BY state ORDER BY fraud_score DESC)`. Descending order puts the most suspicious claim at 0; equal scores get the same value.\n2. Keep the rows with `pct_rank <= 0.05`.\n3. Sort by `state`, then `fraud_score DESC`, then `policy_id`.\n\n## Example 1, step by step\n\n`ranked` assigns these percent ranks:\n\n- California (3 policies): 0.92 → 0, 0.68 → 0.5, 0.17 → 1\n- New York (3): 0.94 → 0, 0.81 → 0.5, 0.77 → 1\n- Texas (3): 0.98 → 0, 0.97 → 0.5, 0.96 → 1\n- Florida (5): 0.98 → 0, 0.97 → 0.25, 0.88 → 0.5, 0.78 → 0.75, 0.66 → 1\n\nOnly the zeros pass the filter: policies 1, 11, 4 and 7, listed by state as California, Florida, New York, Texas. With 21 or more policies in a state, the second rank would also reach 0.05 or less.\n\n## Complexity\n\n- Time: O(N log N) to sort the N policies inside their states for the window, plus the final sort.\n- Space: O(N) for the ranked rows.\n\n## Pitfalls\n\n- Keeping only `RANK() = 1` matches the example but misses the second and third ranks in large states.\n- `< 0.05` instead of `<= 0.05` drops a policy that sits exactly on the boundary, such as rank 2 of 21.\n- `ROW_NUMBER()` breaks ties arbitrarily; two equal top scores must both be reported.\n- Ordering by `fraud_score` ascending or forgetting the `policy_id` tie-break changes the required row order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every policy with its percent rank inside its state |\n| `pct_rank` | `(rank - 1) / (policies in state - 1)`, 0 for the top score |\n| `PARTITION BY state` | ranks each state independently |",
+  "narration": {
+    "1": "The CTE ranked attaches a percent rank to every policy.",
+    "6": "PERCENT_RANK ranks scores from highest to lowest separately in each state, giving 0 to the top score.",
+    "11": "Keep the policies whose percent rank lies in the top 5 percent, boundary included.",
+    "12": "Sort by state, then the most suspicious score first, then the policy id to break ties."
+  }
+}

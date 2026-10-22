@@ -1,0 +1,55 @@
+{
+  "number": 2394,
+  "title": "Employees With Deductions",
+  "spec": "recalled",
+  "statement": "Two tables track working time for October 2022:\n\n- `Employees(employee_id, needed_hours)`: one row per employee; `employee_id` is unique and `needed_hours` is how many hours the employee must work this month.\n- `Logs(employee_id, in_time, out_time)`: one work session of an employee, from `in_time` to `out_time` (datetimes). `(employee_id, in_time, out_time)` is unique, `out_time` is later than `in_time` and may fall on the next day (a session past midnight), and every `employee_id` exists in `Employees`.\n\nEach session counts as its length in **minutes, rounded up**: 51 minutes 2 seconds counts as 52 minutes, while exactly 51 minutes stays 51. An employee's worked time is the sum of these rounded session minutes; an employee without sessions worked 0 minutes.\n\nAn employee gets a deduction when their worked time is less than `needed_hours` hours. Report the `employee_id` of every such employee, in any order.",
+  "constraints": [
+    "employee_id is unique in Employees",
+    "(employee_id, in_time, out_time) is unique in Logs",
+    "every Logs.employee_id exists in Employees",
+    "in_time < out_time; all times are in October 2022, written YYYY-MM-DD HH:MM:SS",
+    "needed_hours is 0 or more"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["employee_id","INT"],["needed_hours","INT"]],
+    "Logs": [["employee_id","INT"],["in_time","DATETIME"],["out_time","DATETIME"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Employees = [], Logs = [] }] = input;\n  const ids = new Set(), sessions = new Set();\n  for (const [id, needed] of Employees) {\n    if (id === null || needed === null) return 'employee_id and needed_hours are required.';\n    if (ids.has(id)) return `employee_id ${id} appears twice in Employees.`;\n    ids.add(id);\n    if (needed < 0) return 'needed_hours cannot be negative.';\n  }\n  const stamp = /^2022-10-(0[1-9]|[12]\\d|3[01]) ([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$/;\n  for (const [id, start, end] of Logs) {\n    if (id === null || start === null || end === null) return 'Logs values are required.';\n    if (!ids.has(id)) return `Logs names employee ${id}, who is not in Employees.`;\n    if (!stamp.test(start) || !stamp.test(end)) return 'Times must be October 2022 datetimes written YYYY-MM-DD HH:MM:SS.';\n    if (start >= end) return `A session of employee ${id} does not end after it starts.`;\n    const key = `${id}|${start}|${end}`;\n    if (sessions.has(key)) return `Employee ${id} has the same session twice.`;\n    sessions.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH sessions AS (\n  SELECT employee_id, CEIL(TIMESTAMPDIFF(SECOND, in_time, out_time) / 60) AS minutes\n  FROM Logs\n),\nworked AS (\n  SELECT e.employee_id, e.needed_hours, IFNULL(SUM(s.minutes), 0) AS total_minutes\n  FROM Employees AS e\n  LEFT JOIN sessions AS s\n    ON s.employee_id = e.employee_id\n  GROUP BY e.employee_id, e.needed_hours\n)\nSELECT employee_id\nFROM worked\nWHERE total_minutes < needed_hours * 60;",
+  "brute": "SELECT e.employee_id\nFROM Employees AS e\nWHERE e.needed_hours * 60 > (\n  SELECT COALESCE(SUM(FLOOR((TIME_TO_SEC(TIMEDIFF(l.out_time, l.in_time)) + 59) / 60)), 0)\n  FROM Logs AS l\n  WHERE l.employee_id = e.employee_id\n)",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const at = ms => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');\n  const october = Date.UTC(2022, 9, 1), november = Date.UTC(2022, 10, 1);\n  const Employees = [], Logs = [], seen = new Set();\n  // Session lengths sit on and just past whole minutes, so rounding up and summing per session matter.\n  const minutes = size === 'small' ? [0, 19, 29, 59, 60, 119, 179] : [5, 29, 59, 60, 90, 119, 179, 239, 299, 479, 599];\n  const seconds = [0, 1, 30, 59];\n  const session = id => {\n    const length = (minutes[pick(minutes.length)] * 60 + seconds[pick(seconds.length)]) * 1000 || 1000;\n    // Start on the hour or a few seconds past it; late starts run past midnight.\n    const start = october + pick(30) * 86400000 + pick(24) * 3600000 + pick(3) * 1000;\n    if (start + length >= november) return;\n    const row = [id, at(start), at(start + length)], key = row.join('|');\n    if (seen.has(key)) return;\n    seen.add(key);\n    Logs.push(row);\n  };\n  if (size === 'small') {\n    const people = pick(5);\n    for (let id = 1; id <= people; id++) Employees.push([id, pick(5)]);\n    const rows = people ? pick(9) : 0;\n    for (let i = 0; i < rows; i++) session(1 + pick(people));\n  } else {\n    // About 6 sessions per employee averaging under 3 hours; needed hours straddle that.\n    for (let id = 1; id <= 300; id++) Employees.push([id, pick(30)]);\n    for (let tries = 0; Logs.length < 1800 && tries < 5000; tries++) session(1 + pick(300));\n  }\n  return [{ Employees, Logs }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[1,20],[2,12],[3,2]],"Logs":[[1,"2022-10-01 09:00:00","2022-10-01 17:00:00"],[1,"2022-10-06 09:05:04","2022-10-06 17:09:03"],[1,"2022-10-12 23:00:00","2022-10-13 03:00:01"],[2,"2022-10-29 12:00:00","2022-10-29 23:58:58"]]}],"expected":{"columns":["employee_id"],"rows":[[2],[3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[[1,0],[2,1],[3,160]],"Logs":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,2]],"Logs":[[1,"2022-10-03 08:00:00","2022-10-03 10:00:00"]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,2]],"Logs":[[1,"2022-10-03 08:00:00","2022-10-03 09:59:00"]]}]},
+    {"name":"Test 4","input":[{"Employees":[[4,1]],"Logs":[[4,"2022-10-05 09:00:00","2022-10-05 09:19:40"],[4,"2022-10-05 11:00:00","2022-10-05 11:19:40"],[4,"2022-10-05 13:00:00","2022-10-05 13:19:40"]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,1],[2,1]],"Logs":[[1,"2022-10-10 10:00:00","2022-10-10 10:59:01"],[2,"2022-10-10 10:00:00","2022-10-10 10:59:00"]]}]},
+    {"name":"Test 6","input":[{"Employees":[[1,3],[2,3]],"Logs":[[1,"2022-10-12 22:30:00","2022-10-13 01:30:00"],[2,"2022-10-12 22:30:00","2022-10-13 01:29:00"]]}]},
+    {"name":"Test 7","input":[{"Employees":[[1,0],[2,0],[3,5]],"Logs":[[2,"2022-10-20 08:00:00","2022-10-20 09:00:00"],[3,"2022-10-20 08:00:00","2022-10-20 13:00:00"]]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,3],[2,4],[3,1],[4,2]],"Logs":[[1,"2022-10-01 09:00:00","2022-10-01 10:30:00"],[1,"2022-10-02 09:00:00","2022-10-02 10:30:00"],[2,"2022-10-01 09:00:00","2022-10-01 12:59:59"],[3,"2022-10-31 23:00:00","2022-10-31 23:59:59"],[4,"2022-10-15 08:00:00","2022-10-15 08:59:30"],[4,"2022-10-16 08:00:00","2022-10-16 08:59:30"]]}]},
+    {"name":"Test 9","input":[{"Employees":[[7,8],[9,1]],"Logs":[[7,"2022-10-07 09:00:00","2022-10-07 13:00:00"],[7,"2022-10-07 13:00:00","2022-10-07 17:00:00"],[9,"2022-10-08 00:00:00","2022-10-08 00:30:00"],[9,"2022-10-08 00:00:00","2022-10-08 00:30:01"]]}]},
+    {"name":"Test 10","input":[{"Employees":[[1,1],[2,1],[3,1]],"Logs":[[1,"2022-10-04 10:00:00","2022-10-04 10:00:01"],[2,"2022-10-04 10:00:00","2022-10-04 10:29:59"],[2,"2022-10-05 10:00:00","2022-10-05 10:29:59"],[3,"2022-10-04 10:00:00","2022-10-04 10:40:00"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo things decide each employee: the minutes they worked and the minutes they needed. Worked minutes come from sessions, and each session is rounded up on its own **before** summing, so the rounding has to happen per row of `Logs`. Then every employee must be considered, including those with no sessions at all, which is the job of a **left join** from `Employees`.\n\n## Approach\n\n1. CTE `sessions`: for each log row, `TIMESTAMPDIFF(SECOND, in_time, out_time)` gives the exact length (it handles sessions past midnight), `/ 60` turns it into minutes and `CEIL` rounds up.\n2. CTE `worked`: `Employees LEFT JOIN sessions`, grouped per employee. `SUM(s.minutes)` is `null` for employees without sessions, so `IFNULL(..., 0)` makes it 0.\n3. Keep the employees whose `total_minutes < needed_hours * 60`. Comparing in minutes avoids rounding hours.\n\n## Example 1, step by step\n\n- `sessions` for employee 1: 09:00:00 to 17:00:00 is exactly 480 minutes; 09:05:04 to 17:09:03 is 483 min 59 s, so 484; 23:00:00 to 03:00:01 the next day is 240 min 1 s, so 241.\n- Employee 2: 12:00:00 to 23:58:58 is 718 min 58 s, so 719.\n- `worked`: employee 1 has 1205 minutes against 20 × 60 = 1200; employee 2 has 719 against 720; employee 3 has no sessions, so 0 against 120.\n- Employees 2 and 3 fall short.\n\n## Complexity\n\n- Time: O(L) to measure the L sessions plus O(E + L) to group them by the E employees.\n- Space: O(E + L) for the two CTEs.\n\n## Pitfalls\n\n- Rounding the total instead of each session undercounts: three sessions of 19 min 40 s are 60 rounded minutes, not 59.\n- An inner join drops employees with no sessions, though they are the clearest deductions.\n- `TIMESTAMPDIFF(MINUTE, ...)` truncates, so 59 min 1 s becomes 59 instead of 60.\n- Subtracting only the clock times (`TIME(out_time) - TIME(in_time)`) breaks for sessions that cross midnight.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `sessions` | one row per log with its length in rounded-up `minutes` |\n| `e`, `s` | an employee and one of their sessions (nulls when none) |\n| `worked` | each employee with `needed_hours` and `total_minutes` worked |\n| `total_minutes` | sum of rounded session minutes, 0 without sessions |",
+  "narration": {
+    "1": "Stage one, sessions, measures every log row on its own.",
+    "2": "The exact length in seconds, divided by 60 and rounded up, is the session's minutes.",
+    "5": "Stage two, worked, totals the minutes of each employee.",
+    "6": "Employees without sessions sum to null, which IFNULL turns into 0.",
+    "8": "A left join keeps every employee, including those who never logged a session.",
+    "10": "One row per employee, carrying needed_hours along with the group.",
+    "14": "Report the employees whose worked minutes fall short of the needed hours times 60."
+  }
+}

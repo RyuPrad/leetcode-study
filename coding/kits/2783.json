@@ -1,0 +1,53 @@
+{
+  "number": 2783,
+  "title": "Flight Occupancy and Waitlist Analysis",
+  "spec": "recalled",
+  "statement": "Two tables describe flights and the people who asked for a seat:\n\n- `Flights(flight_id, capacity)`: one row per flight; `flight_id` is unique and `capacity` is how many seats it has.\n- `Passengers(passenger_id, flight_id)`: one row per passenger; `passenger_id` is unique and `flight_id` names the flight they want, which always exists in `Flights`.\n\nEach flight seats as many of its passengers as its capacity allows; everyone beyond that is put on the waitlist. For **every** flight report `flight_id`, `booked_cnt` (passengers who got a seat) and `waitlist_cnt` (passengers left waiting). A flight nobody asked for has 0 in both counts. Order the rows by `flight_id` ascending.",
+  "constraints": [
+    "flight_id is unique in Flights",
+    "passenger_id is unique in Passengers",
+    "Every Passengers.flight_id exists in Flights",
+    "capacity >= 1"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Flights": [["flight_id","INT"],["capacity","INT"]],
+    "Passengers": [["passenger_id","INT"],["flight_id","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Flights = [], Passengers = [] }] = input;\n  const flights = new Set(), passengers = new Set();\n  for (const [id, capacity] of Flights) {\n    if (id === null) return 'Every flight needs a flight_id.';\n    if (flights.has(id)) return `flight_id ${id} appears twice in Flights.`;\n    flights.add(id);\n    if (capacity === null || capacity < 1) return `Flight ${id} needs a capacity of at least 1.`;\n  }\n  for (const [id, flight] of Passengers) {\n    if (id === null) return 'Every passenger needs a passenger_id.';\n    if (passengers.has(id)) return `passenger_id ${id} appears twice in Passengers.`;\n    passengers.add(id);\n    if (!flights.has(flight)) return `Passenger ${id} wants flight ${flight}, which is not in Flights.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT f.flight_id,\n  LEAST(COUNT(p.passenger_id), f.capacity) AS booked_cnt,\n  GREATEST(COUNT(p.passenger_id) - f.capacity, 0) AS waitlist_cnt\nFROM Flights AS f\nLEFT JOIN Passengers AS p\n  ON p.flight_id = f.flight_id\nGROUP BY f.flight_id, f.capacity\nORDER BY f.flight_id;",
+  "brute": "SELECT flight_id,\n  CASE WHEN demand <= capacity THEN demand ELSE capacity END AS booked_cnt,\n  CASE WHEN demand > capacity THEN demand - capacity ELSE 0 END AS waitlist_cnt\nFROM (\n  SELECT fl.flight_id, fl.capacity,\n    (SELECT COUNT(*) FROM Passengers AS ps WHERE ps.flight_id = fl.flight_id) AS demand\n  FROM Flights AS fl\n) AS totals\nORDER BY flight_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const small = size === 'small';\n  const ids = small ? [1, 2, 3, 4, 5, 6, 7, 8] : Array.from({ length: 500 }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = pick(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const flightCount = small ? pick(6) : 500;\n  const Flights = ids.slice(0, flightCount).map(id => [id, 1 + pick(small ? 3 : 6)]);\n  const Passengers = [];\n  const passengerCount = Flights.length ? (small ? pick(9) : 2000) : 0;\n  for (let k = 0; k < passengerCount; k++) Passengers.push([101 + k, Flights[pick(Flights.length)][0]]);\n  return [{ Flights, Passengers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Flights":[[1,2],[2,2],[3,1]],"Passengers":[[101,1],[102,1],[103,1],[104,2],[105,2],[106,3],[107,3]]}],"expected":{"columns":["flight_id","booked_cnt","waitlist_cnt"],"rows":[[1,2,1],[2,2,0],[3,1,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Flights":[],"Passengers":[]}]},
+    {"name":"Test 2","input":[{"Flights":[[4,3]],"Passengers":[]}]},
+    {"name":"Test 3","input":[{"Flights":[[1,2]],"Passengers":[[10,1],[11,1]]}]},
+    {"name":"Test 4","input":[{"Flights":[[1,1]],"Passengers":[[10,1],[11,1],[12,1],[13,1]]}]},
+    {"name":"Test 5","input":[{"Flights":[[7,5]],"Passengers":[[1,7]]}]},
+    {"name":"Test 6","input":[{"Flights":[[9,1],[2,3],[5,2]],"Passengers":[[1,9],[2,9],[3,5],[4,2],[5,5],[6,5]]}]},
+    {"name":"Test 7","input":[{"Flights":[[1,2],[2,2],[3,2]],"Passengers":[[1,2],[2,2],[3,2]]}]},
+    {"name":"Test 8","input":[{"Flights":[[1,100],[2,1]],"Passengers":[[50,2],[40,1],[30,2],[20,2]]}]},
+    {"name":"Test 9","input":[{"Flights":[[3,1],[1,1],[2,1]],"Passengers":[[1,1],[2,2],[3,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWhich passenger gets which seat does not matter; only how many people want each flight. If a flight with capacity `c` has `n` passengers, then `min(n, c)` of them fly and `max(n - c, 0)` wait. So count passengers per flight and split that count with `LEAST` and `GREATEST`. Every flight must appear, including empty ones, which calls for a left join from `Flights`.\n\n## Approach\n\n1. Start from `Flights` (alias `f`) so that every flight produces a row.\n2. `LEFT JOIN Passengers` (alias `p`) on `flight_id`: a flight with `n` passengers yields `n` rows, and an empty flight yields one row with `p` all null.\n3. `GROUP BY f.flight_id, f.capacity`, so `COUNT(p.passenger_id)` is the number of passengers, 0 for an empty flight.\n4. `booked_cnt` is `LEAST(count, capacity)`; `waitlist_cnt` is `GREATEST(count - capacity, 0)`.\n5. `ORDER BY f.flight_id`.\n\n## Example 1, step by step\n\n- Flight 1 (capacity 2) joins passengers 101, 102 and 103: count 3, so `LEAST(3, 2) = 2` booked and `GREATEST(1, 0) = 1` waiting.\n- Flight 2 (capacity 2) joins 104 and 105: count 2, so 2 booked and `GREATEST(0, 0) = 0` waiting.\n- Flight 3 (capacity 1) joins 106 and 107: count 2, so 1 booked and 1 waiting.\n\nThe result is (1, 2, 1), (2, 2, 0), (3, 1, 1).\n\n## Complexity\n\n- Time: O(F + P) for F flights and P passengers with a hash or index on `flight_id`, plus sorting F output rows.\n- Space: O(F) for the groups.\n\n## Pitfalls\n\n- An inner join drops flights with no passengers; they must appear with 0 and 0.\n- `COUNT(*)` after a left join counts the null row of an empty flight as one passenger; count `p.passenger_id` instead.\n- Without `GREATEST(..., 0)` a flight with spare seats reports a negative waitlist.\n- Grouping only by `flight_id` while selecting `capacity` is accepted by MySQL here (`flight_id` is the key), but listing `f.capacity` in `GROUP BY` keeps the query valid everywhere.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `f` | a flight; every flight yields one output row |\n| `p` | a passenger who wants flight `f`, or nulls if none |\n| `COUNT(p.passenger_id)` | how many passengers want the flight |\n| `booked_cnt` | passengers seated, at most the capacity |\n| `waitlist_cnt` | passengers beyond the capacity, never negative |",
+  "narration": {
+    "1": "Each output row describes one flight.",
+    "2": "Seated passengers are the passenger count capped at the capacity.",
+    "3": "Waiting passengers are those beyond the capacity, or 0 when seats are left.",
+    "4": "Flights is the left table, so every flight is reported.",
+    "5": "A left join keeps flights nobody asked for, with nulls in the Passengers columns.",
+    "7": "Grouping per flight lets COUNT tally that flight's passengers.",
+    "8": "Rows are sorted by flight_id as required."
+  }
+}

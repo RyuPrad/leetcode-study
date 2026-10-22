@@ -1,0 +1,54 @@
+{
+  "number": 2372,
+  "title": "Calculate the Influence of Each Salesperson",
+  "spec": "recalled",
+  "statement": "Three tables link salespeople to the money their customers spend:\n\n- `Salesperson(salesperson_id, name)`: one row per salesperson; `salesperson_id` is unique. Names may repeat.\n- `Customer(customer_id, salesperson_id)`: one row per customer; `customer_id` is unique and `salesperson_id` names the salesperson in charge of that customer (always one that exists).\n- `Sales(sale_id, customer_id, price)`: one row per sale; `sale_id` is unique and `customer_id` always exists in `Customer`.\n\nFor **every** salesperson, report `salesperson_id`, `name` and `total`: the sum of `price` over all sales made to that salesperson's customers. A salesperson with no customers, or whose customers bought nothing, has `total = 0`. Rows may come in any order.",
+  "constraints": [
+    "salesperson_id is unique in Salesperson",
+    "customer_id is unique in Customer",
+    "sale_id is unique in Sales",
+    "Customer.salesperson_id exists in Salesperson",
+    "Sales.customer_id exists in Customer",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salesperson": [["salesperson_id","INT"],["name","VARCHAR(30)"]],
+    "Customer": [["customer_id","INT"],["salesperson_id","INT"]],
+    "Sales": [["sale_id","INT"],["customer_id","INT"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Salesperson = [], Customer = [], Sales = [] }] = input;\n  const people = new Set(), customers = new Set(), sales = new Set();\n  for (const [id, name] of Salesperson) {\n    if (id === null || name === null) return 'Salesperson rows may not contain null.';\n    if (people.has(id)) return `salesperson_id ${id} appears twice.`;\n    people.add(id);\n  }\n  for (const [id, owner] of Customer) {\n    if (id === null || owner === null) return 'Customer rows may not contain null.';\n    if (customers.has(id)) return `customer_id ${id} appears twice.`;\n    if (!people.has(owner)) return `Customer ${id} names unknown salesperson ${owner}.`;\n    customers.add(id);\n  }\n  for (const [id, customer, price] of Sales) {\n    if (id === null || customer === null || price === null) return 'Sales rows may not contain null.';\n    if (sales.has(id)) return `sale_id ${id} appears twice.`;\n    if (!customers.has(customer)) return `Sale ${id} names unknown customer ${customer}.`;\n    sales.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT sp.salesperson_id, sp.name, IFNULL(SUM(s.price), 0) AS total\nFROM Salesperson AS sp\nLEFT JOIN Customer AS c\n  ON c.salesperson_id = sp.salesperson_id\nLEFT JOIN Sales AS s\n  ON s.customer_id = c.customer_id\nGROUP BY sp.salesperson_id, sp.name;",
+  "brute": "SELECT sp.salesperson_id, sp.name,\n       (SELECT IFNULL(SUM(s.price), 0)\n        FROM Sales AS s\n        WHERE s.customer_id IN (\n          SELECT c.customer_id\n          FROM Customer AS c\n          WHERE c.salesperson_id = sp.salesperson_id\n        )) AS total\nFROM Salesperson AS sp",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const names = ['Alice', 'Bob', 'Jerry', 'Maya', 'Omar', 'Lena'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const people = small ? Math.floor(rand() * 5) : 300;\n  const customers = people === 0 ? 0 : small ? Math.floor(rand() * 6) : 1500;\n  const sales = customers === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  const Salesperson = [], Customer = [], Sales = [];\n  for (let i = 0; i < people; i++) Salesperson.push([i + 1, pick(names)]);\n  for (let i = 0; i < customers; i++) Customer.push([i + 1, 1 + Math.floor(rand() * people)]);\n  const prices = [100, 250, 354, 500, 856, 892, 988];\n  for (let i = 0; i < sales; i++) Sales.push([i + 1, 1 + Math.floor(rand() * customers), small ? pick(prices) : 1 + Math.floor(rand() * 1000)]);\n  return [{ Salesperson, Customer, Sales }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salesperson":[[1,"Alice"],[2,"Bob"],[3,"Jerry"]],"Customer":[[1,1],[2,1],[3,2]],"Sales":[[1,2,892],[2,1,354],[3,3,988],[4,3,856]]}],"expected":{"columns":["salesperson_id","name","total"],"rows":[[1,"Alice",1246],[2,"Bob",1844],[3,"Jerry",0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salesperson":[],"Customer":[],"Sales":[]}]},
+    {"name":"Test 2","input":[{"Salesperson":[[1,"Alice"],[2,"Bob"]],"Customer":[],"Sales":[]}]},
+    {"name":"Test 3","input":[{"Salesperson":[[1,"Alice"]],"Customer":[[1,1],[2,1]],"Sales":[]}]},
+    {"name":"Test 4","input":[{"Salesperson":[[4,"Maya"]],"Customer":[[1,4],[2,4],[3,4]],"Sales":[[1,1,100],[2,2,250],[3,3,500],[4,1,100]]}]},
+    {"name":"Test 5","input":[{"Salesperson":[[1,"Alice"],[2,"Alice"]],"Customer":[[1,1],[2,2]],"Sales":[[1,1,300],[2,2,700]]}]},
+    {"name":"Test 6","input":[{"Salesperson":[[1,"Omar"],[2,"Lena"],[3,"Bob"]],"Customer":[[1,1],[2,1],[3,3]],"Sales":[[1,2,40],[2,2,60]]}]},
+    {"name":"Test 7","input":[{"Salesperson":[[1,"Jerry"],[2,"Maya"]],"Customer":[[5,2],[6,2],[7,1]],"Sales":[[1,5,10],[2,6,20],[3,7,30],[4,7,40],[5,5,50]]}]},
+    {"name":"Test 8","input":[{"Salesperson":[[1,"Bob"],[2,"Jerry"],[3,"Lena"]],"Customer":[[1,2],[2,3],[3,3]],"Sales":[[1,1,1],[2,2,1],[3,3,1],[4,3,1]]}]},
+    {"name":"Test 9","input":[{"Salesperson":[[7,"Omar"],[8,"Maya"]],"Customer":[[1,7]],"Sales":[[1,1,999]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe money flows through a chain: a sale belongs to a customer, and a customer belongs to a salesperson. Joining the three tables along that chain puts each sale next to the salesperson who earned it, and a sum per salesperson gives the influence. Every salesperson must be reported, even those with no customers or no sales, so both joins are **left joins** starting from `Salesperson`, and the missing sum becomes `0`.\n\n## Approach\n\n1. Start from `Salesperson` (alias `sp`) so every salesperson keeps at least one row.\n2. `LEFT JOIN Customer` (alias `c`) on `salesperson_id` to attach each customer.\n3. `LEFT JOIN Sales` (alias `s`) on `customer_id` to attach each sale of that customer.\n4. `GROUP BY` the salesperson and output `IFNULL(SUM(s.price), 0)` as `total`.\n\n## Example 1, step by step\n\n- Alice (1) has customers 1 and 2. Customer 1 bought for 354 and customer 2 for 892, so Alice's rows sum to 1246.\n- Bob (2) has customer 3, who made two sales: 988 + 856 = 1844.\n- Jerry (3) has no customers; the left joins keep one row for him with `s.price = null`, so `SUM` is `null` and `IFNULL` turns it into 0.\n\n## Complexity\n\n- Time: O(P + C + S) with hash or indexed joins for P salespeople, C customers and S sales, plus the grouping.\n- Space: O(P + C + S) for the joined rows.\n\n## Pitfalls\n\n- Inner joins drop Jerry, and any salesperson whose customers never bought anything.\n- `SUM` over only nulls is `null`, not `0`; wrap it in `IFNULL` (or `COALESCE`).\n- Grouping by `name` alone merges two salespeople who share a name; group by `salesperson_id`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `sp` | `Salesperson`, one output row each |\n| `c` | `Customer` rows owned by `sp` (null if none) |\n| `s` | `Sales` rows of customer `c` (null if none) |\n| `total` | sum of the prices in the group, 0 when empty |",
+  "narration": {
+    "1": "Output each salesperson with the sum of their sales prices, turning an empty sum into 0.",
+    "2": "Salesperson is the left table, so everyone appears even with no customers.",
+    "3": "Attach each customer to the salesperson in charge of them, keeping salespeople without customers.",
+    "5": "Attach every sale of that customer, keeping customers who never bought anything.",
+    "7": "Collapse the joined rows back to one row per salesperson so SUM adds up their sales."
+  }
+}

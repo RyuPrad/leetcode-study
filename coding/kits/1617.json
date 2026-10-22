@@ -1,0 +1,53 @@
+{
+  "number": 1617,
+  "title": "Count Subtrees With Max Distance Between Cities",
+  "spec": "leetcode",
+  "statement": "Cities `1` to `n` are joined into a tree by the `n - 1` two-way roads in `edges`, where `edges[i] = [ui, vi]` links cities `ui` and `vi`. The distance between two cities is the number of roads on the path between them.\n\nCall a set of cities a *subtree* when every two cities of the set are joined by a path that stays inside the set; two subtrees differ when their sets of cities differ. The *span* of a subtree is the largest distance between two of its cities.\n\nReturn an array of length `n - 1` whose entry at index `d - 1` is the number of subtrees with span exactly `d`, for every `d` from 1 to `n - 1`. (Single cities have span 0 and are not counted.)",
+  "constraints": [
+    "2 <= n <= 15",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "1 <= ui, vi <= n",
+    "All pairs (ui, vi) are distinct",
+    "edges form a tree"
+  ],
+  "signature": "int[] countSubgraphsForEachDiameter(int n, int[][] edges)",
+  "entry": "countSubgraphsForEachDiameter",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges"
+  ],
+  "validator": "function validate([n, edges]) {\n  if (!Number.isInteger(n) || n < 2 || n > 15) return 'n is a whole number from 2 to 15.';\n  if (!Array.isArray(edges) || edges.length !== n - 1) return 'edges needs exactly n - 1 roads.';\n  const root = Array.from({ length: n + 1 }, (_, i) => i);\n  const find = x => { while (root[x] !== x) x = root[x] = root[root[x]]; return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2 || edge.some(c => !Number.isInteger(c) || c < 1 || c > n)) return 'Each road is [u, v] with cities from 1 to n.';\n    const [a, b] = edge.map(find);\n    if (a === b) return 'The roads must form a tree (no loops or repeated roads).';\n    root[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countSubgraphsForEachDiameter(n, edges) {\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) {\n    graph[u - 1].push(v - 1);\n    graph[v - 1].push(u - 1);\n  }\n  const dist = [];\n  for (let start = 0; start < n; start++) {\n    const row = new Array(n).fill(-1);\n    row[start] = 0;\n    const queue = [start];\n    for (let head = 0; head < queue.length; head++) {\n      const city = queue[head];\n      for (const next of graph[city]) {\n        if (row[next] === -1) {\n          row[next] = row[city] + 1;\n          queue.push(next);\n        }\n      }\n    }\n    dist.push(row);\n  }\n\n  const answer = new Array(n - 1).fill(0);\n  for (let mask = 1; mask < (1 << n); mask++) {\n    let cities = 0;\n    let links = 0;\n    let diameter = 0;\n    for (let i = 0; i < n; i++) {\n      if ((mask & (1 << i)) === 0) continue;\n      cities++;\n      for (let j = i + 1; j < n; j++) {\n        if ((mask & (1 << j)) === 0) continue;\n        if (dist[i][j] === 1) links++;\n        diameter = Math.max(diameter, dist[i][j]);\n      }\n    }\n    if (cities >= 2 && links === cities - 1) answer[diameter - 1]++;\n  }\n  return answer;\n}",
+  "brute": "function countSubgraphsForEachDiameter(n, edges) {\n  const graph = Array.from({ length: n + 1 }, () => []);\n  for (const [u, v] of edges) { graph[u].push(v); graph[v].push(u); }\n  // Breadth-first search that never leaves the chosen set: [farthest city, its distance, cities reached].\n  const explore = (inside, start) => {\n    const depth = new Map([[start, 0]]);\n    const queue = [start];\n    let far = start;\n    for (let h = 0; h < queue.length; h++) {\n      const city = queue[h];\n      if (depth.get(city) > depth.get(far)) far = city;\n      for (const next of graph[city]) if (inside.has(next) && !depth.has(next)) { depth.set(next, depth.get(city) + 1); queue.push(next); }\n    }\n    return [far, depth.get(far), queue.length];\n  };\n  const answer = new Array(n - 1).fill(0);\n  for (let mask = 1; mask < (1 << n); mask++) {\n    const inside = new Set();\n    for (let c = 1; c <= n; c++) if (mask & (1 << (c - 1))) inside.add(c);\n    if (inside.size < 2) continue;\n    const [first, , reached] = explore(inside, [...inside][0]);\n    if (reached !== inside.size) continue;\n    // Double sweep: the city farthest from anywhere is one end of a longest path.\n    const [, span] = explore(inside, first);\n    answer[span - 1]++;\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(13, 15) : int(2, 8);\n  const labels = Array.from({ length: n }, (_, i) => i + 1);\n  for (let i = n - 1; i > 0; i--) {\n    const j = int(0, i);\n    [labels[i], labels[j]] = [labels[j], labels[i]];\n  }\n  const shape = rand();\n  const edges = [];\n  for (let k = 1; k < n; k++) {\n    // Paths, stars and random trees each stress different spans.\n    const parent = shape < 0.2 ? k - 1 : shape < 0.35 ? 0 : shape < 0.55 ? Math.max(0, k - 1 - int(0, 2)) : int(0, k - 1);\n    edges.push(rand() < 0.5 ? [labels[parent], labels[k]] : [labels[k], labels[parent]]);\n  }\n  for (let i = edges.length - 1; i > 0; i--) {\n    const j = int(0, i);\n    [edges[i], edges[j]] = [edges[j], edges[i]];\n  }\n  return [n, edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[4,[[1,2],[2,3],[2,4]]],"expected":[3,4,0]},
+    {"name":"Example 2","input":[2,[[1,2]]],"expected":[1]},
+    {"name":"Example 3","input":[3,[[1,2],[2,3]]],"expected":[2,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,[[2,1]]]},
+    {"name":"Test 2","input":[3,[[1,2],[1,3]]]},
+    {"name":"Test 3","input":[4,[[3,1],[1,4],[4,2]]]},
+    {"name":"Test 4","input":[5,[[1,5],[5,2],[3,5],[5,4]]]},
+    {"name":"Test 5","input":[7,[[1,2],[2,3],[1,4],[4,5],[1,6],[6,7]]]},
+    {"name":"Test 6","input":[8,[[1,2],[2,3],[3,4],[4,5],[2,6],[3,7],[4,8]]]},
+    {"name":"Test 7","input":[15,[[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,15]]]},
+    {"name":"Test 8","input":[15,[[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[1,10],[1,11],[1,12],[1,13],[1,14],[1,15]]]},
+    {"name":"Test 9","input":[15,[[1,2],[1,3],[2,4],[2,5],[3,6],[3,7],[4,8],[4,9],[5,10],[5,11],[6,12],[6,13],[7,14],[7,15]]]},
+    {"name":"Test 10","input":[12,[[7,3],[12,7],[1,12],[5,1],[9,3],[11,9],[2,5],[8,2],[6,11],[10,6],[4,8]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith at most 15 cities there are at most 2^15 = 32,768 sets of cities, few enough to try every one as a bitmask. Two facts make each check cheap. In a tree, a set of `k` cities is connected exactly when `k - 1` of the tree's roads lie inside it, and those roads are the pairs at distance 1. And because the set is connected, the path between two of its cities stays inside it, so the tree distance `dist[i][j]` is also their distance in the subtree; the span is the largest such distance.\n\n## Approach\n\n1. Build the adjacency lists `graph` (cities shifted to 0-based) and run a breadth-first search from every city to fill `dist`.\n2. For every `mask` from 1 to `2^n - 1`, walk the pairs `i < j` of cities in it, counting `cities`, counting `links` (pairs with `dist[i][j] === 1`), and tracking the largest distance in `diameter`.\n3. If the set has at least two cities and `links === cities - 1`, it is a subtree: add one to `answer[diameter - 1]`.\n\n## Example 1, step by step\n\nRoads `1-2`, `2-3`, `2-4`. The pairs `{1,2}`, `{2,3}`, `{2,4}` each have 2 cities and 1 link, with span 1, so `answer[0] = 3`. `{1,3}` has no link, so it is skipped. `{1,2,3}`, `{1,2,4}`, `{2,3,4}` have 3 cities, 2 links and span 2, and `{1,2,3,4}` has 4 cities, 3 links and span 2, so `answer[1] = 4`. `{1,3,4}` has no links. Nothing has span 3, giving `[3, 4, 0]`.\n\n## Complexity\n\n- Time: O(2^n · n²): every mask checks its pairs; the searches add only O(n²).\n- Space: O(n²) for `dist`.\n\n## Pitfalls\n\n- Count only connected sets: `{1, 3}` in Example 1 has two cities at distance 2 but is not a subtree.\n- Single cities have span 0; there is no slot for them, so skip sets with fewer than two cities.\n- Cities are numbered from 1; shift them before using them as bit positions.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | neighbours of each city (0-based) |\n| `dist[i][j]` | number of roads between cities `i` and `j` in the whole tree |\n| `mask` | the current set of cities, one bit per city |\n| `cities` | how many cities the set holds |\n| `links` | roads with both ends in the set |\n| `diameter` | the largest distance between two cities of the set |\n| `answer` | subtree counts by span, at index `span - 1` |",
+  "narration": {}
+}

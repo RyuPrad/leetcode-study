@@ -1,0 +1,69 @@
+{
+  "number": 2776,
+  "title": "Convert Callback Based Function to Promise Based Function",
+  "spec": "recalled",
+  "statement": "Write `promisify(fn)`. The function `fn` is written in callback style: its first parameter is a function `callback`, and the parameters after it are ordinary inputs. When `fn` is done, it reports the outcome through that callback: `callback(data)` on success, or `callback(data, error)` on failure, where `error` is the second argument.\n\nReturn a new function that takes only the ordinary inputs and returns a **promise**. It calls `fn` with a callback of your own followed by those inputs. If your callback receives an `error`, the promise rejects with `error`; if it receives only `data`, the promise resolves with `data`.\n\nEach case describes `fn` as JSON `{ t, compute }` or `{ t, compute, error }`. It computes `data` from its inputs: `\"product\"` multiplies them all, `\"sum\"` adds them up, `\"max\"` takes the largest. When `t` is `0` it calls the callback at once, before it returns; otherwise it calls it `t` ms later. With `error` it calls `callback(data, error)`, without it `callback(data)`. The judge calls your promise-based function once with the inputs `args`, and the answer is `{ resolved: value }` or `{ rejected: reason }`: how its promise settled.",
+  "constraints": [
+    "1 <= args.length <= 100",
+    "0 <= args[i] <= 10^4",
+    "fn is { t, compute } or { t, compute, error }",
+    "0 <= fn.t <= 1000",
+    "fn.compute is \"product\", \"sum\" or \"max\"",
+    "fn.error, when given, is a string of 1 to 30 characters",
+    "With \"product\", the product of args is at most 2^53 - 1"
+  ],
+  "signature": "Object promisify(Object fn, int[] args)",
+  "entry": "promisify",
+  "kind": "function",
+  "parameters": [
+    "fn",
+    "args"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [fn, args] = input;\n  if (!fn || typeof fn !== 'object' || Array.isArray(fn)) return 'fn must be an object such as { \"t\": 0, \"compute\": \"sum\" }.';\n  const keys = Object.keys(fn).sort().join(',');\n  if (keys !== 'compute,t' && keys !== 'compute,error,t') return 'fn has t, compute and optionally error, nothing else.';\n  if (!Number.isInteger(fn.t) || fn.t < 0 || fn.t > 1000) return 'fn.t must be an integer from 0 to 1000.';\n  if (!['product', 'sum', 'max'].includes(fn.compute)) return 'fn.compute must be \"product\", \"sum\" or \"max\".';\n  if ('error' in fn && (typeof fn.error !== 'string' || fn.error.length < 1 || fn.error.length > 30)) return 'fn.error must be a string of 1 to 30 characters.';\n  if (!Array.isArray(args) || args.length < 1 || args.length > 100) return 'args needs 1 to 100 numbers.';\n  if (!args.every((x) => Number.isInteger(x) && x >= 0 && x <= 10000)) return 'Each value of args is an integer from 0 to 10^4.';\n  if (fn.compute === 'product') {\n    let product = 1;\n    for (const x of args) {\n      product *= x;\n      if (product > Number.MAX_SAFE_INTEGER) return 'With \"product\", keep the product of args at most 2^53 - 1.';\n    }\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [spec, args] = input;\n  const fn = (callback, ...values) => {\n    kit.trace(`fn(callback, ${values.join(', ')}) starts`);\n    const data = spec.compute === 'sum' ? values.reduce((total, x) => total + x, 0)\n      : spec.compute === 'max' ? Math.max(...values)\n      : values.reduce((total, x) => total * x, 1);\n    const report = () => {\n      if (typeof callback !== 'function') throw new Error('fn must receive a callback function as its first argument.');\n      if (spec.error === undefined) {\n        kit.trace(`fn calls callback(${data})`);\n        callback(data);\n      } else {\n        kit.trace(`fn calls callback(${data}, ${JSON.stringify(spec.error)})`);\n        callback(data, spec.error);\n      }\n    };\n    if (spec.t > 0) setTimeout(report, spec.t);\n    else report();\n  };\n  const promised = solve(fn);\n  if (typeof promised !== 'function') throw new Error('promisify must return a function.');\n  kit.trace(`promised(${args.join(', ')}) is called`);\n  const promise = promised(...args);\n  if (!promise || typeof promise.then !== 'function') throw new Error('The promise-based function must return a promise.');\n  return promise.then((value) => {\n    kit.trace(`The promise resolves with ${JSON.stringify(value)}`);\n    return { resolved: value };\n  }, (reason) => {\n    const rejected = reason instanceof Error ? String(reason) : reason;\n    kit.trace(`The promise rejects with ${JSON.stringify(rejected)}`);\n    return { rejected };\n  });\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn called as fn(callback, ...args); it reports through callback(data, error)\n * @return {Function} takes ...args and returns a promise\n */\nfunction promisify(fn) {\n  // Write your code here.\n  return async function (...args) {\n  };\n}\n",
+    "typescript": "type CallbackFn = (callback: (data: number, error?: string) => void, ...args: number[]) => void;\ntype Promisified = (...args: number[]) => Promise<number>;\n\nfunction promisify(fn: CallbackFn): Promisified {\n  // Write your code here.\n  return async function (...args: number[]): Promise<number> {\n  };\n}\n"
+  },
+  "api": "promisify(fn: (callback: (data: number, error?: string) => void, ...args: number[]) => void): (...args: number[]) => Promise<number>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function promisify(fn) {\n  return function (...args) {\n    return new Promise((resolve, reject) => {\n      fn((data, error) => {\n        if (error !== undefined) {\n          reject(error);\n        } else {\n          resolve(data);\n        }\n      }, ...args);\n    });\n  };\n}",
+  "brute": "function promisify(fn) {\n  return async function (...args) {\n    // First capture whatever the callback receives, then decide how to finish.\n    const outcome = await new Promise((settle) => {\n      fn((data, error) => settle({ data, error }), ...args);\n    });\n    if (outcome.error !== undefined) throw outcome.error;\n    return outcome.data;\n  };\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const compute = pick(['product', 'sum', 'max']);\n  const t = small ? (rand() < 0.5 ? 0 : 1 + Math.floor(rand() * 100)) : Math.floor(rand() * 1001);\n  const length = small ? 1 + Math.floor(rand() * 5) : 100;\n  let args;\n  if (compute === 'product') {\n    args = Array.from({ length }, () => (rand() < (small ? 0.3 : 0.85) ? 1 : Math.floor(rand() * (small ? 11 : 21))));\n    let product = args.reduce((total, x) => total * x, 1);\n    for (let i = length - 1; i >= 0 && product > Number.MAX_SAFE_INTEGER; i--) {\n      args[i] = 1;\n      product = args.reduce((total, x) => total * x, 1);\n    }\n  } else {\n    const top = small ? 10 : 10000;\n    args = Array.from({ length }, () => Math.floor(rand() * (top + 1)));\n  }\n  const spec = { t, compute };\n  if (rand() < 0.4) spec.error = pick(['Promise Rejected', 'Error', 'timeout', 'bad input', '0', 'x']);\n  return [spec, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"t":0,"compute":"product"},[1,2,3]],"expected":{"resolved":6}},
+    {"name":"Example 2","input":[{"t":0,"compute":"product","error":"Promise Rejected"},[4,5,6]],"expected":{"rejected":"Promise Rejected"}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"t":0,"compute":"sum"},[5]]},
+    {"name":"Test 2","input":[{"t":0,"compute":"sum"},[0]]},
+    {"name":"Test 3","input":[{"t":0,"compute":"product"},[0,10000,10000]]},
+    {"name":"Test 4","input":[{"t":0,"compute":"max","error":"Error"},[1]]},
+    {"name":"Test 5","input":[{"t":50,"compute":"sum"},[1,2,3,4]]},
+    {"name":"Test 6","input":[{"t":100,"compute":"product","error":"Promise Rejected"},[2,3]]},
+    {"name":"Test 7","input":[{"t":1000,"compute":"max"},[7,10000,3]]},
+    {"name":"Test 8","input":[{"t":0,"compute":"product"},[10000,10000,10000]]},
+    {"name":"Test 9","input":[{"t":10,"compute":"sum","error":"0"},[0]]},
+    {"name":"Test 10","input":[{"t":5,"compute":"max"},[0,0,0]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nA callback-style function tells you its result by calling you back; a promise tells you by settling. The bridge is the `Promise` constructor: its executor receives `resolve` and `reject`, and nothing stops you from calling them later, from inside some other callback. So the promise-based function creates a promise, and in its executor calls `fn` with a small callback that forwards the outcome: `reject(error)` when an error came back, `resolve(data)` otherwise. It works whether `fn` calls back immediately or much later. (The brute force first resolves an inner promise with whatever the callback received, then throws or returns from an `async` function.)\n\n## Approach\n\n1. `promisify(fn)` returns a new function that collects its inputs in `args`.\n2. That function returns `new Promise((resolve, reject) => ...)`.\n3. Inside the executor, call `fn` with a callback `(data, error) => ...` as the first argument and spread `...args` after it.\n4. In the callback, if `error` is not `undefined`, call `reject(error)`; otherwise call `resolve(data)`.\n\n## Example 1, step by step\n\n`fn` multiplies its inputs and calls back at once; the inputs are `[1, 2, 3]`.\n\n- `promised(1, 2, 3)` creates a promise; its executor calls `fn(callback, 1, 2, 3)`.\n- `fn` computes `data = 6` and calls `callback(6)`, so `error` is `undefined`.\n- The callback calls `resolve(6)`; the promise resolves with `6`, and the answer is `{ resolved: 6 }`.\n\n## Complexity\n\n- Time: O(1) on top of `fn` itself: one promise and one callback per call.\n- Space: O(1) besides the inputs held until `fn` calls back.\n\n## Pitfalls\n\n- The callback's argument order here is `(data, error)`, the reverse of Node's `(error, data)` convention; swapping them resolves with the error.\n- Deciding by `data` (`if (data) resolve(data)`) fails when the result is `0`; decide by `error`.\n- Calling `fn(...args)` without your callback in front shifts every input by one place.\n- Returning the promise from inside the callback does nothing; the promise must be created outside and **returned** by the new function.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `fn` | the callback-style function being wrapped |\n| `args` | the ordinary inputs passed to the promise-based function |\n| `resolve`, `reject` | settle the returned promise with a value or a reason |\n| `data` | the result `fn` passes to the callback |\n| `error` | the failure reason `fn` passes as the second argument, if any |",
+  "narration": {
+    "1": "promisify receives the callback-style fn and returns a promise-based version of it.",
+    "2": "The new function collects every ordinary input in args.",
+    "3": "It returns a promise; resolve and reject can be called later, from fn's callback.",
+    "4": "Call fn with our own callback first, so fn reports its outcome to us.",
+    "5": "A second argument means fn failed.",
+    "6": "Reject the promise with the error fn reported.",
+    "8": "No error: resolve the promise with the data fn produced.",
+    "10": "The ordinary inputs follow the callback, in their original order."
+  }
+}

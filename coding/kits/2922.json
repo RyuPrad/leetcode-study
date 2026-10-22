@@ -1,0 +1,58 @@
+{
+  "number": 2922,
+  "title": "Market Analysis III",
+  "spec": "recalled",
+  "statement": "An online market records sellers, the items on sale and every order:\n\n- `Users(seller_id, join_date, favorite_brand)`: one row per seller; `seller_id` is unique. `favorite_brand` is the brand that seller likes best.\n- `Orders(order_id, order_date, item_id, seller_id)`: one row per sale; `order_id` is unique. `item_id` names a row of `Items` and `seller_id` names a row of `Users`. The same item may be sold many times, by the same or by different sellers.\n- `Items(item_id, item_brand)`: one row per item; `item_id` is unique.\n\nFor each seller, count the **distinct** items they sold whose `item_brand` differs from that seller's `favorite_brand`. Selling the same item twice counts once, and items of the favorite brand do not count at all.\n\nReport the seller (or sellers, on a tie) with the largest such count, as `seller_id` and `num_items` (the count). A seller with no qualifying sale is never reported; if nobody has one, the result is empty. Order the rows by `seller_id` ascending.",
+  "constraints": [
+    "seller_id is unique in Users",
+    "order_id is unique in Orders",
+    "item_id is unique in Items",
+    "Every Orders.item_id exists in Items and every Orders.seller_id exists in Users",
+    "Brands and dates are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["seller_id","INT"],["join_date","DATE"],["favorite_brand","VARCHAR(10)"]],
+    "Orders": [["order_id","INT"],["order_date","DATE"],["item_id","INT"],["seller_id","INT"]],
+    "Items": [["item_id","INT"],["item_brand","VARCHAR(10)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Users = [], Orders = [], Items = [] }] = input;\n  const sellers = new Set(), items = new Set(), orders = new Set();\n  for (const [id, joined, brand] of Users) {\n    if (id === null || joined === null || brand === null) return 'Users rows cannot hold nulls.';\n    if (sellers.has(id)) return `seller_id ${id} appears twice in Users.`;\n    sellers.add(id);\n  }\n  for (const [id, brand] of Items) {\n    if (id === null || brand === null) return 'Items rows cannot hold nulls.';\n    if (items.has(id)) return `item_id ${id} appears twice in Items.`;\n    items.add(id);\n  }\n  for (const [id, date, item, seller] of Orders) {\n    if (id === null || date === null) return 'Orders rows need an order_id and an order_date.';\n    if (orders.has(id)) return `order_id ${id} appears twice in Orders.`;\n    orders.add(id);\n    if (!items.has(item)) return `Order ${id} names item ${item}, which is not in Items.`;\n    if (!sellers.has(seller)) return `Order ${id} names seller ${seller}, who is not in Users.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH other_brand AS (\n  SELECT o.seller_id, COUNT(DISTINCT o.item_id) AS num_items\n  FROM Orders AS o\n  JOIN Users AS u\n    ON u.seller_id = o.seller_id\n  JOIN Items AS i\n    ON i.item_id = o.item_id\n  WHERE i.item_brand <> u.favorite_brand\n  GROUP BY o.seller_id\n)\nSELECT seller_id, num_items\nFROM other_brand\nWHERE num_items = (SELECT MAX(num_items) FROM other_brand)\nORDER BY seller_id;",
+  "brute": "SELECT seller_id, num_items\nFROM (\n  SELECT seller_id, num_items, RANK() OVER (ORDER BY num_items DESC) AS place\n  FROM (\n    SELECT u.seller_id,\n      (SELECT COUNT(DISTINCT o.item_id)\n       FROM Orders AS o, Items AS i\n       WHERE o.seller_id = u.seller_id AND i.item_id = o.item_id AND i.item_brand <> u.favorite_brand) AS num_items\n    FROM Users AS u\n  ) AS counts\n  WHERE num_items > 0\n) AS ranked\nWHERE place = 1\nORDER BY seller_id",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const brands = ['Lenovo', 'Samsung', 'LG', 'HP'];\n  const favorites = ['Lenovo', 'Samsung', 'LG', 'HP', 'Apple'];\n  const day = (month, last) => `2019-${String(month).padStart(2, '0')}-${String(1 + Math.floor(rand() * last)).padStart(2, '0')}`;\n  const small = size === 'small';\n  const userCount = small ? Math.floor(rand() * 6) : 300;\n  const itemCount = small ? Math.floor(rand() * 6) : 400;\n  const orderCount = small ? Math.floor(rand() * 9) : 1800;\n  // Small cases use scattered ids so the output order is tested; large ones use 1..n.\n  const ids = n => {\n    const pool = Array.from({ length: small ? 9 : n }, (_, i) => i + 1);\n    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    return pool.slice(0, n);\n  };\n  const Users = ids(userCount).map(id => [id, day(1 + Math.floor(rand() * 2), 28), pick(favorites)]);\n  const Items = ids(itemCount).map(id => [id, pick(brands)]);\n  const Orders = [];\n  if (Users.length && Items.length) {\n    for (let i = 1; i <= orderCount; i++) Orders.push([i, day(8, 28), pick(Items)[0], pick(Users)[0]]);\n  }\n  return [{ Users, Orders, Items }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"2019-01-01","Lenovo"],[2,"2019-02-09","Samsung"],[3,"2019-01-19","LG"]],"Orders":[[1,"2019-08-01",4,2],[2,"2019-08-02",2,3],[3,"2019-08-03",3,3],[4,"2019-08-04",1,2],[5,"2019-08-04",4,2]],"Items":[[1,"Samsung"],[2,"Lenovo"],[3,"LG"],[4,"HP"]]}],"expected":{"columns":["seller_id","num_items"],"rows":[[2,1],[3,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[[1,"2019-01-01","LG"]],"Orders":[],"Items":[[1,"HP"]]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"2019-01-01","LG"],[2,"2019-01-05","HP"]],"Orders":[[1,"2019-08-01",1,1],[2,"2019-08-02",2,2],[3,"2019-08-03",1,1]],"Items":[[1,"LG"],[2,"HP"]]}]},
+    {"name":"Test 3","input":[{"Users":[[7,"2019-02-01","Samsung"]],"Orders":[[1,"2019-08-01",3,7]],"Items":[[3,"Lenovo"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"2019-01-01","LG"],[2,"2019-01-02","LG"]],"Orders":[[1,"2019-08-01",1,1],[2,"2019-08-02",1,1],[3,"2019-08-03",1,1],[4,"2019-08-04",2,2],[5,"2019-08-05",3,2]],"Items":[[1,"HP"],[2,"Samsung"],[3,"Lenovo"]]}]},
+    {"name":"Test 5","input":[{"Users":[[9,"2019-01-01","HP"],[4,"2019-01-02","LG"],[6,"2019-01-03","Apple"]],"Orders":[[1,"2019-08-01",1,9],[2,"2019-08-01",2,4],[3,"2019-08-02",1,6]],"Items":[[1,"Samsung"],[2,"HP"]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"2019-01-01","HP"],[2,"2019-01-02","LG"]],"Orders":[[1,"2019-08-01",1,1],[2,"2019-08-02",2,1],[3,"2019-08-03",3,1],[4,"2019-08-04",4,2],[5,"2019-08-05",3,2]],"Items":[[1,"HP"],[2,"HP"],[3,"Samsung"],[4,"Lenovo"]]}]},
+    {"name":"Test 7","input":[{"Users":[[1,"2019-01-01","Lenovo"],[2,"2019-01-02","Samsung"],[3,"2019-01-03","Apple"]],"Orders":[[1,"2019-08-01",1,1],[2,"2019-08-01",1,2],[3,"2019-08-01",1,3],[4,"2019-08-02",2,2]],"Items":[[1,"HP"],[2,"LG"]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"2019-01-01","Apple"],[2,"2019-01-02","HP"],[3,"2019-01-03","LG"]],"Orders":[[1,"2019-08-01",1,2],[2,"2019-08-02",2,2],[3,"2019-08-03",3,3]],"Items":[[1,"HP"],[2,"HP"],[3,"Lenovo"]]}]},
+    {"name":"Test 9","input":[{"Users":[[1,"2019-01-01","LG"],[2,"2019-01-02","HP"],[3,"2019-01-03","Samsung"],[12,"2019-02-20","Apple"]],"Orders":[[1,"2019-08-01",1,1],[2,"2019-08-02",2,2],[3,"2019-08-03",3,3],[4,"2019-08-04",1,12],[5,"2019-08-05",2,12],[6,"2019-08-06",3,12],[7,"2019-08-07",4,12]],"Items":[[1,"HP"],[2,"Samsung"],[3,"LG"],[4,"Lenovo"]]}]},
+    {"name":"Test 10","input":[{"Users":[[5,"2019-01-10","Samsung"],[3,"2019-01-11","LG"]],"Orders":[[1,"2019-08-01",1,5],[2,"2019-08-02",2,5],[3,"2019-08-03",3,3],[4,"2019-08-04",2,3]],"Items":[[1,"Samsung"],[2,"LG"],[3,"HP"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWhether a sale counts depends on two other tables at once: the seller's favorite brand lives in `Users` and the item's brand lives in `Items`. Joining all three puts both brands on each order row, so one `WHERE` comparison discards favorite-brand sales. Counting **distinct** `item_id` per seller then gives the score, and the winners are the sellers whose score equals the maximum.\n\n## Approach\n\n1. CTE `other_brand`: join `Orders` (`o`) to `Users` (`u`) and `Items` (`i`), keep rows where `i.item_brand <> u.favorite_brand`, and group by seller with `COUNT(DISTINCT o.item_id) AS num_items`.\n2. Compare each seller's `num_items` with `(SELECT MAX(num_items) FROM other_brand)` and keep the ties at the top.\n3. `ORDER BY seller_id`.\n\n## Example 1, step by step\n\n- Seller 1 (Lenovo) has no orders, so the CTE has no row for them.\n- Seller 2 (Samsung) sold item 4 (HP) twice and item 1 (Samsung) once. The Samsung sale is filtered out; the two HP sales are one distinct item, so `num_items = 1`.\n- Seller 3 (LG) sold item 2 (Lenovo) and item 3 (LG). Only the Lenovo item counts: `num_items = 1`.\n- `other_brand` is `(2, 1), (3, 1)`; the maximum is 1, both sellers keep it, giving rows `(2, 1)` and `(3, 1)`.\n\n## Complexity\n\n- Time: O(O) join work with hashed keys plus grouping, for O orders; the maximum is one more pass over at most U sellers.\n- Space: O(O) for the joined rows and the per-seller distinct sets.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(o.item_id)` counts repeat sales of the same item; the score is about distinct items.\n- Comparing `item_brand` with the favorite of the wrong table (or skipping `Users`) counts favorite-brand items.\n- `ORDER BY num_items DESC LIMIT 1` drops tied winners.\n- Starting from `Users` with a left join would give silent sellers a count of 0 and could report them when nobody qualifies.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `o` | `Orders`, one row per sale |\n| `u` | `Users`, supplying the seller's `favorite_brand` |\n| `i` | `Items`, supplying each sold item's `item_brand` |\n| `other_brand` | per seller, the number of distinct non-favorite items sold |\n| `num_items` | that count, also the reported column |",
+  "narration": {
+    "1": "The CTE other_brand scores each seller by distinct items sold outside their favorite brand.",
+    "2": "Count each item once per seller, however many times it was sold.",
+    "4": "Join the seller's row to bring in their favorite brand.",
+    "6": "Join the item's row to bring in the brand of what was sold.",
+    "8": "Drop sales whose item brand equals the seller's favorite brand.",
+    "9": "One group per seller, so the count is per seller.",
+    "13": "Keep only the sellers whose score equals the best score, which keeps every tie.",
+    "14": "List the winners by seller_id ascending."
+  }
+}

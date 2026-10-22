@@ -1,0 +1,63 @@
+{
+  "number": 1521,
+  "title": "Find a Value of a Mysterious Function Closest to Target",
+  "spec": "leetcode",
+  "statement": "You are given an integer array `arr` and an integer `target`. For two indices `l` and `r` of `arr` (each from `0` to `arr.length - 1`), the function `func(arr, l, r)` is defined as the bitwise AND `arr[l] & arr[l + 1] & ... & arr[r]` when `l <= r`, and as `-1000000000` when `r < l`.\n\nOver all such pairs `(l, r)`, return the smallest possible value of `|func(arr, l, r) - target|`.",
+  "constraints": [
+    "1 <= arr.length <= 10^5",
+    "1 <= arr[i] <= 10^6",
+    "0 <= target <= 10^7"
+  ],
+  "signature": "int closestToTarget(int[] arr, int target)",
+  "entry": "closestToTarget",
+  "kind": "function",
+  "parameters": [
+    "arr",
+    "target"
+  ],
+  "validator": "function validate([arr, target]) {\n  if (!Array.isArray(arr) || arr.length < 1 || arr.length > 100000) return 'arr needs 1 to 10^5 values.';\n  if (arr.some(v => !Number.isInteger(v) || v < 1 || v > 1000000)) return 'Each arr[i] is an integer from 1 to 10^6.';\n  if (!Number.isInteger(target) || target < 0 || target > 10000000) return 'target is an integer from 0 to 10^7.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function closestToTarget(arr, target) {\n  let best = Infinity;\n  let ands = [];\n  for (const value of arr) {\n    const next = [value];\n    for (const prev of ands) {\n      const merged = prev & value;\n      if (merged !== next[next.length - 1]) {\n        next.push(merged);\n      }\n    }\n    for (const result of next) {\n      best = Math.min(best, Math.abs(result - target));\n    }\n    ands = next;\n  }\n  return best;\n}",
+  "brute": "function closestToTarget(arr, target) {\n  // Try every pair l <= r, recomputing the AND from scratch (r < l only gives -10^9, which never wins).\n  let best = Infinity;\n  for (let l = 0; l < arr.length; l++) {\n    for (let r = l; r < arr.length; r++) {\n      let and = arr[l];\n      for (let i = l + 1; i <= r; i++) and = and & arr[i];\n      best = Math.min(best, Math.abs(and - target));\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const style = pick(4);\n  const n = size === 'large' ? 1500 + pick(501) : 1 + pick(10);\n  const bits = size === 'large' ? 20 : 3 + pick(4);\n  const limit = Math.min(1000000, 2 ** bits - 1);\n  const make = () => {\n    if (style === 0) return 1 + pick(limit);\n    // Dense values that lose only a few bits keep long ANDs non-zero and varied.\n    let value = limit;\n    const drops = 1 + pick(style === 1 ? 2 : 4);\n    for (let k = 0; k < drops; k++) value &= ~(1 << pick(bits));\n    if (style === 3 && rand() < 0.3) value = 1 << pick(bits);\n    return Math.min(1000000, Math.max(1, value));\n  };\n  const arr = Array.from({ length: n }, make);\n  const roll = rand();\n  let target;\n  if (roll < 0.2) target = 0;\n  else if (roll < 0.35) target = pick(10000001);\n  else if (roll < 0.6) target = arr[pick(n)] + pick(5) - 2;\n  else target = pick(limit + 2);\n  return [arr, Math.max(0, target)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[9,12,3,7,15],5],"expected":2},
+    {"name":"Example 2","input":[[1000000,1000000,1000000],1],"expected":999999},
+    {"name":"Example 3","input":[[1,2,4,8,16],0],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],5]},
+    {"name":"Test 2","input":[[5],0]},
+    {"name":"Test 3","input":[[1],10000000]},
+    {"name":"Test 4","input":[[7,7,7,7],6]},
+    {"name":"Test 5","input":[[15,14,13,11,7],4]},
+    {"name":"Test 6","input":[[1000000,999999,524288,786432],600000]},
+    {"name":"Test 7","input":[[6,3,12,10],1]},
+    {"name":"Test 8","input":[[999999,999935,999423,991231],999000]},
+    {"name":"Test 9","input":[[31,30,29,27,23,15],17]},
+    {"name":"Test 10","input":[[2,4,8,16,32],100]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":37,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every pair `(l, r)` is O(n²) ANDs, too slow for `10^5` values. (Pairs with `r < l` give `-10^9`, which is never closest because every AND is at least 0 and `target` is at most `10^7`.) The key fact is about bits: extending a subarray can only switch bits off. So among the subarrays that end at one index, the AND values form a chain where each new value drops at least one bit, and since `arr[i] <= 10^6 < 2^20` there are at most about 20 distinct values. Keeping just those distinct values while sweeping right gives every reachable AND.\n\n## Approach\n\n1. `ands` holds the distinct AND values of the subarrays ending at the previous index, from shortest to longest (largest to smallest).\n2. For the next `value`, the subarray of length one gives `value` itself; each older result `prev` extends to `prev & value`. Because the list stays ordered, a repeat can only equal the last entry of `next`, so it is skipped.\n3. Compare every entry of `next` with `target` and keep the smallest distance in `best`.\n4. Replace `ands` with `next` and continue; return `best` at the end.\n\n## Example 1, step by step\n\n`arr = [9, 12, 3, 7, 15]`, `target = 5`.\n\n- `9`: `next = [9]`, `best = 4`.\n- `12`: `next = [12, 9 & 12 = 8]`, distances 7 and 3, `best = 3`.\n- `3`: `next = [3, 12 & 3 = 0]` (`8 & 3 = 0` is a repeat), distance 2, `best = 2`.\n- `7`: `next = [7, 3, 0]`; `15`: `next = [15, 7, 3, 0]`. Nothing gets closer than 2, so the answer is `2`.\n\n## Complexity\n\n- Time: O(n log M), where M is the largest value: each index handles at most about 20 distinct ANDs.\n- Space: O(log M) for the two short lists.\n\n## Pitfalls\n\n- Keeping every AND (not just distinct ones) brings back O(n²) work, for example when all values are equal.\n- Skipping repeats by looking only at the last entry of `next` is safe because the list stays ordered from largest to smallest; in an unordered list it would miss repeats.\n- The closest AND may lie above `target` or below it, so compare every value in `next`, not just the first one that drops below `target`.\n- `best` must start larger than any possible distance (up to `10^7`).\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `best` | smallest distance to `target` found so far |\n| `ands` | distinct AND values of subarrays ending at the previous index |\n| `value` | the current element `arr[i]` |\n| `next` | distinct AND values of subarrays ending at the current index |\n| `prev`, `merged` | an older AND value and that value extended by `value` |\n| `result` | one candidate AND value compared with `target` |",
+  "narration": {
+    "2": "No distance found yet, so start above every possible one.",
+    "3": "No subarray ends before the first element, so the list of ANDs starts empty.",
+    "4": "Sweep the array; value becomes the right end of the subarrays.",
+    "5": "The subarray holding only value has AND equal to value.",
+    "6": "Every subarray ending one step earlier can be extended by value.",
+    "7": "Extending can only switch bits off.",
+    "8": "The list is ordered, so a repeated AND can only equal the last one kept.",
+    "9": "Keep only new values: there are at most about 20 per index.",
+    "12": "Check every AND that ends at this index.",
+    "13": "Keep the smallest distance to target.",
+    "15": "These ANDs become the starting point for the next index.",
+    "17": "Return the closest distance found."
+  }
+}

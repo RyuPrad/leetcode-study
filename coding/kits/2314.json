@@ -1,0 +1,51 @@
+{
+  "number": 2314,
+  "title": "The First Day of the Maximum Recorded Degree in Each City",
+  "spec": "recalled",
+  "statement": "One table holds daily temperature readings:\n\n- `Weather(city_id, day, degree)`: the temperature `degree` recorded in city `city_id` on date `day`. The pair `(city_id, day)` is unique, so a city has at most one reading per day. Degrees may be negative.\n\nFor every city that appears in `Weather`, report the reading with the city's highest `degree`. When the highest degree was recorded on several days, report the earliest of those days. Output the columns `city_id`, `day` and `degree`, one row per city, ordered by `city_id` ascending.",
+  "constraints": [
+    "(city_id, day) is unique in Weather",
+    "degree may be negative",
+    "Each city appears at least once, so it has a maximum"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Weather": [["city_id","INT"],["day","DATE"],["degree","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Weather = [] }] = input;\n  const seen = new Set();\n  for (const [city, day, degree] of Weather) {\n    if (city === null || day === null) return 'Every reading needs a city_id and a day.';\n    if (degree === null) return `City ${city} on ${day} needs a degree.`;\n    const key = `${city}|${day}`;\n    if (seen.has(key)) return `City ${city} has two readings on ${day}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    city_id,\n    day,\n    degree,\n    ROW_NUMBER() OVER (\n      PARTITION BY city_id\n      ORDER BY degree DESC, day ASC\n    ) AS rn\n  FROM Weather\n)\nSELECT city_id, day, degree\nFROM ranked\nWHERE rn = 1\nORDER BY city_id;",
+  "brute": "SELECT w.city_id, w.day, w.degree\nFROM Weather AS w\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Weather AS other\n  WHERE other.city_id = w.city_id\n    AND (other.degree > w.degree OR (other.degree = w.degree AND other.day < w.day))\n)\nORDER BY w.city_id",
+  "generator": "function generate(rand, size) {\n  const pad = value => String(value).padStart(2, '0');\n  const dayAt = offset => {\n    const d = new Date(Date.UTC(2021, 11, 25) + offset * 86400000);\n    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;\n  };\n  const Weather = [];\n  if (size === 'small') {\n    // Few cities, few days and a narrow degree range, so maxima tie often.\n    const cities = [1, 2, 3, 4], days = [0, 3, 7, 8, 30, 200].map(dayAt);\n    const pairs = [];\n    for (const city of cities) for (const day of days) pairs.push([city, day]);\n    for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }\n    const count = Math.floor(rand() * 9);\n    for (const [city, day] of pairs.slice(0, count)) Weather.push([city, day, Math.floor(rand() * 5) - 3]);\n  } else {\n    // 40 cities with 50 readings each, inserted in shuffled order.\n    for (let city = 1; city <= 40; city++) for (let k = 0; k < 50; k++) Weather.push([city, dayAt(k * 7 + Math.floor(rand() * 7)), Math.floor(rand() * 30) - 10]);\n    for (let i = Weather.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Weather[i], Weather[j]] = [Weather[j], Weather[i]]; }\n  }\n  return [{ Weather }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Weather":[[1,"2022-01-07",-12],[1,"2022-03-07",5],[1,"2022-07-07",24],[2,"2022-08-07",37],[2,"2022-08-17",37],[3,"2022-02-07",-7],[3,"2022-12-07",-6]]}],"expected":{"columns":["city_id","day","degree"],"rows":[[1,"2022-07-07",24],[2,"2022-08-07",37],[3,"2022-12-07",-6]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Weather":[]}]},
+    {"name":"Test 2","input":[{"Weather":[[5,"2022-05-01",18]]}]},
+    {"name":"Test 3","input":[{"Weather":[[1,"2022-06-20",30],[1,"2022-06-02",30],[1,"2022-06-11",30],[1,"2022-06-01",29]]}]},
+    {"name":"Test 4","input":[{"Weather":[[2,"2022-01-03",-15],[2,"2022-01-01",-20],[2,"2022-01-02",-15],[2,"2022-01-04",-18]]}]},
+    {"name":"Test 5","input":[{"Weather":[[3,"2022-03-01",4],[1,"2022-02-01",9],[2,"2022-02-01",9],[3,"2022-02-01",7],[1,"2022-01-01",2]]}]},
+    {"name":"Test 6","input":[{"Weather":[[7,"2022-01-05",0],[7,"2022-01-01",-1],[7,"2022-01-09",0],[4,"2022-01-05",-2]]}]},
+    {"name":"Test 7","input":[{"Weather":[[1,"2022-01-01",12],[1,"2021-12-31",12],[1,"2021-12-30",11],[2,"2021-12-31",3],[2,"2022-01-01",8]]}]},
+    {"name":"Test 8","input":[{"Weather":[[1,"2022-04-01",21],[1,"2022-04-02",25],[1,"2022-04-03",25],[2,"2022-04-01",25],[2,"2022-04-03",25],[2,"2022-04-02",30],[3,"2022-04-03",10]]}]},
+    {"name":"Test 9","input":[{"Weather":[[10,"2022-09-09",40],[9,"2022-09-09",40],[8,"2022-09-09",40],[10,"2022-09-08",39],[9,"2022-09-10",41]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithin each city we want one specific reading: the hottest one, and among equally hot readings the earliest. That is \"rank the rows inside each group by a two-key order and keep the first\", the textbook job of `ROW_NUMBER()`. Sorting by `degree DESC, day ASC` puts exactly the wanted reading in first place, and `ROW_NUMBER` (unlike `RANK`) never gives two rows the number 1.\n\n## Approach\n\n1. CTE `ranked`: number every reading inside its city with `ROW_NUMBER() OVER (PARTITION BY city_id ORDER BY degree DESC, day ASC)` as `rn`.\n2. Keep the rows with `rn = 1`: one per city.\n3. Select `city_id`, `day`, `degree` and sort by `city_id`.\n\n## Example 1, step by step\n\n`ranked` numbers the readings like this:\n\n- City 1: 2022-07-07 (24) gets `rn = 1`, 2022-03-07 (5) gets 2, 2022-01-07 (-12) gets 3.\n- City 2: both readings are 37, so the earlier day 2022-08-07 gets `rn = 1` and 2022-08-17 gets 2.\n- City 3: 2022-12-07 (-6) beats 2022-02-07 (-7), so it gets `rn = 1`.\n\nKeeping `rn = 1` gives (1, 2022-07-07, 24), (2, 2022-08-07, 37) and (3, 2022-12-07, -6), already in `city_id` order.\n\n## Complexity\n\n- Time: O(W log W) for W readings, dominated by sorting each city's partition.\n- Space: O(W) for the numbered rows in `ranked`.\n\n## Pitfalls\n\n- `RANK()` or `DENSE_RANK()` without the `day` tie-break gives every tied maximum rank 1, so a city appears twice.\n- `GROUP BY city_id` with `MAX(degree)` and `MIN(day)` mixes rows: `MIN(day)` is the city's earliest reading overall, not the earliest day of the maximum.\n- Joining back to `MAX(degree)` per city still returns every tied day unless you then take the minimum day.\n- Forgetting `ORDER BY city_id` fails because the order is part of the answer.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every reading with its position `rn` inside its city |\n| `rn` | 1 for the hottest reading, earliest day first among ties |\n| `PARTITION BY city_id` | restarts the numbering for each city |\n| `ORDER BY degree DESC, day ASC` | highest degree first, earlier day breaks ties |",
+  "narration": {
+    "1": "The ranked stage numbers the readings of every city from best to worst.",
+    "6": "ROW_NUMBER hands out 1, 2, 3, ... so exactly one reading per city gets 1.",
+    "7": "Numbering restarts for each city.",
+    "8": "Hottest readings come first, and among equal degrees the earlier day wins.",
+    "14": "Keeping position 1 leaves one row per city: its earliest hottest day.",
+    "15": "The answer must be sorted by city_id."
+  }
+}

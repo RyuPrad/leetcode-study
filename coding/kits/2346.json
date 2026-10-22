@@ -1,0 +1,50 @@
+{
+  "number": 2346,
+  "title": "Compute the Rank as a Percentage",
+  "spec": "recalled",
+  "statement": "One table holds exam results:\n\n- `Students(student_id, department_id, mark)`: one row per student; `student_id` is unique. Each student belongs to one department and has one mark.\n\nInside each department, rank the students by `mark` from highest to lowest: the top mark has rank 1, students with equal marks share a rank, and the next distinct mark skips the shared positions (marks 90, 80, 80, 70 get ranks 1, 2, 2, 4).\n\nFor every student report `student_id`, `department_id` and `percentage`, where\n\n`percentage = (rank - 1) * 100 / (number of students in the department - 1)`\n\nrounded to 2 decimal places. A student who is alone in their department gets `percentage = 0`. Rows may come in any order.",
+  "constraints": [
+    "student_id is unique in Students",
+    "department_id and mark are never null",
+    "mark is 0 or more"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Students": [["student_id","INT"],["department_id","INT"],["mark","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Students = [] }] = input;\n  const ids = new Set();\n  for (const [id, department, mark] of Students) {\n    if (id === null || department === null || mark === null) return 'student_id, department_id and mark are required.';\n    if (ids.has(id)) return `student_id ${id} appears twice.`;\n    ids.add(id);\n    if (mark < 0) return 'mark cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    student_id,\n    department_id,\n    RANK() OVER (PARTITION BY department_id ORDER BY mark DESC) AS dept_rank,\n    COUNT(*) OVER (PARTITION BY department_id) AS dept_size\n  FROM Students\n)\nSELECT\n  student_id,\n  department_id,\n  ROUND(IFNULL((dept_rank - 1) * 100 / (dept_size - 1), 0), 2) AS percentage\nFROM ranked;",
+  "brute": "SELECT\n  s.student_id,\n  s.department_id,\n  ROUND(IFNULL(SUM(CASE WHEN o.mark > s.mark THEN 1 ELSE 0 END) * 100 / (COUNT(*) - 1), 0), 2) AS percentage\nFROM Students AS s\nJOIN Students AS o\n  ON o.department_id = s.department_id\nGROUP BY s.student_id, s.department_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Students = [];\n  if (size === 'small') {\n    // Few departments and few marks, so ties, single-student departments and empty tables all occur.\n    const marks = [530, 610, 650, 700, 920];\n    const count = pick(9), ids = [];\n    for (let id = 1; id <= 12; id++) ids.push(id);\n    for (let i = ids.length - 1; i > 0; i--) { const j = pick(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n    for (let i = 0; i < count; i++) Students.push([ids[i], 1 + pick(3), marks[pick(marks.length)]]);\n  } else {\n    // Department sizes avoid 33, 65, 97 and 129, where a percentage could end in an exact half at the third decimal.\n    let id = 0, department = 0;\n    while (id < 1950) {\n      let size = 1 + pick(120);\n      if (size % 32 === 1 && size > 1) size++;\n      department++;\n      for (let k = 0; k < size && id < 2000; k++) Students.push([++id, department, pick(300)]);\n    }\n    for (let i = Students.length - 1; i > 0; i--) { const j = pick(i + 1); [Students[i], Students[j]] = [Students[j], Students[i]]; }\n  }\n  return [{ Students }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Students":[[2,2,650],[8,2,650],[7,1,920],[1,1,610],[3,1,530]]}],"expected":{"columns":["student_id","department_id","percentage"],"rows":[[7,1,0],[1,1,50],[3,1,100],[2,2,0],[8,2,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Students":[]}]},
+    {"name":"Test 2","input":[{"Students":[[5,3,480]]}]},
+    {"name":"Test 3","input":[{"Students":[[1,1,90],[2,1,80],[3,1,80],[4,1,70]]}]},
+    {"name":"Test 4","input":[{"Students":[[1,1,75],[2,1,75],[3,1,75],[4,1,75]]}]},
+    {"name":"Test 5","input":[{"Students":[[10,4,40],[11,4,30],[12,4,20],[13,4,10]]}]},
+    {"name":"Test 6","input":[{"Students":[[1,1,600],[2,1,500],[3,1,400],[4,1,300],[5,1,200],[6,1,100],[7,1,0],[8,2,999]]}]},
+    {"name":"Test 7","input":[{"Students":[[1,7,100],[2,7,50],[3,7,50],[4,8,50],[5,8,100]]}]},
+    {"name":"Test 8","input":[{"Students":[[1,1,0],[2,1,0],[3,1,1]]}]},
+    {"name":"Test 9","input":[{"Students":[[1,1,90],[2,1,80],[3,1,70],[4,1,60],[5,1,50],[6,1,40],[7,1,30],[8,1,20],[9,1,10]]}]},
+    {"name":"Test 10","input":[{"Students":[[3,2,500],[9,1,500],[4,2,700],[6,1,300],[1,3,200],[2,2,600]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output value needs two facts about a student's department: where the student stands in it, and how many students it holds. Both are per-department questions asked on every row, which is exactly what window functions answer without collapsing the rows. `RANK()` gives the standing with shared ranks for equal marks and gaps after them, and `COUNT(*) OVER` the same partition gives the department size. The rest is arithmetic.\n\n## Approach\n\n1. CTE `ranked`: for every student, `RANK() OVER (PARTITION BY department_id ORDER BY mark DESC)` as `dept_rank` and `COUNT(*) OVER (PARTITION BY department_id)` as `dept_size`.\n2. Compute `(dept_rank - 1) * 100 / (dept_size - 1)`. MySQL's `/` divides exactly, so no fraction is lost.\n3. A department of one student divides by zero, which MySQL turns into `null`; `IFNULL(..., 0)` makes it 0.\n4. `ROUND(..., 2)` and name the column `percentage`.\n\n## Example 1, step by step\n\n- Department 1 has 3 students: 7 (920) gets rank 1, 1 (610) rank 2, 3 (530) rank 3, so `dept_size = 3`.\n- Department 2 has students 2 and 8, both 650: both get rank 1, `dept_size = 2`.\n- Percentages: student 7 is `0 * 100 / 2 = 0`, student 1 is `1 * 100 / 2 = 50`, student 3 is `2 * 100 / 2 = 100`; students 2 and 8 are `0 * 100 / 1 = 0`.\n\n## Complexity\n\n- Time: O(n log n) for n students, to sort each department by mark for the window.\n- Space: O(n) for `ranked`.\n\n## Pitfalls\n\n- `DENSE_RANK()` closes the gaps after ties: with marks 90, 80, 80, 70 it gives 70 rank 3 instead of 4, so the last student reports 66.67 instead of 100.\n- Forgetting `PARTITION BY department_id` ranks and counts the whole school at once.\n- Sorting `mark` ascending puts the weakest student at rank 1 and swaps 0 and 100.\n- Without `IFNULL`, a single-student department reports `null`. MySQL's `PERCENT_RANK()` computes the same ratio (times 100) and already returns 0 there.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every student with their rank and their department's size |\n| `dept_rank` | 1 for the top mark in the department; equal marks share it, with gaps after |\n| `dept_size` | number of students in the student's department |\n| `percentage` | `(dept_rank - 1) * 100 / (dept_size - 1)`, 0 when alone, rounded to 2 decimals |",
+  "narration": {
+    "1": "Stage one, ranked, keeps every student and adds two per-department facts.",
+    "5": "RANK numbers students inside their department from the highest mark down; ties share a rank and leave a gap.",
+    "6": "The same partition counted without ordering gives the size of the student's department.",
+    "12": "Turn the rank into a percentage; a lone student divides by zero, gets null, and IFNULL makes it 0.",
+    "13": "Every row of ranked is one student, so no grouping is needed."
+  }
+}

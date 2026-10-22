@@ -1,0 +1,69 @@
+{
+  "number": 1505,
+  "title": "Minimum Possible Integer After at Most K Adjacent Swaps On Digits",
+  "spec": "leetcode",
+  "statement": "The string `num` holds the decimal digits of a big integer, written without leading zeros, and `k` is a budget of moves. A move exchanges two digits that sit next to each other. Using no more than `k` moves, rearrange the digits to make the number as small as possible and return it as a string.\n\nThe answer keeps all the digits of `num`, so it has the same length, and it is allowed to start with zeros. Two strings of the same length compare as numbers exactly as they compare character by character.",
+  "constraints": [
+    "1 <= num.length <= 3 * 10^4",
+    "num contains only the digits 0-9 and has no leading zeros",
+    "1 <= k <= 10^9"
+  ],
+  "signature": "String minInteger(String num, int k)",
+  "entry": "minInteger",
+  "kind": "function",
+  "parameters": [
+    "num",
+    "k"
+  ],
+  "validator": "function validate([num, k]) {\n  if (typeof num !== 'string' || num.length < 1 || num.length > 30000) return 'num needs 1 to 30000 digits.';\n  if (!/^[0-9]+$/.test(num)) return 'num may contain only the digits 0-9.';\n  if (num.length > 1 && num[0] === '0') return 'num must not start with a zero.';\n  if (!Number.isInteger(k) || k < 1 || k > 1000000000) return 'k is between 1 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minInteger(num, k) {\n  const n = num.length;\n  const positions = Array.from({ length: 10 }, () => []);\n  for (let i = 0; i < n; i++) {\n    positions[num.charCodeAt(i) - 48].push(i);\n  }\n  const heads = new Array(10).fill(0);\n  const tree = new Array(n + 1).fill(0);\n  const movedBefore = (index) => {\n    let count = 0;\n    for (let i = index; i > 0; i -= i & -i) {\n      count += tree[i];\n    }\n    return count;\n  };\n  const markMoved = (index) => {\n    for (let i = index + 1; i <= n; i += i & -i) {\n      tree[i]++;\n    }\n  };\n  const result = [];\n  for (let step = 0; step < n; step++) {\n    for (let digit = 0; digit <= 9; digit++) {\n      if (heads[digit] === positions[digit].length) continue;\n      const pos = positions[digit][heads[digit]];\n      const cost = pos - movedBefore(pos);\n      if (cost <= k) {\n        k -= cost;\n        result.push(digit);\n        markMoved(pos);\n        heads[digit]++;\n        break;\n      }\n    }\n  }\n  return result.join('');\n}",
+  "brute": "function minInteger(num, k) {\n  // Simulate the hint directly: for each slot, find the smallest digit within reach and bubble it forward.\n  const digits = num.split('');\n  let budget = k;\n  for (let start = 0; start < digits.length && budget > 0; start++) {\n    let pick = start;\n    const last = Math.min(digits.length - 1, start + budget);\n    for (let j = start + 1; j <= last; j++) if (digits[j] < digits[pick]) pick = j;\n    for (let j = pick; j > start; j--) {\n      const t = digits[j]; digits[j] = digits[j - 1]; digits[j - 1] = t;\n    }\n    budget -= pick - start;\n  }\n  return digits.join('');\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(9000, 10000) : int(1, 8);\n  // A narrow digit range gives many repeated digits; a wide one gives variety.\n  const low = int(0, 4), high = Math.min(9, low + int(1, 9));\n  let num = String(int(Math.max(1, low), Math.max(1, high)));\n  for (let i = 1; i < n; i++) num += String(int(low, high));\n  let k;\n  if (size === 'large') {\n    const scale = rand();\n    k = scale < 0.2 ? 1000000000 : scale < 0.6 ? int(1, 20000) : int(1, 3000000);\n  } else {\n    k = rand() < 0.15 ? int(20, 1000000000) : int(1, 12);\n  }\n  return [num, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":["4321",4],"expected":"1342"},
+    {"name":"Example 2","input":["100",1],"expected":"010"},
+    {"name":"Example 3","input":["36789",1000],"expected":"36789"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["9",1]},
+    {"name":"Test 2","input":["21",1]},
+    {"name":"Test 3","input":["1000000",3]},
+    {"name":"Test 4","input":["9876543210",1000000000]},
+    {"name":"Test 5","input":["9876543210",44]},
+    {"name":"Test 6","input":["5555555",10]},
+    {"name":"Test 7","input":["1234567890",8]},
+    {"name":"Test 8","input":["1234567890",9]},
+    {"name":"Test 9","input":["294984148179",11]},
+    {"name":"Test 10","input":["3141592653589793238462643383279502884197169399375105820974944592",60]},
+    {"name":"Test 11","input":["7070707070707070",5]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe leftmost digit matters most, so fill the answer from the left and always put the smallest digit you can afford there. Choosing a smaller digit for an earlier slot always beats anything later slots could gain. For a digit value, the cheapest copy to bring forward is its leftmost remaining one, and bringing it to the front of what is left costs exactly the number of digits still in front of it. Simulating those moves on the string takes O(n²); a Fenwick tree counts the digits already taken from in front of a position, which gives each cost in O(log n).\n\n## Approach\n\n1. Put the indices of every digit value `0` to `9` into `positions`, in increasing order; `heads[digit]` points at the first one not used yet.\n2. `tree` is a Fenwick tree over original indices. `movedBefore(pos)` counts how many indices smaller than `pos` were already moved into the answer, and `markMoved(pos)` records a move.\n3. For each of the `n` slots, try `digit` from 0 upward. Its candidate is `pos = positions[digit][heads[digit]]`, and `cost = pos - movedBefore(pos)` is how many remaining digits stand in front of it.\n4. Take the first digit with `cost <= k`: spend the cost, append the digit, mark `pos` as moved and advance its head. The first remaining digit always costs 0, so every slot gets filled.\n5. Join `result` into the answer string.\n\n## Example 1, step by step\n\n`num = \"4321\"`, `k = 4`. Slot 1: digit 1 sits at index 3 with nothing moved yet, so the cost is 3; `k` becomes 1 and `result` is `[1]`. Slot 2: digit 2 at index 2 costs `2 - 0 = 2 > 1`, but digit 3 at index 1 costs 1; `k` becomes 0. Slot 3: digit 2 at index 2 now has one moved index (1) before it, but that leaves 1 digit (the 4) in front, so it costs 1, too much; digit 4 at index 0 costs 0. Slot 4: digit 2 now costs `2 - 2 = 0`. The answer is `\"1342\"`.\n\n## Complexity\n\n- Time: O(n · 10 · log n): each slot tries at most 10 digits, and each try is one Fenwick query.\n- Space: O(n) for `positions`, `tree` and `result`.\n\n## Pitfalls\n\n- The cost is the current distance, not `pos - step`: digits moved from behind `pos` do not shorten it, only those from in front do.\n- `k` can be far larger than any useful number of swaps; never loop over `k`.\n- Taking a later copy of the same digit is never better; always use the leftmost unused one.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `positions` | for each digit, its original indices in order |\n| `heads` | for each digit, the next unused entry of `positions` |\n| `tree` | Fenwick tree marking original indices already moved |\n| `pos`, `cost` | the candidate's original index and the swaps it needs |\n| `result` | the digits of the answer so far |",
+  "narration": {
+    "3": "Make one list of original indices for each digit value 0 to 9.",
+    "5": "File index i under its digit; the lists come out in increasing order.",
+    "7": "heads[digit] points at the leftmost copy of that digit not used yet.",
+    "8": "The Fenwick tree marks which original indices were already moved into the answer.",
+    "11": "Walk down the tree to count moved indices smaller than index.",
+    "17": "Walk up the tree to record that this index has been moved.",
+    "22": "Fill the answer one slot at a time, from the most significant digit.",
+    "23": "Try the digits from smallest to largest; the first affordable one wins.",
+    "24": "Skip a digit whose copies are all used.",
+    "25": "Its leftmost unused copy is the cheapest one to bring forward.",
+    "26": "The swaps needed equal the digits still in front of it: its index minus those already moved from in front.",
+    "27": "Can the budget pay for bringing this digit to the front?",
+    "28": "Spend the swaps.",
+    "29": "Place the digit in the next slot of the answer.",
+    "30": "Remove its index from the remaining digits so later costs shrink.",
+    "32": "This slot is decided; move on to the next one.",
+    "36": "Join the chosen digits into the answer string."
+  }
+}

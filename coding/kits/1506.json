@@ -1,0 +1,56 @@
+{
+  "number": 1506,
+  "title": "Find Root of N-Ary Tree",
+  "spec": "recalled",
+  "statement": "You get `tree`, an array that holds every node of one tree, in no particular order. A node may have any number of children: it has a unique integer `val` and an array `children` listing its child nodes from left to right. Return the node object in `tree` that is the root, that is, the only node that is not a child of any other node.\n\nEach case is written as `[tree]`, the tree serialized breadth first: the root's value and a `null`, then, for every node in breadth-first order, its children's values followed by one `null` that closes the group (a leaf contributes only the `null`), with trailing `null`s left out. The judge builds the nodes from this, hands them to your function as an array in a scrambled order, and shows the tree hanging from the node you return in the same serialization, so a correct answer reproduces the input. (The TypeScript starter types nodes as `_Node`, which does not list `children`; the objects still have it.)\n\nFollow-up: can you find the root in linear time with only constant extra space?",
+  "constraints": [
+    "The tree has between 1 and 5 * 10^4 nodes",
+    "Node values are unique 32-bit integers"
+  ],
+  "signature": "Node findRoot(Node[] tree)",
+  "entry": "findRoot",
+  "kind": "function",
+  "parameters": [
+    "tree"
+  ],
+  "validator": "function validate([tree]) {\n  if (!Array.isArray(tree) || tree.length === 0) return 'tree is a non-empty list of values with null closing each group of children.';\n  if (tree.length > 1 && tree[1] !== null) return 'The root value must be followed by a null.';\n  const isValue = value => Number.isInteger(value) && value >= -(2 ** 31) && value < 2 ** 31;\n  if (!isValue(tree[0])) return 'The list starts with the root value, a 32-bit integer.';\n  const values = [tree[0]];\n  let owner = 0;\n  for (let i = 2; i < tree.length; i++) {\n    if (owner >= values.length) return 'Each group of children needs a node before it to own it.';\n    if (tree[i] === null) {\n      owner++;\n      continue;\n    }\n    if (!isValue(tree[i])) return 'Node values are 32-bit integers.';\n    values.push(tree[i]);\n  }\n  if (values.length > 50000) return 'The tree has at most 5 * 10^4 nodes.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values] = input;\n  class Node {\n    constructor(val, children = []) { this.val = val; this.children = children; }\n  }\n  // Rebuild the tree: nodes appear in breadth-first order, so nodes[owner] owns the group being read.\n  const root = new Node(values[0]);\n  const nodes = [root];\n  let owner = 0;\n  for (let i = 2; i < values.length; i++) {\n    if (values[i] === null) {\n      owner++;\n      continue;\n    }\n    const child = new Node(values[i]);\n    nodes[owner].children.push(child);\n    nodes.push(child);\n  }\n  // Scramble the nodes with a fixed pseudo-random order derived from the values, keeping the root away from both ends.\n  let seed = values.length * 7919 + 17;\n  for (const value of values) if (value !== null) seed = (seed * 31 + value) % 2147483647;\n  if (seed <= 0) seed += 2147483646;\n  const shuffled = nodes.slice();\n  for (let k = shuffled.length - 1; k > 0; k--) {\n    seed = (seed * 48271) % 2147483647;\n    const j = seed % (k + 1);\n    [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]];\n  }\n  const at = shuffled.indexOf(root);\n  if (shuffled.length > 2 && (at === 0 || at === shuffled.length - 1)) {\n    const middle = Math.floor(shuffled.length / 2);\n    [shuffled[at], shuffled[middle]] = [shuffled[middle], shuffled[at]];\n  }\n  const result = solve(shuffled);\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (!nodes.includes(result)) throw new Error('Return one of the node objects from tree.');\n  // Serialize the tree that hangs from the returned node, refusing anything that is not a tree.\n  const out = [result.val, null];\n  const order = [result];\n  const seen = new Set(order);\n  for (let k = 0; k < order.length; k++) {\n    if (!Array.isArray(order[k].children)) throw new Error('Every node needs a children array.');\n    for (const child of order[k].children) {\n      if (!child || typeof child !== 'object') throw new Error('children may only hold nodes.');\n      if (seen.has(child)) throw new Error('The tree must not be changed: a node is reached twice.');\n      seen.add(child);\n      order.push(child);\n      out.push(child.val);\n    }\n    out.push(null);\n  }\n  while (out.length > 0 && out[out.length - 1] === null) out.pop();\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function findRoot(tree) {\n  let xor = 0;\n  for (const node of tree) {\n    xor ^= node.val;\n    for (const child of node.children) {\n      xor ^= child.val;\n    }\n  }\n  for (const node of tree) {\n    if (node.val === xor) {\n      return node;\n    }\n  }\n  return null;\n}",
+  "brute": "function findRoot(tree) {\n  // Try each node and ask every other node whether it lists that node as a child.\n  for (const candidate of tree) {\n    let hasParent = false;\n    for (const other of tree) {\n      if (other.children.includes(candidate)) hasParent = true;\n    }\n    if (!hasParent) return candidate;\n  }\n  return null;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 900 + pick(95) : 1 + pick(10);\n  // Unique values: a shuffled run of distinct integers, sometimes shifted to include zero and negatives.\n  const shift = rand() < 0.3 ? -pick(2 * n) : rand() < 0.1 ? 2147483647 - 4 * n : 0;\n  const pool = Array.from({ length: 3 * n }, (_, k) => k + 1 + shift);\n  for (let k = pool.length - 1; k > 0; k--) {\n    const j = pick(k + 1);\n    [pool[k], pool[j]] = [pool[j], pool[k]];\n  }\n  const shape = rand();\n  const nodes = [{ val: pool[0], children: [] }];\n  while (nodes.length < n) {\n    // Deep trees grow from recent nodes, wide trees from a few early ones, mixed trees from anywhere.\n    let parent;\n    if (shape < 0.3) parent = nodes[Math.max(0, nodes.length - 1 - pick(3))];\n    else if (shape < 0.5) parent = nodes[pick(Math.min(nodes.length, 3))];\n    else parent = nodes[pick(nodes.length)];\n    const child = { val: pool[nodes.length], children: [] };\n    parent.children.push(child);\n    nodes.push(child);\n  }\n  const values = [nodes[0].val, null];\n  const order = [nodes[0]];\n  for (let k = 0; k < order.length; k++) {\n    for (const child of order[k].children) {\n      order.push(child);\n      values.push(child.val);\n    }\n    values.push(null);\n  }\n  while (values[values.length - 1] === null) values.pop();\n  return [values];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,null,3,2,4,null,5,6]],"expected":[1,null,3,2,4,null,5,6]},
+    {"name":"Example 2","input":[[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]],"expected":[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7]]},
+    {"name":"Test 2","input":[[1,null,2]]},
+    {"name":"Test 3","input":[[2,null,1]]},
+    {"name":"Test 4","input":[[0,null,5,6,7]]},
+    {"name":"Test 5","input":[[4,null,3,null,2,null,1,null,0]]},
+    {"name":"Test 6","input":[[-3,null,-1,2,null,-7,null,8,9]]},
+    {"name":"Test 7","input":[[10,null,20,30,40,50,60,null,null,70]]},
+    {"name":"Test 8","input":[[2147483647,null,-2147483648,0]]},
+    {"name":"Test 9","input":[[6,null,1,2,null,3,null,4,5]]},
+    {"name":"Test 10","input":[[100,null,1,2,3,null,4,null,5,null,6,null,7,null,8]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":29,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery node except the root is listed twice: once as an entry of `tree`, and once inside its parent's `children`. The root is listed only once, because nobody owns it. A hash set of all children would find it, but there is a trick that needs no extra memory: XOR. Since `x ^ x = 0` and XOR does not care about order, XOR-ing every value we meet cancels each value seen twice and leaves exactly the root's value. Unique values make that value point to one node.\n\n## Approach\n\n1. Start `xor` at `0`.\n2. For each `node` in `tree`, fold in `node.val`, then fold in the value of every `child` in `node.children`.\n3. After the pass, `xor` equals the root's value. Scan `tree` again and return the `node` whose `val` matches.\n\n## Example 1, step by step\n\nThe tree is `1 → [3, 2, 4]`, `3 → [5, 6]`. As nodes the values are `1, 3, 2, 4, 5, 6`; as children they are `3, 2, 4, 5, 6`. Every value but `1` occurs twice and cancels, so `xor` ends at `1`, whatever order the nodes arrive in. The second scan returns node 1, whose tree serializes back to `[1,null,3,2,4,null,5,6]`.\n\n## Complexity\n\n- Time: O(n): each node is visited once as an entry of `tree` and once as somebody's child.\n- Space: O(1): one integer, no set or recursion.\n\n## Pitfalls\n\n- Return the node object, not its value: the judge serializes the tree hanging from what you return.\n- Do not assume the root is first in `tree`; the order is scrambled.\n- The trick depends on unique values; with repeated values the XOR could point to a wrong node. A sum works the same way (add nodes, subtract children) but XOR cannot overflow.\n- Do not change `children` while scanning; the answer must still be the original tree.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `xor` | XOR of all node values and all child values seen so far |\n| `node` | the current entry of `tree` |\n| `child` | one of `node`'s children |",
+  "narration": {
+    "2": "Start the running XOR at 0, which changes nothing when XOR-ed in.",
+    "3": "Visit every node once, in whatever order the array holds them.",
+    "4": "Fold in the node's own value: every value appears here exactly once.",
+    "5": "Look at each child of this node.",
+    "6": "Fold in the child's value too: every value except the root's appears here once more and cancels.",
+    "9": "Now xor holds the root's value; scan the array to find that node.",
+    "10": "Values are unique, so the matching value identifies the root.",
+    "11": "Return the root node object itself.",
+    "14": "Not reached for a valid tree."
+  }
+}

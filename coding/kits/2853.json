@@ -1,0 +1,51 @@
+{
+  "number": 2853,
+  "title": "Highest Salaries Difference",
+  "spec": "recalled",
+  "statement": "One table lists the pay of employees in two departments:\n\n- `Salaries(emp_name, department, salary)`: one row per employee and department; `(emp_name, department)` is unique. `department` is either `'Engineering'` or `'Marketing'`, and each of the two departments has at least one row.\n\nFind the top salary in Marketing and the top salary in Engineering, and report how far apart they are as a non-negative number (the absolute value of their difference). Return a single row with one column named `salary_difference`.",
+  "constraints": [
+    "(emp_name, department) is unique in Salaries",
+    "department is 'Engineering' or 'Marketing'",
+    "Both departments have at least one employee",
+    "salary is a non-negative integer and never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salaries": [["emp_name","VARCHAR(30)"],["department","VARCHAR(30)"],["salary","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Salaries = [] }] = input;\n  const seen = new Set(), departments = new Set();\n  for (const [name, department, salary] of Salaries) {\n    if (name === null || department === null || salary === null) return 'emp_name, department and salary cannot be null.';\n    if (department !== 'Engineering' && department !== 'Marketing') return `department must be Engineering or Marketing, not ${department}.`;\n    const key = `${name.toLowerCase()}|${department}`;\n    if (seen.has(key)) return `(${name}, ${department}) appears twice in Salaries.`;\n    if (salary < 0) return 'salary cannot be negative.';\n    seen.add(key);\n    departments.add(department);\n  }\n  if (departments.size < 2) return 'Engineering and Marketing each need at least one employee.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH dept_top AS (\n  SELECT department, MAX(salary) AS top_salary\n  FROM Salaries\n  GROUP BY department\n)\nSELECT MAX(top_salary) - MIN(top_salary) AS salary_difference\nFROM dept_top;",
+  "brute": "SELECT ABS(m.salary - e.salary) AS salary_difference\nFROM (\n  SELECT DISTINCT s.salary\n  FROM Salaries AS s\n  WHERE s.department = 'Marketing'\n    AND NOT EXISTS (SELECT 1 FROM Salaries AS t WHERE t.department = 'Marketing' AND t.salary > s.salary)\n) AS m\nCROSS JOIN (\n  SELECT DISTINCT s.salary\n  FROM Salaries AS s\n  WHERE s.department = 'Engineering'\n    AND NOT EXISTS (SELECT 1 FROM Salaries AS t WHERE t.department = 'Engineering' AND t.salary > s.salary)\n) AS e",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const departments = ['Engineering', 'Marketing'];\n  const Salaries = [];\n  if (size === 'small') {\n    const names = ['Kathy', 'Roy', 'Jack', 'Evelyn', 'Arthur', 'Terry', 'Anthony', 'Edward'];\n    const pay = [30000, 42000, 53000, 61000, 85000, 102000];\n    const used = { Engineering: new Set(), Marketing: new Set() };\n    const rows = 2 + Math.floor(rand() * 7);\n    for (let i = 0; i < rows; i++) {\n      // The first two rows put one employee in each department; the rest go anywhere.\n      const department = i < 2 ? departments[i] : pick(departments);\n      const free = names.filter(name => !used[department].has(name));\n      const name = pick(free);\n      used[department].add(name);\n      Salaries.push([name, department, pick(pay)]);\n    }\n    // Shuffle so the guaranteed rows are not always first.\n    for (let i = Salaries.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Salaries[i], Salaries[j]] = [Salaries[j], Salaries[i]]; }\n  } else {\n    for (let i = 0; i < 2000; i++) {\n      const department = i < 2 ? departments[i] : pick(departments);\n      Salaries.push([`Emp${i}`, department, 1000 + Math.floor(rand() * 200000)]);\n    }\n  }\n  return [{ Salaries }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salaries":[["Kathy","Engineering",50000],["Roy","Marketing",30000],["Charles","Engineering",45000],["Jack","Engineering",85000],["Benjamin","Marketing",34000],["Anthony","Marketing",42000],["Edward","Engineering",102000],["Terry","Engineering",44000],["Evelyn","Marketing",53000],["Arthur","Engineering",32000]]}],"expected":{"columns":["salary_difference"],"rows":[[49000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salaries":[["Ana","Marketing",70000],["Ben","Engineering",40000]]}]},
+    {"name":"Test 2","input":[{"Salaries":[["Ana","Marketing",40000],["Ben","Engineering",65000]]}]},
+    {"name":"Test 3","input":[{"Salaries":[["Ana","Marketing",50000],["Ben","Engineering",50000],["Cid","Engineering",20000]]}]},
+    {"name":"Test 4","input":[{"Salaries":[["Ana","Engineering",90000],["Ben","Engineering",90000],["Cid","Marketing",30000],["Dee","Marketing",30000],["Eve","Marketing",10000]]}]},
+    {"name":"Test 5","input":[{"Salaries":[["Ana","Engineering",80000],["Ana","Marketing",95000],["Ben","Engineering",20000],["Ben","Marketing",5000]]}]},
+    {"name":"Test 6","input":[{"Salaries":[["Ana","Engineering",1000],["Ben","Engineering",2000],["Cid","Engineering",3000],["Dee","Engineering",4000],["Eve","Marketing",100000]]}]},
+    {"name":"Test 7","input":[{"Salaries":[["Ana","Marketing",0],["Ben","Engineering",0],["Cid","Engineering",0]]}]},
+    {"name":"Test 8","input":[{"Salaries":[["Ana","Marketing",60000],["Ben","Marketing",59000],["Cid","Marketing",58000],["Dee","Engineering",61000],["Eve","Engineering",12000],["Fay","Engineering",3000]]}]},
+    {"name":"Test 9","input":[{"Salaries":[["Zed","Engineering",45000],["Yan","Marketing",120000],["Xia","Marketing",15000],["Wes","Engineering",44999]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly two numbers matter: the largest salary in each department. Once those two maxima sit side by side, the gap between them is just the larger minus the smaller, which is the absolute difference without needing to know which department pays more.\n\n## Approach\n\n1. In the CTE `dept_top`, `GROUP BY department` and keep `MAX(salary)` as `top_salary`. With exactly two departments this yields exactly two rows.\n2. Over those two rows, `MAX(top_salary) - MIN(top_salary)` is the bigger top salary minus the smaller one, so the result is never negative.\n3. Name the result `salary_difference`.\n\n## Example 1, step by step\n\n- Engineering salaries are 50000, 45000, 85000, 102000, 44000 and 32000, so its `top_salary` is 102000.\n- Marketing salaries are 30000, 34000, 42000 and 53000, so its `top_salary` is 53000.\n- `dept_top` therefore holds (Engineering, 102000) and (Marketing, 53000).\n- The final select returns 102000 − 53000 = 49000.\n\n## Complexity\n\n- Time: O(n) for n salary rows; one grouping pass, then two rows to combine.\n- Space: O(1) beyond the two-row CTE.\n\n## Pitfalls\n\n- Subtracting the Engineering maximum from the Marketing maximum directly gives a negative number when Engineering pays more; take the absolute value or subtract the smaller maximum from the larger.\n- `MAX(salary) - MIN(salary)` over the whole table compares the best-paid and worst-paid employees, not the two department maxima.\n- Using `SUM` or `AVG` instead of `MAX` measures department totals or averages, not the highest salary.\n- When both maxima are equal the answer is 0, not an empty result.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `dept_top` | one row per department with its highest salary |\n| `top_salary` | `MAX(salary)` inside a department |\n| `salary_difference` | larger department maximum minus the smaller one |",
+  "narration": {
+    "1": "The CTE dept_top collapses each department to a single row.",
+    "2": "For every department keep its highest salary as top_salary.",
+    "4": "Grouping by department yields one row for Engineering and one for Marketing.",
+    "6": "The larger top salary minus the smaller one is the absolute difference, whichever department pays more.",
+    "7": "Read the two department maxima from the CTE."
+  }
+}

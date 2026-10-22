@@ -1,0 +1,105 @@
+{
+  "number": 1500,
+  "title": "Design a File Sharing System",
+  "spec": "recalled",
+  "statement": "A large file is split into `m` chunks numbered `1` to `m`, and users pass these chunks to each other through a system you build as the class `FileSharing`.\n\n- `FileSharing(m)` sets up the system for a file of `m` chunks, with no users yet.\n- `join(ownedChunks)` adds a new user who already holds the chunks listed in `ownedChunks` (distinct chunk numbers, possibly none). The user is given the smallest positive integer id that no user currently in the system has; ids of users who have left may be handed out again. Return that id.\n- `leave(userID)` removes the user. Their chunks can no longer be obtained from them, and their id becomes free.\n- `request(userID, chunkID)`: user `userID` asks for chunk `chunkID`. Return, in increasing order, the ids of all users now in the system who hold that chunk (this includes `userID` if they already held it). If that list is not empty, `userID` holds the chunk from then on; the returned list still reflects the moment before the request. If it is empty, nothing changes.\n\nEvery `userID` passed to `leave` and `request` belongs to a user who is currently in the system.",
+  "constraints": [
+    "1 <= m <= 10^5",
+    "0 <= ownedChunks.length <= min(100, m)",
+    "1 <= ownedChunks[i] <= m",
+    "The values in ownedChunks are distinct",
+    "1 <= chunkID <= m",
+    "userID always names a user currently in the system (when ids are assigned correctly)",
+    "Every leave matches an earlier join",
+    "At most 10^4 calls in total are made to join, leave and request"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "FileSharing",
+    "constructor": "FileSharing(int m)",
+    "methods": [
+      "int join(List<Integer> ownedChunks)",
+      "void leave(int userID)",
+      "List<Integer> request(int userID, int chunkID)"
+    ]
+  },
+  "entry": "FileSharing",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "m"
+    ],
+    "join": [
+      "ownedChunks"
+    ],
+    "leave": [
+      "userID"
+    ],
+    "request": [
+      "userID",
+      "chunkID"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  if (!Array.isArray(operations) || !Array.isArray(args) || operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'FileSharing' || !Array.isArray(args[0]) || args[0].length !== 1) return 'Start with FileSharing(m).';\n  const m = args[0][0];\n  if (!Number.isInteger(m) || m < 1 || m > 100000) return 'm is a whole number from 1 to 10^5.';\n  if (operations.length - 1 > 10000) return 'At most 10^4 calls to join, leave and request.';\n  const active = new Set();\n  for (let i = 1; i < operations.length; i++) {\n    const a = args[i];\n    if (!Array.isArray(a)) return 'Each call needs an argument list.';\n    if (operations[i] === 'join') {\n      const owned = a[0];\n      if (a.length !== 1 || !Array.isArray(owned)) return 'join takes one list, ownedChunks.';\n      if (owned.length > Math.min(100, m)) return 'ownedChunks has at most min(100, m) chunks.';\n      if (owned.some(c => !Number.isInteger(c) || c < 1 || c > m)) return 'Chunk numbers go from 1 to m.';\n      if (new Set(owned).size !== owned.length) return 'ownedChunks cannot repeat a chunk.';\n      let id = 1;\n      while (active.has(id)) id++;\n      active.add(id);\n    } else if (operations[i] === 'leave') {\n      if (a.length !== 1 || !active.has(a[0])) return 'leave needs the id of a user currently in the system.';\n      active.delete(a[0]);\n    } else if (operations[i] === 'request') {\n      if (a.length !== 2 || !active.has(a[0])) return 'request needs the id of a user currently in the system.';\n      if (!Number.isInteger(a[1]) || a[1] < 1 || a[1] > m) return 'chunkID goes from 1 to m.';\n    } else {\n      return 'Only join, leave and request can follow the constructor.';\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class FileSharing {\n  constructor(m) {\n    this.nextId = 1;\n    this.freeIds = [];\n    this.owners = new Map();\n    this.chunksOf = new Map();\n  }\n\n  join(ownedChunks) {\n    const userID = this.freeIds.length > 0 ? this.takeSmallestFreeId() : this.nextId++;\n    this.chunksOf.set(userID, new Set(ownedChunks));\n    for (const chunk of ownedChunks) {\n      if (!this.owners.has(chunk)) {\n        this.owners.set(chunk, new Set());\n      }\n      this.owners.get(chunk).add(userID);\n    }\n    return userID;\n  }\n\n  leave(userID) {\n    for (const chunk of this.chunksOf.get(userID)) {\n      this.owners.get(chunk).delete(userID);\n    }\n    this.chunksOf.delete(userID);\n    this.releaseId(userID);\n  }\n\n  request(userID, chunkID) {\n    const holders = this.owners.get(chunkID);\n    if (!holders || holders.size === 0) {\n      return [];\n    }\n    const result = [...holders].sort((a, b) => a - b);\n    holders.add(userID);\n    this.chunksOf.get(userID).add(chunkID);\n    return result;\n  }\n\n  releaseId(id) {\n    const heap = this.freeIds;\n    heap.push(id);\n    let i = heap.length - 1;\n    while (i > 0 && heap[(i - 1) >> 1] > heap[i]) {\n      const parent = (i - 1) >> 1;\n      [heap[i], heap[parent]] = [heap[parent], heap[i]];\n      i = parent;\n    }\n  }\n\n  takeSmallestFreeId() {\n    const heap = this.freeIds;\n    const smallest = heap[0];\n    const last = heap.pop();\n    if (heap.length > 0) heap[0] = last;\n    let i = 0;\n    for (let child = 1; child < heap.length; child = 2 * i + 1) {\n      if (child + 1 < heap.length && heap[child + 1] < heap[child]) child++;\n      if (heap[i] <= heap[child]) break;\n      [heap[i], heap[child]] = [heap[child], heap[i]];\n      i = child;\n    }\n    return smallest;\n  }\n}",
+  "brute": "class FileSharing {\n  constructor(m) {\n    this.users = new Map();\n  }\n  join(ownedChunks) {\n    let id = 1;\n    while (this.users.has(id)) id++;\n    this.users.set(id, new Set(ownedChunks));\n    return id;\n  }\n  leave(userID) {\n    this.users.delete(userID);\n  }\n  request(userID, chunkID) {\n    const ids = [...this.users.keys()].sort((a, b) => a - b);\n    const result = ids.filter(id => this.users.get(id).has(chunkID));\n    if (result.length > 0) this.users.get(userID).add(chunkID);\n    return result;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const large = size === 'large';\n  const m = large ? [100000, 1000, int(5, 60)][int(0, 2)] : int(1, 6);\n  const calls = large ? 499 : int(1, 12);\n  const maxOwned = Math.min(m, large ? 30 : 4);\n  const pickChunk = () => rand() < 0.7 ? int(1, Math.min(m, 40)) : int(1, m);\n  const joinRate = 0.15 + rand() * 0.25;\n  const leaveRate = 0.05 + rand() * 0.2;\n  const active = new Set();\n  const operations = ['FileSharing'];\n  const args = [[m]];\n  for (let i = 0; i < calls; i++) {\n    const roll = rand();\n    if (active.size === 0 || roll < joinRate) {\n      const count = int(0, maxOwned);\n      const owned = new Set();\n      while (owned.size < count) owned.add(pickChunk());\n      let id = 1;\n      while (active.has(id)) id++;\n      active.add(id);\n      operations.push('join');\n      args.push([[...owned]]);\n    } else {\n      const ids = [...active];\n      const user = ids[int(0, ids.length - 1)];\n      if (roll < joinRate + leaveRate) {\n        active.delete(user);\n        operations.push('leave');\n        args.push([user]);\n      } else {\n        operations.push('request');\n        args.push([user, pickChunk()]);\n      }\n    }\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["FileSharing","join","join","join","request","request","leave","request","leave","join"],[[4],[[1,2]],[[2,3]],[[4]],[1,3],[2,2],[1],[2,1],[2],[[]]]],"expected":[null,1,2,3,[2],[1,2],null,[],null,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["FileSharing","join","request","join","request","request","leave","request"],[[1],[[1]],[1,1],[[]],[2,1],[2,1],[1],[2,1]]]},
+    {"name":"Test 2","input":[["FileSharing","join","join","join","leave","leave","join","join","join"],[[3],[[1]],[[2]],[[3]],[2],[1],[[]],[[3]],[[1,2,3]]]]},
+    {"name":"Test 3","input":[["FileSharing","join","join","request","request","request"],[[5],[[]],[[]],[1,5],[2,5],[1,5]]]},
+    {"name":"Test 4","input":[["FileSharing","join","join","join","request","request","leave","request"],[[3],[[1]],[[]],[[]],[2,1],[3,1],[1],[3,1]]]},
+    {"name":"Test 5","input":[["FileSharing","join","leave","join","request","request"],[[3],[[1,2]],[1],[[3]],[1,1],[1,3]]]},
+    {"name":"Test 6","input":[["FileSharing","join","join","request","request","request"],[[100000],[[100000,1]],[[50000]],[2,100000],[1,50000],[2,99999]]]},
+    {"name":"Test 7","input":[["FileSharing","join","request","request"],[[2],[[2]],[1,2],[1,1]]]},
+    {"name":"Test 8","input":[["FileSharing","join","join","join","join","join","leave","leave","leave","join","join","join","join"],[[4],[[1]],[[2]],[[3]],[[4]],[[]],[4],[2],[5],[[]],[[]],[[]],[[4]]]]},
+    {"name":"Test 9","input":[["FileSharing","join","join","request","leave","join","leave","request"],[[2],[[1]],[[]],[2,1],[2],[[]],[1],[2,1]]]},
+    {"name":"Test 10","input":[["FileSharing","join","join","join","request","request","request","leave","request","join","request"],[[6],[[1,2,3]],[[3,4]],[[5,6]],[3,3],[3,4],[1,6],[2],[3,4],[[]],[2,4]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThree questions must be answered quickly: which id does the next user get, who holds a given chunk, and which chunks does a leaving user take with them. A plain list of users can answer all of them by scanning, but each call then costs time proportional to the number of users. Instead keep two maps that mirror each other (chunk to its holders, user to their chunks) and a min-heap of ids that were freed. The smallest free id is either the top of that heap or, if the heap is empty, the next never-used id, because every id below the next never-used one is either taken or in the heap.\n\n## Approach\n\n1. `nextId` starts at 1; `freeIds` is an empty min-heap; `owners` maps a chunk to the set of users holding it; `chunksOf` maps a user to the set of chunks they hold.\n2. `join`: take the heap's smallest id if it has one, else `nextId++`. Record the user's chunks in both maps.\n3. `leave`: remove the user from `owners` for each chunk they hold, delete their `chunksOf` entry and push their id onto the heap.\n4. `request`: if nobody holds the chunk, return `[]`. Otherwise sort the holders into `result`, then add the requester to the chunk's holders (and the chunk to the requester's set) and return `result`.\n5. `releaseId` and `takeSmallestFreeId` are the usual heap push (sift up) and pop (move the last item to the top and sift it down).\n\n## Example 1, step by step\n\n`m = 4`. Three joins get ids 1, 2, 3 from `nextId`; `owners` is `1→{1}, 2→{1,2}, 3→{2}, 4→{3}`. `request(1, 3)` finds holders `{2}`, returns `[2]` and adds user 1 to chunk 3. `request(2, 2)` returns `[1, 2]`. `leave(1)` removes user 1 from chunks 1, 2 and 3 and pushes 1 onto `freeIds`. `request(2, 1)` finds no holders and returns `[]`. `leave(2)` pushes 2. `join([])` pops the smallest free id, `1`.\n\n## Complexity\n\n- Time: `join` is O(c + log u) for c owned chunks and u freed ids; `leave` is O(chunks held + log u); `request` is O(h log h) to sort its h holders.\n- Space: O(total chunks held + users).\n\n## Pitfalls\n\n- The returned list is taken before the requester is added, so a first-time requester does not appear in it.\n- A failed request (empty list) must not give the chunk to the requester.\n- Chunks gained through requests leave with the user too; keep `chunksOf` updated or stale holders remain.\n- New ids are the smallest free one, not always `nextId`: a freed id must be reused before a fresh one.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `nextId` | smallest id never handed out |\n| `freeIds` | min-heap of ids whose users left |\n| `owners` | chunk number → set of users holding it |\n| `chunksOf` | user id → set of chunks they hold |\n| `holders` | the set of users holding the requested chunk |\n| `result` | those holders sorted, as returned |\n| `heap`, `i`, `parent`, `child` | the heap array and positions during sift up and sift down |",
+  "narration": {
+    "3": "Ids from nextId upward have never been used.",
+    "4": "Ids of users who left wait in a min-heap so the smallest can be reused first.",
+    "5": "For each chunk, the set of users holding it.",
+    "6": "For each user, the set of chunks they hold, needed when they leave.",
+    "10": "Reuse the smallest freed id if there is one; otherwise hand out a fresh one.",
+    "11": "Remember which chunks this user holds.",
+    "12": "Register the user as a holder of each of their chunks.",
+    "16": "Add the user to this chunk's holders.",
+    "18": "Return the id the new user received.",
+    "22": "Go through every chunk the leaving user holds...",
+    "23": "...and drop the user from that chunk's holders.",
+    "25": "Forget the user's chunk list.",
+    "26": "Their id becomes free for a later join.",
+    "30": "Look up who holds the requested chunk.",
+    "31": "Nobody in the system holds it...",
+    "32": "...so the request fails and nothing changes.",
+    "34": "Take the holders in increasing order before the requester is added.",
+    "35": "The request succeeded: the requester now holds the chunk too.",
+    "36": "Keep the requester's own chunk list in step, so leaving removes it.",
+    "44": "Bubble the freed id up while it is smaller than its parent in the heap.",
+    "53": "The top of the min-heap is the smallest free id.",
+    "54": "Remove the last item...",
+    "55": "...and, if any items remain, move it to the top to refill the gap.",
+    "57": "Sift the moved item down while it has a child.",
+    "58": "Pick the smaller of the two children.",
+    "59": "Stop once the item is no larger than that child.",
+    "63": "Hand back the smallest free id."
+  }
+}

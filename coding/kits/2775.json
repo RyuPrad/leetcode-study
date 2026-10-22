@@ -1,0 +1,62 @@
+{
+  "number": 2775,
+  "title": "Undefined to Null",
+  "spec": "recalled",
+  "statement": "Write `undefinedToNull(obj)`. The argument `obj` is an object or an array, and its values may themselves be objects and arrays, nested to any depth. Return it with every `undefined` value, at every depth, turned into `null`; all other values stay exactly as they are, and no property or element is added or removed. You may change `obj` in place or build a new value.\n\nWhy it is useful: `JSON.stringify` silently drops an object property whose value is `undefined` (and writes `null` for one inside an array), so converting first makes the serialized result predictable.\n\nJSON has no `undefined`, so each case gives `obj` as text: JSON in which `undefined` may also appear as a value. The judge turns that text into a real object or array, calls `undefinedToNull` once, and writes the returned value back as compact text in the same notation (keys in the object's own order, `undefined` spelled out wherever one is left). That text is the answer.",
+  "constraints": [
+    "obj is an object or an array",
+    "Every value inside obj is null, a boolean, a number, a string, an array, an object or undefined",
+    "2 <= length of obj written as text <= 10^5"
+  ],
+  "signature": "String undefinedToNull(String obj)",
+  "entry": "undefinedToNull",
+  "kind": "function",
+  "parameters": [
+    "obj"
+  ],
+  "validator": "function validate(input) {\n  const [text] = input;\n  if (typeof text !== 'string' || text.length < 2 || text.length > 100000) return 'obj must be text of 2 to 10^5 characters.';\n  if (text.includes('\\u0000') || /\\\\u0000/i.test(text)) return 'obj must not contain the character U+0000.';\n  // Write each bare undefined as a marker string, parse the JSON, then check its shape.\n  let json = '', inString = false;\n  for (let i = 0; i < text.length; i++) {\n    const ch = text[i];\n    if (inString) {\n      json += ch;\n      if (ch === '\\\\') json += text[++i] ?? '';\n      else if (ch === '\"') inString = false;\n    } else if (ch === '\"') {\n      inString = true;\n      json += ch;\n    } else if (text.startsWith('undefined', i)) {\n      json += '\"\\\\u0000\"';\n      i += 8;\n    } else json += ch;\n  }\n  let value;\n  try { value = JSON.parse(json); } catch { return 'obj must be JSON in which undefined may also appear as a value.'; }\n  if (value === null || typeof value !== 'object') return 'obj must be an object or an array.';\n  const stack = [value];\n  while (stack.length) {\n    const item = stack.pop();\n    if (item === null || typeof item !== 'object') continue;\n    if (!Array.isArray(item) && Object.hasOwn(item, '__proto__')) return 'No key may be \"__proto__\".';\n    stack.push(...Object.values(item));\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [text] = input;\n  const marker = '\\u0000';\n  // Parse: each bare undefined becomes a marker string, and the markers become real undefined values.\n  let json = '', inString = false;\n  for (let i = 0; i < text.length; i++) {\n    const ch = text[i];\n    if (inString) {\n      json += ch;\n      if (ch === '\\\\') json += text[++i] ?? '';\n      else if (ch === '\"') inString = false;\n    } else if (ch === '\"') {\n      inString = true;\n      json += ch;\n    } else if (text.startsWith('undefined', i)) {\n      json += '\"\\\\u0000\"';\n      i += 8;\n    } else json += ch;\n  }\n  const revive = (value) => {\n    if (value === marker) return undefined;\n    if (value !== null && typeof value === 'object') for (const key of Object.keys(value)) value[key] = revive(value[key]);\n    return value;\n  };\n  const obj = revive(JSON.parse(json));\n  const show = (value) => {\n    if (value === undefined) return 'undefined';\n    if (Array.isArray(value)) return `[${Array.from(value, show).join(',')}]`;\n    if (value !== null && typeof value === 'object') return `{${Object.keys(value).map((key) => `${JSON.stringify(key)}:${show(value[key])}`).join(',')}}`;\n    const written = JSON.stringify(value);\n    if (written === undefined) throw new Error(`The result holds a ${typeof value}, which is not a JSON value.`);\n    return written;\n  };\n  kit.trace(`undefinedToNull is called with ${text.length > 120 ? 'obj' : show(obj)}`);\n  const result = solve(obj);\n  if (result === null || typeof result !== 'object') throw new Error('undefinedToNull must return the object or array with undefined replaced by null.');\n  const answer = show(result);\n  kit.trace(`undefinedToNull returns ${answer.length > 120 ? 'the converted value' : answer}`);\n  return answer;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Object|Array} obj\n * @return {Object|Array} obj with every undefined value replaced by null\n */\nfunction undefinedToNull(obj) {\n  // Write your code here.\n}\n",
+    "typescript": "type Value = null | boolean | number | string | undefined | Value[] | { [key: string]: Value };\ntype Container = Value[] | { [key: string]: Value };\n\nfunction undefinedToNull(obj: Container): Container {\n  // Write your code here.\n  return obj;\n}\n"
+  },
+  "api": "undefinedToNull(obj: Record<string, unknown> | unknown[]): Record<string, unknown> | unknown[]",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function undefinedToNull(obj) {\n  for (const key of Object.keys(obj)) {\n    const value = obj[key];\n    if (value === undefined) {\n      obj[key] = null;\n    } else if (value !== null && typeof value === 'object') {\n      undefinedToNull(value);\n    }\n  }\n  return obj;\n}",
+  "brute": "function undefinedToNull(obj) {\n  // Serialize with a replacer that swaps undefined for null, then parse the text back into a new value.\n  const text = JSON.stringify(obj, (key, value) => (value === undefined ? null : value));\n  return JSON.parse(text);\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const keys = ['a', 'b', 'c', 'id', 'name', 'value', 'list', 'x', 'y', 'undefined', 'null', 'data'];\n  const words = ['', 'a', 'undefined', 'null', 'hello', 'x y'];\n  const maxDepth = small ? 3 : 6;\n  const show = (value) => {\n    if (value === undefined) return 'undefined';\n    if (Array.isArray(value)) return `[${value.map(show).join(',')}]`;\n    if (value !== null && typeof value === 'object') return `{${Object.keys(value).map((key) => `${JSON.stringify(key)}:${show(value[key])}`).join(',')}}`;\n    return JSON.stringify(value);\n  };\n  const leaf = () => {\n    const roll = rand();\n    if (roll < 0.45) return undefined;\n    if (roll < 0.55) return null;\n    if (roll < 0.75) return Math.floor(rand() * 201) - 100;\n    if (roll < 0.9) return pick(words);\n    return rand() < 0.5;\n  };\n  const container = (depth) => {\n    const count = small ? Math.floor(rand() * 4) : 2 + Math.floor(rand() * 5);\n    const value = () => (depth < maxDepth && rand() < (small ? 0.3 : 0.45) ? container(depth + 1) : leaf());\n    if (rand() < 0.5) return Array.from({ length: count }, value);\n    const object = {};\n    for (let i = 0; i < count; i++) object[pick(keys)] = value();\n    return object;\n  };\n  let text = '';\n  for (let tries = 0; tries < 50; tries++) {\n    text = show(container(0));\n    if (small || (text.length >= 2000 && text.length <= 10000)) break;\n  }\n  if (text.length > 10000) text = '[undefined,null,1]';\n  return [text];\n}",
+  "examples": [
+    {"name":"Example 1","input":["{\"a\": undefined, \"b\":3}"],"expected":"{\"a\":null,\"b\":3}"},
+    {"name":"Example 2","input":["{\"a\": undefined, \"b\":[\"a\", undefined]}"],"expected":"{\"a\":null,\"b\":[\"a\",null]}"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["{}"]},
+    {"name":"Test 2","input":["[]"]},
+    {"name":"Test 3","input":["[undefined]"]},
+    {"name":"Test 4","input":["[undefined,undefined,undefined]"]},
+    {"name":"Test 5","input":["{\"a\":null,\"b\":undefined}"]},
+    {"name":"Test 6","input":["[0,false,\"\",null,undefined]"]},
+    {"name":"Test 7","input":["{\"text\":\"undefined\",\"value\":undefined}"]},
+    {"name":"Test 8","input":["{\"a\":{\"b\":{\"c\":{\"d\":undefined}}}}"]},
+    {"name":"Test 9","input":["{\"list\":[1,undefined,[undefined,{\"x\":undefined}],null],\"ok\":true}"]},
+    {"name":"Test 10","input":["{\"a\":[],\"b\":{},\"c\":undefined,\"d\":[[],[undefined]]}"]},
+    {"name":"Test 11","input":["[{\"id\":1,\"tags\":[\"x\",undefined]},{\"id\":2,\"tags\":undefined},{\"id\":undefined}]"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\n`undefined` can hide anywhere inside `obj`, at any depth, so the function has to visit every value. The structure is a tree: objects and arrays are inner nodes, everything else is a leaf. A recursive walk handles it naturally: look at each value of the current container; replace it when it is `undefined`, descend into it when it is itself a container, and leave it alone otherwise. `Object.keys` lists the keys of an object and the indexes of an array alike, so one loop serves both. (The brute force uses `JSON.stringify` with a replacer that turns `undefined` into `null`, then parses the text back.)\n\n## Approach\n\n1. For each `key` of `Object.keys(obj)`, read `value = obj[key]`.\n2. If `value === undefined`, write `null` in its place.\n3. Otherwise, if `value` is a non-null object (a plain object or an array), call `undefinedToNull(value)` to clean it in place.\n4. Leave every other value as it is, and return `obj` after the loop.\n\n## Example 1, step by step\n\n`obj` is `{ a: undefined, b: 3 }`, so `Object.keys(obj)` is `[\"a\", \"b\"]`.\n\n- `key = \"a\"`: `value` is `undefined`, so `obj.a = null`.\n- `key = \"b\"`: `value` is `3`, neither `undefined` nor a container, so nothing changes.\n- Return `obj`, now `{ a: null, b: 3 }`, written as `{\"a\":null,\"b\":3}`.\n\n## Complexity\n\n- Time: O(n), where n is the number of values inside `obj`: each is looked at once.\n- Space: O(d) for the recursion, where d is the nesting depth; the conversion happens in place.\n\n## Pitfalls\n\n- `if (!value)` also catches `0`, `false`, `\"\"` and `null`; compare with `=== undefined`.\n- `typeof null` is `\"object\"`, so test `value !== null` before recursing, or `Object.keys(null)` throws.\n- `JSON.parse(JSON.stringify(obj))` without a replacer **drops** object properties holding `undefined` instead of keeping them as `null`.\n- Deleting the key instead of assigning `null` changes the shape; the key must stay.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `obj` | the object or array being cleaned in place |\n| `key` | a property name, or an array index as a string |\n| `value` | `obj[key]`, the value under that key |",
+  "narration": {
+    "1": "undefinedToNull cleans one object or array in place and calls itself for nested ones.",
+    "2": "Object.keys lists property names for objects and indexes for arrays, so one loop handles both.",
+    "3": "Read the value stored under this key.",
+    "4": "Only undefined is replaced; 0, false, empty strings and null stay as they are.",
+    "5": "Write null where undefined was, keeping the key.",
+    "6": "A non-null object is a nested container (typeof null is also \"object\", hence the extra check).",
+    "7": "Recurse to clean the nested object or array in place.",
+    "10": "Every value has been visited; return the cleaned obj."
+  }
+}

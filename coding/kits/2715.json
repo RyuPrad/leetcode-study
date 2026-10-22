@@ -1,0 +1,67 @@
+{
+  "number": 2715,
+  "title": "Timeout Cancellation",
+  "spec": "leetcode",
+  "statement": "Write `cancellable(fn, args, t)`. It must arrange for `fn(...args)` to run `t` milliseconds from now, and immediately return a function `cancelFn`. If `cancelFn` is called before those `t` ms are up, the pending call is dropped and `fn` never runs. If it is not, `fn` runs once, at `t` ms, receiving the elements of `args` as separate arguments, and calling `cancelFn` afterwards changes nothing.\n\nEach case gives `fn`, `args`, `t` and `cancelTimeMs`. The judge calls `cancellable(fn, args, t)` at time 0, then calls the returned `cancelFn` at `cancelTimeMs` ms. Because a case is JSON, `fn` is described rather than written out:\n\n- `{ \"times\": k }` is `(x) => x * k`, and `{ \"power\": k }` is `(x) => x ** k`; both use only their first argument.\n- `\"product\"` multiplies all of its arguments together.\n\nThe answer lists every run of `fn` as `{ \"time\", \"returned\" }`: when it ran, in ms after the start, and the value it returned. It is `[]` when `fn` never ran. `t` and `cancelTimeMs` are never equal.",
+  "constraints": [
+    "20 <= t <= 1000",
+    "10 <= cancelTimeMs <= 1000",
+    "t !== cancelTimeMs",
+    "1 <= args.length <= 10",
+    "args[i] is an integer from -20 to 20",
+    "fn is \"product\", { \"times\": k } with -100 <= k <= 100, or { \"power\": k } with 0 <= k <= 5"
+  ],
+  "signature": "List<Object> cancellable(Object fn, int[] args, int t, int cancelTimeMs)",
+  "entry": "cancellable",
+  "kind": "function",
+  "parameters": [
+    "fn",
+    "args",
+    "t",
+    "cancelTimeMs"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [fn, args, t, cancelTimeMs] = input;\n  const described = fn === 'product' || (fn !== null && typeof fn === 'object' && !Array.isArray(fn) && Object.keys(fn).length === 1\n    && ((Number.isInteger(fn.times) && Math.abs(fn.times) <= 100) || (Number.isInteger(fn.power) && fn.power >= 0 && fn.power <= 5)));\n  if (!described) return 'fn must be \"product\", { \"times\": k } with k from -100 to 100, or { \"power\": k } with k from 0 to 5.';\n  if (!Array.isArray(args) || args.length < 1 || args.length > 10 || !args.every(x => Number.isInteger(x) && x >= -20 && x <= 20)) return 'args must hold 1 to 10 integers from -20 to 20.';\n  if (!Number.isInteger(t) || t < 20 || t > 1000) return 't must be an integer from 20 to 1000.';\n  if (!Number.isInteger(cancelTimeMs) || cancelTimeMs < 10 || cancelTimeMs > 1000) return 'cancelTimeMs must be an integer from 10 to 1000.';\n  if (t === cancelTimeMs) return 'Pick a cancelTimeMs different from t, so the result does not depend on a tie.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [spec, args, t, cancelTimeMs] = input;\n  const compute = values => {\n    if (spec === 'product') return values.reduce((product, x) => product * x, 1);\n    if (Object.hasOwn(spec, 'times')) return values[0] * spec.times;\n    return values[0] ** spec.power;\n  };\n  const start = Date.now(), runs = [];\n  const fn = (...values) => {\n    const returned = compute(values);\n    runs.push({ time: Date.now() - start, returned });\n    kit.trace(`fn(${values.map(value => JSON.stringify(value)).join(', ')}) runs and returns ${returned}`);\n    return returned;\n  };\n  kit.trace(`cancellable(fn, [${args.join(', ')}], ${t}) is called`);\n  const cancelFn = solve(fn, args, t);\n  if (typeof cancelFn !== 'function') throw new Error('cancellable must return a function.');\n  setTimeout(() => {\n    kit.trace('cancelFn() is called');\n    cancelFn();\n  }, cancelTimeMs);\n  // Every run is over once both the delay and the cancellation have passed.\n  return new Promise(resolve => setTimeout(() => resolve(runs), Math.max(t, cancelTimeMs) + 15));\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn the function to run later\n * @param {Array} args the arguments to give it\n * @param {number} t the delay in milliseconds\n * @return {Function} a function that cancels the pending run\n */\nfunction cancellable(fn, args, t) {\n  // Write your code here.\n  return function cancelFn() {\n  };\n}\n",
+    "typescript": "type Fn = (...args: number[]) => unknown;\n\nfunction cancellable(fn: Fn, args: number[], t: number): () => void {\n  // Write your code here.\n  return function cancelFn() {\n  };\n}\n"
+  },
+  "api": "cancellable(fn: (...args: number[]) => unknown, args: number[], t: number): () => void",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function cancellable(fn, args, t) {\n  const timer = setTimeout(() => fn(...args), t);\n  return function cancelFn() {\n    clearTimeout(timer);\n  };\n}",
+  "brute": "function cancellable(fn, args, t) {\n  let cancelled = false;\n  setTimeout(() => {\n    if (!cancelled) fn(...args);\n  }, t);\n  return () => {\n    cancelled = true;\n  };\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const kind = Math.floor(rand() * 3);\n  const fn = kind === 0 ? { times: int(-10, 10) } : kind === 1 ? { power: int(0, 5) } : 'product';\n  const args = Array.from({ length: int(1, size === 'small' ? 4 : 10) }, () => int(-20, 20));\n  const t = int(20, size === 'small' ? 200 : 1000);\n  let cancelTimeMs = int(10, size === 'small' ? 200 : 1000);\n  if (cancelTimeMs === t) cancelTimeMs = t > 500 ? t - 1 : t + 1;\n  return [fn, args, t, cancelTimeMs];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"times":5},[2],20,50],"expected":[{"time":20,"returned":10}]},
+    {"name":"Example 2","input":[{"power":2},[2],100,50],"expected":[]},
+    {"name":"Example 3","input":["product",[2,4],30,100],"expected":[{"time":30,"returned":8}]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"times":3},[7],20,10]},
+    {"name":"Test 2","input":[{"times":3},[7],20,1000]},
+    {"name":"Test 3","input":["product",[1,2,3,4,5,6,7,8,9,10],1000,999]},
+    {"name":"Test 4","input":["product",[2,3,4],999,1000]},
+    {"name":"Test 5","input":[{"power":0},[5],500,501]},
+    {"name":"Test 6","input":[{"power":3},[-2],500,499]},
+    {"name":"Test 7","input":[{"times":-4},[6,9],40,41]},
+    {"name":"Test 8","input":["product",[-3,5,2],20,21]},
+    {"name":"Test 9","input":["product",[-3],1000,10]},
+    {"name":"Test 10","input":[{"times":100},[-20,1],21,20]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nA delayed call is exactly what `setTimeout` makes, and it hands back an id that `clearTimeout` can use to call the timer off while it is still pending. So `cancellable` starts the timer straight away and returns a small function that remembers the id through a closure and clears it. Once the timer has fired, `clearTimeout` on its id does nothing, which is precisely the \"cancelling later changes nothing\" rule. (The brute force lets the timer always fire and has it check a `cancelled` flag first; it behaves the same but keeps a useless timer alive.)\n\n## Approach\n\n1. Schedule `fn(...args)` with `setTimeout` after `t` ms and keep its id in `timer`.\n2. Return `cancelFn`, which calls `clearTimeout(timer)`.\n\n## Example 1, step by step\n\n`fn` is `(x) => x * 5`, `args = [2]`, `t = 20`, `cancelTimeMs = 50`.\n\n- At 0 ms, `cancellable` sets a timer for 20 ms and returns `cancelFn`.\n- At 20 ms the timer fires: `fn(2)` returns `10`, recorded as `{ time: 20, returned: 10 }`.\n- At 50 ms the judge calls `cancelFn()`; the timer is already done, so `clearTimeout` has no effect.\n- The answer is `[{ time: 20, returned: 10 }]`.\n\nIn Example 2 the order flips: `cancelFn` runs at 50 ms and clears the timer that was due at 100 ms, so `fn` never runs and the answer is `[]`.\n\n## Complexity\n\n- Time: O(1) to schedule and O(1) to cancel (calling `fn` itself aside).\n- Space: O(1): one timer id kept by the closure.\n\n## Pitfalls\n\n- Spread the arguments: `fn(...args)` passes `2, 4`, while `fn(args)` passes one array.\n- Start the timer inside `cancellable`, not inside `cancelFn`, and do not call `fn` right away.\n- `setInterval` would run `fn` again every `t` ms; it must run at most once.\n- Return a function, not the timer id itself.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `timer` | id of the pending call of `fn`, used to cancel it |\n| `cancelFn` | the returned function that clears `timer` |\n| `args` | the arguments `fn` receives when it runs |",
+  "narration": {
+    "1": "cancellable receives the function, its arguments and the delay, and must return a way to cancel.",
+    "2": "Schedule fn with the spread args t ms from now, and keep the timer id so it can be cancelled.",
+    "3": "Return cancelFn right away; it closes over timer.",
+    "4": "Clearing the timer drops the pending call; if fn already ran, this does nothing."
+  }
+}

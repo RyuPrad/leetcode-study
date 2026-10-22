@@ -1,0 +1,72 @@
+{
+  "number": 2795,
+  "title": "Parallel Execution of Promises for Individual Results Retrieval",
+  "spec": "recalled",
+  "statement": "Write `promiseAllSettled(functions)`. Each entry of `functions` takes no arguments and gives back a promise when called. Start **all** of them at once, and return one promise that waits until every one of those promises has settled, whether it was fulfilled or rejected. It then resolves with an array holding one outcome per function, in the same order as `functions`:\n\n- `{ status: \"fulfilled\", value }` when that function's promise resolved with `value`;\n- `{ status: \"rejected\", reason }` when it rejected with `reason`.\n\nThe returned promise never rejects, and it settles at the moment the last of the promises settles. Build this yourself: the built-in `Promise.allSettled` is not allowed.\n\nEach case describes `functions` as JSON. An entry `{ t, resolve }` is a function whose promise resolves with the value `resolve` after `t` ms; `{ t, reject }` rejects with the string `reject` after `t` ms. When `t` is `0` the promise is already settled when the function returns. Timing starts when the function is called. The answer is `{ t, values }`: the array your promise resolved with, and when it resolved, in ms after `promiseAllSettled` was called.",
+  "constraints": [
+    "1 <= functions.length <= 10",
+    "Each function is { t, resolve } or { t, reject }",
+    "0 <= t <= 1000",
+    "resolve is an integer from -1000 to 1000",
+    "reject is a string of 1 to 20 characters"
+  ],
+  "signature": "Object promiseAllSettled(List<Object> functions)",
+  "entry": "promiseAllSettled",
+  "kind": "function",
+  "parameters": [
+    "functions"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [functions] = input;\n  if (!Array.isArray(functions) || functions.length < 1 || functions.length > 10) return 'Give 1 to 10 functions.';\n  for (const spec of functions) {\n    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return 'Each function must be an object such as { \"t\": 100, \"resolve\": 5 }.';\n    if (!Number.isInteger(spec.t) || spec.t < 0 || spec.t > 1000) return 'Each function needs a time t from 0 to 1000.';\n    const keys = Object.keys(spec).sort().join(',');\n    if (keys === 'resolve,t') {\n      if (!Number.isInteger(spec.resolve) || spec.resolve < -1000 || spec.resolve > 1000) return 'resolve must be an integer from -1000 to 1000.';\n    } else if (keys === 'reject,t') {\n      if (typeof spec.reject !== 'string' || spec.reject.length < 1 || spec.reject.length > 20) return 'reject must be a string of 1 to 20 characters.';\n    } else return 'Each function needs t and exactly one of resolve or reject.';\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [specs] = input;\n  const functions = specs.map((spec, index) => () => {\n    kit.trace(`functions[${index}] is called`);\n    const failing = spec.reject !== undefined;\n    const outcome = failing ? spec.reject : spec.resolve;\n    const settle = () => kit.trace(`The promise of functions[${index}] ${failing ? 'rejects' : 'resolves'} with ${JSON.stringify(outcome)}`);\n    if (spec.t === 0) {\n      settle();\n      return failing ? Promise.reject(outcome) : Promise.resolve(outcome);\n    }\n    return new Promise((resolve, reject) => setTimeout(() => {\n      settle();\n      if (failing) reject(outcome);\n      else resolve(outcome);\n    }, spec.t));\n  });\n  // Each outcome object lists status first, then value or reason, so key order never decides a verdict.\n  const tidy = (entry) => {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return entry;\n    const ordered = {};\n    for (const key of ['status', 'value', 'reason', ...Object.keys(entry).sort()]) {\n      if (Object.hasOwn(entry, key) && !Object.hasOwn(ordered, key)) ordered[key] = entry[key];\n    }\n    return ordered;\n  };\n  const start = Date.now();\n  kit.trace(`promiseAllSettled is called with ${specs.length} function${specs.length === 1 ? '' : 's'}`);\n  // The exercise asks for a solution without the built-in Promise.allSettled.\n  const builtin = Promise.allSettled;\n  Promise.allSettled = () => { throw new Error('Solve this without the built-in Promise.allSettled.'); };\n  let promise;\n  try { promise = solve(functions); } finally { Promise.allSettled = builtin; }\n  if (!promise || typeof promise.then !== 'function') throw new Error('promiseAllSettled must return a promise.');\n  return promise.then((values) => {\n    if (!Array.isArray(values)) throw new Error('The returned promise must resolve with an array of outcome objects.');\n    const tidied = values.map(tidy);\n    kit.trace(`The returned promise resolves with ${JSON.stringify(tidied)}`);\n    return { t: Date.now() - start, values: tidied };\n  }, (reason) => {\n    const rejected = reason instanceof Error ? String(reason) : reason;\n    kit.trace(`The returned promise rejects with ${JSON.stringify(rejected)}`);\n    return { t: Date.now() - start, rejected };\n  });\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Array<() => Promise<any>>} functions\n * @return {Promise<Array<{status: string, value?: any, reason?: any}>>}\n */\nfunction promiseAllSettled(functions) {\n  // Write your code here.\n  return new Promise((resolve) => {\n  });\n}\n",
+    "typescript": "type Outcome<T> = { status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown };\n\nfunction promiseAllSettled<T>(functions: Array<() => Promise<T>>): Promise<Outcome<T>[]> {\n  // Write your code here.\n  return new Promise((resolve) => {\n  });\n}\n"
+  },
+  "api": "promiseAllSettled<T>(functions: Array<() => Promise<T>>): Promise<Array<{ status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown }>>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function promiseAllSettled(functions) {\n  return new Promise((resolve) => {\n    const results = new Array(functions.length);\n    let pending = functions.length;\n    const record = (index, outcome) => {\n      results[index] = outcome;\n      pending -= 1;\n      if (pending === 0) {\n        resolve(results);\n      }\n    };\n    functions.forEach((fn, index) => {\n      fn().then(\n        (value) => record(index, { status: 'fulfilled', value }),\n        (reason) => record(index, { status: 'rejected', reason }),\n      );\n    });\n  });\n}",
+  "brute": "function promiseAllSettled(functions) {\n  // Turn every promise into one that always resolves with its outcome, then wait for all of them together.\n  const outcomes = functions.map((fn) => fn().then(\n    (value) => ({ status: 'fulfilled', value }),\n    (reason) => ({ status: 'rejected', reason }),\n  ));\n  return Promise.all(outcomes);\n}",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? 1 + Math.floor(rand() * 4) : 6 + Math.floor(rand() * 5);\n  const maxTime = size === 'small' ? 120 : 1000;\n  const failRate = rand() * 0.7;\n  const functions = [];\n  for (let i = 0; i < count; i++) {\n    const t = rand() < 0.1 ? 0 : Math.floor(rand() * (maxTime + 1));\n    if (rand() < failRate) functions.push({ t, reject: `Error ${i}` });\n    else functions.push({ t, resolve: Math.floor(rand() * (size === 'small' ? 21 : 2001)) - (size === 'small' ? 10 : 1000) });\n  }\n  return [functions];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[{"t":100,"resolve":15}]],"expected":{"t":100,"values":[{"status":"fulfilled","value":15}]}},
+    {"name":"Example 2","input":[[{"t":100,"resolve":20},{"t":100,"resolve":15}]],"expected":{"t":100,"values":[{"status":"fulfilled","value":20},{"status":"fulfilled","value":15}]}},
+    {"name":"Example 3","input":[[{"t":200,"resolve":30},{"t":100,"reject":"Error"}]],"expected":{"t":200,"values":[{"status":"fulfilled","value":30},{"status":"rejected","reason":"Error"}]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[{"t":0,"resolve":42}]]},
+    {"name":"Test 2","input":[[{"t":0,"reject":"Oops"}]]},
+    {"name":"Test 3","input":[[{"t":300,"resolve":1},{"t":200,"reject":"B"},{"t":100,"resolve":3}]]},
+    {"name":"Test 4","input":[[{"t":50,"reject":"A"},{"t":10,"reject":"B"}]]},
+    {"name":"Test 5","input":[[{"t":10,"resolve":1},{"t":500,"reject":"Late"}]]},
+    {"name":"Test 6","input":[[{"t":100,"resolve":5},{"t":100,"reject":"Tie"},{"t":100,"reject":"Other"}]]},
+    {"name":"Test 7","input":[[{"t":1000,"resolve":1},{"t":1000,"resolve":2},{"t":1000,"resolve":3},{"t":1000,"resolve":4},{"t":1000,"resolve":5},{"t":1000,"resolve":6},{"t":1000,"resolve":7},{"t":1000,"resolve":8},{"t":1000,"resolve":9},{"t":1000,"resolve":10}]]},
+    {"name":"Test 8","input":[[{"t":5,"resolve":-3},{"t":5,"resolve":-3},{"t":0,"resolve":0}]]},
+    {"name":"Test 9","input":[[{"t":400,"resolve":1},{"t":0,"reject":"Now"}]]},
+    {"name":"Test 10","input":[[{"t":0,"resolve":-1000},{"t":999,"reject":"Slow failure"},{"t":1,"resolve":1000}]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nThis is `Promise.all` without the early exit. Calling every function first and only then waiting keeps the work parallel, so the total wait is the slowest promise, not the sum. Each promise then needs **two** handlers, one for success and one for failure, and both do the same bookkeeping: write an outcome object into the slot of that function's index and count it as done. When the count of unfinished promises reaches zero, every slot is filled and the result can be delivered. Because a rejection is recorded instead of passed on, the returned promise never rejects. (The brute force wraps each promise so it always resolves with its outcome object, and then waits for all of the wrapped promises with `Promise.all`.)\n\n## Approach\n\n1. Return a new promise and keep its `resolve`.\n2. Create `results` with one slot per function and set `pending` to the number of functions.\n3. Write `record(index, outcome)`: store `outcome` in `results[index]`, decrease `pending`, and resolve with `results` when it reaches 0.\n4. Call every `fn` right away and attach both handlers: a value becomes `{ status: 'fulfilled', value }`, a reason becomes `{ status: 'rejected', reason }`, and each is passed to `record` with the function's `index`.\n\n## Example 1, step by step\n\n`functions` has one entry that resolves with 15 after 100 ms.\n\n- At 0 ms `results = [empty]` and `pending = 1`. `functions[0]` is called and its timer starts.\n- At 100 ms its promise resolves with 15, so the success handler calls `record(0, { status: 'fulfilled', value: 15 })`.\n- `results[0]` is filled and `pending` drops to 0, so the returned promise resolves at 100 ms. The answer is `{ t: 100, values: [{ status: 'fulfilled', value: 15 }] }`.\n\n## Complexity\n\n- Time: O(n) work for n functions; the wait is that of the slowest promise.\n- Space: O(n) for `results`.\n\n## Pitfalls\n\n- Awaiting the functions one at a time in a loop runs them in sequence: three 100 ms promises then take 300 ms instead of 100.\n- Forgetting the rejection handler leaves `pending` above 0 forever when a function fails, so the promise never resolves.\n- Pushing outcomes as they arrive puts them in finishing order; write them at their function's `index` instead.\n- Use the keys `value` for a fulfilled promise and `reason` for a rejected one; mixing them up gives a different answer.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `results` | the outcome objects, each at its function's index |\n| `pending` | how many promises have not settled yet |\n| `record` | stores one outcome and resolves once none is pending |\n| `fn`, `index` | the function being started and its position |\n| `resolve` | settles the promise that `promiseAllSettled` returns |",
+  "narration": {
+    "1": "promiseAllSettled receives the list of functions that each produce a promise.",
+    "2": "Return a new promise; it only ever resolves, so only resolve is kept.",
+    "3": "results has one slot per function so each outcome lands at its own index.",
+    "4": "pending counts the promises that have not settled yet.",
+    "5": "record handles one settled promise, whether it succeeded or failed.",
+    "6": "Store the outcome at the index of its function, whatever order the promises finish in.",
+    "7": "One fewer promise is still waiting.",
+    "8": "When none is left, every slot holds an outcome.",
+    "9": "Resolve the returned promise with the full list of outcomes.",
+    "12": "Visit every function in order, remembering its index.",
+    "13": "Call the function now so all of them run in parallel, and attach two handlers to its promise.",
+    "14": "If the promise resolves, record a fulfilled outcome with its value.",
+    "15": "If it rejects, record a rejected outcome with its reason instead of passing the failure on."
+  }
+}

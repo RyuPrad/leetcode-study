@@ -1,0 +1,51 @@
+{
+  "number": 2738,
+  "title": "Count Occurrences in Text",
+  "spec": "recalled",
+  "statement": "One table holds text files:\n\n- `Files(file_name, content)`: one row per file; `file_name` is unique and `content` is the file's text.\n\nFor each of the two words `bull` and `bear`, count how many **files** contain that word at least once as a standalone word, meaning with a space directly before it **and** a space directly after it. Anything else does not count: longer words such as `bullet` or `bears`, the word followed by punctuation (`bull.`, `bear,`), or the word at the very start or end of the content. A file that contains the word several times still counts once.\n\nReturn exactly two rows, one for `bull` and one for `bear`, with the columns `word` and `count`; a word found in no file has `count` 0. Rows may come in any order.",
+  "constraints": [
+    "file_name is unique in Files",
+    "Only a space on both sides makes a standalone word",
+    "The result always has the two rows bull and bear"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Files": [["file_name","VARCHAR(100)"],["content","TEXT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Files = [] }] = input;\n  const names = new Set();\n  for (const [name, content] of Files) {\n    if (name === null) return 'Every file needs a file_name.';\n    if (names.has(name)) return `file_name ${name} appears twice.`;\n    names.add(name);\n    if (content === null) return `File ${name} needs content.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH words AS (\n  SELECT 'bull' AS word\n  UNION ALL\n  SELECT 'bear'\n)\nSELECT w.word, COUNT(f.file_name) AS count\nFROM words AS w\nLEFT JOIN Files AS f\n  ON f.content LIKE CONCAT('% ', w.word, ' %')\nGROUP BY w.word;",
+  "brute": "SELECT 'bull' AS word, COUNT(*) AS count\nFROM Files\nWHERE content LIKE '% bull %'\nUNION ALL\nSELECT 'bear' AS word, COUNT(*) AS count\nFROM Files\nWHERE content LIKE '% bear %'",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const tokens = ['bull', 'bear', 'bull', 'bear', 'bullet', 'bears', 'bull.', 'bear,', 'abull', 'the', 'market', 'a', 'is', 'up', 'down', 'and'];\n  const files = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const words = size === 'small' ? 6 : 30;\n  const Files = [];\n  for (let i = 1; i <= files; i++) {\n    const parts = [];\n    for (let k = 1 + Math.floor(rand() * words); k > 0; k--) parts.push(pick(tokens));\n    Files.push([`file${i}.txt`, parts.join(' ')]);\n  }\n  return [{ Files }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Files":[["draft1.txt","The stock exchange predicts a bull market which would make many investors happy."],["draft2.txt","The stock exchange predicts a bull market which would make many investors happy, but analysts warn of possibility of too much optimism and that in fact we are awaiting a bear market."],["final.txt","The stock exchange predicts a bull market which would make many investors happy, but analysts warn of possibility of too much optimism and that in fact we are awaiting a bear market. As always predicting the future market is an uncertain game and all investors should follow their instincts and best practices."]]}],"expected":{"columns":["word","count"],"rows":[["bull",3],["bear",2]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Files":[]}]},
+    {"name":"Test 2","input":[{"Files":[["a.txt","bull"],["b.txt","bear"]]}]},
+    {"name":"Test 3","input":[{"Files":[["a.txt","a bullet and some bears"],["b.txt","the bull. a bear, the end"],["c.txt","abull abear bulls"]]}]},
+    {"name":"Test 4","input":[{"Files":[["a.txt","a bull and a bear market"]]}]},
+    {"name":"Test 5","input":[{"Files":[["a.txt","a bull run and a bull trap and a bull again"],["b.txt","the bull is here"]]}]},
+    {"name":"Test 6","input":[{"Files":[["a.txt","bull market rises"],["b.txt","markets fear the bear"],["c.txt","bear and bull"]]}]},
+    {"name":"Test 7","input":[{"Files":[["x.txt","one bear here"],["y.txt","two bear here"],["z.txt","three bear here and a bull too"],["w.txt","no animals"]]}]},
+    {"name":"Test 8","input":[{"Files":[["a.txt","a  bull  with double spaces"],["b.txt","abull bear market"],["c.txt","the bear-market and a bear"]]}]},
+    {"name":"Test 9","input":[{"Files":[["r1.txt","up bull up"],["r2.txt","down bull down"],["r3.txt","side bull side"],["r4.txt","big bear big"],["r5.txt","bull bear bull bear"]]}]},
+    {"name":"Test 10","input":[{"Files":[["only.txt","the bulls and the bears met a bull dozer"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Standalone\" here has a precise meaning: the word must have a space right before it and a space right after it. That is exactly the `LIKE` pattern `'% bull %'`, where each `%` matches any text (possibly empty) and the spaces are literal. A file either matches the pattern or not, so counting matching files answers the question. The only twist is that a word nobody uses must still appear with count 0, so the two words should be the rows we start from, not the files.\n\n## Approach\n\n1. `words`: build a two-row table holding `bull` and `bear`.\n2. `LEFT JOIN Files` on `f.content LIKE CONCAT('% ', w.word, ' %')`: each word pairs with every file whose content contains it surrounded by spaces. A file matches once no matter how many times the word occurs, because the join condition is just true or false per pair.\n3. `GROUP BY w.word` and `COUNT(f.file_name)`: count the matched files per word. A word with no matching file keeps one row of nulls from the left join, and `COUNT` of a column skips nulls, giving 0.\n\n## Example 1, step by step\n\n- `draft1.txt` contains \"a bull market\": it matches `% bull %`; it has no \"bear\".\n- `draft2.txt` contains \"a bull market\" and \"a bear market.\": the bear is followed by a space (\"bear market\"), so both words match.\n- `final.txt` repeats that text and more: both words match.\n\nThe join yields 3 pairs for `bull` and 2 for `bear`, so the result is `bull` 3 and `bear` 2.\n\n## Complexity\n\n- Time: O(F · L) for F files of average length L, since each word scans every file's content once.\n- Space: O(1) beyond the two output rows.\n\n## Pitfalls\n\n- `LIKE '%bull%'` also matches `bullet`, `bulls` and `abull`; the spaces in the pattern are what make the word standalone.\n- The word at the very start or end of the content has no space on one side and must not count.\n- An inner join (or a `WHERE` filter followed by `GROUP BY`) drops a word that appears in no file; the answer always has both rows.\n- `COUNT(*)` after the left join would give 1 instead of 0 for an unmatched word; count `f.file_name` instead.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `words` | the two words to look for, one per row |\n| `w` | a row of `words` |\n| `f` | a file whose content contains `w.word` between spaces |\n| `count` | number of matching files per word, 0 when none match |",
+  "narration": {
+    "1": "The first stage lists the words to count, so each becomes an output row even if no file contains it.",
+    "6": "For each word, count the files that joined to it; COUNT of a column ignores the nulls of an unmatched word.",
+    "7": "The words table drives the query.",
+    "8": "A left join keeps a word that matches no file.",
+    "9": "A file matches when its content has the word with a space on both sides; % stands for any surrounding text.",
+    "10": "One group per word turns the matched files into a count."
+  }
+}

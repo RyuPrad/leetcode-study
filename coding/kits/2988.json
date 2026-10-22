@@ -1,0 +1,52 @@
+{
+  "number": 2988,
+  "title": "Manager of the Largest Department",
+  "spec": "recalled",
+  "statement": "One table lists the employees of a company:\n\n- `Employees(emp_id, emp_name, dep_id, position)`: one row per employee; `emp_id` is unique. `dep_id` is the employee's department and `position` their job title. Every department has exactly one employee whose `position` is `'Manager'`.\n\nA department's size is the number of employees in it, the manager included. The **largest** departments are those whose size equals the maximum size; several departments can tie for it. For each largest department report its manager with the columns `manager_name` (the manager's `emp_name`) and `dep_id`. Order the rows by `dep_id` ascending.",
+  "constraints": [
+    "emp_id is unique in Employees",
+    "every department has exactly one employee with position = 'Manager'",
+    "several departments may share the largest size"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["emp_id","INT"],["emp_name","VARCHAR(50)"],["dep_id","INT"],["position","VARCHAR(30)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const ids = new Set(), managers = new Map();\n  for (const [id, name, dep, position] of Employees) {\n    if (id === null || name === null || dep === null || position === null) return 'Every employee needs an id, a name, a department and a position.';\n    if (ids.has(id)) return `emp_id ${id} appears twice.`;\n    ids.add(id);\n    managers.set(dep, (managers.get(dep) ?? 0) + (position.toLowerCase() === 'manager' ? 1 : 0));\n  }\n  for (const [dep, count] of managers) if (count !== 1) return `Department ${dep} must have exactly one Manager.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH dept_sizes AS (\n  SELECT dep_id, COUNT(*) AS headcount\n  FROM Employees\n  GROUP BY dep_id\n)\nSELECT e.emp_name AS manager_name, e.dep_id\nFROM Employees AS e\nJOIN dept_sizes AS d\n  ON d.dep_id = e.dep_id\nWHERE e.position = 'Manager'\n  AND d.headcount = (SELECT MAX(headcount) FROM dept_sizes)\nORDER BY e.dep_id;",
+  "brute": "SELECT m.emp_name AS manager_name, m.dep_id\nFROM Employees AS m\nWHERE m.position = 'Manager'\n  AND (SELECT COUNT(*) FROM Employees AS e WHERE e.dep_id = m.dep_id) = (\n    SELECT COUNT(*)\n    FROM Employees\n    GROUP BY dep_id\n    ORDER BY COUNT(*) DESC\n    LIMIT 1\n  )\nORDER BY m.dep_id",
+  "generator": "function generate(rand, size) {\n  const names = ['Michael', 'Lucas', 'Isabella', 'Joseph', 'Aiden', 'Skylar', 'Stella', 'Audrey', 'Nathan', 'Ian', 'Ethan', 'Lee'];\n  const roles = ['Consultant', 'Engineer', 'Freelancer', 'Coordinator', 'Supervisor', 'Administrator'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const departments = size === 'small' ? Math.floor(rand() * 4) : 300;\n  const maxSize = size === 'small' ? 3 : 10;\n  // Increasing department ids with random gaps; each gets a manager plus 0..maxSize-1 other employees.\n  const rows = [];\n  let dep = 99;\n  for (let d = 0; d < departments; d++) {\n    dep += 1 + Math.floor(rand() * 4);\n    rows.push([dep, 'Manager']);\n    const extra = Math.floor(rand() * maxSize);\n    // Small sets stay within 8 rows, leaving room for the later departments' managers.\n    for (let i = 0; i < extra && (size !== 'small' || rows.length + departments - d - 1 < 8); i++) rows.push([dep, pick(roles)]);\n  }\n  // Shuffle so managers and departments come in mixed order; employee ids are increasing with gaps, so unique.\n  for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  let id = 0;\n  const Employees = rows.map(([dep, position]) => [id += 1 + Math.floor(rand() * 20), pick(names), dep, position]);\n  for (let i = Employees.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Employees[i][0], Employees[j][0]] = [Employees[j][0], Employees[i][0]]; }\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[156,"Michael",107,"Manager"],[112,"Lucas",107,"Consultant"],[8,"Isabella",101,"Manager"],[160,"Joseph",100,"Manager"],[80,"Aiden",100,"Engineer"],[190,"Skylar",100,"Freelancer"],[196,"Stella",101,"Coordinator"],[167,"Audrey",100,"Consultant"],[97,"Nathan",101,"Supervisor"],[128,"Ian",101,"Administrator"],[81,"Ethan",107,"Administrator"]]}],"expected":{"columns":["manager_name","dep_id"],"rows":[["Joseph",100],["Isabella",101]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,"Ana",10,"Manager"]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,"Ana",10,"Engineer"],[2,"Ben",10,"Manager"],[3,"Cy",10,"Analyst"]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,"Ana",30,"Manager"],[2,"Ben",30,"Engineer"],[3,"Cy",10,"Engineer"],[4,"Dee",10,"Manager"],[5,"Eve",20,"Manager"],[6,"Fay",20,"Analyst"]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,"Ana",5,"Manager"],[2,"Ben",5,"Engineer"],[3,"Cy",9,"Engineer"],[4,"Dee",9,"Analyst"],[5,"Eve",9,"Manager"],[6,"Fay",2,"Manager"]]}]},
+    {"name":"Test 6","input":[{"Employees":[[1,"Ana",1,"Manager"],[2,"Ben",1,"Engineer"],[3,"Cy",1,"Engineer"],[4,"Dee",1,"Engineer"],[5,"Eve",2,"Manager"],[6,"Fay",2,"Analyst"],[7,"Gus",2,"Designer"]]}]},
+    {"name":"Test 7","input":[{"Employees":[[11,"Lee",40,"Manager"],[12,"Lee",50,"Manager"],[13,"Kim",40,"Engineer"],[14,"Kim",50,"Engineer"],[15,"Ray",60,"Manager"]]}]},
+    {"name":"Test 8","input":[{"Employees":[[900,"Ian",7,"Supervisor"],[901,"Ian",7,"Manager"],[5,"Zoe",3,"Manager"],[6,"Max",8,"Manager"],[7,"Liv",8,"Consultant"],[8,"Bo",3,"Consultant"],[9,"Al",4,"Manager"]]}]},
+    {"name":"Test 9","input":[{"Employees":[[1,"Ana",100,"Manager"],[2,"Ben",200,"Manager"],[3,"Cy",200,"Engineer"],[4,"Dee",200,"Engineer"],[5,"Eve",300,"Manager"],[6,"Fay",300,"Engineer"],[7,"Gus",300,"Engineer"],[8,"Hal",300,"Engineer"],[9,"Ivy",100,"Engineer"],[10,"Jo",100,"Engineer"],[11,"Kai",100,"Engineer"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo facts decide the answer: how many employees each department has, and which of those counts is the largest. Once every department carries its headcount, the answer is the managers whose department's headcount equals the overall maximum. Comparing with the maximum (instead of taking the single top row) keeps every department that ties for first place.\n\n## Approach\n\n1. CTE `dept_sizes`: `GROUP BY dep_id` and `COUNT(*)` every employee, so each department gets its `headcount`.\n2. Read `Employees` as `e` and join `dept_sizes` as `d` on `dep_id`, attaching the headcount to every employee.\n3. Keep only rows where `e.position = 'Manager'`, one per department.\n4. Keep only departments whose `headcount` equals `(SELECT MAX(headcount) FROM dept_sizes)`.\n5. Report `emp_name` as `manager_name` with `dep_id`, ordered by `dep_id`.\n\n## Example 1, step by step\n\n- `dept_sizes`: department 100 has 4 employees (Joseph, Aiden, Skylar, Audrey), 101 has 4 (Isabella, Stella, Nathan, Ian), 107 has 3 (Michael, Lucas, Ethan).\n- The maximum headcount is 4.\n- The managers are Michael (107, size 3), Isabella (101, size 4) and Joseph (100, size 4). Michael's department is too small.\n- Ordered by `dep_id`: `(Joseph, 100)`, `(Isabella, 101)`.\n\n## Complexity\n\n- Time: O(E log E) for E employees, for the grouping and the join; the maximum is one pass over the D department rows.\n- Space: O(D) for `dept_sizes`.\n\n## Pitfalls\n\n- `ORDER BY headcount DESC LIMIT 1` returns one department even when several tie for the largest size (Tests 4 and 7).\n- `COUNT(DISTINCT position)` counts job titles, not people; in Test 6 department 1 has four employees but only two titles.\n- Forgetting the final `ORDER BY e.dep_id`: the result must be sorted by department.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `dept_sizes` | one row per department with its `headcount` |\n| `e` | `Employees` rows; the filter keeps only managers |\n| `d` | the headcount of `e`'s department |\n| `MAX(headcount)` | the size of the largest department(s) |",
+  "narration": {
+    "1": "The CTE computes the size of every department.",
+    "2": "COUNT(*) counts every employee of the department, the manager included.",
+    "4": "One group, and so one headcount, per department.",
+    "8": "Joining the sizes back gives every employee their department's headcount.",
+    "10": "Only the manager row of each department can become an output row.",
+    "11": "Comparing with the maximum keeps every department tied for the largest size.",
+    "12": "The problem asks for the rows ordered by department id."
+  }
+}

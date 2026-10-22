@@ -1,0 +1,56 @@
+{
+  "number": 2474,
+  "title": "Customers With Strictly Increasing Purchases",
+  "spec": "recalled",
+  "statement": "One table records customers' orders:\n\n- `Orders(order_id, customer_id, order_date, price)`: one row per order; `order_id` is unique, `order_date` is a date and `price` is a positive integer. A customer may place several orders in a year, even on the same day.\n\nA customer's **total purchases** in a year is the sum of `price` over their orders dated in that year. Look at every calendar year from the year of the customer's first order to the year of their last order, inclusive; a year in that span with no orders counts as a total of `0`.\n\nReport the `customer_id` of every customer whose yearly totals are **strictly increasing** across that span (each year's total is greater than the previous year's). A customer whose orders all fall in one year qualifies. Rows may come in any order.",
+  "constraints": [
+    "order_id is unique in Orders",
+    "price is a positive integer",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Orders": [["order_id","INT"],["customer_id","INT"],["order_date","DATE"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Orders = [] }] = input;\n  const seen = new Set();\n  for (const [id, customer, date, price] of Orders) {\n    if (id === null || customer === null || date === null || price === null) return 'Orders rows may not contain null.';\n    if (seen.has(id)) return `order_id ${id} appears twice.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `order_date ${date} is not a date.`;\n    if (price <= 0) return `Order ${id} must have a positive price.`;\n    seen.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH yearly AS (\n  SELECT customer_id, YEAR(order_date) AS yr, SUM(price) AS total\n  FROM Orders\n  GROUP BY customer_id, YEAR(order_date)\n),\ncompared AS (\n  SELECT customer_id, yr, total,\n         LAG(yr) OVER (PARTITION BY customer_id ORDER BY yr) AS prev_yr,\n         LAG(total) OVER (PARTITION BY customer_id ORDER BY yr) AS prev_total\n  FROM yearly\n)\nSELECT customer_id\nFROM compared\nGROUP BY customer_id\nHAVING SUM(CASE WHEN prev_yr IS NULL THEN 0\n                WHEN yr = prev_yr + 1 AND total > prev_total THEN 0\n                ELSE 1 END) = 0;",
+  "brute": "WITH totals AS (\n  SELECT customer_id, YEAR(order_date) AS yr, SUM(price) AS total\n  FROM Orders\n  GROUP BY customer_id, YEAR(order_date)\n)\nSELECT a.customer_id\nFROM totals AS a\nLEFT JOIN totals AS b\n  ON b.customer_id = a.customer_id AND b.yr = a.yr + 1\nGROUP BY a.customer_id\nHAVING COUNT(*) - COUNT(b.yr) = 1\n   AND SUM(CASE WHEN b.total <= a.total THEN 1 ELSE 0 END) = 0",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pad = v => String(v).padStart(2, '0');\n  const date = year => `${year}-${pad(1 + Math.floor(rand() * 12))}-${pad(1 + Math.floor(rand() * 28))}`;\n  const limit = small ? 8 : 2000;\n  const customers = small ? Math.floor(rand() * 4) : 400;\n  const Orders = [];\n  for (let customer = 1; customer <= customers && Orders.length < limit; customer++) {\n    const years = 1 + Math.floor(rand() * (small ? 3 : 5));\n    const start = 2016 + Math.floor(rand() * 5);\n    const flaw = rand();\n    const totals = [];\n    let total = small ? 100 * (1 + Math.floor(rand() * 4)) : 1 + Math.floor(rand() * 500);\n    for (let i = 0; i < years; i++) {\n      totals.push(total);\n      total += small ? 100 * Math.floor(rand() * 3) + (rand() < 0.7 ? 100 : 0) : Math.floor(rand() * 300) - (rand() < 0.15 ? 200 : -1);\n      if (total < 1) total = 1;\n    }\n    // Usually strictly increasing; sometimes a skipped year or a repeated total breaks it.\n    let year = start;\n    totals.forEach((value, i) => {\n      if (i > 0 && flaw < 0.15) year += 1;\n      if (i > 0 && flaw > 0.85 && i === years - 1) value = totals[i - 1];\n      const parts = value >= 2 && rand() < 0.4 ? [Math.floor(value / 3) || 1] : [];\n      if (parts.length) parts.push(value - parts[0]); else parts.push(value);\n      for (const price of parts) if (Orders.length < limit) Orders.push([0, customer, date(year), price]);\n      year++;\n    });\n  }\n  for (let i = Orders.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Orders[i], Orders[j]] = [Orders[j], Orders[i]]; }\n  Orders.forEach((row, i) => { row[0] = i + 1; });\n  return [{ Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Orders":[[1,1,"2019-07-01",1100],[2,1,"2019-11-01",1200],[3,1,"2020-05-26",3000],[4,1,"2021-08-31",3100],[5,1,"2022-12-07",4700],[6,2,"2015-01-01",700],[7,2,"2017-11-07",1000],[8,3,"2017-01-01",900],[9,3,"2018-11-07",900]]}],"expected":{"columns":["customer_id"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Orders":[]}]},
+    {"name":"Test 2","input":[{"Orders":[[1,5,"2020-03-04",250]]}]},
+    {"name":"Test 3","input":[{"Orders":[[1,1,"2021-01-10",500],[2,1,"2021-06-10",100],[3,1,"2021-06-10",100]]}]},
+    {"name":"Test 4","input":[{"Orders":[[1,2,"2018-02-01",100],[2,2,"2019-02-01",200],[3,2,"2020-02-01",300],[4,3,"2019-05-05",900],[5,3,"2020-05-05",900]]}]},
+    {"name":"Test 5","input":[{"Orders":[[1,4,"2015-01-01",700],[2,4,"2017-01-01",1000],[3,6,"2015-01-01",700],[4,6,"2016-01-01",1000]]}]},
+    {"name":"Test 6","input":[{"Orders":[[1,1,"2019-03-01",800],[2,1,"2020-03-01",600],[3,1,"2021-03-01",900]]}]},
+    {"name":"Test 7","input":[{"Orders":[[1,7,"2019-01-01",100],[2,7,"2019-09-01",500],[3,7,"2020-02-01",300],[4,7,"2020-08-01",400]]}]},
+    {"name":"Test 8","input":[{"Orders":[[1,8,"2019-01-01",300],[2,8,"2019-09-01",400],[3,8,"2020-02-01",500]]}]},
+    {"name":"Test 9","input":[{"Orders":[[1,9,"2019-12-31",100],[2,9,"2020-01-01",150],[3,10,"2019-12-31",200],[4,10,"2020-01-01",150],[5,10,"2020-12-31",100]]}]},
+    {"name":"Test 10","input":[{"Orders":[[1,3,"2022-05-01",400],[2,1,"2021-04-01",200],[3,2,"2020-01-01",50],[4,1,"2020-04-01",100],[5,3,"2021-05-01",400],[6,2,"2021-01-01",40],[7,1,"2022-04-01",300]]}]},
+    {"name":"Test 11","input":[{"Orders":[[1,1,"2018-06-01",10],[2,1,"2019-06-01",20],[3,1,"2021-06-01",30],[4,1,"2020-06-01",25],[5,2,"2018-06-01",10],[6,2,"2019-06-01",20],[7,2,"2021-06-01",30]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rule is about **yearly totals**, not single orders, so the first stage collapses orders into one row per customer and year. A customer then qualifies when, walking through their years in order, each year is exactly one after the previous and has a larger total. A missing year in the middle has total 0, and since prices are positive the year before it always had more than 0, so any gap is a failure. Comparing each year with the one before it is a job for `LAG`.\n\n## Approach\n\n1. `yearly`: `GROUP BY customer_id, YEAR(order_date)` and `SUM(price)` give `total` per customer and year `yr`.\n2. `compared`: `LAG` over each customer's years in order brings the previous year (`prev_yr`) and its total (`prev_total`) onto the row.\n3. Final select: a row is bad unless it is the first year (`prev_yr` is null) or it directly follows the previous year with a larger total. `GROUP BY customer_id` and keep customers whose bad-row count is 0.\n\n## Example 1, step by step\n\n| customer_id | yr | total | prev_yr | prev_total | bad |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 2019 | 2300 | null | null | 0 |\n| 1 | 2020 | 3000 | 2019 | 2300 | 0 |\n| 1 | 2021 | 3100 | 2020 | 3000 | 0 |\n| 1 | 2022 | 4700 | 2021 | 3100 | 0 |\n| 2 | 2015 | 700 | null | null | 0 |\n| 2 | 2017 | 1000 | 2015 | 700 | 1 (2016 is missing) |\n| 3 | 2017 | 900 | null | null | 0 |\n| 3 | 2018 | 900 | 2017 | 900 | 1 (not larger) |\n\nOnly customer 1 has no bad rows, so the answer is `1`.\n\n## Complexity\n\n- Time: O(n log n) for n orders, for the grouping and the window sort.\n- Space: O(n) for the yearly rows.\n\n## Pitfalls\n\n- Comparing individual orders instead of yearly sums: customer 1's two 2019 orders must be added first.\n- Ignoring gap years: customer 2 looks increasing (700, 1000) unless the missing 2016 is treated as 0.\n- `>=` instead of `>` lets equal totals through, like customer 3.\n- Dropping first-year rows with `WHERE prev_yr IS NOT NULL` would also drop single-year customers, who must be reported.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `yearly` | one row per customer and year with its `total` |\n| `compared` | each yearly row with the previous year's `prev_yr` and `prev_total` |\n| `yr` | the calendar year of the orders |\n| `HAVING SUM(CASE ...) = 0` | the customer has no year that breaks the rule |",
+  "narration": {
+    "1": "The first stage turns orders into one row per customer and year.",
+    "2": "Sum the prices of each customer's orders that fall in the same calendar year.",
+    "4": "Group by customer and year so each yearly total is computed separately.",
+    "6": "The second stage puts each year next to the customer's previous year.",
+    "8": "LAG reads the previous year number in the customer's year order, or null for the first year.",
+    "9": "LAG reads the previous year's total so the two totals can be compared on one row.",
+    "12": "Each qualifying customer is reported once by id.",
+    "14": "Group the yearly rows by customer so their years can be judged together.",
+    "15": "Count the bad years: any year that does not directly follow the previous one with a larger total.",
+    "17": "Keep a customer only if that count is 0; the first year never counts as bad."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "number": 3059,
+  "title": "Find All Unique Email Domains",
+  "spec": "recalled",
+  "statement": "One table lists email addresses:\n\n- `Emails(id, email)`: one row per address; `id` is unique. Every `email` is lowercase and contains exactly one `@`, which separates a non-empty local part from a non-empty domain.\n\nThe domain of an address is everything after its `@`. Consider only domains that end with `.com`. For each such distinct domain, count how many rows of `Emails` use it. Return the columns `email_domain` and `count`, one row per qualifying domain, ordered by `email_domain` ascending.",
+  "constraints": [
+    "id is unique in Emails",
+    "Every email is lowercase and contains exactly one @",
+    "The local part and the domain are both non-empty"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Emails": [["id","INT"],["email","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Emails = [] }] = input;\n  const ids = new Set();\n  for (const [id, email] of Emails) {\n    if (id === null) return 'Every row needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Emails.`;\n    ids.add(id);\n    if (typeof email !== 'string') return `Row ${id} needs an email.`;\n    if (email !== email.toLowerCase()) return `Email ${email} must be lowercase.`;\n    const parts = email.split('@');\n    if (parts.length !== 2 || !parts[0] || !parts[1]) return `Email ${email} needs exactly one @ between a local part and a domain.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT SUBSTRING_INDEX(email, '@', -1) AS email_domain,\n       COUNT(*) AS count\nFROM Emails\nWHERE email LIKE '%.com'\nGROUP BY email_domain\nORDER BY email_domain;",
+  "brute": "SELECT d.email_domain,\n       (SELECT COUNT(*)\n        FROM Emails AS e\n        WHERE SUBSTRING(e.email, INSTR(e.email, '@') + 1) = d.email_domain) AS count\nFROM (SELECT DISTINCT SUBSTRING(email, INSTR(email, '@') + 1) AS email_domain\n      FROM Emails\n      WHERE RIGHT(email, 4) = '.com') AS d\nORDER BY d.email_domain",
+  "generator": "function generate(rand, size) {\n  const locals = ['ana', 'bob', 'kim', 'lee.com', 'ravi', 'sofia', 'wang', 'x'];\n  const domains = ['outlook.com', 'yahoo.com', 'gmail.com', 'leetcode.com', 'test.edu', 'example.org', 'mail.com.au', 'box.telecom', 'com.net', 'a.com'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const used = new Set(), Emails = [];\n  while (Emails.length < count) {\n    const id = 1 + Math.floor(rand() * (size === 'small' ? 20 : 100000));\n    if (used.has(id)) continue;\n    used.add(id);\n    const local = size === 'small' ? pick(locals) : `${pick(locals)}${Math.floor(rand() * 1000)}`;\n    const domain = size === 'small' ? pick(domains) : (rand() < 0.5 ? pick(domains) : `d${Math.floor(rand() * 300)}.${pick(['com', 'org', 'net'])}`);\n    Emails.push([id, `${local}@${domain}`]);\n  }\n  return [{ Emails }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Emails":[[336,"hwkiy@test.edu"],[489,"adcmaf@outlook.com"],[449,"vrzmwyum@yahoo.com"],[95,"tof@test.edu"],[320,"jxhbagkpm@example.org"],[411,"zxcf@outlook.com"]]}],"expected":{"columns":["email_domain","count"],"rows":[["outlook.com",2],["yahoo.com",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Emails":[]}]},
+    {"name":"Test 2","input":[{"Emails":[[1,"ana@test.edu"],[2,"bob@example.org"]]}]},
+    {"name":"Test 3","input":[{"Emails":[[7,"kim@gmail.com"]]}]},
+    {"name":"Test 4","input":[{"Emails":[[1,"ana@yahoo.com"],[2,"bob@outlook.com"],[3,"kim@gmail.com"],[4,"lee@a.com"]]}]},
+    {"name":"Test 5","input":[{"Emails":[[1,"ana@mail.com.au"],[2,"bob@box.telecom"],[3,"kim@com.net"],[4,"ravi@leetcode.com"]]}]},
+    {"name":"Test 6","input":[{"Emails":[[1,"lee.com@test.edu"],[2,"wang.com@example.org"],[3,"x@outlook.com"]]}]},
+    {"name":"Test 7","input":[{"Emails":[[5,"ana@outlook.com"],[3,"bob@outlook.com"],[9,"kim@outlook.com"],[1,"ravi@yahoo.com"],[2,"ana@yahoo.com"]]}]},
+    {"name":"Test 8","input":[{"Emails":[[1,"ana@zeta.com"],[2,"bob@alpha.com"],[3,"kim@mid.com"],[4,"lee@alpha.com"],[5,"wang@test.edu"]]}]},
+    {"name":"Test 9","input":[{"Emails":[[1,"ana@a.com"],[2,"bob@ba.com"],[3,"kim@b.com"],[4,"x@ab.com"],[5,"y@a.com"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach address splits at its single `@`, and the part after it is the domain. Once every row is reduced to its domain, the task is an ordinary count per group, keeping only the groups whose domain ends with `.com`. MySQL's `SUBSTRING_INDEX(email, '@', -1)` returns everything after the last `@`, which is the domain because there is exactly one.\n\n## Approach\n\n1. Compute `email_domain` with `SUBSTRING_INDEX(email, '@', -1)`.\n2. Keep rows with `email LIKE '%.com'`: the address ends with `.com` exactly when its domain does, since the domain is the tail of the address.\n3. `GROUP BY email_domain` and `COUNT(*)` the rows in each group.\n4. `ORDER BY email_domain` ascending.\n\n## Example 1, step by step\n\n- Domains per row: 336 `test.edu`, 489 `outlook.com`, 449 `yahoo.com`, 95 `test.edu`, 320 `example.org`, 411 `outlook.com`.\n- The `.com` filter keeps 489, 449 and 411.\n- Grouping gives `outlook.com` with 2 rows (489, 411) and `yahoo.com` with 1 row (449).\n- Sorted by domain: `outlook.com, 2` then `yahoo.com, 1`.\n\n## Complexity\n\n- Time: O(E log E) for E rows, from grouping and sorting the domains.\n- Space: O(D) for D distinct `.com` domains in the result.\n\n## Pitfalls\n\n- `LIKE '%com'` (without the dot) also accepts a domain such as `box.telecom`.\n- `LIKE '%.com%'` accepts `mail.com.au`, and it also matches a local part such as `lee.com@test.edu`; anchor the pattern at the end.\n- `SUBSTRING_INDEX(email, '.', -1)` gives only the last label (`com`), so every `.com` domain would collapse into one group.\n- Forgetting `ORDER BY` fails because the problem fixes the row order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `email_domain` | the part of `email` after the `@` |\n| `count` | number of rows whose address uses that domain |\n| `WHERE email LIKE '%.com'` | keeps only addresses whose domain ends with `.com` |",
+  "narration": {
+    "1": "Cut each address after its single @ to get the domain.",
+    "2": "Count the rows that fall into each domain group.",
+    "4": "Keep only addresses ending in .com; the domain is the tail of the address, so this tests the domain.",
+    "5": "One group per distinct domain.",
+    "6": "The problem asks for domains in ascending order."
+  }
+}

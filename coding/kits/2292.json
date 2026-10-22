@@ -1,0 +1,55 @@
+{
+  "number": 2292,
+  "title": "Products With Three or More Orders in Two Consecutive Years",
+  "spec": "recalled",
+  "statement": "A shop logs its orders in one table:\n\n- `Orders(order_id, product_id, quantity, purchase_date)`: one row per order; `order_id` is unique. An order buys `quantity` units of one product on `purchase_date`.\n\nA product qualifies when, for some calendar year Y, it has **at least 3 orders** dated in year Y and **at least 3 orders** dated in year Y + 1. Orders are counted as rows; `quantity` plays no part.\n\nReport each qualifying product once, in a single column `product_id`. Rows may come in any order.",
+  "constraints": [
+    "order_id is unique in Orders",
+    "product_id and purchase_date are never null",
+    "An order counts once no matter its quantity",
+    "Years are calendar years of purchase_date"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Orders": [["order_id","INT"],["product_id","INT"],["quantity","INT"],["purchase_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Orders = [] }] = input;\n  const ids = new Set();\n  for (const [id, product, quantity, date] of Orders) {\n    if (id === null) return 'Every order needs an order_id.';\n    if (ids.has(id)) return `order_id ${id} appears twice in Orders.`;\n    ids.add(id);\n    if (product === null) return `Order ${id} needs a product_id.`;\n    if (quantity !== null && quantity < 1) return `Order ${id} needs a positive quantity.`;\n    if (date === null || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `Order ${id} needs a purchase_date like 2020-01-31.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH busy_years AS (\n  SELECT product_id, YEAR(purchase_date) AS order_year\n  FROM Orders\n  GROUP BY product_id, YEAR(purchase_date)\n  HAVING COUNT(*) >= 3\n)\nSELECT DISTINCT cur.product_id\nFROM busy_years AS cur\nJOIN busy_years AS nxt\n  ON nxt.product_id = cur.product_id\n  AND nxt.order_year = cur.order_year + 1;",
+  "brute": "SELECT DISTINCT product_id\nFROM (\n  SELECT product_id, yr, cnt,\n    LAG(yr) OVER (PARTITION BY product_id ORDER BY yr) AS prev_yr,\n    LAG(cnt) OVER (PARTITION BY product_id ORDER BY yr) AS prev_cnt\n  FROM (\n    SELECT product_id, YEAR(purchase_date) AS yr, COUNT(order_id) AS cnt\n    FROM Orders\n    GROUP BY product_id, YEAR(purchase_date)\n  ) AS per_year\n) AS paired\nWHERE cnt >= 3 AND prev_cnt >= 3 AND prev_yr = yr - 1",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const products = small ? 1 + Math.floor(rand() * 2) : 200;\n  const firstYear = 2018 + Math.floor(rand() * 3);\n  const span = small ? 2 + Math.floor(rand() * 2) : 5;\n  const pad = n => String(n).padStart(2, '0');\n  const Orders = [];\n  for (let id = 1; id <= count; id++) {\n    const year = firstYear + Math.floor(rand() * span);\n    // Dates at the turn of the year test that grouping uses calendar years.\n    const r = rand();\n    const day = r < 0.15 ? '01-01' : r < 0.3 ? '12-31' : `${pad(1 + Math.floor(rand() * 12))}-${pad(1 + Math.floor(rand() * 28))}`;\n    Orders.push([id, 1 + Math.floor(rand() * products), pick([1, 2, 3, 5, 10]), `${year}-${day}`]);\n  }\n  return [{ Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Orders":[[1,1,7,"2020-03-16"],[2,1,4,"2020-12-02"],[3,1,7,"2020-05-10"],[4,1,6,"2021-12-23"],[5,1,5,"2021-05-21"],[6,1,6,"2021-10-11"],[7,2,6,"2022-10-11"]]}],"expected":{"columns":["product_id"],"rows":[[1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Orders":[]}]},
+    {"name":"Test 2","input":[{"Orders":[[1,4,9,"2021-06-01"]]}]},
+    {"name":"Test 3","input":[{"Orders":[[1,1,1,"2020-01-05"],[2,1,1,"2020-02-05"],[3,1,1,"2020-03-05"],[4,1,1,"2022-01-05"],[5,1,1,"2022-02-05"],[6,1,1,"2022-03-05"]]}]},
+    {"name":"Test 4","input":[{"Orders":[[1,3,2,"2020-04-01"],[2,3,2,"2020-05-01"],[3,3,2,"2020-06-01"],[4,3,2,"2021-04-01"],[5,3,2,"2021-05-01"]]}]},
+    {"name":"Test 5","input":[{"Orders":[[1,1,1,"2019-01-10"],[2,1,1,"2019-02-10"],[3,1,1,"2019-03-10"],[4,1,1,"2020-01-10"],[5,1,1,"2020-02-10"],[6,1,1,"2020-03-10"],[7,2,50,"2019-05-05"],[8,2,50,"2020-05-05"]]}]},
+    {"name":"Test 6","input":[{"Orders":[[1,7,1,"2019-01-01"],[2,7,1,"2019-06-01"],[3,7,1,"2019-12-31"],[4,7,1,"2020-01-01"],[5,7,1,"2020-06-01"],[6,7,1,"2020-12-31"],[7,7,1,"2021-01-01"],[8,7,1,"2021-06-01"],[9,7,1,"2021-12-31"]]}]},
+    {"name":"Test 7","input":[{"Orders":[[1,1,1,"2020-12-29"],[2,1,1,"2020-12-30"],[3,1,1,"2020-12-31"],[4,1,1,"2021-01-01"],[5,1,1,"2021-01-02"],[6,1,1,"2021-01-03"],[7,2,1,"2020-11-01"],[8,2,1,"2020-12-01"],[9,2,1,"2021-01-01"],[10,2,1,"2021-02-01"],[11,2,1,"2021-03-01"],[12,2,1,"2021-04-01"]]}]},
+    {"name":"Test 8","input":[{"Orders":[[1,1,3,"2020-01-01"],[2,1,3,"2020-02-01"],[3,1,3,"2020-03-01"],[4,2,3,"2021-01-01"],[5,2,3,"2021-02-01"],[6,2,3,"2021-03-01"]]}]},
+    {"name":"Test 9","input":[{"Orders":[[1,5,1,"2018-03-01"],[2,5,1,"2018-04-01"],[3,5,1,"2018-05-01"],[4,5,1,"2019-03-01"],[5,5,1,"2019-04-01"],[6,5,1,"2019-05-01"],[7,6,2,"2021-03-01"],[8,6,2,"2021-04-01"],[9,6,2,"2021-05-01"],[10,6,2,"2021-06-01"],[11,6,2,"2022-03-01"],[12,6,2,"2022-04-01"],[13,6,2,"2022-05-01"],[14,8,1,"2021-03-01"],[15,8,1,"2022-03-01"]]}]},
+    {"name":"Test 10","input":[{"Orders":[[1,2,1,"2020-02-01"],[2,2,1,"2020-02-01"],[3,2,1,"2020-02-01"],[4,2,1,"2019-08-01"],[5,2,1,"2019-09-01"],[6,2,1,"2019-10-01"],[7,9,1,"2019-08-01"],[8,9,1,"2018-08-01"],[9,9,1,"2020-08-01"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe question is about **years**, not single orders, so first collapse the orders into one row per product and calendar year, keeping only the years with at least 3 orders. A product then qualifies when two of its kept years sit next to each other, which a **self-join** of that summary on `year + 1` finds directly.\n\n## Approach\n\n1. CTE `busy_years`: group `Orders` by `product_id` and `YEAR(purchase_date)`, and keep the groups whose `COUNT(*)` is at least 3.\n2. Join `busy_years` to itself: `cur` is one busy year and `nxt` must be the same product's busy year exactly one later.\n3. `SELECT DISTINCT cur.product_id`: a product with three busy years in a row matches twice and must still be reported once.\n\n## Example 1, step by step\n\nGrouping the seven orders by product and year gives:\n\n| product_id | year | orders | kept in `busy_years` |\n| --- | --- | --- | --- |\n| 1 | 2020 | 3 (ids 1, 2, 3) | yes |\n| 1 | 2021 | 3 (ids 4, 5, 6) | yes |\n| 2 | 2022 | 1 (id 7) | no |\n\nThe self-join pairs `cur = (1, 2020)` with `nxt = (1, 2021)`, since 2021 = 2020 + 1. No other pair matches, so the answer is product 1.\n\n## Complexity\n\n- Time: O(R) to group R orders by hashing, then O(G) for the self-join over G busy (product, year) groups with a hash on the join keys.\n- Space: O(G) for the `busy_years` summary.\n\n## Pitfalls\n\n- Summing `quantity` instead of counting rows: one big order is still a single order.\n- Forgetting `DISTINCT`: three consecutive busy years produce two matching pairs for the same product.\n- Joining only on `order_year + 1` without matching `product_id` pairs one product's busy year with another product's.\n- Checking \"any two busy years\" instead of adjacent ones: 2020 and 2022 are not consecutive.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `busy_years` | one row per (product, year) with at least 3 orders |\n| `order_year` | calendar year of `purchase_date` |\n| `cur` | a product's busy year |\n| `nxt` | the same product's busy year directly after `cur` |",
+  "narration": {
+    "1": "Stage one summarises orders as the busy years of each product.",
+    "3": "Read every order once.",
+    "4": "Each group is one product in one calendar year.",
+    "5": "Only years with at least three orders count as busy.",
+    "7": "Report each qualifying product once, even if it has several consecutive pairs.",
+    "9": "Join the summary to itself to look for a second busy year.",
+    "10": "The second busy year must belong to the same product...",
+    "11": "...and come exactly one year after the first."
+  }
+}

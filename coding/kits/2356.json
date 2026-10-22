@@ -1,0 +1,46 @@
+{
+  "number": 2356,
+  "title": "Number of Unique Subjects Taught by Each Teacher",
+  "spec": "leetcode",
+  "statement": "One table lists which subjects each teacher covers in a university:\n\n- `Teacher(teacher_id, subject_id, dept_id)`: one row says that teacher `teacher_id` teaches subject `subject_id` in department `dept_id`. The pair `(subject_id, dept_id)` is unique, but a teacher can teach the same subject in several departments.\n\nFor every teacher in the table, report `teacher_id` and `cnt`, the number of **distinct** subjects that teacher teaches. A subject taught in two departments counts once. Rows may come in any order.",
+  "constraints": [
+    "(subject_id, dept_id) is unique in Teacher",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Teacher": [["teacher_id","INT"],["subject_id","INT"],["dept_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Teacher = [] }] = input;\n  const seen = new Set();\n  for (const [teacher, subject, dept] of Teacher) {\n    if (teacher === null || subject === null || dept === null) return 'Teacher rows may not contain null.';\n    const key = `${subject}|${dept}`;\n    if (seen.has(key)) return `Subject ${subject} appears twice in department ${dept}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT teacher_id, COUNT(DISTINCT subject_id) AS cnt\nFROM Teacher\nGROUP BY teacher_id;",
+  "brute": "SELECT t.teacher_id, COUNT(*) AS cnt\nFROM Teacher AS t\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Teacher AS e\n  WHERE e.teacher_id = t.teacher_id\n    AND e.subject_id = t.subject_id\n    AND e.dept_id < t.dept_id\n)\nGROUP BY t.teacher_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const teachers = small ? 4 : 300, subjects = small ? 4 : 100, depts = small ? 4 : 40;\n  const target = small ? Math.floor(rand() * 9) : 2000;\n  const used = new Set(), Teacher = [];\n  let tries = 0;\n  while (Teacher.length < target && tries < target * 20) {\n    tries++;\n    const subject = 1 + Math.floor(rand() * subjects), dept = 1 + Math.floor(rand() * depts);\n    const key = `${subject}|${dept}`;\n    if (used.has(key)) continue;\n    used.add(key);\n    Teacher.push([1 + Math.floor(rand() * teachers), subject, dept]);\n  }\n  return [{ Teacher }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Teacher":[[1,2,3],[1,2,4],[1,3,3],[2,1,1],[2,2,1],[2,3,1],[2,4,1]]}],"expected":{"columns":["teacher_id","cnt"],"rows":[[1,2],[2,4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Teacher":[]}]},
+    {"name":"Test 2","input":[{"Teacher":[[7,1,1]]}]},
+    {"name":"Test 3","input":[{"Teacher":[[1,5,1],[1,5,2],[1,5,3],[1,5,4]]}]},
+    {"name":"Test 4","input":[{"Teacher":[[1,1,1],[2,1,2],[3,1,3]]}]},
+    {"name":"Test 5","input":[{"Teacher":[[1,1,1],[1,2,1],[1,3,1],[2,4,2],[2,4,3]]}]},
+    {"name":"Test 6","input":[{"Teacher":[[3,2,1],[3,2,2],[3,3,1],[4,2,3],[4,3,2],[4,3,3],[4,1,1]]}]},
+    {"name":"Test 7","input":[{"Teacher":[[1,1,1],[1,1,2],[1,2,1],[1,2,2],[2,3,1],[2,3,2]]}]},
+    {"name":"Test 8","input":[{"Teacher":[[10,1,5],[20,2,5],[10,2,6],[20,1,6],[30,3,5],[30,3,6],[30,4,7]]}]},
+    {"name":"Test 9","input":[{"Teacher":[[1,1,1],[1,2,2],[1,3,3],[1,4,4],[2,1,2],[2,1,3]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row is one (subject, department) assignment, so a teacher who covers the same subject in two departments has two rows for it. Counting rows would count that subject twice. The question is how many different `subject_id` values each teacher has, which is exactly what `COUNT(DISTINCT ...)` computes inside a group.\n\n## Approach\n\n1. `GROUP BY teacher_id` gathers every row of one teacher into one group.\n2. In each group, `COUNT(DISTINCT subject_id)` drops repeated subjects before counting and is returned as `cnt`.\n\n## Example 1, step by step\n\n- Teacher 1 has rows for subjects 2, 2 and 3. Subject 2 repeats (departments 3 and 4), so the distinct subjects are {2, 3} and `cnt = 2`.\n- Teacher 2 has subjects 1, 2, 3 and 4, all in department 1, so `cnt = 4`.\n\nThe result is `(1, 2)` and `(2, 4)`.\n\n## Complexity\n\n- Time: O(T log T) for T rows, to sort or hash the rows by teacher and subject.\n- Space: O(T) in the worst case for the distinct sets.\n\n## Pitfalls\n\n- `COUNT(*)` or `COUNT(subject_id)` counts assignments, so teacher 1 in Example 1 would get 3 instead of 2.\n- Counting distinct `dept_id` answers a different question (how many departments).\n- Grouping by `teacher_id, subject_id` gives one row per subject instead of one per teacher.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY teacher_id` | one group per teacher |\n| `COUNT(DISTINCT subject_id)` | number of different subjects in the group |\n| `cnt` | the output column holding that count |",
+  "narration": {
+    "1": "Report the teacher and how many different subjects appear among that teacher's rows, named cnt.",
+    "2": "Every row is one subject taught in one department.",
+    "3": "Group the rows by teacher so the count is computed per teacher."
+  }
+}

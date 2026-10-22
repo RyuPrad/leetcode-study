@@ -1,0 +1,73 @@
+{
+  "number": 1591,
+  "title": "Strange Printer II",
+  "spec": "leetcode",
+  "statement": "A printer works on an empty `m x n` grid. Each turn it picks one color and one axis-aligned rectangle of cells and paints the whole rectangle in that color, hiding whatever was there before. Once a color has been used for a turn, it can never be used again.\n\n`targetGrid[row][col]` is the color that cell `(row, col)` must have when printing is over. Return `true` if some sequence of turns produces exactly `targetGrid`, and `false` otherwise.",
+  "constraints": [
+    "m == targetGrid.length",
+    "n == targetGrid[i].length",
+    "1 <= m, n <= 60",
+    "1 <= targetGrid[row][col] <= 60"
+  ],
+  "signature": "boolean isPrintable(int[][] targetGrid)",
+  "entry": "isPrintable",
+  "kind": "function",
+  "parameters": [
+    "targetGrid"
+  ],
+  "validator": "function validate([targetGrid]) {\n  if (!Array.isArray(targetGrid) || targetGrid.length < 1 || targetGrid.length > 60) return 'targetGrid needs 1 to 60 rows.';\n  const cols = Array.isArray(targetGrid[0]) ? targetGrid[0].length : 0;\n  if (cols < 1 || cols > 60) return 'Each row needs 1 to 60 cells.';\n  for (const row of targetGrid) {\n    if (!Array.isArray(row) || row.length !== cols) return 'All rows must have the same length.';\n    if (row.some(v => !Number.isInteger(v) || v < 1 || v > 60)) return 'Each color is an integer from 1 to 60.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isPrintable(targetGrid) {\n  const rows = targetGrid.length;\n  const cols = targetGrid[0].length;\n  const top = new Array(61).fill(rows);\n  const left = new Array(61).fill(cols);\n  const bottom = new Array(61).fill(-1);\n  const right = new Array(61).fill(-1);\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      const color = targetGrid[r][c];\n      top[color] = Math.min(top[color], r);\n      left[color] = Math.min(left[color], c);\n      bottom[color] = Math.max(bottom[color], r);\n      right[color] = Math.max(right[color], c);\n    }\n  }\n\n  const covers = Array.from({ length: 61 }, () => new Set());\n  const indegree = new Array(61).fill(0);\n  for (let color = 1; color <= 60; color++) {\n    for (let r = top[color]; r <= bottom[color]; r++) {\n      for (let c = left[color]; c <= right[color]; c++) {\n        const other = targetGrid[r][c];\n        if (other !== color && !covers[color].has(other)) {\n          covers[color].add(other);\n          indegree[other]++;\n        }\n      }\n    }\n  }\n\n  const queue = [];\n  let used = 0;\n  for (let color = 1; color <= 60; color++) {\n    if (bottom[color] < 0) continue;\n    used++;\n    if (indegree[color] === 0) queue.push(color);\n  }\n  let head = 0;\n  while (head < queue.length) {\n    const color = queue[head];\n    head++;\n    for (const next of covers[color]) {\n      indegree[next]--;\n      if (indegree[next] === 0) queue.push(next);\n    }\n  }\n  return queue.length === used;\n}",
+  "brute": "function isPrintable(targetGrid) {\n  // Undo the printing: repeatedly remove a color whose rectangle shows only itself or removed cells.\n  const grid = targetGrid.map(row => row.slice());\n  const boxes = {};\n  grid.forEach((row, r) => row.forEach((color, c) => {\n    const b = boxes[color] || (boxes[color] = { r1: r, c1: c, r2: r, c2: c });\n    b.r1 = Math.min(b.r1, r); b.c1 = Math.min(b.c1, c); b.r2 = Math.max(b.r2, r); b.c2 = Math.max(b.c2, c);\n  }));\n  let remaining = Object.keys(boxes).map(Number);\n  while (remaining.length) {\n    const peel = remaining.find(color => {\n      const b = boxes[color];\n      for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) if (grid[r][c] !== color && grid[r][c] !== 0) return false;\n      return true;\n    });\n    if (peel === undefined) return false;\n    const b = boxes[peel];\n    for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) grid[r][c] = 0;\n    remaining = remaining.filter(color => color !== peel);\n  }\n  return true;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const rows = large ? 40 + Math.floor(rand() * 21) : 1 + Math.floor(rand() * 4);\n  const cols = large ? 40 + Math.floor(rand() * 21) : 1 + Math.floor(rand() * 4);\n  const palette = large ? 60 : 1 + Math.floor(rand() * 6);\n  const pick = (limit) => Math.floor(rand() * limit);\n  const mode = rand();\n  if (mode < 0.2) {\n    // Random colors: usually not printable.\n    return [Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + pick(palette)))];\n  }\n  // Simulate a real printing order with distinct colors, the first covering everything.\n  const colors = Array.from({ length: palette }, (_, i) => i + 1);\n  for (let i = colors.length - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [colors[i], colors[j]] = [colors[j], colors[i]];\n  }\n  const grid = Array.from({ length: rows }, () => new Array(cols).fill(colors[0]));\n  for (const color of colors.slice(1)) {\n    const r1 = pick(rows), r2 = r1 + pick(rows - r1), c1 = pick(cols), c2 = c1 + pick(cols - c1);\n    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) grid[r][c] = color;\n  }\n  if (mode < 0.6) {\n    // Change a cell or two, which often makes the grid impossible.\n    const changes = 1 + pick(2);\n    for (let k = 0; k < changes; k++) grid[pick(rows)][pick(cols)] = 1 + pick(palette);\n  }\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,1,1,1],[1,2,2,1],[1,2,2,1],[1,1,1,1]]],"expected":true},
+    {"name":"Example 2","input":[[[1,1,1,1],[1,1,3,3],[1,1,3,4],[5,5,1,4]]],"expected":true},
+    {"name":"Example 3","input":[[[1,2,1],[2,1,2],[1,2,1]]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1]]]},
+    {"name":"Test 2","input":[[[1,2],[2,1]]]},
+    {"name":"Test 3","input":[[[1,1,1],[3,1,3]]]},
+    {"name":"Test 4","input":[[[1,2,3,4,5]]]},
+    {"name":"Test 5","input":[[[1],[1],[2],[1]]]},
+    {"name":"Test 6","input":[[[60,60],[60,60]]]},
+    {"name":"Test 7","input":[[[1,1,1,1,1],[1,2,2,2,1],[1,2,3,2,1],[1,2,2,2,1],[1,1,1,1,1]]]},
+    {"name":"Test 8","input":[[[1,2,1],[2,2,2],[1,2,1]]]},
+    {"name":"Test 9","input":[[[1,2,1,2]]]},
+    {"name":"Test 10","input":[[[1,1,2,2],[1,3,3,2],[4,3,3,5],[4,4,5,5]]]},
+    {"name":"Test 11","input":[[[1,1,2],[3,1,2],[3,3,2]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach color is printed once, so its rectangle must be at least the **bounding box** of all its cells in the target. Any other color `d` that shows up inside color `c`'s bounding box must have been printed **after** `c`, covering part of it. These \"must come before\" facts form a directed graph between colors, and the grid is printable exactly when that graph has no cycle, i.e. when a topological order of the colors exists.\n\nThe hint's reverse view gives a slower check: repeatedly peel off a color whose box shows only itself or already-peeled cells; if you get stuck, it is impossible.\n\n## Approach\n\n1. Scan the grid and record each color's bounding box in `top`, `left`, `bottom`, `right`.\n2. For every present `color`, look at each cell of its box. A different color `other` there gives an edge `color -> other`; store it once in `covers[color]` and raise `indegree[other]`.\n3. Count the present colors in `used` and put those with no incoming edge in `queue`.\n4. Run Kahn's algorithm: take a color from the queue, and decrease the indegree of every color it must precede, queueing those that reach zero.\n5. All colors get queued only if there is no cycle, so return `queue.length === used`.\n\n## Example 1, step by step\n\nColor `1` has box rows 0–3, columns 0–3; color `2` has rows 1–2, columns 1–2. Inside 1's box there are cells of color 2, so `covers[1] = {2}` and `indegree[2] = 1`. Color 2's box holds only 2s. `used = 2`, and the queue starts as `[1]`. Processing 1 drops `indegree[2]` to 0, so 2 joins: `queue = [1, 2]`. Its length equals `used`, so the answer is `true` (print 1 over everything, then 2 in the middle).\n\n## Complexity\n\n- Time: O(C · m · n) where C ≤ 60 is the number of colors: each color scans its box once; Kahn's algorithm adds O(C²).\n- Space: O(C²) for the edge sets, besides the input.\n\n## Pitfalls\n\n- A color's rectangle must cover its whole bounding box, even cells that end up another color.\n- Add each edge once (the `Set`), or the indegrees will count repeats and never reach zero.\n- Compare against the number of colors that actually appear, not 60.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `top`, `left`, `bottom`, `right` | bounding box of each color (`bottom = -1` means absent) |\n| `covers[color]` | colors that must be printed after `color` |\n| `indegree[color]` | how many colors must be printed before `color` |\n| `used` | number of colors present in the grid |\n| `queue`, `head` | Kahn's queue of printable colors and its read position |",
+  "narration": {
+    "3": "Start every color's box empty: top beyond the last row...",
+    "6": "...and right before the first column, so absent colors have no box.",
+    "7": "Scan every cell to grow its color's bounding box.",
+    "10": "color is the final color of this cell.",
+    "11": "Stretch the box upward, leftward, downward and rightward to include this cell.",
+    "18": "covers[color] will list the colors that must be printed after color.",
+    "19": "indegree counts how many colors must be printed before each color.",
+    "20": "Examine each color's bounding box (absent colors have an empty range).",
+    "23": "other is what this cell inside the box finally shows.",
+    "24": "A different color inside the box must have been printed later; record the edge once.",
+    "25": "color must come before other.",
+    "26": "other gains one more color that must precede it.",
+    "32": "Kahn's queue holds colors whose predecessors are all printed.",
+    "35": "Skip colors that never appear.",
+    "36": "Count the colors that need a turn.",
+    "37": "Colors with nothing to wait for can be printed first.",
+    "40": "Process colors in the order they become printable.",
+    "43": "Each color that had to wait for this one...",
+    "44": "...now has one fewer color blocking it.",
+    "45": "Once nothing blocks it, it can be printed too.",
+    "48": "Every color was ordered exactly when the graph has no cycle."
+  }
+}

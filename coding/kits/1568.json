@@ -1,0 +1,68 @@
+{
+  "number": 1568,
+  "title": "Minimum Number of Days to Disconnect Island",
+  "spec": "leetcode",
+  "statement": "`grid` is an `m x n` map of `0`s (water) and `1`s (land). Land cells that touch through a shared side (up, down, left or right; diagonals do not count) belong to the same island, and an island is a largest such group of land cells. The grid counts as **connected** when it contains exactly one island; with zero islands or two or more islands it counts as **disconnected**.\n\nEach day you may turn one land cell into water. Return the fewest days needed to make the grid disconnected (`0` if it already is).",
+  "constraints": [
+    "m == grid.length",
+    "n == grid[i].length",
+    "1 <= m, n <= 30",
+    "grid[i][j] is 0 or 1"
+  ],
+  "signature": "int minDays(int[][] grid)",
+  "entry": "minDays",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 30) return 'grid needs 1 to 30 rows.';\n  const cols = grid[0].length;\n  if (cols < 1 || cols > 30) return 'grid needs 1 to 30 columns.';\n  for (const row of grid) {\n    if (row.length !== cols) return 'Every row must have the same length.';\n    if (row.some(v => v !== 0 && v !== 1)) return 'Each cell is 0 or 1.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minDays(grid) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n\n  const countIslands = () => {\n    const seen = Array.from({ length: rows }, () => new Array(cols).fill(false));\n    const dfs = (r, c) => {\n      seen[r][c] = true;\n      for (const [dr, dc] of directions) {\n        const nr = r + dr;\n        const nc = c + dc;\n        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === 1 && !seen[nr][nc]) {\n          dfs(nr, nc);\n        }\n      }\n    };\n    let islands = 0;\n    for (let r = 0; r < rows; r++) {\n      for (let c = 0; c < cols; c++) {\n        if (grid[r][c] === 1 && !seen[r][c]) {\n          islands++;\n          dfs(r, c);\n        }\n      }\n    }\n    return islands;\n  };\n\n  if (countIslands() !== 1) {\n    return 0;\n  }\n\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (grid[r][c] === 0) {\n        continue;\n      }\n      grid[r][c] = 0;\n      const islands = countIslands();\n      grid[r][c] = 1;\n      if (islands !== 1) {\n        return 1;\n      }\n    }\n  }\n  return 2;\n}",
+  "brute": "function minDays(grid) {\n  // Try removing every set of 0, 1, 2, ... land cells and count islands with union-find.\n  const rows = grid.length, cols = grid[0].length;\n  const land = [];\n  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c] === 1) land.push(r * cols + c);\n  const islandsWithout = removed => {\n    const parent = new Map();\n    const find = x => { while (parent.get(x) !== x) x = parent.get(x); return x; };\n    for (const cell of land) if (!removed.has(cell)) parent.set(cell, cell);\n    for (const cell of parent.keys()) {\n      const r = Math.floor(cell / cols), c = cell % cols;\n      if (c + 1 < cols && parent.has(cell + 1)) parent.set(find(cell), find(cell + 1));\n      if (r + 1 < rows && parent.has(cell + cols)) parent.set(find(cell), find(cell + cols));\n    }\n    return new Set([...parent.keys()].map(find)).size;\n  };\n  const tryK = (k, start, removed) => {\n    if (k === 0) return islandsWithout(removed) !== 1;\n    for (let i = start; i < land.length; i++) {\n      removed.add(land[i]);\n      const ok = tryK(k - 1, i + 1, removed);\n      removed.delete(land[i]);\n      if (ok) return true;\n    }\n    return false;\n  };\n  for (let k = 0; ; k++) if (tryK(k, 0, new Set())) return k;\n}",
+  "generator": "function generate(rand, size) {\n  const rows = size === 'large' ? 20 + Math.floor(rand() * 11) : 1 + Math.floor(rand() * 4);\n  const cols = size === 'large' ? 20 + Math.floor(rand() * 11) : 1 + Math.floor(rand() * 4);\n  const grid = Array.from({ length: rows }, () => new Array(cols).fill(0));\n  const mode = rand();\n  if (mode < 0.3) {\n    // Scattered land: often several islands or none.\n    const density = rand();\n    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) grid[r][c] = rand() < density ? 1 : 0;\n  } else if (mode < 0.85) {\n    // Grow one island cell by cell from a random start.\n    const target = 1 + Math.floor(rand() * rows * cols * (size === 'large' ? 0.6 : 1));\n    const frontier = [[Math.floor(rand() * rows), Math.floor(rand() * cols)]];\n    let placed = 0;\n    while (placed < target && frontier.length > 0) {\n      const pick = Math.floor(rand() * frontier.length);\n      const [r, c] = frontier[pick];\n      frontier[pick] = frontier[frontier.length - 1];\n      frontier.pop();\n      if (grid[r][c] === 1) continue;\n      grid[r][c] = 1;\n      placed++;\n      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {\n        const nr = r + dr, nc = c + dc;\n        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === 0) frontier.push([nr, nc]);\n      }\n    }\n  } else {\n    // A solid rectangle of land, possibly with one hole punched in it.\n    const top = Math.floor(rand() * rows), left = Math.floor(rand() * cols);\n    const bottom = top + Math.floor(rand() * (rows - top)), right = left + Math.floor(rand() * (cols - left));\n    for (let r = top; r <= bottom; r++) for (let c = left; c <= right; c++) grid[r][c] = 1;\n    if (rand() < 0.5) grid[top + Math.floor(rand() * (bottom - top + 1))][left + Math.floor(rand() * (right - left + 1))] = 0;\n  }\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,1,0],[0,1,1,0],[0,0,0,0]]],"expected":2},
+    {"name":"Example 2","input":[[[1,1]]],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0]]]},
+    {"name":"Test 2","input":[[[1]]]},
+    {"name":"Test 3","input":[[[1,0,1]]]},
+    {"name":"Test 4","input":[[[1,1,1]]]},
+    {"name":"Test 5","input":[[[1,0],[0,1]]]},
+    {"name":"Test 6","input":[[[0,1,0],[1,1,1],[0,1,0]]]},
+    {"name":"Test 7","input":[[[1,1,1],[1,0,1],[1,1,1]]]},
+    {"name":"Test 8","input":[[[1,1,0],[0,1,1]]]},
+    {"name":"Test 9","input":[[[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1]]]},
+    {"name":"Test 10","input":[[[1,1,0,1,1],[1,1,1,1,1],[1,1,0,1,1]]]},
+    {"name":"Test 11","input":[[[1],[1],[1],[1],[1],[1]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is never more than `2`. Take the land cell that is highest, and leftmost among the highest: nothing sits above it or to its left, so it touches at most two land cells (right and below). Turning those two into water cuts it off, or leaves no land at all. So only three cases remain: the grid is already disconnected (`0`), one removal is enough (`1`), or neither (`2`). Each case can be tested with a flood fill that counts islands. A brute force would try every set of removed cells, which explodes quickly.\n\n## Approach\n\n1. Write `countIslands`: scan the grid, and whenever an unseen land cell appears, add one island and flood it with `dfs`, marking every land cell reachable through shared sides in `seen`.\n2. If the count is not exactly `1`, the grid is already disconnected: return `0`.\n3. For each land cell, turn it into water, count islands, then put it back. If the count is not `1`, return `1`.\n4. If no single removal works, return `2`.\n\n## Example 1, step by step\n\nThe land is the 2 x 2 block at rows 0–1, columns 1–2, so `countIslands` returns `1` and we continue. Removing `(0, 1)` leaves an L of three cells, still one island; the same happens for `(0, 2)`, `(1, 1)` and `(1, 2)`. No single removal works, so the answer is `2`.\n\n## Complexity\n\n- Time: O((m·n)²): up to m·n trial removals, each followed by an O(m·n) flood fill.\n- Space: O(m·n) for `seen` and the recursion stack.\n\n## Pitfalls\n\n- Zero islands also counts as disconnected, so a grid with no land answers `0`, and a single land cell answers `1`.\n- Restore the cell to land after each trial, or later trials see a damaged grid.\n- Diagonal neighbours are not connected; only the four side directions join cells.\n- Tarjan's articulation points give O(m·n), but at 30 x 30 the simple trial removal is fast enough.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rows`, `cols` | grid height and width |\n| `directions` | the four side-sharing moves |\n| `seen` | land cells already flooded during one count |\n| `islands` | number of islands found by a count |\n| `r`, `c` | the cell being scanned or removed |\n| `nr`, `nc` | a neighbour of the cell being flooded |",
+  "narration": {
+    "4": "The four moves that join cells sharing a side; diagonals are left out.",
+    "7": "Each count starts with no land cell flooded yet.",
+    "9": "Mark this land cell as part of the island being flooded.",
+    "13": "Step only onto in-bounds, unflooded land.",
+    "14": "Flood onward from that neighbour.",
+    "21": "An unflooded land cell starts a new island.",
+    "22": "Count it...",
+    "23": "...and flood the whole island so its other cells are not counted again.",
+    "30": "Zero islands or several islands already means disconnected.",
+    "31": "No days are needed.",
+    "36": "Only land cells can be removed.",
+    "39": "Try turning this cell into water.",
+    "40": "Count the islands that remain.",
+    "41": "Put the cell back so later trials see the original grid.",
+    "42": "Did this single removal break the grid apart (or remove the last land)?",
+    "43": "Then one day is enough.",
+    "47": "No single cell works, and two always do, so the answer is 2."
+  }
+}

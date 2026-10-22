@@ -1,0 +1,55 @@
+{
+  "number": 3057,
+  "title": "Employees Project Allocation",
+  "spec": "recalled",
+  "statement": "Two tables describe who works on what:\n\n- `Project(project_id, employee_id, workload)`: one row per assignment of an employee to a project; the pair `(project_id, employee_id)` is unique. `workload` is a positive integer, and every `employee_id` here exists in `Employees`.\n- `Employees(employee_id, name, team)`: one row per employee; `employee_id` is unique. Each employee belongs to one `team`.\n\nFor each team, its **average workload** is the average of `workload` over all `Project` rows whose employee belongs to that team (every assignment counts once; employees without assignments do not count).\n\nReport every assignment whose `workload` is **strictly greater** than the average workload of its employee's team, with the columns `employee_id`, `project_id`, `employee_name` (the employee's `name`) and `project_workload` (the assignment's `workload`). Order the rows by `employee_id` ascending, then `project_id` ascending.",
+  "constraints": [
+    "(project_id, employee_id) is unique in Project",
+    "employee_id is unique in Employees",
+    "Every Project.employee_id exists in Employees",
+    "workload is a positive integer; name and team are never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Project": [["project_id","INT"],["employee_id","INT"],["workload","INT"]],
+    "Employees": [["employee_id","INT"],["name","VARCHAR(20)"],["team","VARCHAR(20)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Project = [], Employees = [] }] = input;\n  const staff = new Set(), pairs = new Set();\n  for (const [id, name, team] of Employees) {\n    if (id === null || name === null || team === null) return 'employee_id, name and team are required.';\n    if (staff.has(id)) return `employee_id ${id} appears twice in Employees.`;\n    staff.add(id);\n  }\n  for (const [project, employee, workload] of Project) {\n    if (project === null || employee === null || workload === null) return 'project_id, employee_id and workload are required.';\n    if (!staff.has(employee)) return `Project names employee ${employee}, who is not in Employees.`;\n    if (workload <= 0) return 'workload must be positive.';\n    const key = `${project}|${employee}`;\n    if (pairs.has(key)) return `Employee ${employee} is assigned to project ${project} twice.`;\n    pairs.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH team_avg AS (\n  SELECT e.team, AVG(p.workload) AS avg_workload\n  FROM Project AS p\n  JOIN Employees AS e\n    ON e.employee_id = p.employee_id\n  GROUP BY e.team\n)\nSELECT\n  p.employee_id,\n  p.project_id,\n  e.name AS employee_name,\n  p.workload AS project_workload\nFROM Project AS p\nJOIN Employees AS e\n  ON e.employee_id = p.employee_id\nJOIN team_avg AS t\n  ON t.team = e.team\nWHERE p.workload > t.avg_workload\nORDER BY p.employee_id, p.project_id;",
+  "brute": "SELECT p.employee_id, p.project_id, e.name AS employee_name, p.workload AS project_workload\nFROM Project AS p, Employees AS e\nWHERE e.employee_id = p.employee_id\n  AND p.workload * (\n    SELECT COUNT(*) FROM Project AS q\n    WHERE q.employee_id IN (SELECT m.employee_id FROM Employees AS m WHERE m.team = e.team)\n  ) > (\n    SELECT SUM(q.workload) FROM Project AS q\n    WHERE q.employee_id IN (SELECT m.employee_id FROM Employees AS m WHERE m.team = e.team)\n  )\nORDER BY p.employee_id, p.project_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const names = ['Khaled', 'Ali', 'John', 'Doe', 'Mona', 'Sara', 'Omar', 'Lina'];\n  const small = size === 'small';\n  const teams = small ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];\n  const staffCount = small ? pick(7) : 400;\n  const Employees = [];\n  for (let id = 1; id <= staffCount; id++) Employees.push([id, names[pick(names.length)], teams[pick(teams.length)]]);\n  const Project = [];\n  if (staffCount > 0) {\n    // Few distinct workloads in small cases, so assignments often land exactly on the team average.\n    const loads = [10, 20, 30, 45, 60, 90];\n    const target = small ? pick(9) : 1500, projects = small ? 4 : 300;\n    const pairs = new Set();\n    for (let tries = 0; Project.length < target && tries < target * 5; tries++) {\n      const project = 1 + pick(projects), employee = 1 + pick(staffCount);\n      const key = `${project}|${employee}`;\n      if (pairs.has(key)) continue;\n      pairs.add(key);\n      Project.push([project, employee, small ? loads[pick(loads.length)] : 1 + pick(100)]);\n    }\n  }\n  return [{ Project, Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Project":[[1,1,45],[1,2,90],[2,3,12],[2,4,68]],"Employees":[[1,"Khaled","A"],[2,"Ali","B"],[3,"John","B"],[4,"Doe","A"]]}],"expected":{"columns":["employee_id","project_id","employee_name","project_workload"],"rows":[[2,1,"Ali",90],[4,2,"Doe",68]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Project":[],"Employees":[]}]},
+    {"name":"Test 2","input":[{"Project":[],"Employees":[[1,"Mona","A"],[2,"Omar","B"]]}]},
+    {"name":"Test 3","input":[{"Project":[[7,1,50]],"Employees":[[1,"Sara","A"]]}]},
+    {"name":"Test 4","input":[{"Project":[[1,1,10],[2,2,20],[3,3,30]],"Employees":[[1,"Ali","A"],[2,"John","A"],[3,"Doe","A"]]}]},
+    {"name":"Test 5","input":[{"Project":[[1,1,10],[2,1,20],[3,1,30],[4,2,50]],"Employees":[[1,"Lina","X"],[2,"Omar","X"]]}]},
+    {"name":"Test 6","input":[{"Project":[[1,1,10],[2,2,20],[3,3,100],[4,4,200]],"Employees":[[1,"Ali","A"],[2,"Doe","A"],[3,"Sara","B"],[4,"Mona","B"]]}]},
+    {"name":"Test 7","input":[{"Project":[[9,3,80],[2,3,70],[5,1,90],[1,1,75],[4,2,5],[3,2,10]],"Employees":[[3,"Khaled","T"],[1,"Lina","T"],[2,"John","T"]]}]},
+    {"name":"Test 8","input":[{"Project":[[1,1,40],[1,2,60],[2,3,40],[2,4,20],[3,5,99]],"Employees":[[1,"Ali","A"],[2,"Ali","A"],[3,"Ali","B"],[4,"John","B"],[5,"Doe","C"],[6,"Omar","C"]]}]},
+    {"name":"Test 9","input":[{"Project":[[1,1,30],[1,2,30],[2,3,30],[2,4,31]],"Employees":[[1,"Sara","A"],[2,"Mona","A"],[3,"Omar","B"],[4,"Lina","B"]]}]},
+    {"name":"Test 10","input":[{"Project":[[1,1,45],[1,2,90],[2,3,12],[2,4,68],[3,2,20],[3,4,70],[4,5,1]],"Employees":[[1,"Khaled","A"],[2,"Ali","B"],[3,"John","B"],[4,"Doe","A"],[5,"Sara","A"],[6,"Omar","B"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach assignment has to be compared with a number that summarises a whole team, so the work splits into two stages: first compute one average per team, then bring that average next to every assignment and compare. Both stages need the team, which lives in `Employees`, so `Project` is joined to `Employees` twice: once to build the averages and once to report.\n\n## Approach\n\n1. CTE `team_avg`: join `Project` to `Employees` and `GROUP BY e.team`, taking `AVG(p.workload)` over the team's assignments.\n2. Main query: join every assignment `p` to its employee `e` (for the name and team), then to `team_avg` on the team.\n3. `WHERE p.workload > t.avg_workload` keeps assignments strictly above their team's average.\n4. Rename `name` to `employee_name` and `workload` to `project_workload`, and order by `employee_id`, `project_id`.\n\n## Example 1, step by step\n\n`team_avg`:\n\n- Team A: Khaled 45 and Doe 68, average 56.5\n- Team B: Ali 90 and John 12, average 51\n\nComparing each assignment with its team's average: Khaled 45 < 56.5 (dropped), Ali 90 > 51 (kept), John 12 < 51 (dropped), Doe 68 > 56.5 (kept). Sorted by employee: (2, 1, Ali, 90) and (4, 2, Doe, 68).\n\n## Complexity\n\n- Time: O(P + E) with hash joins for P assignments and E employees, plus O(K log K) to sort the K reported rows.\n- Space: O(E) for the join lookup plus one row per team in `team_avg`.\n\n## Pitfalls\n\n- Averaging over all assignments instead of per team compares against the wrong number.\n- Averaging per employee first and then per team weights an employee with one assignment like one with many; the average here is over assignments.\n- `>=` reports an assignment that is exactly equal to the average; the rule is strictly greater.\n- Forgetting the `project_id` tie-break: an employee can appear several times.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `team_avg` | one row per team with `avg_workload` over its assignments |\n| `p` | `Project`, one assignment per row |\n| `e` | `Employees`, gives each assignment its name and team |\n| `t` | the matching `team_avg` row for the employee's team |",
+  "narration": {
+    "1": "The CTE team_avg computes one average workload per team.",
+    "2": "Average the workload over every assignment of the team's members.",
+    "4": "Join each assignment to its employee to learn which team it counts for.",
+    "6": "Group by team so each team gets its own average.",
+    "14": "Join each reported assignment to its employee for the name and the team.",
+    "16": "Bring in the average of that employee's team.",
+    "18": "Keep only assignments strictly above their team's average.",
+    "19": "Order by employee, then by project, as required."
+  }
+}

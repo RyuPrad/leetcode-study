@@ -1,0 +1,80 @@
+{
+  "number": 2759,
+  "title": "Convert JSON String to Object",
+  "spec": "recalled",
+  "statement": "Write `jsonParse(str)`, which reads the JSON text `str` and returns the JavaScript value it describes. Do it without the built-in `JSON.parse`: here it throws an error while your function runs.\n\n`str` is always valid JSON for exactly one value, and a value is one of:\n\n- `null`, `true` or `false`;\n- a number: an optional `-`, digits, and optionally a `.` followed by more digits (never an exponent);\n- a string: a `\"`, any characters except `\"`, and a closing `\"`. There are no backslashes, so no escape sequences;\n- an array: `[`, values separated by `,`, then `]`;\n- an object: `{`, `key:value` pairs separated by `,`, then `}`, where every key is a string. Keys within one object are distinct, and no key is `\"__proto__\"`.\n\n`str` contains no whitespace at all, not even inside strings. Return arrays with their elements in order, and objects with exactly the keys of the text. Numbers are compared with a tolerance of `1e-5`.",
+  "constraints": [
+    "1 <= str.length <= 10^5",
+    "str is valid JSON with no whitespace and no backslashes",
+    "Numbers have no exponent, and |number| <= 2^53",
+    "Keys within one object are distinct, and no key is \"__proto__\"",
+    "Arrays and objects are nested at most 100 levels deep"
+  ],
+  "signature": "Object jsonParse(String str)",
+  "entry": "jsonParse",
+  "kind": "function",
+  "parameters": [
+    "str"
+  ],
+  "compare": "float",
+  "validator": "function validate(input) {\n  const [str] = input;\n  if (typeof str !== 'string' || str.length < 1 || str.length > 100000) return 'str must be a string of 1 to 10^5 characters.';\n  if (/\\s/.test(str)) return 'Leave out all whitespace, also inside strings.';\n  if (str.includes('\\\\')) return 'Leave out backslashes: strings here have no escape sequences.';\n  try {\n    JSON.parse(str);\n  } catch {\n    return 'str must be valid JSON.';\n  }\n  // Strings come first in the pattern, so brackets and commas inside them stay part of the string.\n  const tokens = str.match(/\"[^\"]*\"|[^\",:{}[\\]]+|[,:{}[\\]]/g);\n  const open = [];\n  for (let k = 0; k < tokens.length; k++) {\n    const token = tokens[k];\n    if (token === '{' || token === '[') {\n      open.push(token === '{' ? new Set() : null);\n      if (open.length > 100) return 'Nest arrays and objects at most 100 levels deep.';\n    } else if (token === '}' || token === ']') {\n      open.pop();\n    } else if (token[0] === '\"' && tokens[k + 1] === ':') {\n      const keys = open[open.length - 1];\n      if (token === '\"__proto__\"') return 'No key may be \"__proto__\".';\n      if (keys.has(token)) return `The key ${token} appears twice in one object.`;\n      keys.add(token);\n    } else if (/^-?\\d/.test(token)) {\n      if (/[eE]/.test(token)) return 'Write numbers without an exponent.';\n      if (Math.abs(Number(token)) > 2 ** 53) return 'Keep numbers within 2^53 in size.';\n    }\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [str] = input;\n  // The problem asks for a parser of your own, so the built-in one is switched off during the call.\n  const builtIn = JSON.parse;\n  JSON.parse = function () { throw new Error('Solve it without the built-in JSON.parse.'); };\n  let result;\n  try {\n    result = solve(str);\n  } finally {\n    JSON.parse = builtIn;\n  }\n  if (result === undefined) throw new Error('jsonParse returned undefined; it should return the value that str describes.');\n  const kind = result === null ? 'null' : Array.isArray(result) ? `an array of ${result.length}` : typeof result === 'object' ? `an object with ${Object.keys(result).length} keys` : JSON.stringify(result);\n  kit.trace(`jsonParse returns ${kind}`);\n  return result;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {string} str valid JSON without whitespace or escapes\n * @return {null|boolean|number|string|Array|Object} the value str describes\n */\nfunction jsonParse(str) {\n  // Write your code here.\n}\n",
+    "typescript": "type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };\n\nfunction jsonParse(str: string): JSONValue {\n  // Write your code here.\n  return null;\n}\n"
+  },
+  "api": "jsonParse(str: string): JSONValue, where type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue }",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function jsonParse(str) {\n  let i = 0;\n  const literals = [['true', true], ['false', false], ['null', null]];\n\n  const parseValue = () => {\n    if (str[i] === '{') return parseObject();\n    if (str[i] === '[') return parseArray();\n    if (str[i] === '\"') return parseString();\n    for (const [word, value] of literals) {\n      if (str.startsWith(word, i)) {\n        i += word.length;\n        return value;\n      }\n    }\n    return parseNumber();\n  };\n\n  const parseString = () => {\n    const end = str.indexOf('\"', i + 1);\n    const text = str.slice(i + 1, end);\n    i = end + 1;\n    return text;\n  };\n\n  const parseNumber = () => {\n    const start = i;\n    while (i < str.length && '-.0123456789'.includes(str[i])) {\n      i++;\n    }\n    return Number(str.slice(start, i));\n  };\n\n  const parseArray = () => {\n    const result = [];\n    i++;\n    while (str[i] !== ']') {\n      result.push(parseValue());\n      if (str[i] === ',') i++;\n    }\n    i++;\n    return result;\n  };\n\n  const parseObject = () => {\n    const result = {};\n    i++;\n    while (str[i] !== '}') {\n      const key = parseString();\n      i++;\n      result[key] = parseValue();\n      if (str[i] === ',') i++;\n    }\n    i++;\n    return result;\n  };\n\n  return parseValue();\n}",
+  "brute": "function jsonParse(str) {\n  // Cut the text into tokens first, then build the value with an explicit stack instead of recursion.\n  const tokens = str.match(/\"[^\"]*\"|-?\\d+(?:\\.\\d+)?|true|false|null|[{}[\\],:]/g);\n  const stack = [];\n  let root;\n  const attach = (value) => {\n    if (stack.length === 0) {\n      root = value;\n      return;\n    }\n    const top = stack[stack.length - 1];\n    if (Array.isArray(top.container)) top.container.push(value);\n    else top.container[top.key] = value;\n  };\n  for (let k = 0; k < tokens.length; k++) {\n    const token = tokens[k];\n    if (token === '{' || token === '[') {\n      const container = token === '{' ? {} : [];\n      attach(container);\n      stack.push({ container, key: null });\n    } else if (token === '}' || token === ']') {\n      stack.pop();\n    } else if (token !== ',' && token !== ':') {\n      let value;\n      if (token[0] === '\"') value = token.slice(1, -1);\n      else if (token === 'true') value = true;\n      else if (token === 'false') value = false;\n      else if (token === 'null') value = null;\n      else value = parseFloat(token);\n      const top = stack[stack.length - 1];\n      if (top && !Array.isArray(top.container) && tokens[k + 1] === ':') top.key = value;\n      else attach(value);\n    }\n  }\n  return root;\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const chars = 'abcxyzAZ0129-.:,{}[]tfnul';\n  const word = (most) => Array.from({ length: Math.floor(rand() * (most + 1)) }, () => chars[Math.floor(rand() * chars.length)]).join('');\n  const number = () => {\n    const roll = rand(), whole = Math.floor(rand() * 2001) - 1000;\n    return roll < 0.6 ? whole : roll < 0.9 ? whole / 100 : whole * 1000003;\n  };\n  const value = (depth) => {\n    const roll = rand();\n    if (depth >= (small ? 3 : 6) || roll < 0.45) {\n      const kind = rand();\n      if (kind < 0.35) return number();\n      if (kind < 0.7) return word(small ? 4 : 8);\n      if (kind < 0.8) return true;\n      if (kind < 0.9) return false;\n      return null;\n    }\n    const count = Math.floor(rand() * (small ? 4 : 6));\n    if (roll < 0.72) return Array.from({ length: count }, () => value(depth + 1));\n    // Assigning keys to an object keeps them distinct.\n    const object = {};\n    for (let k = 0; k < count; k++) object[word(small ? 3 : 6)] = value(depth + 1);\n    return object;\n  };\n  if (small) return [JSON.stringify(value(0))];\n  const top = rand() < 0.5 ? [] : {};\n  let textLength = 2;\n  for (let k = 0; textLength < 8000; k++) {\n    const item = value(1);\n    if (Array.isArray(top)) top.push(item);\n    else top['key' + k] = item;\n    textLength = JSON.stringify(top).length;\n    // Drop an item that would push the text past 10,000 characters, and stop.\n    if (textLength > 10000) {\n      if (Array.isArray(top)) top.pop();\n      else delete top['key' + k];\n      break;\n    }\n  }\n  return [JSON.stringify(top)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["{\"a\":2,\"b\":[1,2,3]}"],"expected":{"a":2,"b":[1,2,3]}},
+    {"name":"Example 2","input":["true"],"expected":true},
+    {"name":"Example 3","input":["[1,5,\"false\",{\"a\":2}]"],"expected":[1,5,"false",{"a":2}]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["0"]},
+    {"name":"Test 2","input":["null"]},
+    {"name":"Test 3","input":["\"\""]},
+    {"name":"Test 4","input":["-12.5"]},
+    {"name":"Test 5","input":["[]"]},
+    {"name":"Test 6","input":["{}"]},
+    {"name":"Test 7","input":["[[[]],{},[{}],[[1]]]"]},
+    {"name":"Test 8","input":["{\"k\":\"{[,:]}\",\"n\":null,\"f\":false,\"a,b\":\"c:d\"}"]},
+    {"name":"Test 9","input":["[-0.25,1000000,\"123\",true,\"null\",9007199254740991]"]},
+    {"name":"Test 10","input":["{\"a\":{\"b\":{\"c\":[1,{\"d\":\"e\"}]}},\"z\":-7}"]},
+    {"name":"Test 11","input":["[\"tru\",\"fals\",\"-\",\"a:b\",\"[]\",\"\"]"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nJSON is a recursive grammar: a value is a literal, a number, a string, or a bracket that holds more values. The first character of a value tells which kind it is (`{`, `[`, `\"`, a letter, or a digit or `-`), so a **recursive descent** parser can read it from left to right in one pass. One helper per kind reads its piece and leaves a shared position `i` just past it, and the array and object helpers call back into `parseValue` for their elements. The closure over `i` is what lets all helpers share the progress. Splitting on commas cannot work, because commas also sit inside nested values and strings. (The brute force cuts the text into tokens with a regular expression and builds the value with an explicit stack instead of recursion.)\n\n## Approach\n\n1. `parseValue` looks at `str[i]`: `{`, `[` and `\"` go to their helpers; `true`, `false` and `null` are matched whole with `startsWith`; anything else is a number.\n2. `parseString` finds the closing quote with `indexOf` (there are no escapes) and returns the text between the quotes.\n3. `parseNumber` takes the run of `-`, `.` and digits and converts it with `Number`.\n4. `parseArray` skips `[`, reads values until `]`, stepping over each `,`, then skips `]`.\n5. `parseObject` does the same between `{` and `}`, reading a `key` with `parseString` and stepping over `:` before each value.\n\n## Example 1, step by step\n\n`str = {\"a\":2,\"b\":[1,2,3]}`.\n\n- `str[0]` is `{`, so `parseObject` starts with `result = {}` and `i = 1`.\n- `parseString` reads the key `\"a\"` and leaves `i` on `:`; skipping it, `parseValue` reads the number `2`. Then `,` is skipped.\n- The key `\"b\"` is read; its value starts with `[`, so `parseArray` collects `1`, `2` and `3` and steps past `]`.\n- `str[i]` is now `}`: the object is done, and the answer is `{ a: 2, b: [1, 2, 3] }`.\n\n## Complexity\n\n- Time: O(n): every character is read a constant number of times.\n- Space: O(n) for the result, plus O(d) recursion for nesting depth d.\n\n## Pitfalls\n\n- Every helper must move `i` past what it read, including `:`, `,` and the closing bracket; a missed step loops forever.\n- Decide by the first character of a **value**, not by searching the text: `\"false\"` in Example 3 is a string, and `\"{[,:]}\"` in Test 8 is one too.\n- `parseInt` drops the fraction of `-12.5`; `Number` keeps it.\n- Passing the position into helpers by value loses their progress; keep one shared `i`.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `i` | position of the next unread character, shared by all helpers |\n| `literals` | the three words `true`, `false`, `null` with their values |\n| `end` | index of the quote that closes the current string |\n| `start` | where the current number begins |\n| `result` | the array or object being filled |\n| `key` | the key whose value `parseObject` reads next |",
+  "narration": {
+    "2": "i is the position of the next unread character; every helper below moves it forward.",
+    "6": "An object starts with {.",
+    "7": "An array starts with [.",
+    "8": "A string starts with a quote.",
+    "10": "true, false and null are matched as whole words.",
+    "11": "Step over the word and return its value.",
+    "15": "Anything else must be a number.",
+    "19": "With no escapes, the next quote closes the string.",
+    "21": "Move past the closing quote.",
+    "27": "A number is a run of minus signs, dots and digits.",
+    "30": "Number keeps the fraction, unlike parseInt.",
+    "35": "Skip the [.",
+    "36": "Read elements until the closing bracket.",
+    "37": "Each element is any value, so recurse into parseValue.",
+    "38": "Step over the comma between elements.",
+    "40": "Skip the ] so the caller continues after the array.",
+    "46": "Skip the {.",
+    "48": "Every key is a string.",
+    "49": "Step over the colon after the key.",
+    "50": "The value can be anything, including another object.",
+    "53": "Skip the } so the caller continues after the object.",
+    "57": "Parse the single value that the whole text describes."
+  }
+}

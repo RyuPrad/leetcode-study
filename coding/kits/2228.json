@@ -1,0 +1,49 @@
+{
+  "number": 2228,
+  "title": "Users With Two Purchases Within Seven Days",
+  "spec": "recalled",
+  "statement": "One table lists purchases:\n\n- `Purchases(purchase_id, user_id, purchase_date)`: one row per purchase; `purchase_id` is unique. A user may buy several times, even on the same day.\n\nFind the users who made two purchases (any two, not only back to back in the table) whose dates are **at most 7 days apart**: the same day counts, exactly 7 days apart counts, 8 days does not.\n\nReport one column, `user_id`, with each such user once, ordered by `user_id` ascending.",
+  "constraints": [
+    "purchase_id is unique in Purchases",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Purchases": [["purchase_id","INT"],["user_id","INT"],["purchase_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Purchases = [] }] = input;\n  const ids = new Set();\n  for (const [id, user, date] of Purchases) {\n    if (id === null || user === null || date === null) return 'Purchases rows may not contain null.';\n    if (ids.has(id)) return `purchase_id ${id} appears twice in Purchases.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `purchase_date ${date} is not a date.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH gaps AS (\n  SELECT user_id, purchase_date,\n         LAG(purchase_date) OVER (PARTITION BY user_id ORDER BY purchase_date) AS prev_date\n  FROM Purchases\n)\nSELECT DISTINCT user_id\nFROM gaps\nWHERE DATEDIFF(purchase_date, prev_date) <= 7\nORDER BY user_id;",
+  "brute": "SELECT DISTINCT a.user_id\nFROM Purchases AS a\nWHERE EXISTS (\n  SELECT 1\n  FROM Purchases AS b\n  WHERE b.user_id = a.user_id\n    AND b.purchase_id <> a.purchase_id\n    AND ABS(DATEDIFF(b.purchase_date, a.purchase_date)) <= 7\n)\nORDER BY a.user_id",
+  "generator": "function generate(rand, size) {\n  const day = n => new Date(Date.UTC(2021, 11, 20 + n)).toISOString().slice(0, 10);\n  const Purchases = [];\n  if (size === 'small') {\n    // Offsets cluster around the 7-day boundary so gaps of 0, 7 and 8 days all happen.\n    const offsets = [0, 1, 7, 8, 14, 15, 22, 30];\n    const count = Math.floor(rand() * 8);\n    for (let i = 0; i < count; i++) Purchases.push([i + 1, 1 + Math.floor(rand() * 4), day(offsets[Math.floor(rand() * offsets.length)])]);\n  } else {\n    for (let i = 0; i < 2000; i++) Purchases.push([i + 1, 1 + Math.floor(rand() * 400), day(Math.floor(rand() * 730))]);\n  }\n  // Shuffle purchase ids so their order says nothing about the dates.\n  const ids = Purchases.map(p => p[0]);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  Purchases.forEach((p, i) => { p[0] = ids[i]; });\n  return [{ Purchases }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Purchases":[[4,2,"2022-03-13"],[1,5,"2022-02-11"],[3,7,"2022-06-19"],[6,2,"2022-03-20"],[5,7,"2022-06-19"],[2,2,"2022-06-08"]]}],"expected":{"columns":["user_id"],"rows":[[2],[7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Purchases":[]}]},
+    {"name":"Test 2","input":[{"Purchases":[[1,3,"2022-05-01"]]}]},
+    {"name":"Test 3","input":[{"Purchases":[[1,1,"2022-01-01"],[2,1,"2022-01-08"],[3,2,"2022-01-01"],[4,2,"2022-01-09"]]}]},
+    {"name":"Test 4","input":[{"Purchases":[[1,4,"2022-02-14"],[2,4,"2022-02-14"]]}]},
+    {"name":"Test 5","input":[{"Purchases":[[1,3,"2022-01-01"],[2,3,"2022-03-01"],[3,3,"2022-01-05"]]}]},
+    {"name":"Test 6","input":[{"Purchases":[[10,8,"2021-12-28"],[11,8,"2022-01-04"],[12,9,"2022-02-25"],[13,9,"2022-03-05"]]}]},
+    {"name":"Test 7","input":[{"Purchases":[[1,1,"2022-01-01"],[2,2,"2022-01-03"],[3,1,"2022-02-01"],[4,2,"2022-03-01"],[5,3,"2022-04-10"],[6,3,"2022-04-12"]]}]},
+    {"name":"Test 8","input":[{"Purchases":[[1,9,"2022-07-01"],[2,9,"2022-07-03"],[3,4,"2022-07-01"],[4,4,"2022-07-06"],[5,6,"2022-07-10"],[6,6,"2022-07-04"]]}]},
+    {"name":"Test 9","input":[{"Purchases":[[1,1,"2022-01-01"],[2,1,"2022-01-09"],[3,1,"2022-01-17"],[4,2,"2022-01-01"],[5,2,"2022-01-09"],[6,2,"2022-01-10"]]}]},
+    {"name":"Test 10","input":[{"Purchases":[[4,2,"2022-03-13"],[1,5,"2022-02-11"],[3,7,"2022-06-19"],[6,2,"2022-03-21"],[5,7,"2022-06-27"],[2,2,"2022-06-08"],[7,5,"2022-02-18"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIf some two purchases of a user are at most 7 days apart, then two purchases that are **neighbours** in date order are too: anything between them is even closer to one of them. So there is no need to compare every pair. Sort each user's purchases by date, look at the gap to the previous purchase only, and keep the users with some gap of 7 days or less. `LAG` hands every row its predecessor's date.\n\n## Approach\n\n1. `gaps`: for each user (`PARTITION BY user_id`), in `purchase_date` order, attach the previous purchase's date as `prev_date` with `LAG`. The user's first purchase gets `null`.\n2. Keep rows where `DATEDIFF(purchase_date, prev_date) <= 7`. A `null` `prev_date` makes the difference `null`, which never passes the filter.\n3. `SELECT DISTINCT user_id`, since a user can have several close pairs, and `ORDER BY user_id`.\n\n## Example 1, step by step\n\n- User 2: 2022-03-13 (prev null), 2022-03-20 (prev 2022-03-13, 7 days), 2022-06-08 (prev 2022-03-20, 80 days). The 7-day gap qualifies.\n- User 5: one purchase, prev null; never qualifies.\n- User 7: 2022-06-19 twice; the second row's gap is 0 days, which qualifies.\n\nResult in order: 2, 7.\n\n## Complexity\n\n- Time: O(N log N) for N purchases, to sort each user's rows for the window; the filter is linear.\n- Space: O(N) for `gaps`.\n\n## Pitfalls\n\n- Using `< 7` drops user 2 in Example 1, whose purchases are exactly 7 days apart.\n- Forgetting `PARTITION BY user_id` compares one user's purchase with another user's.\n- Relying on table order or `purchase_id` order instead of `ORDER BY purchase_date` compares purchases that are not neighbours in time.\n- Subtracting date strings or using day-of-month arithmetic breaks across month and year boundaries; use `DATEDIFF`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `gaps` | every purchase with the date of the same user's previous purchase |\n| `prev_date` | that previous date, or null for the user's first purchase |\n| `DATEDIFF(purchase_date, prev_date)` | days since the previous purchase |",
+  "narration": {
+    "1": "The first stage pairs every purchase with the user's previous purchase.",
+    "3": "LAG reads the date of the row before this one, within the same user's purchases sorted by date.",
+    "6": "A user may have several close pairs but is reported once.",
+    "8": "Only gaps of 7 days or less count; the first purchase has a null gap and is dropped.",
+    "9": "The answer is sorted by user id."
+  }
+}

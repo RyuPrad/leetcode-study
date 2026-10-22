@@ -1,0 +1,48 @@
+{
+  "number": 2504,
+  "title": "Concatenate the Name and the Profession",
+  "spec": "recalled",
+  "statement": "One table lists people and their jobs:\n\n- `Person(person_id, name, profession)`: one row per person; `person_id` is the primary key. `profession` is one of `'Doctor'`, `'Singer'`, `'Actor'`, `'Player'`, `'Engineer'` or `'Lawyer'`.\n\nFor every person, report `person_id` and a column named `name` holding the person's name immediately followed by the first letter of their profession in parentheses, with no space in between: Alex the Singer becomes `Alex(S)`.\n\nOrder the rows by `person_id` from largest to smallest.",
+  "constraints": [
+    "person_id is unique in Person",
+    "profession is one of 'Doctor', 'Singer', 'Actor', 'Player', 'Engineer', 'Lawyer'",
+    "name is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Person": [["person_id","INT"],["name","VARCHAR(30)"],["profession","ENUM('Doctor', 'Singer', 'Actor', 'Player', 'Engineer', 'Lawyer')"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Person = [] }] = input;\n  const jobs = ['Doctor', 'Singer', 'Actor', 'Player', 'Engineer', 'Lawyer'];\n  const ids = new Set();\n  for (const [id, name, profession] of Person) {\n    if (id === null || name === null || profession === null) return 'person_id, name and profession are required.';\n    if (ids.has(id)) return `person_id ${id} appears twice in Person.`;\n    ids.add(id);\n    if (!jobs.includes(profession)) return `Unknown profession ${profession}.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  person_id,\n  CONCAT(name, '(', LEFT(profession, 1), ')') AS name\nFROM Person\nORDER BY person_id DESC;",
+  "brute": "SELECT p.person_id,\n  CONCAT(p.name, CASE p.profession\n    WHEN 'Doctor' THEN '(D)'\n    WHEN 'Singer' THEN '(S)'\n    WHEN 'Actor' THEN '(A)'\n    WHEN 'Player' THEN '(P)'\n    WHEN 'Engineer' THEN '(E)'\n    ELSE '(L)' END) AS name\nFROM Person AS p\nORDER BY p.person_id DESC",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const names = ['Alex', 'Alice', 'Bob', 'Messi', 'Tyson', 'Meir', 'Zoe', 'Ana Lee'];\n  const jobs = ['Doctor', 'Singer', 'Actor', 'Player', 'Engineer', 'Lawyer'];\n  const count = size === 'small' ? pick(9) : 2000;\n  const span = size === 'small' ? 20 : 100000;\n  const ids = new Set();\n  while (ids.size < count) ids.add(1 + pick(span));\n  // Ids are inserted in random order so the required ordering is never free.\n  const Person = [...ids].map(id => [id, names[pick(names.length)], jobs[pick(jobs.length)]]);\n  return [{ Person }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Person":[[1,"Alex","Singer"],[3,"Alice","Actor"],[2,"Bob","Player"],[4,"Messi","Doctor"],[6,"Tyson","Engineer"],[5,"Meir","Lawyer"]]}],"expected":{"columns":["person_id","name"],"rows":[[6,"Tyson(E)"],[5,"Meir(L)"],[4,"Messi(D)"],[3,"Alice(A)"],[2,"Bob(P)"],[1,"Alex(S)"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Person":[]}]},
+    {"name":"Test 2","input":[{"Person":[[7,"Zoe","Doctor"]]}]},
+    {"name":"Test 3","input":[{"Person":[[1,"Ana","Lawyer"],[2,"Ben","Lawyer"],[3,"Cid","Lawyer"]]}]},
+    {"name":"Test 4","input":[{"Person":[[2,"Zed","Actor"],[10,"Amy","Player"],[1,"Moe","Engineer"]]}]},
+    {"name":"Test 5","input":[{"Person":[[4,"Sam","Singer"],[3,"Sam","Singer"]]}]},
+    {"name":"Test 6","input":[{"Person":[[1,"Ana Lee","Doctor"],[2,"Bo","Engineer"]]}]},
+    {"name":"Test 7","input":[{"Person":[[100,"Kim","Player"],[9,"Lee","Actor"],[55,"Ravi","Singer"],[23,"Mia","Doctor"]]}]},
+    {"name":"Test 8","input":[{"Person":[[1,"Al","Doctor"],[2,"Bea","Singer"],[3,"Cy","Actor"],[4,"Di","Player"],[5,"Ed","Engineer"],[6,"Flo","Lawyer"]]}]},
+    {"name":"Test 9","input":[{"Person":[[3,"A","Engineer"],[1,"B","Lawyer"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach output row comes from exactly one input row, with no filtering or grouping: the work is purely a string build. Take the name, glue on an opening parenthesis, the profession's first character and a closing parenthesis, then sort by id from high to low.\n\n## Approach\n\n1. `LEFT(profession, 1)` takes the first character of the profession: `'Singer'` gives `'S'`.\n2. `CONCAT(name, '(', ..., ')')` joins the four pieces with nothing between them and is renamed `name`, the required output column.\n3. `ORDER BY person_id DESC` puts the largest id first.\n\n## Example 1, step by step\n\n- Tyson, Engineer: `LEFT('Engineer', 1)` is `E`, so the row becomes `(6, 'Tyson(E)')`.\n- Meir, Lawyer gives `Meir(L)`; Messi, Doctor gives `Messi(D)`; Alice, Actor gives `Alice(A)`; Bob, Player gives `Bob(P)`; Alex, Singer gives `Alex(S)`.\n- The input lists ids as 1, 3, 2, 4, 6, 5; sorting descending gives 6, 5, 4, 3, 2, 1, which is the expected output.\n\n## Complexity\n\n- Time: O(P log P) for P people, dominated by the sort; building each string is constant work.\n- Space: O(P) for the result.\n\n## Pitfalls\n\n- Forgetting `DESC` returns the rows in ascending id order, which this problem treats as wrong.\n- Adding a space (`'Alex (S)'`) or using the whole profession produces strings that do not match.\n- The new column must be called `name`; leaving the expression unnamed gives a column titled with the expression itself.\n- In MySQL, `CONCAT` returns null if any piece is null; here names and professions are always present, so that never happens.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `LEFT(profession, 1)` | the profession's first letter |\n| `CONCAT(...) AS name` | the name followed by that letter in parentheses |\n| `ORDER BY person_id DESC` | largest id first |",
+  "narration": {
+    "2": "Each person keeps their person_id unchanged.",
+    "3": "Build the new name from the old name, an opening parenthesis, the first letter of the profession and a closing parenthesis, and call it name.",
+    "4": "Every row of Person produces one output row; nothing is filtered.",
+    "5": "Sort by person_id from largest to smallest, as the problem requires."
+  }
+}

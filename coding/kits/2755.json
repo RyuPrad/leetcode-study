@@ -1,0 +1,70 @@
+{
+  "number": 2755,
+  "title": "Deep Merge of Two Objects",
+  "spec": "recalled",
+  "statement": "Write `deepMerge(obj1, obj2)`. Both arguments were produced by `JSON.parse`, so each is an object, an array or a primitive (`null`, a boolean, a number or a string), possibly nested. Return their **deep merge**, defined recursively:\n\n- If both are objects (not arrays and not `null`), the result is an object with every key that appears in either of them. A key found in only one of them keeps its value from that one; a key found in both maps to the deep merge of its value in `obj1` with its value in `obj2`.\n- If both are arrays, they are merged the same way with the indexes playing the role of keys: the result is as long as the longer array, an index present in both holds the deep merge of the two elements, and the indexes past the end of the shorter array keep the longer array's elements.\n- In every other situation (at least one side is a primitive, or an object meets an array) the result is simply `obj2`.\n\nThe keys of a returned object may come in any order.",
+  "constraints": [
+    "obj1 and obj2 are valid JSON values",
+    "1 <= JSON.stringify(obj1).length <= 5 * 10^5",
+    "1 <= JSON.stringify(obj2).length <= 5 * 10^5",
+    "obj1 and obj2 are nested at most 100 levels deep",
+    "No key is \"__proto__\""
+  ],
+  "signature": "Object deepMerge(Object obj1, Object obj2)",
+  "entry": "deepMerge",
+  "kind": "function",
+  "parameters": [
+    "obj1",
+    "obj2"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  // Deep equality in which the order of object keys does not matter.\n  const same = (x, y) => {\n    if (Array.isArray(y)) return Array.isArray(x) && x.length === y.length && y.every((value, i) => same(x[i], value));\n    if (y !== null && typeof y === 'object') {\n      if (x === null || typeof x !== 'object' || Array.isArray(x)) return false;\n      const keys = Object.keys(y);\n      return Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key) && same(x[key], y[key]));\n    }\n    return x === y;\n  };\n  return same(actual, expected);\n}",
+  "validator": "function validate(input) {\n  const [obj1, obj2] = input;\n  for (const value of [obj1, obj2]) {\n    const text = JSON.stringify(value);\n    if (text === undefined || text.length > 500000) return 'obj1 and obj2 must be JSON values of at most 500,000 characters.';\n    const stack = [[value, 1]];\n    while (stack.length) {\n      const [item, depth] = stack.pop();\n      if (item === null || typeof item !== 'object') continue;\n      if (depth > 100) return 'Keep obj1 and obj2 at most 100 levels deep.';\n      if (!Array.isArray(item) && Object.hasOwn(item, '__proto__')) return 'Keys named \"__proto__\" are not allowed.';\n      for (const key of Object.keys(item)) stack.push([item[key], depth + 1]);\n    }\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [obj1, obj2] = input;\n  const result = solve(obj1, obj2);\n  if (result === undefined) throw new Error('deepMerge must return a JSON value, not undefined.');\n  kit.trace(`deepMerge returns ${JSON.stringify(result)}`);\n  return result;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {*} obj1 a value produced by JSON.parse\n * @param {*} obj2 a value produced by JSON.parse; it wins wherever the two cannot be merged\n * @return {*} the deep merge of obj1 and obj2\n */\nfunction deepMerge(obj1, obj2) {\n  // Write your code here.\n}\n",
+    "typescript": "type Json = null | boolean | number | string | Json[] | { [key: string]: Json };\n\nfunction deepMerge(obj1: Json, obj2: Json): Json {\n  // Write your code here.\n  return null;\n}\n"
+  },
+  "api": "deepMerge(obj1: Json, obj2: Json): Json, where Json is any JSON value",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function deepMerge(obj1, obj2) {\n  const bothContainers = obj1 !== null && obj2 !== null && typeof obj1 === 'object' && typeof obj2 === 'object';\n  if (!bothContainers || Array.isArray(obj1) !== Array.isArray(obj2)) {\n    return obj2;\n  }\n  const result = Array.isArray(obj1) ? [...obj1] : { ...obj1 };\n  for (const key of Object.keys(obj2)) {\n    if (Object.hasOwn(result, key)) {\n      result[key] = deepMerge(result[key], obj2[key]);\n    } else {\n      result[key] = obj2[key];\n    }\n  }\n  return result;\n}",
+  "brute": "function deepMerge(obj1, obj2) {\n  // Classify both values, then build a fresh result: arrays by index, objects over the union of keys.\n  const kind = value => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);\n  if (kind(obj1) !== kind(obj2) || (kind(obj1) !== 'array' && kind(obj1) !== 'object')) return obj2;\n  if (kind(obj1) === 'array') {\n    const out = [];\n    for (let i = 0; i < Math.max(obj1.length, obj2.length); i++) {\n      if (i >= obj2.length) out.push(obj1[i]);\n      else if (i >= obj1.length) out.push(obj2[i]);\n      else out.push(deepMerge(obj1[i], obj2[i]));\n    }\n    return out;\n  }\n  const out = {};\n  for (const key of new Set([...Object.keys(obj1), ...Object.keys(obj2)])) {\n    const in1 = Object.prototype.hasOwnProperty.call(obj1, key), in2 = Object.prototype.hasOwnProperty.call(obj2, key);\n    out[key] = in1 && in2 ? deepMerge(obj1[key], obj2[key]) : in2 ? obj2[key] : obj1[key];\n  }\n  return out;\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['a', 'b', 'c', 'd', 'x'];\n  let budget = small ? 14 : 1800;\n  const primitive = () => {\n    const roll = rand();\n    if (roll < 0.45) return Math.floor(rand() * 10) - 3;\n    if (roll < 0.65) return pick(['', 'a', 'z']);\n    if (roll < 0.8) return rand() < 0.5;\n    return null;\n  };\n  const value = (depth, container) => {\n    budget--;\n    if (!container && (depth >= (small ? 3 : 6) || budget <= 0 || rand() < 0.45)) return primitive();\n    const length = depth === 0 ? (small ? 1 + Math.floor(rand() * 4) : 40) : Math.floor(rand() * (small ? 4 : 6));\n    if (rand() < 0.5) return Array.from({ length }, () => value(depth + 1, false));\n    const object = {};\n    for (let i = 0; i < length; i++) object[pick(names) + (small ? '' : i)] = value(depth + 1, false);\n    return object;\n  };\n  // A changed copy: values kept, replaced or dropped, keys added, arrays shortened or lengthened, kinds swapped.\n  const mutate = (item, depth) => {\n    if (item === null || typeof item !== 'object') {\n      const roll = rand();\n      if (roll < 0.5) return item;\n      return roll < 0.85 ? primitive() : value(depth, true);\n    }\n    if (rand() < 0.1) return Array.isArray(item) ? Object.assign({}, item) : rand() < 0.5 ? Object.values(item) : primitive();\n    if (Array.isArray(item)) {\n      const out = item.map(child => mutate(child, depth + 1));\n      const roll = rand();\n      if (roll < 0.3) out.length = Math.floor(rand() * (out.length + 1));\n      else if (roll < 0.6) out.push(primitive(), ...(rand() < 0.5 ? [value(depth + 1, false)] : []));\n      return out;\n    }\n    const out = {};\n    for (const key of Object.keys(item)) if (rand() < 0.75) out[key] = mutate(item[key], depth + 1);\n    if (rand() < 0.4) out[pick(names) + 'new'] = rand() < 0.7 ? primitive() : value(depth + 1, true);\n    return out;\n  };\n  if (rand() < 0.1) return [rand() < 0.5 ? primitive() : value(0, true), rand() < 0.5 ? primitive() : value(0, true)];\n  const obj1 = value(0, true);\n  const obj2 = mutate(obj1, 0);\n  return rand() < 0.5 ? [obj1, obj2] : [obj2, obj1];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"a":1,"c":3},{"a":2,"b":2}],"expected":{"a":2,"c":3,"b":2}},
+    {"name":"Example 2","input":[[{},2,3],[[],5]],"expected":[[],5,3]},
+    {"name":"Example 3","input":[{"a":1,"b":{"c":[1,[2,7],5],"d":2}},{"a":1,"b":{"c":[6,[6],[9]],"e":3}}],"expected":{"a":1,"b":{"c":[6,[6,7],[9]],"d":2,"e":3}}},
+    {"name":"Example 4","input":[true,null],"expected":null}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,2]},
+    {"name":"Test 2","input":[{"a":1},null]},
+    {"name":"Test 3","input":[null,{"a":1}]},
+    {"name":"Test 4","input":[[1,2,3],[9]]},
+    {"name":"Test 5","input":[[1],[7,8,9]]},
+    {"name":"Test 6","input":[{"a":[1,2]},{"a":{"0":5}}]},
+    {"name":"Test 7","input":[{"a":{"b":{"c":1,"d":2}}},{"a":{"b":{"c":3}}}]},
+    {"name":"Test 8","input":[{"x":1,"y":2},{}]},
+    {"name":"Test 9","input":[[],[]]},
+    {"name":"Test 10","input":[{"a":null},{"a":{"b":1}}]},
+    {"name":"Test 11","input":[[{"a":1},{"b":2}],[{"c":3}]]},
+    {"name":"Test 12","input":[{"a":0,"s":"keep"},{"a":false}]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rules describe a recursion over two trees laid on top of each other. At any pair of values there are only two situations. If both are containers of the same kind (two objects, or two arrays), the result is again a container of that kind: start from `obj1`'s entries and fold `obj2`'s entries into it, merging recursively wherever both sides have the key. In every other situation `obj2` simply wins. Arrays need no special code: their indexes are keys, and writing past the end of a copied array extends it, so the result automatically takes the longer length. (The brute force classifies both values, then builds a fresh array index by index or a fresh object over the union of keys.)\n\n## Approach\n\n1. `bothContainers` is true when neither value is `null` and both have `typeof \"object\"`.\n2. If they are not both containers, or one is an array and the other is not, return `obj2`.\n3. Copy `obj1` shallowly into `result`: `[...obj1]` for an array, `{ ...obj1 }` for an object.\n4. For each `key` of `obj2` (its indexes for an array): if `result` already has the key, store `deepMerge(result[key], obj2[key])`; otherwise store `obj2[key]`.\n5. Return `result`.\n\n## Example 1, step by step\n\n`obj1 = {\"a\": 1, \"c\": 3}`, `obj2 = {\"a\": 2, \"b\": 2}`.\n\n- Both are plain objects, so `result` starts as a copy of `obj1`: `{\"a\": 1, \"c\": 3}`.\n- `key = \"a\"`: `result` has it, so `result.a = deepMerge(1, 2)`. Two numbers are not containers, so that call returns `2`.\n- `key = \"b\"`: `result` lacks it, so `result.b = 2`.\n- `\"c\"` is only in `obj1` and stays. The answer is `{\"a\": 2, \"c\": 3, \"b\": 2}`.\n\n## Complexity\n\n- Time: O(n1 + n2), where n1 and n2 count the values in `obj1` and `obj2`: at each merged level every key of either side is copied or visited once.\n- Space: O(d + r): recursion depth d plus the size r of the new containers built (unmerged subtrees are shared, not copied).\n\n## Pitfalls\n\n- `typeof null` is `\"object\"`: without the `null` checks, `{\"a\": 1}` merged with `null` would not return `null`.\n- An object and an array never merge, even though both have `typeof \"object\"`: in Example 2, `{}` and `[]` give `[]`.\n- Arrays merge index by index; they are not concatenated: `[1, 2, 3]` with `[9]` gives `[9, 2, 3]`.\n- `{ ...obj1, ...obj2 }` is only a shallow merge: in Example 3 it would replace `b` wholesale and lose `\"d\": 2`.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `obj1`, `obj2` | the two values being merged at this level |\n| `bothContainers` | both values are non-null objects or arrays |\n| `result` | the merged container, starting as a shallow copy of `obj1` |\n| `key` | a key (or array index) of `obj2` being folded in |",
+  "narration": {
+    "2": "Merging only happens between two non-null objects or arrays; typeof null is \"object\", so rule it out explicitly.",
+    "3": "A primitive on either side, or an object paired with an array, cannot be merged.",
+    "4": "In those cases obj2 wins outright.",
+    "6": "Start from a shallow copy of obj1 of the same kind, so keys found only in obj1 survive.",
+    "7": "Fold in every key of obj2; for an array these are its indexes.",
+    "8": "Both sides have this key, so the two values must themselves be merged.",
+    "9": "Recurse one level down; the deeper call decides whether they merge or obj2 wins.",
+    "11": "A key only obj2 has is copied over; for an array this extends it to the longer length.",
+    "14": "Every key of obj2 has been folded in; return the merged container."
+  }
+}

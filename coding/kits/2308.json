@@ -1,0 +1,49 @@
+{
+  "number": 2308,
+  "title": "Arrange Table by Gender",
+  "spec": "recalled",
+  "statement": "One table lists users and their gender:\n\n- `Genders(user_id, gender)`: one row per user; `user_id` is unique. `gender` is one of `'female'`, `'other'` or `'male'`, and the table holds **the same number** of users of each of the three genders.\n\nReturn all rows, with the columns `user_id` and `gender`, rearranged so that the genders repeat in the cycle `female`, `other`, `male`, `female`, `other`, `male`, .... Within each gender, users appear in increasing `user_id` order: the first cycle holds the female, other and male users with the smallest ids of their gender, the second cycle the second smallest, and so on.\n\nThe row order is part of the answer.",
+  "constraints": [
+    "user_id is unique in Genders",
+    "gender is one of 'female', 'other', 'male'",
+    "Each gender has the same number of users"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Genders": [["user_id","INT"],["gender","ENUM('female', 'other', 'male')"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Genders = [] }] = input;\n  const ids = new Set(), counts = { female: 0, other: 0, male: 0 };\n  for (const [id, gender] of Genders) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (ids.has(id)) return `user_id ${id} appears twice in Genders.`;\n    ids.add(id);\n    if (!Object.hasOwn(counts, gender)) return `User ${id} has gender ${gender}; use female, other or male.`;\n    counts[gender]++;\n  }\n  if (counts.female !== counts.other || counts.other !== counts.male) return 'Each gender needs the same number of users.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    user_id,\n    gender,\n    ROW_NUMBER() OVER (PARTITION BY gender ORDER BY user_id) AS gender_rank\n  FROM Genders\n)\nSELECT user_id, gender\nFROM ranked\nORDER BY gender_rank, FIELD(gender, 'female', 'other', 'male');",
+  "brute": "SELECT g.user_id, g.gender\nFROM Genders AS g\nORDER BY\n  (SELECT COUNT(*) FROM Genders AS h WHERE h.gender = g.gender AND h.user_id < g.user_id),\n  CASE g.gender WHEN 'female' THEN 0 WHEN 'other' THEN 1 ELSE 2 END",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const perGender = small ? Math.floor(rand() * 3) : 666;\n  const total = perGender * 3;\n  // Distinct ids drawn from a slightly larger pool, so gaps appear and genders interleave.\n  const pool = [];\n  for (let id = 1; id <= total + (small ? 4 : 500); id++) pool.push(id);\n  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const Genders = [];\n  ['female', 'other', 'male'].forEach((gender, g) => {\n    for (let i = 0; i < perGender; i++) Genders.push([pool[g * perGender + i], gender]);\n  });\n  for (let i = Genders.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Genders[i], Genders[j]] = [Genders[j], Genders[i]]; }\n  return [{ Genders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Genders":[[4,"male"],[7,"female"],[2,"other"],[5,"male"],[3,"female"],[8,"male"],[6,"other"],[1,"other"],[9,"female"]]}],"expected":{"columns":["user_id","gender"],"rows":[[3,"female"],[1,"other"],[4,"male"],[7,"female"],[2,"other"],[5,"male"],[9,"female"],[6,"other"],[8,"male"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Genders":[]}]},
+    {"name":"Test 2","input":[{"Genders":[[1,"male"],[2,"other"],[3,"female"]]}]},
+    {"name":"Test 3","input":[{"Genders":[[10,"female"],[20,"other"],[30,"male"]]}]},
+    {"name":"Test 4","input":[{"Genders":[[1,"female"],[2,"female"],[3,"other"],[4,"other"],[5,"male"],[6,"male"]]}]},
+    {"name":"Test 5","input":[{"Genders":[[6,"female"],[5,"female"],[4,"other"],[3,"other"],[2,"male"],[1,"male"]]}]},
+    {"name":"Test 6","input":[{"Genders":[[100,"other"],[7,"male"],[55,"female"],[3,"other"],[41,"male"],[12,"female"]]}]},
+    {"name":"Test 7","input":[{"Genders":[[1,"male"],[2,"female"],[3,"other"],[4,"male"],[5,"female"],[6,"other"],[7,"male"],[8,"female"],[9,"other"],[10,"male"],[11,"female"],[12,"other"]]}]},
+    {"name":"Test 8","input":[{"Genders":[[15,"female"],[2,"other"],[9,"male"],[1,"female"],[30,"other"],[8,"male"],[4,"female"],[3,"other"],[22,"male"]]}]},
+    {"name":"Test 9","input":[{"Genders":[[1000,"other"],[999,"male"],[1,"female"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe output interleaves three sorted lists. If every row knows its **position inside its own gender** (1 for the smallest id, 2 for the next, ...), the whole arrangement is just a sort: first by that position, so the first cycle comes first, then by the gender's place in the cycle `female`, `other`, `male`. `ROW_NUMBER()` partitioned by gender gives exactly that position.\n\n## Approach\n\n1. CTE `ranked`: number the rows of each gender separately with `ROW_NUMBER() OVER (PARTITION BY gender ORDER BY user_id)`, calling it `gender_rank`.\n2. Select `user_id` and `gender` from `ranked`.\n3. `ORDER BY gender_rank`, then by `FIELD(gender, 'female', 'other', 'male')`, which maps the genders to 1, 2 and 3 so each cycle comes out in the required order.\n\n## Example 1, step by step\n\n`ranked` gives each user a rank within their gender:\n\n| gender | users by id | gender_rank |\n| --- | --- | --- |\n| female | 3, 7, 9 | 1, 2, 3 |\n| other | 1, 2, 6 | 1, 2, 3 |\n| male | 4, 5, 8 | 1, 2, 3 |\n\nSorting by rank and then by gender order yields rank 1: (3, female), (1, other), (4, male); rank 2: (7, female), (2, other), (5, male); rank 3: (9, female), (6, other), (8, male).\n\n## Complexity\n\n- Time: O(n log n) for n users: sorting inside each partition and the final sort.\n- Space: O(n) for the ranked rows.\n\n## Pitfalls\n\n- `ORDER BY gender_rank, gender` relies on MySQL sorting an `ENUM` by its declared position; compared as text the genders sort as female, male, other. Spell the cycle out with `FIELD` or `CASE`.\n- Sorting by `user_id` first breaks the cycle: ids of different genders interleave arbitrarily.\n- Forgetting `PARTITION BY gender` numbers all users together, so the ranks no longer line up across genders.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every user with their position inside their gender |\n| `gender_rank` | 1 for the smallest `user_id` of that gender, 2 for the next, ... |\n| `FIELD(gender, ...)` | 1 for female, 2 for other, 3 for male |",
+  "narration": {
+    "1": "Stage one gives every user a position inside their own gender.",
+    "5": "Number each gender's users separately, smallest user_id first.",
+    "8": "Output the two original columns.",
+    "10": "Sort by position so cycle 1 comes first, then by gender in the order female, other, male."
+  }
+}

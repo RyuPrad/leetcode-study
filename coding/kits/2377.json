@@ -1,0 +1,51 @@
+{
+  "number": 2377,
+  "title": "Sort the Olympic Table",
+  "spec": "recalled",
+  "statement": "One table holds a medal count:\n\n- `Olympic(country, gold_medals, silver_medals, bronze_medals)`: one row per country; `country` is unique, and each column counts the medals of that kind the country won.\n\nReturn the whole table, all four columns in their original order, sorted like an Olympic medal table:\n\n1. more `gold_medals` first;\n2. on equal gold, more `silver_medals` first;\n3. on equal gold and silver, more `bronze_medals` first;\n4. on equal counts of all three, by `country` name in ascending alphabetical order.\n\nThe row order is part of the answer.",
+  "constraints": [
+    "country is unique in Olympic",
+    "gold_medals, silver_medals and bronze_medals are 0 or more",
+    "country names compare without regard to case, as in MySQL"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Olympic": [["country","VARCHAR(50)"],["gold_medals","INT"],["silver_medals","INT"],["bronze_medals","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Olympic = [] }] = input;\n  const names = new Set();\n  for (const [country, gold, silver, bronze] of Olympic) {\n    if (country === null || gold === null || silver === null || bronze === null) return 'Every value is required.';\n    const key = String(country).toLowerCase();\n    if (names.has(key)) return `Country ${country} appears twice.`;\n    names.add(key);\n    if (gold < 0 || silver < 0 || bronze < 0) return 'Medal counts cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT country, gold_medals, silver_medals, bronze_medals\nFROM Olympic\nORDER BY\n  gold_medals DESC,\n  silver_medals DESC,\n  bronze_medals DESC,\n  country ASC;",
+  "brute": "SELECT o.country, o.gold_medals, o.silver_medals, o.bronze_medals\nFROM Olympic AS o\nORDER BY (\n  SELECT COUNT(*)\n  FROM Olympic AS b\n  WHERE b.gold_medals > o.gold_medals\n     OR (b.gold_medals = o.gold_medals AND b.silver_medals > o.silver_medals)\n     OR (b.gold_medals = o.gold_medals AND b.silver_medals = o.silver_medals AND b.bronze_medals > o.bronze_medals)\n     OR (b.gold_medals = o.gold_medals AND b.silver_medals = o.silver_medals AND b.bronze_medals = o.bronze_medals AND b.country < o.country)\n)",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const Olympic = [];\n  if (size === 'small') {\n    // Medal counts from 0 to 2 make ties on gold, on silver and on all three columns common.\n    const pool = ['China', 'USA', 'Israel', 'Egypt', 'South Sudan', 'Brazil', 'Kenya', 'Japan', 'Chad', 'Norway', 'Peru', 'Italy'];\n    for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    const count = pick(9);\n    for (let i = 0; i < count; i++) Olympic.push([pool[i], pick(3), pick(3), pick(3)]);\n  } else {\n    // Distinct invented names built from syllables; small medal ranges keep many full ties.\n    const parts = ['ka', 'lo', 'mi', 'ra', 'su', 'te', 'vo', 'ne', 'bi', 'do', 'fa', 'gu', 'ha', 'ji', 'po', 'ze'];\n    const seen = new Set();\n    while (Olympic.length < 2000) {\n      let name = '';\n      const length = 2 + pick(3);\n      for (let k = 0; k < length; k++) name += parts[pick(parts.length)];\n      name = name[0].toUpperCase() + name.slice(1);\n      if (seen.has(name)) continue;\n      seen.add(name);\n      Olympic.push([name, pick(8), pick(6), pick(5)]);\n    }\n  }\n  return [{ Olympic }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Olympic":[["China",10,10,20],["South Sudan",0,0,1],["USA",10,10,20],["Israel",2,2,3],["Egypt",2,2,2]]}],"expected":{"columns":["country","gold_medals","silver_medals","bronze_medals"],"rows":[["China",10,10,20],["USA",10,10,20],["Israel",2,2,3],["Egypt",2,2,2],["South Sudan",0,0,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Olympic":[]}]},
+    {"name":"Test 2","input":[{"Olympic":[["Kenya",4,1,0]]}]},
+    {"name":"Test 3","input":[{"Olympic":[["Norway",1,0,0],["Brazil",0,9,9],["Peru",0,0,20]]}]},
+    {"name":"Test 4","input":[{"Olympic":[["Italy",3,1,9],["Japan",3,2,0],["Chad",3,0,15]]}]},
+    {"name":"Test 5","input":[{"Olympic":[["Spain",5,5,1],["Mexico",5,5,3],["Ghana",5,5,2]]}]},
+    {"name":"Test 6","input":[{"Olympic":[["Zambia",0,0,0],["Austria",0,0,0],["Mali",0,0,0],["Fiji",0,0,0]]}]},
+    {"name":"Test 7","input":[{"Olympic":[["South Sudan",1,1,1],["South Africa",1,1,1],["Sudan",1,1,1],["Samoa",2,0,0]]}]},
+    {"name":"Test 8","input":[{"Olympic":[["USA",39,41,33],["China",38,32,18],["Japan",27,14,17],["Great Britain",22,21,22],["Russia",20,28,23],["Australia",17,7,22]]}]},
+    {"name":"Test 9","input":[{"Olympic":[["Peru",0,2,0],["Chile",0,1,5],["Cuba",1,0,0],["Iran",0,2,1],["Oman",0,1,5]]}]},
+    {"name":"Test 10","input":[{"Olympic":[["Uganda",2,1,1],["USA",2,1,1],["Ukraine",2,1,0],["Uruguay",2,1,1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nNothing is filtered or computed: the task is purely about ordering. A medal table compares countries the way a dictionary compares words, one column at a time: gold decides unless it is equal, then silver, then bronze, then the name. `ORDER BY` with several keys does exactly this, consulting each key only when all earlier keys tie.\n\n## Approach\n\n1. `SELECT` the four columns of `Olympic` in their original order.\n2. `ORDER BY gold_medals DESC`: more gold first.\n3. Add `silver_medals DESC` and `bronze_medals DESC` as the next tie-breakers.\n4. Finish with `country ASC` so countries with identical counts come out alphabetically, which makes the order unique.\n\n## Example 1, step by step\n\n- China and USA both have 10 gold, 10 silver and 20 bronze, so the name decides: China before USA.\n- Israel and Egypt both have 2 gold and 2 silver; Israel's 3 bronze beat Egypt's 2.\n- South Sudan has no gold, so it comes last despite its bronze medal.\n\nResult: China, USA, Israel, Egypt, South Sudan.\n\n## Complexity\n\n- Time: O(n log n) to sort the n countries.\n- Space: O(n) for the sorted result.\n\n## Pitfalls\n\n- Leaving out `DESC` sorts ascending, putting the countries with the fewest medals first. `DESC` applies to one key only, so it must be repeated on each medal column.\n- Omitting `country` leaves fully tied countries in an arbitrary order, which fails an ordered comparison.\n- Ranking by the total number of medals is a different table: one gold outranks any number of silver or bronze medals.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `gold_medals DESC` | primary key of the order: more gold first |\n| `silver_medals DESC` | used only between countries with equal gold |\n| `bronze_medals DESC` | used only when gold and silver are both equal |\n| `country ASC` | final tie-break, alphabetical |",
+  "narration": {
+    "1": "Return the table as it is: all four columns in their original order.",
+    "3": "The sort keys follow, each one consulted only when every earlier key ties.",
+    "4": "Gold decides first: more gold medals rank higher.",
+    "5": "Between countries with equal gold, more silver ranks higher.",
+    "6": "Bronze breaks ties that remain after gold and silver.",
+    "7": "Fully tied countries are listed alphabetically, so the order is unique."
+  }
+}

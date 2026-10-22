@@ -1,0 +1,48 @@
+{
+  "number": 2879,
+  "title": "Display the First Three Rows",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `employees`; here the DataFrame is a table and you answer with one MySQL query.\n\n- `employees(employee_id, name, department, salary)`: one row per employee. The rows have a fixed order: the order in which they are listed in the input.\n\nReturn the first three rows of `employees` in that same order, with all four columns `employee_id`, `name`, `department` and `salary` unchanged. Position decides which rows are first, not any column value. If the table has fewer than three rows, return all of them.",
+  "constraints": [
+    "employee_id is unique in employees",
+    "Rows keep the order in which they are listed",
+    "The table may hold fewer than three rows"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "employees": [["employee_id","INT"],["name","VARCHAR"],["department","VARCHAR"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ employees = [] }] = input;\n  const ids = new Set();\n  for (const [id] of employees) {\n    if (id === null) return 'Every employee needs an employee_id.';\n    if (ids.has(id)) return `employee_id ${id} appears twice in employees.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  employee_id, name, department, salary\nFROM employees\nLIMIT 3;",
+  "brute": "WITH numbered AS (\n  SELECT employee_id, name, department, salary, ROW_NUMBER() OVER () AS position\n  FROM employees\n)\nSELECT employee_id, name, department, salary\nFROM numbered\nWHERE position <= 3\nORDER BY position",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Bob', 'Alice', 'Tatiana', 'Annabelle', 'Jonathan', 'Khaled', 'Mira', 'Omar'];\n  const departments = ['Operations', 'Sales', 'Engineering', 'InformationTechnology', 'HumanResources', 'Administration'];\n  const employees = [];\n  if (size === 'small') {\n    // Shuffle a small pool of ids so the stored order differs from id order.\n    const ids = Array.from({ length: 20 }, (_, i) => i + 1);\n    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n    const rows = Math.floor(rand() * 9);\n    for (let i = 0; i < rows; i++) employees.push([ids[i], pick(names), pick(departments), 10000 + Math.floor(rand() * 40000)]);\n  } else {\n    // Stepping by 7919 modulo the prime 100003 gives 2,000 distinct ids in scrambled order.\n    const offset = Math.floor(rand() * 100003);\n    for (let i = 0; i < 2000; i++) employees.push([1 + (i * 7919 + offset) % 100003, pick(names), pick(departments), 10000 + Math.floor(rand() * 40000)]);\n  }\n  return [{ employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"employees":[[3,"Bob","Operations",48675],[90,"Alice","Sales",11096],[9,"Tatiana","Engineering",33805],[60,"Annabelle","InformationTechnology",37678],[49,"Jonathan","HumanResources",23793],[43,"Khaled","Administration",40454]]}],"expected":{"columns":["employee_id","name","department","salary"],"rows":[[3,"Bob","Operations",48675],[90,"Alice","Sales",11096],[9,"Tatiana","Engineering",33805]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"employees":[]}]},
+    {"name":"Test 2","input":[{"employees":[[7,"Mira","Sales",30000]]}]},
+    {"name":"Test 3","input":[{"employees":[[5,"Omar","Sales",21000],[2,"Mira","Operations",45000]]}]},
+    {"name":"Test 4","input":[{"employees":[[1,"Ana","Sales",10000],[2,"Ben","Sales",20000],[3,"Cid","Engineering",30000]]}]},
+    {"name":"Test 5","input":[{"employees":[[40,"Dee","Administration",15000],[30,"Eve","Sales",25000],[20,"Fay","Operations",35000],[10,"Gus","Engineering",45000]]}]},
+    {"name":"Test 6","input":[{"employees":[[8,"Ana","Sales",50000],[6,"Ana","Sales",50000],[9,"Ben","HumanResources",12000],[1,"Cid","Sales",99000],[3,"Dee","Engineering",70000]]}]},
+    {"name":"Test 7","input":[{"employees":[[12,"Khaled","Administration",40454],[11,"Jonathan","HumanResources",23793],[15,"Annabelle","InformationTechnology",37678],[14,"Tatiana","Engineering",33805],[13,"Alice","Sales",11096],[16,"Bob","Operations",48675],[17,"Omar","Sales",60000]]}]},
+    {"name":"Test 8","input":[{"employees":[[100,"Zoe","Sales",1000],[99,"Yan","Sales",2000],[1,"Xia","Engineering",90000],[2,"Wes","Engineering",80000],[3,"Vic","Engineering",70000],[4,"Uma","Engineering",60000]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA DataFrame's `head(3)` takes rows by position. The table here keeps its rows in the order they were listed, and a plain read with no sorting returns them in that order. So the task is simply to read the table and stop after three rows; sorting by any column would change which rows count as \"first\".\n\n## Approach\n\n1. `SELECT` the four columns exactly as stored: `employee_id`, `name`, `department`, `salary`.\n2. Read them `FROM employees` with no `WHERE` and no `ORDER BY`, so the stored order is kept.\n3. `LIMIT 3` stops after the third row; a shorter table simply returns everything it has.\n\n## Example 1, step by step\n\n- The table is read in its listed order: employee 3 (Bob), 90 (Alice), 9 (Tatiana), 60 (Annabelle), 49 (Jonathan), 43 (Khaled).\n- `LIMIT 3` keeps Bob, Alice and Tatiana and stops there.\n- The ids 3, 90, 9 are not sorted, and the output keeps them that way.\n\n## Complexity\n\n- Time: O(1); the scan stops after three rows however large the table is.\n- Space: O(1) for at most three output rows.\n\n## Pitfalls\n\n- `ORDER BY employee_id` returns the three smallest ids (3, 9, 43 in Example 1), not the first three rows.\n- Sorting by `salary` or any other column has the same problem: \"first\" means position, not value.\n- In a production MySQL table, rows without an `ORDER BY` have no guaranteed order; a real system would store an explicit position column and order by it. Here the listed order plays that role.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `employees` | the input table, read in its stored order |\n| `LIMIT 3` | keep at most the first three rows of that order |",
+  "narration": {
+    "1": "The query only selects; it never filters or sorts.",
+    "2": "Keep all four columns exactly as they are stored.",
+    "3": "Read employees in the order its rows were listed.",
+    "4": "Stop after three rows; a shorter table returns every row it has."
+  }
+}

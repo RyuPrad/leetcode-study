@@ -1,0 +1,49 @@
+{
+  "number": 2238,
+  "title": "Number of Times a Driver Was a Passenger",
+  "spec": "recalled",
+  "statement": "One table lists rides:\n\n- `Rides(ride_id, driver_id, passenger_id)`: one row per ride; `ride_id` is unique. In every ride the driver and the passenger are different people. The same pair may share many rides.\n\nA person is a **driver** when they appear as `driver_id` in at least one ride. For every driver, report `driver_id` and `cnt`, the number of rides in which that person was the passenger (`0` if never). People who only ever rode as passengers are not reported. Rows may come in any order.",
+  "constraints": [
+    "ride_id is unique in Rides",
+    "driver_id != passenger_id in every ride",
+    "No column is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Rides": [["ride_id","INT"],["driver_id","INT"],["passenger_id","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Rides = [] }] = input;\n  const ids = new Set();\n  for (const [id, driver, passenger] of Rides) {\n    if (id === null || driver === null || passenger === null) return 'Rides rows may not contain null.';\n    if (ids.has(id)) return `ride_id ${id} appears twice in Rides.`;\n    if (driver === passenger) return `In ride ${id} the driver is also the passenger.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH drivers AS (\n  SELECT DISTINCT driver_id\n  FROM Rides\n)\nSELECT d.driver_id, COUNT(r.ride_id) AS cnt\nFROM drivers AS d\nLEFT JOIN Rides AS r\n  ON r.passenger_id = d.driver_id\nGROUP BY d.driver_id;",
+  "brute": "SELECT DISTINCT d.driver_id,\n       (SELECT COUNT(*) FROM Rides AS r WHERE r.passenger_id = d.driver_id) AS cnt\nFROM Rides AS d",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const people = small ? 5 : 300, count = small ? Math.floor(rand() * 9) : 2000;\n  const Rides = [];\n  for (let i = 0; i < count; i++) {\n    const driver = 1 + Math.floor(rand() * people);\n    let passenger = 1 + Math.floor(rand() * (people - 1));\n    if (passenger >= driver) passenger++;\n    Rides.push([i + 1, driver, passenger]);\n  }\n  return [{ Rides }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Rides":[[1,7,1],[2,7,2],[3,11,1],[4,11,7],[5,11,7],[6,11,3]]}],"expected":{"columns":["driver_id","cnt"],"rows":[[7,2],[11,0]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Rides":[]}]},
+    {"name":"Test 2","input":[{"Rides":[[1,1,2]]}]},
+    {"name":"Test 3","input":[{"Rides":[[1,1,2],[2,1,2],[3,1,2],[4,2,1]]}]},
+    {"name":"Test 4","input":[{"Rides":[[1,7,1],[2,7,2],[3,7,3],[4,11,7],[5,11,7]]}]},
+    {"name":"Test 5","input":[{"Rides":[[1,1,2],[2,2,3],[3,3,1]]}]},
+    {"name":"Test 6","input":[{"Rides":[[1,5,9],[2,6,9],[3,5,8],[4,6,8]]}]},
+    {"name":"Test 7","input":[{"Rides":[[10,4,2],[11,2,4],[12,3,4],[13,3,2],[14,4,3],[15,5,4]]}]},
+    {"name":"Test 8","input":[{"Rides":[[1,7,1],[2,7,2],[3,11,1],[4,11,7],[5,11,7],[6,11,3],[7,1,11],[8,2,7]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer has one row per driver, so the set of drivers comes first: the distinct `driver_id` values. Each driver is then matched against the `passenger_id` column of `Rides`, and the matching rides are counted. Drivers who never rode as a passenger must still appear with 0, so the match is a **left join** and the count skips the null row such a driver gets.\n\n## Approach\n\n1. `drivers`: `SELECT DISTINCT driver_id` from `Rides`, one row per person who drove at least once.\n2. `LEFT JOIN Rides` (`r`) on `r.passenger_id = d.driver_id`: one row per ride in which the driver was the passenger, or a single row of nulls when there is none.\n3. Group by `d.driver_id` and take `COUNT(r.ride_id)` as `cnt`; counting a column of `r` ignores the null row, giving 0.\n\n## Example 1, step by step\n\n- `drivers`: 7 (rides 1, 2) and 11 (rides 3 to 6).\n- Driver 7 matches rides 4 and 5, where 7 is the passenger: `cnt = 2`.\n- Driver 11 is never a passenger: the left join yields one null row and `cnt = 0`.\n- Passengers 1, 2 and 3 never drive, so they are not reported.\n\nResult: (7, 2), (11, 0).\n\n## Complexity\n\n- Time: O(R) to build `drivers` for R rides, then O(D · R) for D drivers without an index on `passenger_id`, or O(R) with a hash join.\n- Space: O(D) for `drivers`.\n\n## Pitfalls\n\n- Joining `Rides` to itself without first reducing to distinct drivers multiplies counts: a driver with 3 rides who was a passenger twice shows 6.\n- An inner join drops drivers who were never passengers instead of reporting 0.\n- `COUNT(*)` after a left join counts the null row, turning 0 into 1.\n- `COUNT(DISTINCT ...)` on the other person undercounts repeated rides with the same partner.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `drivers` | distinct ids of people who drove at least once |\n| `d` | one driver |\n| `r` | a ride in which that driver was the passenger |\n| `cnt` | number of such rides |",
+  "narration": {
+    "1": "The first stage lists everyone who must appear in the answer.",
+    "2": "Each person who drove at least once appears exactly once.",
+    "5": "Counting a column of the joined ride skips the null row of a driver who never rode, giving 0.",
+    "7": "A left join keeps drivers who were never passengers.",
+    "8": "A ride matches when the driver's id is that ride's passenger.",
+    "9": "One output row per driver."
+  }
+}

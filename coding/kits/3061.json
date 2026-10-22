@@ -1,0 +1,50 @@
+{
+  "number": 3061,
+  "title": "Calculate Trapping Rain Water",
+  "spec": "recalled",
+  "statement": "One table describes a row of bars standing side by side:\n\n- `Heights(id, height)`: one bar per row; `id` is unique and the ids are consecutive integers, so sorting by `id` gives the bars from left to right. Each bar is 1 unit wide and `height` is a non-negative integer. The table has at least one bar.\n\nRain falls on the bars. Above each bar, water rises to the smaller of two levels: the tallest bar at or to its left, and the tallest bar at or to its right. The water held above the bar is that level minus the bar's own height. Report the total water held above all bars as a single row with the column `total_trapped_water`.",
+  "constraints": [
+    "id is unique in Heights and the ids are consecutive integers",
+    "height is a non-negative integer, never null",
+    "Heights has at least one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Heights": [["id","INT"],["height","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Heights = [] }] = input;\n  if (Heights.length === 0) return 'Heights needs at least one bar.';\n  const ids = new Set();\n  let low = Infinity, high = -Infinity;\n  for (const [id, height] of Heights) {\n    if (id === null) return 'Every bar needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice in Heights.`;\n    ids.add(id);\n    low = Math.min(low, id);\n    high = Math.max(high, id);\n    if (height === null || height < 0) return `Bar ${id} needs a non-negative height.`;\n  }\n  if (high - low + 1 !== ids.size) return 'The ids must be consecutive integers.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH levels AS (\n  SELECT id,\n         height,\n         MAX(height) OVER (ORDER BY id) AS left_max,\n         MAX(height) OVER (ORDER BY id DESC) AS right_max\n  FROM Heights\n)\nSELECT SUM(LEAST(left_max, right_max) - height) AS total_trapped_water\nFROM levels;",
+  "brute": "SELECT SUM(water) AS total_trapped_water\nFROM (SELECT h.id,\n             LEAST(MAX(CASE WHEN o.id <= h.id THEN o.height END),\n                   MAX(CASE WHEN o.id >= h.id THEN o.height END)) - h.height AS water\n      FROM Heights AS h\n      CROSS JOIN Heights AS o\n      GROUP BY h.id, h.height) AS per_bar",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? 1 + Math.floor(rand() * 8) : 1500;\n  const top = size === 'small' ? 5 : 1000;\n  const start = rand() < 0.7 ? 1 : 1 + Math.floor(rand() * 50);\n  const Heights = [];\n  for (let i = 0; i < count; i++) Heights.push([start + i, Math.floor(rand() * (top + 1))]);\n  // Store the bars in a shuffled order so nothing may rely on insertion order.\n  for (let i = Heights.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Heights[i], Heights[j]] = [Heights[j], Heights[i]];\n  }\n  return [{ Heights }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Heights":[[1,0],[2,1],[3,0],[4,2],[5,1],[6,0],[7,1],[8,3],[9,2],[10,1],[11,2],[12,1]]}],"expected":{"columns":["total_trapped_water"],"rows":[[6]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Heights":[[1,4]]}]},
+    {"name":"Test 2","input":[{"Heights":[[1,3],[2,5]]}]},
+    {"name":"Test 3","input":[{"Heights":[[1,1],[2,2],[3,3],[4,4]]}]},
+    {"name":"Test 4","input":[{"Heights":[[1,4],[2,3],[3,2],[4,1]]}]},
+    {"name":"Test 5","input":[{"Heights":[[1,3],[2,0],[3,3]]}]},
+    {"name":"Test 6","input":[{"Heights":[[1,4],[2,2],[3,0],[4,3],[5,2],[6,5]]}]},
+    {"name":"Test 7","input":[{"Heights":[[1,5],[2,1],[3,2],[4,1],[5,3]]}]},
+    {"name":"Test 8","input":[{"Heights":[[1,2],[2,2],[3,2],[4,2]]}]},
+    {"name":"Test 9","input":[{"Heights":[[1,0],[2,0],[3,0]]}]},
+    {"name":"Test 10","input":[{"Heights":[[14,2],[12,0],[10,3],[11,1],[13,1],[15,0],[16,4]]}]},
+    {"name":"Test 11","input":[{"Heights":[[1,2],[2,0],[3,2],[4,0],[5,4],[6,0],[7,1]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWater above a bar is capped by the walls on both sides: it can rise only as high as the shorter of the tallest bar to the left and the tallest bar to the right (each counting the bar itself). So each bar holds `LEAST(left_max, right_max) - height`, which is never negative because both maxima include the bar. Both maxima are running maxima, one scanning left to right and one right to left, which is exactly what a `MAX() OVER (ORDER BY ...)` window computes.\n\n## Approach\n\n1. In the CTE `levels`, compute `left_max` with `MAX(height) OVER (ORDER BY id)`: the default frame runs from the first bar to the current one.\n2. Compute `right_max` the same way with `ORDER BY id DESC`, so the frame runs from the last bar back to the current one.\n3. Sum `LEAST(left_max, right_max) - height` over all bars as `total_trapped_water`.\n\n## Example 1, step by step\n\nHeights by id: 0 1 0 2 1 0 1 3 2 1 2 1.\n\n- `left_max`: 0 1 1 2 2 2 2 3 3 3 3 3.\n- `right_max`: 3 3 3 3 3 3 3 3 2 2 2 1.\n- `LEAST`: 0 1 1 2 2 2 2 3 2 2 2 1.\n- Water per bar: 0 0 1 0 1 2 1 0 0 1 0 0 (ids 3, 5, 6, 7 and 10 hold water).\n- The sum is 6.\n\n## Complexity\n\n- Time: O(n log n) for n bars, from sorting by `id` twice for the two windows.\n- Space: O(n) for the `levels` rows.\n\n## Pitfalls\n\n- Using only `left_max` (or only `right_max`) counts water that would spill out over the lower side, as at the right end of Example 1.\n- Using the overall `MAX(height)` instead of running maxima ignores where the tall bars stand.\n- Relying on the order rows were inserted instead of `ORDER BY id` in the window gives wrong running maxima.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `levels` | each bar with its running maxima from both sides |\n| `left_max` | tallest bar from the left end up to this one |\n| `right_max` | tallest bar from the right end back to this one |\n| `total_trapped_water` | sum over bars of `LEAST(left_max, right_max) - height` |",
+  "narration": {
+    "1": "The levels stage attaches to every bar the walls that bound it on each side.",
+    "4": "A running maximum from the left: the tallest bar from the first id up to this one.",
+    "5": "The same running maximum scanned from the right, by ordering the window by id descending.",
+    "8": "Water above a bar rises to the lower wall; subtract the bar height and add over all bars."
+  }
+}

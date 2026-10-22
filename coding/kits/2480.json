@@ -1,0 +1,50 @@
+{
+  "number": 2480,
+  "title": "Form a Chemical Bond",
+  "spec": "recalled",
+  "statement": "One table lists chemical elements:\n\n- `Elements(symbol, type, electrons)`: one row per element; `symbol` is the primary key. `type` is one of `'Metal'`, `'Nonmetal'` or `'Noble'`. For a metal, `electrons` is how many electrons one atom can give away; for a nonmetal, how many it needs; for a noble element it is `0`.\n\nA bond can form between two elements exactly when one of them is a metal and the other is a nonmetal. The electron counts play no part in this rule, and noble elements never bond.\n\nReport every pair of elements that can form a bond, one row per pair, with the columns `metal` (the metal's symbol) and `nonmetal` (the nonmetal's symbol). Rows may come in any order.",
+  "constraints": [
+    "symbol is unique in Elements",
+    "type is one of 'Metal', 'Nonmetal', 'Noble'",
+    "electrons is 0 for every Noble element and never negative"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Elements": [["symbol","VARCHAR(2)"],["type","ENUM('Metal', 'Nonmetal', 'Noble')"],["electrons","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Elements = [] }] = input;\n  const types = ['Metal', 'Nonmetal', 'Noble'];\n  const seen = new Set();\n  for (const [symbol, type, electrons] of Elements) {\n    if (symbol === null || type === null || electrons === null) return 'symbol, type and electrons are required.';\n    const key = String(symbol).toLowerCase();\n    if (seen.has(key)) return `symbol ${symbol} appears twice in Elements.`;\n    seen.add(key);\n    if (!types.includes(type)) return `Unknown type ${type}.`;\n    if (electrons < 0) return `${symbol} has a negative electron count.`;\n    if (type === 'Noble' && electrons !== 0) return `Noble element ${symbol} must have 0 electrons.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT m.symbol AS metal, n.symbol AS nonmetal\nFROM Elements AS m\nCROSS JOIN Elements AS n\nWHERE m.type = 'Metal'\n  AND n.type = 'Nonmetal';",
+  "brute": "SELECT a.symbol AS metal, b.symbol AS nonmetal\nFROM Elements AS a, Elements AS b\nWHERE a.symbol IN (SELECT symbol FROM Elements WHERE type = 'Metal')\n  AND b.symbol IN (SELECT symbol FROM Elements WHERE type = 'Nonmetal')",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', lower = upper.toLowerCase();\n  // Symbols look like real ones: one capital letter, optionally followed by a small letter.\n  const pool = [...upper];\n  for (const a of upper) for (const b of lower) pool.push(a + b);\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const count = size === 'small' ? pick(9) : 200;\n  const types = ['Metal', 'Nonmetal', 'Noble'];\n  const Elements = [];\n  for (let i = 0; i < count; i++) {\n    const type = types[pick(3)];\n    Elements.push([pool[i], type, type === 'Noble' ? 0 : 1 + pick(4)]);\n  }\n  return [{ Elements }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Elements":[["He","Noble",0],["Na","Metal",1],["Ca","Metal",2],["La","Metal",3],["Cl","Nonmetal",1],["O","Nonmetal",2],["N","Nonmetal",3]]}],"expected":{"columns":["metal","nonmetal"],"rows":[["La","Cl"],["Ca","Cl"],["Na","Cl"],["La","O"],["Ca","O"],["Na","O"],["La","N"],["Ca","N"],["Na","N"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Elements":[]}]},
+    {"name":"Test 2","input":[{"Elements":[["Na","Metal",1]]}]},
+    {"name":"Test 3","input":[{"Elements":[["Na","Metal",1],["K","Metal",1],["Mg","Metal",2]]}]},
+    {"name":"Test 4","input":[{"Elements":[["He","Noble",0],["Ne","Noble",0],["Ar","Noble",0]]}]},
+    {"name":"Test 5","input":[{"Elements":[["Na","Metal",1],["Cl","Nonmetal",1]]}]},
+    {"name":"Test 6","input":[{"Elements":[["Al","Metal",3],["F","Nonmetal",1],["S","Nonmetal",2]]}]},
+    {"name":"Test 7","input":[{"Elements":[["Ar","Noble",0],["Kr","Noble",0],["Fe","Metal",2]]}]},
+    {"name":"Test 8","input":[{"Elements":[["Xe","Noble",0],["Br","Nonmetal",1],["I","Nonmetal",1],["Li","Metal",1],["Rn","Noble",0]]}]},
+    {"name":"Test 9","input":[{"Elements":[["Cl","Nonmetal",1],["O","Nonmetal",2],["N","Nonmetal",3],["P","Nonmetal",3]]}]},
+    {"name":"Test 10","input":[{"Elements":[["Na","Metal",1],["Ca","Metal",2],["Al","Metal",3],["Cl","Nonmetal",1],["O","Nonmetal",2],["N","Nonmetal",3],["He","Noble",0],["Ne","Noble",0]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe bonding rule looks only at `type`: any metal pairs with any nonmetal, whatever their electron counts. So the answer is every combination of one metal and one nonmetal, which is a **cross join** of the table with itself, filtered so the left copy is a metal and the right copy is a nonmetal. With M metals and N nonmetals the result has exactly M · N rows.\n\n## Approach\n\n1. Read `Elements` twice: alias `m` plays the metal, alias `n` plays the nonmetal.\n2. `CROSS JOIN` the two copies, forming every ordered pair of elements.\n3. `WHERE` keeps only pairs whose left side has `type = 'Metal'` and whose right side has `type = 'Nonmetal'`. Noble elements fail both tests and disappear.\n4. Select `m.symbol AS metal` and `n.symbol AS nonmetal`.\n\n## Example 1, step by step\n\n- The metals are Na, Ca and La; the nonmetals are Cl, O and N; He is noble.\n- The cross join builds 7 · 7 = 49 pairs. The filter keeps the 3 · 3 = 9 pairs whose left side is in {Na, Ca, La} and whose right side is in {Cl, O, N}.\n- He never survives: its type is neither `'Metal'` nor `'Nonmetal'`.\n- The electrons (1, 2, 3 on each side) are never consulted, so La (3) still pairs with Cl (1).\n\n## Complexity\n\n- Time: O(E²) for E elements in the naive cross join; an index on `type` brings it to O(E + M · N), the size of the output.\n- Space: O(M · N) for the result.\n\n## Pitfalls\n\n- Joining on `m.type <> n.type` also pairs metals with noble elements and lists every bond twice, once in each direction.\n- Writing `n.type <> 'Metal'` instead of `n.type = 'Nonmetal'` lets noble elements in as partners.\n- Matching electron counts (`m.electrons = n.electrons`) is not part of the rule and drops valid pairs such as La with Cl.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `m` | the copy of `Elements` that supplies the metal |\n| `n` | the copy of `Elements` that supplies the nonmetal |\n| `CROSS JOIN` | pairs every row of `m` with every row of `n` |\n| `metal`, `nonmetal` | the two symbols of one bonding pair |",
+  "narration": {
+    "1": "Each output row names one metal symbol and one nonmetal symbol.",
+    "2": "The first copy of Elements, aliased m, will hold the metal of the pair.",
+    "3": "A cross join pairs every element with every element of the second copy, aliased n.",
+    "4": "Only pairs whose left element is a metal are kept.",
+    "5": "And only those whose right element is a nonmetal, so noble elements never appear."
+  }
+}

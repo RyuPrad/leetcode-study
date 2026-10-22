@@ -1,0 +1,74 @@
+{
+  "number": 2805,
+  "title": "Custom Interval",
+  "spec": "recalled",
+  "statement": "Write two functions that work like `setInterval` and `clearInterval`, except that the pause between calls grows steadily:\n\n- `customInterval(fn, delay, period)` starts calling `fn` over and over and returns a number `id` that names this repetition. Count the calls of `fn` from `0`. Call number `count` happens `delay + period * count` ms after the previous call; for call `0` that wait is just `delay`, measured from the moment `customInterval` was called.\n- `customClearInterval(id)` stops the repetition named `id`: `fn` is not called by it any more.\n\nEach case gives `delay`, `period` and `stopTime`. The judge calls `customInterval(fn, delay, period)` at time `0` and `customClearInterval(id)` at `stopTime` ms, with the `id` it got back. The answer is the list of times, in ms from the start, at which `fn` ran. `stopTime` never falls exactly on a moment when `fn` is due.",
+  "constraints": [
+    "20 <= delay <= 250",
+    "20 <= period <= 250",
+    "20 <= stopTime <= 1000",
+    "stopTime is not a time at which fn is due to run"
+  ],
+  "signature": "int[] customInterval(int delay, int period, int stopTime)",
+  "entry": "customInterval",
+  "kind": "function",
+  "parameters": [
+    "delay",
+    "period",
+    "stopTime"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [delay, period, stopTime] = input;\n  if (!Number.isInteger(delay) || delay < 20 || delay > 250) return 'delay must be an integer from 20 to 250.';\n  if (!Number.isInteger(period) || period < 20 || period > 250) return 'period must be an integer from 20 to 250.';\n  if (!Number.isInteger(stopTime) || stopTime < 20 || stopTime > 1000) return 'stopTime must be an integer from 20 to 1000.';\n  let time = 0;\n  for (let count = 0; time < stopTime; count++) {\n    time += delay + period * count;\n    if (time === stopTime) return `fn is due exactly at ${stopTime} ms; pick a stopTime between two runs.`;\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [delay, period, stopTime] = input, runs = [];\n  if (typeof customClearInterval !== 'function') throw new Error('Define customClearInterval(id) next to customInterval.');\n  const clear = customClearInterval, start = Date.now();\n  const fn = () => {\n    runs.push(Date.now() - start);\n    kit.trace(`fn runs (call ${runs.length - 1})`);\n  };\n  kit.trace(`customInterval(fn, ${delay}, ${period}) is called`);\n  const id = solve(fn, delay, period);\n  if (typeof id !== 'number') throw new Error('customInterval must return a number id.');\n  setTimeout(() => {\n    kit.trace(`customClearInterval(${id}) is called`);\n    clear(id);\n  }, stopTime);\n  // Had the clear failed, the next run would come within 1000 ms of stopTime, so wait that long before answering.\n  return new Promise(resolve => setTimeout(() => resolve(runs), stopTime + 1000));\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Function} fn\n * @param {number} delay\n * @param {number} period\n * @return {number} an id for customClearInterval\n */\nfunction customInterval(fn, delay, period) {\n  // Write your code here.\n}\n\n/**\n * @param {number} id\n * @return {void}\n */\nfunction customClearInterval(id) {\n  // Write your code here.\n}\n",
+    "typescript": "function customInterval(fn: () => void, delay: number, period: number): number {\n  // Write your code here.\n}\n\nfunction customClearInterval(id: number): void {\n  // Write your code here.\n}\n"
+  },
+  "api": "customInterval(fn: () => void, delay: number, period: number): number; customClearInterval(id: number): void",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "const schedules = new Map();\nlet nextId = 0;\n\nfunction customInterval(fn, delay, period) {\n  const id = nextId++;\n  let count = 0;\n  const scheduleNext = () => {\n    const wait = delay + period * count;\n    const timer = setTimeout(() => {\n      fn();\n      count++;\n      scheduleNext();\n    }, wait);\n    schedules.set(id, timer);\n  };\n  scheduleNext();\n  return id;\n}\n\nfunction customClearInterval(id) {\n  clearTimeout(schedules.get(id));\n  schedules.delete(id);\n}",
+  "brute": "const plans = {};\nlet counter = 1;\n\nfunction customInterval(fn, delay, period) {\n  // Schedule many runs up front at their absolute times; clearing cancels the ones still waiting.\n  const id = counter++;\n  const timers = [];\n  let at = 0;\n  for (let count = 0; count < 60; count++) {\n    at += delay + period * count;\n    timers.push(setTimeout(fn, at));\n  }\n  plans[id] = timers;\n  return id;\n}\n\nfunction customClearInterval(id) {\n  for (const timer of plans[id] || []) clearTimeout(timer);\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  for (;;) {\n    const delay = 20 + Math.floor(rand() * (small ? 81 : 231));\n    const period = 20 + Math.floor(rand() * (small ? 81 : 231));\n    const stopTime = 20 + Math.floor(rand() * (small ? 381 : 981));\n    let time = 0, tie = false;\n    for (let count = 0; time < stopTime; count++) {\n      time += delay + period * count;\n      if (time === stopTime) tie = true;\n    }\n    if (!tie) return [delay, period, stopTime];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[50,20,225],"expected":[50,120,210]},
+    {"name":"Example 2","input":[20,20,150],"expected":[20,60,120]},
+    {"name":"Example 3","input":[100,200,500],"expected":[100,400]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[20,20,21]},
+    {"name":"Test 2","input":[250,250,1000]},
+    {"name":"Test 3","input":[100,20,50]},
+    {"name":"Test 4","input":[20,250,1000]},
+    {"name":"Test 5","input":[250,20,999]},
+    {"name":"Test 6","input":[20,20,1000]},
+    {"name":"Test 7","input":[30,40,500]},
+    {"name":"Test 8","input":[137,61,777]},
+    {"name":"Test 9","input":[21,249,270]},
+    {"name":"Test 10","input":[249,21,251]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\n`setInterval` waits the same time between calls, but here every wait is `period` ms longer than the last, so no single interval fits. Instead, chain one `setTimeout` after another: each run of `fn` schedules the next run with the next, longer wait. That raises a second problem. Every link of the chain has a new timer handle, yet the caller holds one `id` for the whole repetition. So hand out a stable `id` and keep a map from it to whichever timer is pending right now; clearing looks up that timer and cancels it. (The brute force schedules sixty runs up front at their absolute times and cancels all that remain; it works for this window but wastes timers and needs an arbitrary cap.)\n\n## Approach\n\n1. Keep `schedules`, a `Map` from each `id` to its pending timer, and a counter `nextId` for fresh ids.\n2. In `customInterval`, take a new `id` and start `count` at `0`.\n3. `scheduleNext` computes `wait = delay + period * count`, sets a timer for it, and records the timer under `id`.\n4. When the timer fires, call `fn`, increase `count`, and call `scheduleNext` again for the following run.\n5. Call `scheduleNext` once to start the chain, and return `id`.\n6. `customClearInterval(id)` cancels the timer stored under `id` and forgets it.\n\n## Example 1, step by step\n\n`delay = 50`, `period = 20`, `stopTime = 225`.\n\n- 0 ms: `id = 0`, `count = 0`, `wait = 50`, so a timer is set for 50 ms.\n- 50 ms: `fn` runs; `count = 1`, `wait = 70`, next timer at 120 ms.\n- 120 ms: `fn` runs; `count = 2`, `wait = 90`, next timer at 210 ms.\n- 210 ms: `fn` runs; `count = 3`, `wait = 110`, next timer at 320 ms.\n- 225 ms: `customClearInterval(0)` cancels the timer due at 320 ms.\n\nThe answer is `[50, 120, 210]`.\n\n## Complexity\n\n- Time: O(1) per run of `fn` and per clear.\n- Space: O(1) per active repetition: one map entry holding its pending timer.\n\n## Pitfalls\n\n- Returning the first timer's handle as the id: by the time the clear comes, a later timer is pending, and cancelling the first one does nothing.\n- Measuring every wait from time 0 (runs at 50, 70, 90) instead of from the previous run (50, 120, 210).\n- Increasing `count` before the first wait, which makes the first run come at `delay + period` instead of `delay`.\n- One shared timer variable for all repetitions: a second `customInterval` would overwrite it, and clearing one would stop the other.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `schedules` | map from each id to the timer currently pending for it |\n| `nextId` | the id the next `customInterval` call hands out |\n| `id` | the stable name of one repetition |\n| `count` | how many times `fn` has run in this repetition |\n| `wait` | the pause before the next run, `delay + period * count` |\n| `timer` | the handle of the pending `setTimeout` |",
+  "narration": {
+    "1": "schedules maps each repetition id to the timer that is pending for it right now.",
+    "2": "nextId hands out a fresh id for every customInterval call.",
+    "5": "Take a stable id for this repetition; it stays the same while the timers change.",
+    "6": "count is how many times fn has run so far, starting at 0.",
+    "8": "The next pause grows with count: delay for the first run, then period ms more each time.",
+    "9": "Schedule the next run after that pause.",
+    "10": "When the timer fires, run fn.",
+    "11": "One more run is done, so the next pause will be longer.",
+    "12": "Chain the following run from this moment.",
+    "14": "Remember the pending timer under the id so a clear can find it.",
+    "16": "Start the chain with the first wait of delay ms.",
+    "17": "Return the id the caller will pass to customClearInterval.",
+    "21": "Cancel whichever timer is pending for this id, so fn never runs again.",
+    "22": "Forget the id; its repetition is over."
+  }
+}

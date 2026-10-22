@@ -1,0 +1,48 @@
+{
+  "number": 2668,
+  "title": "Find Latest Salaries",
+  "spec": "recalled",
+  "statement": "One table keeps a history of salary records:\n\n- `Salary(emp_id, firstname, lastname, salary, department_id)`: one row per salary an employee has had; `(emp_id, salary)` is unique. An employee's `firstname`, `lastname` and `department_id` are the same in all of their rows. Some rows are outdated.\n\nSalaries only ever go up, so an employee's **current** salary is the highest one recorded for them.\n\nReport one row per employee with the columns `emp_id`, `firstname`, `lastname`, `salary` (their current salary) and `department_id`, ordered by `emp_id` ascending.",
+  "constraints": [
+    "(emp_id, salary) is unique in Salary",
+    "An employee has the same firstname, lastname and department_id in every row",
+    "Salaries increase over time, so the largest one is current"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Salary": [["emp_id","INT"],["firstname","VARCHAR(100)"],["lastname","VARCHAR(100)"],["salary","INT"],["department_id","VARCHAR(100)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Salary = [] }] = input;\n  const seen = new Set(), details = new Map();\n  for (const [emp, first, last, salary, dept] of Salary) {\n    if (emp === null || salary === null) return 'Every row needs an emp_id and a salary.';\n    if (salary <= 0) return `Employee ${emp} has a salary of ${salary}; salaries are positive.`;\n    const key = `${emp}:${salary}`;\n    if (seen.has(key)) return `Employee ${emp} has salary ${salary} twice.`;\n    seen.add(key);\n    const who = JSON.stringify([first, last, dept]);\n    if (details.has(emp) && details.get(emp) !== who) return `Employee ${emp} has different names or departments in different rows.`;\n    details.set(emp, who);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT emp_id, firstname, lastname, MAX(salary) AS salary, department_id\nFROM Salary\nGROUP BY emp_id, firstname, lastname, department_id\nORDER BY emp_id;",
+  "brute": "SELECT s.emp_id, s.firstname, s.lastname, s.salary, s.department_id\nFROM Salary AS s\nWHERE NOT EXISTS (\n  SELECT 1 FROM Salary AS t\n  WHERE t.emp_id = s.emp_id AND t.salary > s.salary\n)\nORDER BY s.emp_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const firsts = ['Todd', 'Justin', 'Kelly', 'Patricia', 'Sherry', 'Natasha', 'Omar'];\n  const lasts = ['Wilson', 'Simon', 'Rosario', 'Powell', 'Golden', 'Swanson'];\n  const employees = small ? Math.floor(rand() * 5) : 600;\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const rows = [];\n  for (let i = 0; i < employees; i++) {\n    // Ids are sparse so that the order by emp_id is not the insertion order.\n    const emp = small ? i * 3 + 1 + Math.floor(rand() * 3) : i + 1;\n    const first = pick(firsts), last = pick(lasts), dept = `D100${1 + Math.floor(rand() * 6)}`;\n    const count = 1 + Math.floor(rand() * 3), used = new Set();\n    for (let k = 0; k < count && (!small || rows.length < 8); k++) {\n      const salary = small ? 40000 + 10000 * Math.floor(rand() * 8) : 30000 + Math.floor(rand() * 150000);\n      if (used.has(salary)) continue;\n      used.add(salary);\n      rows.push([emp, first, last, salary, dept]);\n    }\n  }\n  for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ Salary: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Salary":[[1,"Todd","Wilson",110000,"D1006"],[1,"Todd","Wilson",106119,"D1006"],[2,"Justin","Simon",128922,"D1005"],[2,"Justin","Simon",130000,"D1005"],[3,"Kelly","Rosario",42689,"D1002"],[4,"Patricia","Powell",162825,"D1004"],[4,"Patricia","Powell",170000,"D1004"],[5,"Sherry","Golden",44101,"D1002"],[6,"Natasha","Swanson",79632,"D1005"],[6,"Natasha","Swanson",90000,"D1005"]]}],"expected":{"columns":["emp_id","firstname","lastname","salary","department_id"],"rows":[[1,"Todd","Wilson",110000,"D1006"],[2,"Justin","Simon",130000,"D1005"],[3,"Kelly","Rosario",42689,"D1002"],[4,"Patricia","Powell",170000,"D1004"],[5,"Sherry","Golden",44101,"D1002"],[6,"Natasha","Swanson",90000,"D1005"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Salary":[]}]},
+    {"name":"Test 2","input":[{"Salary":[[7,"Omar","Golden",51000,"D1003"]]}]},
+    {"name":"Test 3","input":[{"Salary":[[2,"Kelly","Simon",90000,"D1001"],[2,"Kelly","Simon",60000,"D1001"],[2,"Kelly","Simon",75000,"D1001"]]}]},
+    {"name":"Test 4","input":[{"Salary":[[9,"Todd","Powell",40000,"D1002"],[3,"Sherry","Wilson",70000,"D1004"],[5,"Justin","Rosario",55000,"D1002"]]}]},
+    {"name":"Test 5","input":[{"Salary":[[1,"Todd","Wilson",50000,"D1006"],[2,"Todd","Wilson",80000,"D1006"],[1,"Todd","Wilson",60000,"D1006"]]}]},
+    {"name":"Test 6","input":[{"Salary":[[4,"Natasha","Swanson",100000,"D1005"],[8,"Kelly","Powell",100000,"D1001"],[4,"Natasha","Swanson",95000,"D1005"],[8,"Kelly","Powell",120000,"D1001"]]}]},
+    {"name":"Test 7","input":[{"Salary":[[12,"Omar","Simon",9999,"D1003"],[12,"Omar","Simon",10000,"D1003"],[10,"Patricia","Golden",100000,"D1003"],[11,"Sherry","Rosario",20000,"D1004"]]}]},
+    {"name":"Test 8","input":[{"Salary":[[6,"Justin","Simon",128922,"D1005"],[1,"Todd","Wilson",110000,"D1006"],[6,"Justin","Simon",130000,"D1005"],[3,"Kelly","Rosario",42689,"D1002"],[1,"Todd","Wilson",106119,"D1006"],[3,"Kelly","Rosario",41000,"D1002"]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"small"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBecause salaries only rise, \"latest\" means \"largest\": the current salary is simply the maximum over an employee's rows. One `GROUP BY` per employee with `MAX(salary)` answers the question, and since the name and department never change for an employee, they can ride along as grouping columns.\n\n## Approach\n\n1. Read `Salary` and group its rows by `emp_id` together with `firstname`, `lastname` and `department_id` (constant per employee, so each group is exactly one employee).\n2. Report `MAX(salary)` under the name `salary`.\n3. `ORDER BY emp_id` for the required ascending order.\n\n## Example 1, step by step\n\nThe groups and their maximums:\n\n- 1 Todd Wilson: 110000 and 106119 → 110000\n- 2 Justin Simon: 128922 and 130000 → 130000\n- 3 Kelly Rosario: 42689 → 42689\n- 4 Patricia Powell: 162825 and 170000 → 170000\n- 5 Sherry Golden: 44101 → 44101\n- 6 Natasha Swanson: 79632 and 90000 → 90000\n\nSorted by `emp_id`, these six rows are the answer.\n\n## Complexity\n\n- Time: O(n log n) for n rows, to group and then sort by `emp_id`.\n- Space: O(e) for e employees.\n\n## Pitfalls\n\n- The latest row in the table is not the latest salary: rows come in no particular order, so picking the last or first row per employee is wrong (Todd's newer 110000 is listed before 106119).\n- Grouping by name instead of `emp_id` merges two different employees who share a name.\n- `MIN(salary)` reports the oldest salary instead of the current one.\n- The order by `emp_id` is required; without `ORDER BY` the rows may come in any order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY emp_id, ...` | one group per employee, with the unchanging details as extra keys |\n| `MAX(salary) AS salary` | the employee's highest, therefore current, salary |\n| `ORDER BY emp_id` | ascending employee id, as required |",
+  "narration": {
+    "1": "Keep the employee's details and replace their salaries with the largest one, named salary.",
+    "2": "Every salary record is read, current or outdated.",
+    "3": "Grouping by emp_id (with the details that never change) gives one row per employee.",
+    "4": "Employees are listed by ascending emp_id, as the problem requires."
+  }
+}

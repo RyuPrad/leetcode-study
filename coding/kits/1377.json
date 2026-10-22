@@ -1,0 +1,74 @@
+{
+  "number": 1377,
+  "title": "Frog Position After T Seconds",
+  "spec": "leetcode",
+  "statement": "An undirected tree has `n` vertices labelled `1` to `n`, and each `edges[i] = [a, b]` joins vertices `a` and `b`. A frog stands on vertex `1` at time 0. Each second it moves along an edge to a neighbouring vertex it has never stood on before, choosing uniformly at random among all such neighbours. When no unvisited neighbour is left, it stays on its current vertex for the rest of time.\n\nReturn the probability that the frog is on vertex `target` exactly `t` seconds after it starts. An answer within `10^-5` of the true value is accepted.",
+  "constraints": [
+    "1 <= n <= 100",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "1 <= a_i, b_i <= n",
+    "edges form a tree",
+    "1 <= t <= 50",
+    "1 <= target <= n",
+    "Answers within 10^-5 of the correct value are accepted"
+  ],
+  "signature": "double frogPosition(int n, int[][] edges, int t, int target)",
+  "entry": "frogPosition",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges",
+    "t",
+    "target"
+  ],
+  "compare": "float",
+  "validator": "function validate([n, edges, t, target]) {\n  if (!Number.isInteger(n) || n < 1 || n > 100) return 'n is between 1 and 100.';\n  if (!Array.isArray(edges) || edges.length !== n - 1) return 'edges must have exactly n - 1 pairs.';\n  if (!Number.isInteger(t) || t < 1 || t > 50) return 't is between 1 and 50.';\n  if (!Number.isInteger(target) || target < 1 || target > n) return 'target is a vertex from 1 to n.';\n  const root = Array.from({ length: n + 1 }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [a, b].';\n    const [a, b] = edge;\n    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || a > n || b < 1 || b > n) return 'Edge endpoints are vertices from 1 to n.';\n    const ra = find(a), rb = find(b);\n    if (ra === rb) return 'The edges must form a tree (no cycles or repeated edges).';\n    root[ra] = rb;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function frogPosition(n, edges, t, target) {\n  const graph = Array.from({ length: n + 1 }, () => []);\n  for (const [a, b] of edges) {\n    graph[a].push(b);\n    graph[b].push(a);\n  }\n\n  const dfs = (vertex, parent, time) => {\n    const children = graph[vertex].length - (parent === 0 ? 0 : 1);\n    if (vertex === target) {\n      return time === t || children === 0 ? 1 : 0;\n    }\n    if (time === t) {\n      return 0;\n    }\n    for (const next of graph[vertex]) {\n      if (next === parent) continue;\n      const found = dfs(next, vertex, time + 1);\n      if (found > 0) {\n        return found / children;\n      }\n    }\n    return 0;\n  };\n\n  return dfs(1, 0, 0);\n}",
+  "brute": "function frogPosition(n, edges, t, target) {\n  // Forward simulation: push the whole probability distribution one second at a time.\n  const adjacent = Array.from({ length: n + 1 }, () => []);\n  edges.forEach(([a, b]) => { adjacent[a].push(b); adjacent[b].push(a); });\n  const up = new Array(n + 1).fill(-1);\n  up[1] = 0;\n  const order = [1];\n  for (let k = 0; k < order.length; k++) for (const w of adjacent[order[k]]) if (up[w] === -1) { up[w] = order[k]; order.push(w); }\n  let chance = new Array(n + 1).fill(0);\n  chance[1] = 1;\n  for (let second = 0; second < t; second++) {\n    const after = new Array(n + 1).fill(0);\n    for (let v = 1; v <= n; v++) {\n      if (chance[v] === 0) continue;\n      const kids = adjacent[v].filter(w => w !== up[v]);\n      if (kids.length === 0) after[v] += chance[v];\n      else kids.forEach(w => { after[w] += chance[v] / kids.length; });\n    }\n    chance = after;\n  }\n  return chance[target];\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(60, 100) : int(1, 8);\n  const shape = rand();\n  // Build a tree on positions 0..n-1 where each position hangs below an earlier one.\n  const parentOf = [-1];\n  for (let i = 1; i < n; i++) {\n    if (shape < 0.2) parentOf.push(i - 1);\n    else if (shape < 0.35) parentOf.push(0);\n    else if (shape < 0.6) parentOf.push(Math.max(0, i - int(1, 3)));\n    else parentOf.push(int(0, i - 1));\n  }\n  // Relabel with a random permutation; any vertex may become label 1.\n  const labels = Array.from({ length: n }, (_, i) => i + 1);\n  for (let i = n - 1; i > 0; i--) { const j = int(0, i); [labels[i], labels[j]] = [labels[j], labels[i]]; }\n  const edges = [];\n  for (let i = 1; i < n; i++) edges.push(rand() < 0.5 ? [labels[i], labels[parentOf[i]]] : [labels[parentOf[i]], labels[i]]);\n  for (let i = edges.length - 1; i > 0; i--) { const j = int(0, i); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const t = size === 'large' ? int(1, 50) : int(1, 6);\n  // Bias the target toward vertices at distance about t from vertex 1 so non-zero answers are common.\n  const adjacent = Array.from({ length: n + 1 }, () => []);\n  edges.forEach(([a, b]) => { adjacent[a].push(b); adjacent[b].push(a); });\n  const depth = new Array(n + 1).fill(-1);\n  depth[1] = 0;\n  const order = [1];\n  for (let k = 0; k < order.length; k++) for (const w of adjacent[order[k]]) if (depth[w] === -1) { depth[w] = depth[order[k]] + 1; order.push(w); }\n  let target = int(1, n);\n  if (rand() < 0.6) {\n    const near = order.filter(v => depth[v] === t || (depth[v] < t && adjacent[v].length === (v === 1 ? 0 : 1)));\n    if (near.length) target = near[int(0, near.length - 1)];\n  }\n  return [n, edges, t, target];\n}",
+  "examples": [
+    {"name":"Example 1","input":[7,[[1,2],[1,3],[1,7],[2,4],[2,6],[3,5]],2,4],"expected":0.16666666666666666},
+    {"name":"Example 2","input":[7,[[1,2],[1,3],[1,7],[2,4],[2,6],[3,5]],1,7],"expected":0.3333333333333333}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[],1,1]},
+    {"name":"Test 2","input":[3,[[1,2],[2,3]],1,3]},
+    {"name":"Test 3","input":[3,[[2,1],[3,2]],5,3]},
+    {"name":"Test 4","input":[4,[[1,2],[1,3],[1,4]],1,1]},
+    {"name":"Test 5","input":[7,[[1,2],[1,3],[1,7],[2,4],[2,6],[3,5]],20,6]},
+    {"name":"Test 6","input":[7,[[1,2],[1,3],[1,7],[2,4],[2,6],[3,5]],3,2]},
+    {"name":"Test 7","input":[7,[[1,2],[1,3],[1,7],[2,4],[2,6],[3,5]],2,7]},
+    {"name":"Test 8","input":[8,[[2,1],[3,1],[4,2],[5,2],[6,2],[7,3],[8,7]],3,8]},
+    {"name":"Test 9","input":[2,[[2,1]],50,1]},
+    {"name":"Test 10","input":[5,[[4,3],[3,1],[1,2],[2,5]],2,5]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe frog can never step back, so from vertex `1` it walks straight down the tree: it can only be on `target` if it follows the unique path from `1` to `target`. Each vertex on that path with `c` unvisited neighbours sends the frog the right way with probability `1 / c`, so the answer is the product of those fractions, provided the timing works. A forward simulation that spreads the whole probability distribution second by second also works, but a single DFS finds the path and multiplies along it.\n\n## Approach\n\n1. Build an adjacency list `graph` from `edges`.\n2. Run `dfs(vertex, parent, time)`. The number of `children` is the vertex's neighbours minus its parent (vertex `1` has no parent).\n3. On `target`: the frog is there at second `t` if it arrived exactly at `t`, or arrived earlier and has no child to move to. Return `1` or `0` accordingly.\n4. Otherwise, if the clock already reads `t`, the frog is stuck elsewhere: return `0`.\n5. Try each child at `time + 1`. When a child's subtree yields a positive `found`, divide it by `children` (the chance of picking that child) and return it.\n6. If nothing is found, return `0`.\n\n## Example 1, step by step\n\n`t = 2`, `target = 4`. `dfs(1, 0, 0)` sees 3 children (`2`, `3`, `7`). It calls `dfs(2, 1, 1)`, which has 2 children (`4`, `6`) and calls `dfs(4, 2, 2)`. Vertex `4` is the target and `time === t`, so it returns `1`. Vertex `2` returns `1 / 2`, and vertex `1` returns `(1 / 2) / 3 = 0.1666...`.\n\n## Complexity\n\n- Time: O(n): each vertex is visited at most once.\n- Space: O(n) for the adjacency list and the recursion depth.\n\n## Pitfalls\n\n- Reaching `target` early is not enough: if it still has children, the frog must jump away, so the answer is `0`.\n- Vertex `1` has no parent, so all its neighbours are children; every other vertex loses one neighbour to its parent.\n- With `n = 1` there are no edges; the frog stays on vertex `1` and the answer is `1`.\n- Stop the search once `time === t`; going deeper only describes moves that have not happened yet.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of the tree |\n| `vertex`, `parent` | current vertex and the one the frog came from (`0` for the start) |\n| `time` | seconds elapsed when the frog lands on `vertex` |\n| `children` | unvisited neighbours the frog can choose from |\n| `next` | the child being explored |\n| `found` | probability of reaching `target` correctly once the frog is on `next` |",
+  "narration": {
+    "2": "Create an empty neighbour list for every vertex from 1 to n.",
+    "3": "Read each edge once.",
+    "4": "The tree is undirected, so record the edge in both directions.",
+    "8": "The DFS walks down from vertex 1 tracking the parent and the clock.",
+    "9": "Unvisited neighbours are all neighbours except the parent; vertex 1 has none to subtract.",
+    "10": "Did the frog land on the target?",
+    "11": "It counts only if time is up now, or the target is a leaf where the frog stays forever.",
+    "13": "Time is up but the frog is elsewhere, so this branch cannot succeed.",
+    "14": "Return zero for this branch.",
+    "16": "Try every neighbour as the next jump.",
+    "17": "Skip the vertex the frog came from; it is already visited.",
+    "18": "Explore the child one second later.",
+    "19": "The target lies down this branch with a positive chance.",
+    "20": "The frog picks this child with probability 1 / children, so scale the result.",
+    "23": "The target is not reachable correctly through this vertex.",
+    "26": "Start at vertex 1, with no parent, at time 0."
+  }
+}

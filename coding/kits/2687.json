@@ -1,0 +1,48 @@
+{
+  "number": 2687,
+  "title": "Bikes Last Time Used",
+  "spec": "recalled",
+  "statement": "One table logs the rides of a bike-sharing service:\n\n- `Bikes(ride_id, bike_number, start_time, end_time)`: one row per ride; `ride_id` is the primary key. `bike_number` identifies the bike that was ridden, and a bike can have many rides. `start_time` and `end_time` are datetimes such as `'2012-03-25 11:30:00'`, and every ride ends after it starts.\n\nA bike was last used at the latest `end_time` among its rides. For every bike, report the columns `bike_number` and `end_time`, the latter being that last-used moment.\n\nOrder the rows by `end_time` from most recent to oldest. No two bikes share the same last-used moment, so the order is unique.",
+  "constraints": [
+    "ride_id is unique in Bikes",
+    "start_time < end_time in every ride",
+    "No two bikes have the same latest end_time"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Bikes": [["ride_id","INT"],["bike_number","VARCHAR(100)"],["start_time","DATETIME"],["end_time","DATETIME"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Bikes = [] }] = input;\n  const ids = new Set(), last = new Map();\n  const stamp = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;\n  for (const [id, bike, start, end] of Bikes) {\n    if (id === null || bike === null || start === null || end === null) return 'ride_id, bike_number, start_time and end_time are required.';\n    if (ids.has(id)) return `ride_id ${id} appears twice in Bikes.`;\n    ids.add(id);\n    if (!stamp.test(start) || !stamp.test(end)) return `Ride ${id} needs times as YYYY-MM-DD HH:MM:SS.`;\n    if (start >= end) return `Ride ${id} must end after it starts.`;\n    const key = String(bike).toLowerCase();\n    if (!last.has(key) || last.get(key) < end) last.set(key, end);\n  }\n  if (new Set(last.values()).size < last.size) return 'Two bikes share the same latest end_time.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT bike_number, MAX(end_time) AS end_time\nFROM Bikes\nGROUP BY bike_number\nORDER BY end_time DESC;",
+  "brute": "SELECT DISTINCT b.bike_number, b.end_time\nFROM Bikes AS b\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Bikes AS later\n  WHERE later.bike_number = b.bike_number\n    AND later.end_time > b.end_time)\nORDER BY b.end_time DESC",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const base = Date.UTC(2012, 2, 20);\n  const fmt = minutes => new Date(base + minutes * 60000).toISOString().slice(0, 19).replace('T', ' ');\n  const small = size === 'small';\n  const bikeCount = small ? pick(5) : 300;\n  const budget = small ? 8 : 2000;\n  // Each bike first gets a distinct last end time; its other rides end strictly earlier,\n  // sometimes after other bikes' last rides, so ordering by anything else goes wrong.\n  const lastEnds = new Set();\n  while (lastEnds.size < bikeCount) lastEnds.add(small ? 4320 + 10 * pick(100) : 4320 + pick(100000));\n  const rides = [];\n  [...lastEnds].forEach((end, i) => {\n    const bike = 'W' + String(small ? [576, 300, 455, 120][i] : 100 + i).padStart(5, '0');\n    const extra = small ? pick(3) : pick(12);\n    let previousEnd = end;\n    for (let r = 0; r <= extra && rides.length < budget; r++) {\n      const finish = r === 0 ? end : previousEnd - (small ? 10 + 10 * pick(60) : 1 + pick(3000));\n      const start = finish - (small ? 10 + 10 * pick(12) : 5 + pick(200));\n      rides.push([bike, fmt(start), fmt(finish)]);\n      previousEnd = finish;\n    }\n  });\n  // Shuffle rows and number them, so ride_id carries no hint about recency.\n  for (let i = rides.length - 1; i > 0; i--) { const j = pick(i + 1); [rides[i], rides[j]] = [rides[j], rides[i]]; }\n  const Bikes = rides.map((ride, i) => [i + 1, ...ride]);\n  return [{ Bikes }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Bikes":[[1,"W00576","2012-03-25 11:30:00","2012-03-25 12:40:00"],[2,"W00300","2012-03-25 10:30:00","2012-03-25 10:50:00"],[3,"W00455","2012-03-26 14:30:00","2012-03-26 17:40:00"],[4,"W00455","2012-03-25 12:30:00","2012-03-25 13:40:00"],[5,"W00576","2012-03-25 08:10:00","2012-03-25 09:10:00"],[6,"W00576","2012-03-28 02:30:00","2012-03-28 02:50:00"]]}],"expected":{"columns":["bike_number","end_time"],"rows":[["W00576","2012-03-28 02:50:00"],["W00455","2012-03-26 17:40:00"],["W00300","2012-03-25 10:50:00"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Bikes":[]}]},
+    {"name":"Test 2","input":[{"Bikes":[[1,"W00100","2012-03-25 09:00:00","2012-03-25 09:30:00"]]}]},
+    {"name":"Test 3","input":[{"Bikes":[[1,"W00100","2012-03-25 09:00:00","2012-03-25 09:30:00"],[2,"W00100","2012-03-27 18:00:00","2012-03-27 18:45:00"],[3,"W00100","2012-03-26 07:15:00","2012-03-26 08:00:00"]]}]},
+    {"name":"Test 4","input":[{"Bikes":[[1,"W00300","2012-03-25 10:00:00","2012-03-25 12:00:00"],[2,"W00455","2012-03-25 11:00:00","2012-03-25 11:30:00"]]}]},
+    {"name":"Test 5","input":[{"Bikes":[[1,"W00576","2012-03-25 23:10:00","2012-03-26 00:20:00"],[2,"W00300","2012-03-25 21:00:00","2012-03-25 23:59:00"],[3,"W00455","2012-03-25 06:00:00","2012-03-25 06:30:00"]]}]},
+    {"name":"Test 6","input":[{"Bikes":[[1,"W00100","2012-03-28 08:00:00","2012-03-28 08:30:00"],[2,"W00100","2012-03-20 08:00:00","2012-03-20 08:30:00"],[3,"W00200","2012-03-24 10:00:00","2012-03-24 10:40:00"],[4,"W00300","2012-03-21 12:00:00","2012-03-21 12:15:00"],[5,"W00300","2012-03-29 12:00:00","2012-03-29 12:15:00"]]}]},
+    {"name":"Test 7","input":[{"Bikes":[[10,"W00001","2012-01-01 00:00:00","2012-01-01 00:01:00"],[20,"W00002","2012-12-31 23:00:00","2012-12-31 23:59:59"],[30,"W00003","2012-06-15 12:00:00","2012-06-15 13:00:00"]]}]},
+    {"name":"Test 8","input":[{"Bikes":[[1,"W00576","2012-03-25 08:00:00","2012-03-25 08:59:00"],[2,"W00576","2012-03-25 09:00:00","2012-03-25 09:01:00"],[3,"W00455","2012-03-25 08:30:00","2012-03-25 09:00:00"]]}]},
+    {"name":"Test 9","input":[{"Bikes":[[1,"W00900","2012-03-25 10:00:00","2012-03-25 10:30:00"],[2,"W00800","2012-03-25 11:00:00","2012-03-25 11:30:00"],[3,"W00700","2012-03-25 12:00:00","2012-03-25 12:30:00"],[4,"W00900","2012-03-25 13:00:00","2012-03-25 13:30:00"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Last time used\" is a per-bike maximum: among all rides of a bike, the one that finished latest. That is exactly what `GROUP BY bike_number` with `MAX(end_time)` computes, one row per bike. Datetimes in the `YYYY-MM-DD HH:MM:SS` layout compare correctly, so `MAX` returns the most recent moment.\n\n## Approach\n\n1. Read every ride from `Bikes`.\n2. `GROUP BY bike_number` gathers the rides of each bike.\n3. `MAX(end_time) AS end_time` keeps the latest finish in each group, under the required column name.\n4. `ORDER BY end_time DESC` lists the most recently used bike first; the alias refers to the aggregated value.\n\n## Example 1, step by step\n\n- W00576 has rides 1, 5 and 6 ending at `2012-03-25 12:40:00`, `2012-03-25 09:10:00` and `2012-03-28 02:50:00`; the maximum is `2012-03-28 02:50:00`.\n- W00300 has only ride 2, ending at `2012-03-25 10:50:00`.\n- W00455 has rides 3 and 4, ending at `2012-03-26 17:40:00` and `2012-03-25 13:40:00`; the maximum is `2012-03-26 17:40:00`.\n- Sorting those three moments newest first gives W00576, W00455, W00300.\n\n## Complexity\n\n- Time: O(R) to group R rides with hashing, plus O(B log B) to sort the B bikes.\n- Space: O(B) for the groups and the result.\n\n## Pitfalls\n\n- Ordering by `start_time` or reporting `MAX(start_time)` is not the same thing: a long ride can start earlier than another bike's short ride yet finish later (Test 4).\n- Sorting ascending puts the least recently used bike first.\n- Selecting `end_time` without `MAX` while grouping takes an arbitrary ride's value in engines that allow it, and is rejected by MySQL's `ONLY_FULL_GROUP_BY` mode.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY bike_number` | one group per bike |\n| `end_time` (output) | `MAX(end_time)`, the bike's latest finish |\n| `ORDER BY end_time DESC` | most recently used bike first |",
+  "narration": {
+    "1": "Each output row is one bike and the latest end_time among its rides, keeping the column name end_time.",
+    "2": "Every ride in the log is read.",
+    "3": "Rides are grouped by bike, so MAX looks at one bike's rides at a time.",
+    "4": "The most recently used bike comes first."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "number": 2688,
+  "title": "Find Active Users",
+  "spec": "recalled",
+  "statement": "One table logs purchases:\n\n- `Users(user_id, item, created_at, amount)`: one row per purchase, made by `user_id` on the date `created_at` for `amount`. The table has no key and may repeat a row; every row counts as a purchase of its own.\n\nA user is **active** when two of their purchases are at most 7 days apart: the later one falls on the same day as the earlier one or up to 7 days after it (a purchase on May 31 pairs with any purchase from May 31 to June 7).\n\nReport the `user_id` of every active user, each once, in any order.",
+  "constraints": [
+    "Users has no primary key and may contain duplicate rows",
+    "created_at is a date 'YYYY-MM-DD'",
+    "Two purchases are within 7 days when their dates differ by 0 to 7 days"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["item","VARCHAR(100)"],["created_at","DATE"],["amount","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Users = [] }] = input;\n  for (const [user, item, created] of Users) {\n    if (user === null || item === null) return 'Every purchase needs a user_id and an item.';\n    if (typeof created !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(created)) return `A purchase of user ${user} needs a created_at date like 2021-09-18.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH purchases AS (\n  SELECT user_id, created_at,\n    LAG(created_at) OVER (\n      PARTITION BY user_id ORDER BY created_at\n    ) AS prev_date\n  FROM Users\n)\nSELECT DISTINCT user_id\nFROM purchases\nWHERE DATEDIFF(created_at, prev_date) <= 7;",
+  "brute": "SELECT DISTINCT a.user_id\nFROM Users AS a\nWHERE (\n  SELECT COUNT(*)\n  FROM Users AS b\n  WHERE b.user_id = a.user_id\n    AND b.created_at BETWEEN a.created_at AND DATE_ADD(a.created_at, INTERVAL 7 DAY)\n) >= 2",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const day = offset => new Date(Date.UTC(2021, 8, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const items = ['Smart Lock', 'Smart Bed', 'Smart Crock Pot', 'Smart Thermostat', 'Smart Light Strip', 'Smart Cat Feeder'];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const users = small ? 4 : 400, span = small ? 24 : 365;\n  const Users = [];\n  while (Users.length < count) {\n    // Now and then repeat an earlier row, since the table may hold duplicates.\n    if (Users.length && rand() < 0.1) { Users.push([...Users[Math.floor(rand() * Users.length)]]); continue; }\n    Users.push([1 + Math.floor(rand() * users), items[Math.floor(rand() * items.length)], day(Math.floor(rand() * span)), 1000 + Math.floor(rand() * 700000)]);\n  }\n  return [{ Users }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[5,"Smart Crock Pot","2021-09-18",698882],[6,"Smart Lock","2021-09-14",11487],[6,"Smart Thermostat","2021-09-10",674762],[8,"Smart Light Strip","2021-09-29",630773],[4,"Smart Cat Feeder","2021-09-02",693545],[4,"Smart Bed","2021-09-13",170249]]}],"expected":{"columns":["user_id"],"rows":[[6]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"Smart Lock","2021-09-01",500]]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"Smart Lock","2021-09-01",500],[1,"Smart Bed","2021-09-08",900]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"Smart Lock","2021-09-01",500],[1,"Smart Bed","2021-09-09",900]]}]},
+    {"name":"Test 5","input":[{"Users":[[2,"Smart Lock","2021-09-03",500],[2,"Smart Bed","2021-09-03",900],[3,"Smart Lock","2021-09-03",500]]}]},
+    {"name":"Test 6","input":[{"Users":[[4,"Smart Cat Feeder","2021-09-02",693545],[4,"Smart Cat Feeder","2021-09-02",693545],[5,"Smart Bed","2021-09-02",100]]}]},
+    {"name":"Test 7","input":[{"Users":[[7,"Smart Lock","2021-09-01",10],[7,"Smart Bed","2021-09-20",20],[7,"Smart Crock Pot","2021-09-05",30],[8,"Smart Lock","2021-09-01",10],[8,"Smart Bed","2021-09-20",20],[8,"Smart Crock Pot","2021-09-10",30]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"Smart Lock","2021-09-28",10],[1,"Smart Bed","2021-10-05",20],[2,"Smart Lock","2021-12-28",10],[2,"Smart Bed","2022-01-05",20],[3,"Smart Lock","2021-12-29",10],[3,"Smart Bed","2022-01-05",20]]}]},
+    {"name":"Test 9","input":[{"Users":[[9,"Smart Lock","2021-09-10",10],[9,"Smart Bed","2021-09-11",20],[9,"Smart Thermostat","2021-09-12",30],[9,"Smart Light Strip","2021-09-13",40],[10,"Smart Lock","2021-09-10",10],[10,"Smart Bed","2021-09-30",20],[11,"Smart Lock","2021-09-29",10],[11,"Smart Bed","2021-09-22",20]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"small"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIf any two of a user's purchases are at most 7 days apart, then two **neighbouring** purchases (in date order) are too: the gap between neighbours can only be smaller than the gap between purchases further apart. So it is enough to compare each purchase with the one just before it, which is exactly what `LAG` provides.\n\n## Approach\n\n1. `purchases`: for each row, `LAG(created_at)` over the user's purchases ordered by date gives `prev_date`, the date of the previous purchase (null for the first one).\n2. Keep the rows where `DATEDIFF(created_at, prev_date) <= 7`; a null `prev_date` makes the difference null, so first purchases drop out.\n3. `SELECT DISTINCT user_id`, since an active user may have several qualifying rows.\n\n## Example 1, step by step\n\n`purchases`, user by user in date order:\n\n- User 4: 2021-09-02 (no previous), 2021-09-13 (previous 09-02, 11 days) → not within 7 days.\n- User 5: 2021-09-18 only.\n- User 6: 2021-09-10 (no previous), 2021-09-14 (previous 09-10, 4 days) → qualifies.\n- User 8: 2021-09-29 only.\n\nOnly user 6 passes the filter, so the result is `[6]`.\n\n## Complexity\n\n- Time: O(n log n) for n purchases, to sort each user's purchases for the window.\n- Space: O(n) for the CTE.\n\n## Pitfalls\n\n- The bound is inclusive: purchases exactly 7 days apart count, so `< 7` is wrong.\n- Two purchases on the same day (even two identical rows) are 0 days apart and make the user active.\n- Without `DISTINCT`, a user with three close purchases is reported twice.\n- Comparing only rows that are adjacent in the table, not in date order, misses pairs: rows listed as 09-01, 09-20, 09-05 hide the close pair 09-01 and 09-05.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `purchases` | every purchase with the date of the same user's previous purchase |\n| `prev_date` | `LAG(created_at)` per user in date order; null for a user's first purchase |\n| `DATEDIFF(created_at, prev_date)` | days since that previous purchase |",
+  "narration": {
+    "1": "The CTE purchases pairs each purchase with the user's previous one.",
+    "3": "LAG reads the created_at of the row just before this one.",
+    "4": "Rows are compared within each user, in date order, so the previous row is the previous purchase.",
+    "8": "Each active user is listed once, however many close pairs they have.",
+    "10": "A gap of at most 7 days makes the user active; first purchases have a null gap and drop out."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "number": 2821,
+  "title": "Delay the Resolution of Each Promise",
+  "spec": "recalled",
+  "statement": "Write `delayAll(functions, ms)`. Each entry of `functions` takes no arguments and gives back a promise when called. Return a new array of functions, one for each entry and in the same order. Calling the new function at index `i` runs `functions[i]` and gives back a promise that ends the same way as the promise of `functions[i]`, resolving with the same value or rejecting with the same reason, but `ms` milliseconds after that original promise settled.\n\nEach case describes `functions` as JSON. An entry `{ t, resolve }` is a function whose promise resolves with the value `resolve` after `t` ms; `{ t, reject }` rejects with the string `reject` after `t` ms. When `t` is `0` the promise is already settled when the function returns. The judge calls `delayAll(functions, ms)` and then calls every function of the returned array at time `0`, in order. The answer has one entry per returned function, in the same order: `{ t, status: \"fulfilled\", value }` or `{ t, status: \"rejected\", reason }`, where `t` is when its promise settled, in ms from the start.",
+  "constraints": [
+    "1 <= functions.length <= 10",
+    "10 <= ms <= 500",
+    "Each function is { t, resolve } or { t, reject }",
+    "0 <= t <= 1000",
+    "resolve is an integer from -1000 to 1000",
+    "reject is a string of 1 to 20 characters"
+  ],
+  "signature": "List<Object> delayAll(List<Object> functions, int ms)",
+  "entry": "delayAll",
+  "kind": "function",
+  "parameters": [
+    "functions",
+    "ms"
+  ],
+  "io": {
+    "events": true
+  },
+  "validator": "function validate(input) {\n  const [functions, ms] = input;\n  if (!Array.isArray(functions) || functions.length < 1 || functions.length > 10) return 'Give 1 to 10 functions.';\n  for (const spec of functions) {\n    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return 'Each function must be an object such as { \"t\": 100, \"resolve\": 5 }.';\n    if (!Number.isInteger(spec.t) || spec.t < 0 || spec.t > 1000) return 'Each function needs a time t from 0 to 1000.';\n    const keys = Object.keys(spec).sort().join(',');\n    if (keys === 'resolve,t') {\n      if (!Number.isInteger(spec.resolve) || spec.resolve < -1000 || spec.resolve > 1000) return 'resolve must be an integer from -1000 to 1000.';\n    } else if (keys === 'reject,t') {\n      if (typeof spec.reject !== 'string' || spec.reject.length < 1 || spec.reject.length > 20) return 'reject must be a string of 1 to 20 characters.';\n    } else return 'Each function needs t and exactly one of resolve or reject.';\n  }\n  if (!Number.isInteger(ms) || ms < 10 || ms > 500) return 'ms must be an integer from 10 to 500.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [specs, ms] = input;\n  const functions = specs.map((spec, index) => () => {\n    kit.trace(`functions[${index}] is called`);\n    const failing = spec.reject !== undefined;\n    const outcome = failing ? spec.reject : spec.resolve;\n    const settle = () => kit.trace(`The promise of functions[${index}] ${failing ? 'rejects' : 'resolves'} with ${JSON.stringify(outcome)}`);\n    if (spec.t === 0) {\n      settle();\n      return failing ? Promise.reject(outcome) : Promise.resolve(outcome);\n    }\n    return new Promise((resolve, reject) => setTimeout(() => {\n      settle();\n      if (failing) reject(outcome);\n      else resolve(outcome);\n    }, spec.t));\n  });\n  const start = Date.now();\n  kit.trace(`delayAll is called with ${specs.length} function${specs.length === 1 ? '' : 's'} and ms = ${ms}`);\n  const delayed = solve(functions, ms);\n  if (!Array.isArray(delayed) || delayed.length !== specs.length) throw new Error('delayAll must return an array with one function per entry of functions.');\n  const outcomes = delayed.map((fn, index) => {\n    if (typeof fn !== 'function') throw new Error('Every entry of the returned array must be a function.');\n    kit.trace(`delayed[${index}] is called`);\n    const promise = fn();\n    if (!promise || typeof promise.then !== 'function') throw new Error('Each returned function must give back a promise.');\n    return promise.then((value) => {\n      kit.trace(`The promise of delayed[${index}] resolves with ${JSON.stringify(value)}`);\n      return { t: Date.now() - start, status: 'fulfilled', value };\n    }, (reason) => {\n      const shown = reason instanceof Error ? String(reason) : reason;\n      kit.trace(`The promise of delayed[${index}] rejects with ${JSON.stringify(shown)}`);\n      return { t: Date.now() - start, status: 'rejected', reason: shown };\n    });\n  });\n  return Promise.all(outcomes);\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Array<() => Promise<any>>} functions\n * @param {number} ms\n * @return {Array<() => Promise<any>>}\n */\nfunction delayAll(functions, ms) {\n  // Write your code here.\n}\n",
+    "typescript": "type Fn = () => Promise<any>;\n\nfunction delayAll(functions: Fn[], ms: number): Fn[] {\n  // Write your code here.\n}\n"
+  },
+  "api": "delayAll(functions: Array<() => Promise<any>>, ms: number): Array<() => Promise<any>>",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function delayAll(functions, ms) {\n  return functions.map((fn) => {\n    return () => new Promise((resolve, reject) => {\n      fn().then(\n        (value) => setTimeout(() => resolve(value), ms),\n        (reason) => setTimeout(() => reject(reason), ms),\n      );\n    });\n  });\n}",
+  "brute": "function delayAll(functions, ms) {\n  // The same idea with async/await: wait for the original, pause, then pass its outcome on.\n  const pause = () => new Promise((resolve) => setTimeout(resolve, ms));\n  return functions.map((fn) => async () => {\n    let outcome;\n    try {\n      outcome = { ok: true, value: await fn() };\n    } catch (reason) {\n      outcome = { ok: false, reason };\n    }\n    await pause();\n    if (!outcome.ok) throw outcome.reason;\n    return outcome.value;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? 1 + Math.floor(rand() * 4) : 6 + Math.floor(rand() * 5);\n  const maxTime = size === 'small' ? 120 : 1000;\n  const failRate = rand() * 0.7;\n  const functions = [];\n  for (let i = 0; i < count; i++) {\n    const t = rand() < 0.1 ? 0 : Math.floor(rand() * (maxTime + 1));\n    if (rand() < failRate) functions.push({ t, reject: `Error ${i}` });\n    else functions.push({ t, resolve: Math.floor(rand() * 2001) - 1000 });\n  }\n  const ms = 10 + Math.floor(rand() * (size === 'small' ? 91 : 491));\n  return [functions, ms];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[{"t":30,"resolve":1}],50],"expected":[{"t":80,"status":"fulfilled","value":1}]},
+    {"name":"Example 2","input":[[{"t":50,"resolve":1},{"t":80,"resolve":2}],70],"expected":[{"t":120,"status":"fulfilled","value":1},{"t":150,"status":"fulfilled","value":2}]},
+    {"name":"Example 3","input":[[{"t":20,"reject":"Rejected"},{"t":100,"reject":"Rejected"}],30],"expected":[{"t":50,"status":"rejected","reason":"Rejected"},{"t":130,"status":"rejected","reason":"Rejected"}]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[{"t":0,"resolve":42}],10]},
+    {"name":"Test 2","input":[[{"t":0,"reject":"Now"}],500]},
+    {"name":"Test 3","input":[[{"t":300,"resolve":1},{"t":200,"reject":"B"},{"t":100,"resolve":3}],100]},
+    {"name":"Test 4","input":[[{"t":10,"reject":"A"},{"t":10,"resolve":-5}],25]},
+    {"name":"Test 5","input":[[{"t":1000,"resolve":1000}],500]},
+    {"name":"Test 6","input":[[{"t":5,"resolve":7},{"t":5,"resolve":7},{"t":0,"resolve":0}],10]},
+    {"name":"Test 7","input":[[{"t":100,"resolve":1},{"t":100,"resolve":2},{"t":100,"resolve":3},{"t":100,"resolve":4},{"t":100,"resolve":5},{"t":100,"resolve":6},{"t":100,"resolve":7},{"t":100,"resolve":8},{"t":100,"resolve":9},{"t":100,"resolve":10}],200]},
+    {"name":"Test 8","input":[[{"t":250,"reject":"Slow failure"},{"t":0,"resolve":-1000}],75]},
+    {"name":"Test 9","input":[[{"t":40,"resolve":3},{"t":60,"reject":"x"},{"t":0,"reject":"y"},{"t":999,"resolve":4}],11]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"small"}}
+  ],
+  "notes": "## Intuition\n\nEach new function is a thin wrapper around one original function. It calls the original, waits for its promise to settle, and then waits `ms` more before passing the very same outcome on. A wrapper can only decide when its promise settles if it creates that promise itself, so it returns `new Promise(...)` and keeps `resolve` and `reject`. Both outcomes need a handler, each of which starts a `setTimeout` for `ms`. The wrappers are independent, so when they all run at once each one is shifted by exactly `ms`; the delays do not add up. (The brute force does the same with `async`/`await`: it awaits the original inside `try`/`catch`, awaits a pause of `ms`, and then returns the value or throws the reason.)\n\n## Approach\n\n1. Map every `fn` of `functions` to a new function, keeping the order.\n2. The new function returns a new promise and keeps its `resolve` and `reject`.\n3. It calls `fn()` and attaches two handlers with `then`.\n4. When the original resolves with `value`, wait `ms` with `setTimeout`, then `resolve(value)`.\n5. When it rejects with `reason`, wait `ms`, then `reject(reason)`.\n\n## Example 1, step by step\n\n`functions` has one entry that resolves with 1 after 30 ms, and `ms = 50`.\n\n- `delayAll` returns one wrapper. At 0 ms the judge calls it, which calls `functions[0]` and starts its 30 ms timer.\n- At 30 ms the original promise resolves with 1, so the first handler starts a 50 ms timer.\n- At 80 ms that timer fires and `resolve(1)` settles the wrapper's promise.\n\nThe answer is `[{ t: 80, status: \"fulfilled\", value: 1 }]`.\n\n## Complexity\n\n- Time: O(n) to build the array of n wrappers; each call adds O(1) work and one timer.\n- Space: O(n) for the wrappers.\n\n## Pitfalls\n\n- Returning promises instead of functions: `delayAll` must hand back functions, and the work starts only when one is called.\n- Without a rejection handler, a failing original leaves the new promise waiting forever.\n- Calling `resolve` in both handlers turns a failure into a success; pass a rejection on with `reject(reason)`.\n- Waiting for the functions one after another makes the delays add up; each wrapper must wait only for its own original.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `functions`, `ms` | the original functions and the extra delay |\n| `fn` | the original function one wrapper delays |\n| `resolve`, `reject` | settle the wrapper's own promise |\n| `value`, `reason` | the outcome of the original promise, passed on unchanged |",
+  "narration": {
+    "1": "delayAll receives the original functions and the extra delay ms.",
+    "2": "Build one wrapper per original function, in the same order.",
+    "3": "Calling a wrapper returns a new promise whose resolve and reject it controls.",
+    "4": "Call the original function and wait for its promise to settle.",
+    "5": "If it resolves, wait ms more and then resolve the new promise with the same value.",
+    "6": "If it rejects, wait ms more and then reject the new promise with the same reason."
+  }
+}

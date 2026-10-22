@@ -1,0 +1,55 @@
+{
+  "number": 2720,
+  "title": "Popularity Percentage",
+  "spec": "recalled",
+  "statement": "One table lists friendships on a social platform:\n\n- `Friends(user1, user2)`: each row says that `user1` and `user2` are friends. Friendship is mutual, so the row gives a friend to **both** users. `(user1, user2)` is the primary key, nobody is their own friend, and a pair is never listed a second time in the reversed order.\n\nEvery id that appears in either column is a user of the platform. For each user, report `user1` (the user's id) and `percentage_popularity`: the user's number of friends divided by the total number of users, multiplied by 100 and rounded to 2 decimal places. Order the rows by `user1` ascending.",
+  "constraints": [
+    "(user1, user2) is the primary key of Friends",
+    "user1 and user2 differ in every row",
+    "A pair never appears twice, in either order",
+    "The users are exactly the ids found in user1 or user2"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Friends": [["user1","INT"],["user2","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Friends = [] }] = input;\n  const seen = new Set();\n  for (const [a, b] of Friends) {\n    if (a === null || b === null) return 'user1 and user2 cannot be null.';\n    if (a === b) return `User ${a} cannot be friends with themselves.`;\n    const key = a < b ? `${a},${b}` : `${b},${a}`;\n    if (seen.has(key)) return `The pair ${a}, ${b} appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH pairs AS (\n  SELECT user1, user2\n  FROM Friends\n  UNION\n  SELECT user2, user1\n  FROM Friends\n),\ntotal AS (\n  SELECT COUNT(DISTINCT user1) AS user_count\n  FROM pairs\n)\nSELECT p.user1, ROUND(COUNT(*) * 100 / t.user_count, 2) AS percentage_popularity\nFROM pairs AS p\nCROSS JOIN total AS t\nGROUP BY p.user1, t.user_count\nORDER BY p.user1;",
+  "brute": "SELECT u.user1,\n  ROUND(100 * (SELECT COUNT(*) FROM Friends AS f WHERE f.user1 = u.user1 OR f.user2 = u.user1)\n    / (SELECT COUNT(*) FROM (SELECT user1 FROM Friends UNION SELECT user2 FROM Friends) AS everyone), 2) AS percentage_popularity\nFROM (SELECT user1 FROM Friends UNION SELECT user2 FROM Friends) AS u\nORDER BY u.user1",
+  "generator": "function generate(rand, size) {\n  const users = size === 'small' ? 2 + Math.floor(rand() * 7) : 90;\n  const want = size === 'small' ? Math.floor(rand() * 9) : 1500;\n  const base = size === 'small' ? 1 + Math.floor(rand() * 3) * 10 : 1;\n  const seen = new Set(), Friends = [];\n  for (let tries = 0; Friends.length < want && tries < want * 20; tries++) {\n    const a = base + Math.floor(rand() * users), b = base + Math.floor(rand() * users);\n    if (a === b) continue;\n    const key = a < b ? `${a},${b}` : `${b},${a}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Friends.push([a, b]);\n  }\n  return [{ Friends }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Friends":[[2,1],[1,3],[4,1],[1,5],[1,6],[2,6],[7,2],[8,3],[3,9]]}],"expected":{"columns":["user1","percentage_popularity"],"rows":[[1,55.56],[2,33.33],[3,33.33],[4,11.11],[5,11.11],[6,22.22],[7,11.11],[8,11.11],[9,11.11]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Friends":[]}]},
+    {"name":"Test 2","input":[{"Friends":[[1,2]]}]},
+    {"name":"Test 3","input":[{"Friends":[[5,1],[2,5],[5,3],[4,5]]}]},
+    {"name":"Test 4","input":[{"Friends":[[1,2],[1,3],[1,4],[2,3],[4,2],[3,4]]}]},
+    {"name":"Test 5","input":[{"Friends":[[1,2],[3,2]]}]},
+    {"name":"Test 6","input":[{"Friends":[[10,20],[30,40],[50,60],[40,50],[70,80],[90,100]]}]},
+    {"name":"Test 7","input":[{"Friends":[[33,2],[10,2],[100,9],[9,33]]}]},
+    {"name":"Test 8","input":[{"Friends":[[7,1],[7,2],[7,3],[8,1],[8,2],[9,3]]}]},
+    {"name":"Test 9","input":[{"Friends":[[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,1],[1,4]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA row `(a, b)` is one friendship but two \"has a friend\" facts: `a` has friend `b` and `b` has friend `a`. Once every friendship is listed in **both directions**, a user's friend count is simply the number of rows where they sit in the first column, and the platform's user count is the number of distinct ids in that column. The percentage is then one division per user.\n\n## Approach\n\n1. `pairs`: the rows of `Friends` plus the same rows with the columns swapped, combined with `UNION`. Now each user appears in `user1` once per friend.\n2. `total`: count the distinct `user1` values of `pairs`, which is every user of the platform.\n3. Attach that single number to every pair with `CROSS JOIN`, group by `p.user1`, and compute `ROUND(COUNT(*) * 100 / t.user_count, 2)`.\n4. Sort by `p.user1`.\n\n## Example 1, step by step\n\n- `pairs` holds 18 rows. User 1 appears in `user1` five times (friends 2, 3, 4, 5, 6); users 2 and 3 three times each; user 6 twice; users 4, 5, 7, 8, 9 once each.\n- `total` finds 9 distinct users.\n- User 1: 5 · 100 / 9 = 55.555..., rounded to 55.56. Users 2 and 3: 300 / 9 = 33.33. User 6: 200 / 9 = 22.22. The rest: 100 / 9 = 11.11.\n\n## Complexity\n\n- Time: O(F log F) for F friendships, dominated by the duplicate removal of `UNION` and the grouping.\n- Space: O(F) for the doubled pair list.\n\n## Pitfalls\n\n- Counting only the `user1` column of `Friends` misses friends recorded in the other direction: in Example 1, user 1 would get 3 friends instead of 5.\n- The denominator is the number of distinct users in **both** columns, not the number of rows and not the distinct values of `Friends.user1` alone.\n- Multiply by 100 before rounding, and round to 2 places; rounding the fraction first loses precision.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pairs` | every friendship in both directions: `(user1, friend)` |\n| `total` | one row, `user_count`: how many users the platform has |\n| `p` | a row of `pairs`, grouped by its `user1` |\n| `t` | the single row of `total` |\n| `percentage_popularity` | friends of `p.user1` as a percentage of all users |",
+  "narration": {
+    "1": "The first stage builds the friendship list in both directions.",
+    "2": "Keep each friendship as written: user1 has user2 as a friend.",
+    "5": "Add the swapped rows so user2 also counts user1 as a friend.",
+    "8": "The second stage computes a single number, the platform size.",
+    "9": "Every user now appears in user1 of pairs, so its distinct values are all users.",
+    "12": "Each user's friend count is the size of their group; scale by 100, divide by the user count, round to 2 places.",
+    "14": "The one-row total table is attached to every pair so the division can see user_count.",
+    "15": "One output row per user; user_count is constant, so grouping by it changes nothing.",
+    "16": "The problem asks for the rows sorted by user id."
+  }
+}

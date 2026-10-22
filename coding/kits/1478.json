@@ -1,0 +1,62 @@
+{
+  "number": 1478,
+  "title": "Allocate Mailboxes",
+  "spec": "leetcode",
+  "statement": "Houses stand on a straight street, and `houses[i]` is the coordinate of the `i`-th one. You may place exactly `k` mailboxes anywhere on the street. Every house uses whichever mailbox is closest to it, and its distance is the absolute difference of the two coordinates.\n\nReturn the smallest possible sum of these distances over all houses. The answer is guaranteed to fit in a 32-bit signed integer.",
+  "constraints": [
+    "1 <= k <= houses.length <= 100",
+    "1 <= houses[i] <= 10^4",
+    "All values in houses are distinct"
+  ],
+  "signature": "int minDistance(int[] houses, int k)",
+  "entry": "minDistance",
+  "kind": "function",
+  "parameters": [
+    "houses",
+    "k"
+  ],
+  "validator": "function validate([houses, k]) {\n  if (!Array.isArray(houses) || houses.length < 1 || houses.length > 100) return 'houses needs 1 to 100 values.';\n  if (houses.some(h => !Number.isInteger(h) || h < 1 || h > 10000)) return 'Each house is an integer between 1 and 10^4.';\n  if (new Set(houses).size !== houses.length) return 'House positions must be distinct.';\n  if (!Number.isInteger(k) || k < 1 || k > houses.length) return 'k is between 1 and houses.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minDistance(houses, k) {\n  houses.sort((a, b) => a - b);\n  const n = houses.length;\n  const cost = Array.from({ length: n }, () => new Array(n).fill(0));\n\n  for (let i = n - 1; i >= 0; i--) {\n    for (let j = i + 1; j < n; j++) {\n      cost[i][j] = cost[i + 1][j - 1] + houses[j] - houses[i];\n    }\n  }\n\n  const dp = Array.from({ length: k + 1 }, () => new Array(n + 1).fill(Infinity));\n  dp[0][0] = 0;\n\n  for (let boxes = 1; boxes <= k; boxes++) {\n    for (let end = 1; end <= n; end++) {\n      for (let start = boxes - 1; start < end; start++) {\n        const total = dp[boxes - 1][start] + cost[start][end - 1];\n        dp[boxes][end] = Math.min(dp[boxes][end], total);\n      }\n    }\n  }\n  return dp[k][n];\n}",
+  "brute": "function minDistance(houses, k) {\n  // Some optimal placement puts every mailbox on a different house, so try every k-subset of houses.\n  const n = houses.length;\n  let best = Infinity;\n  const chosen = [];\n  const pick = (from) => {\n    if (chosen.length === k) {\n      let sum = 0;\n      for (const h of houses) sum += Math.min(...chosen.map(c => Math.abs(h - c)));\n      best = Math.min(best, sum);\n      return;\n    }\n    for (let i = from; i < n; i++) {\n      chosen.push(houses[i]);\n      pick(i + 1);\n      chosen.pop();\n    }\n  };\n  pick(0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 100 : 1 + Math.floor(rand() * 9);\n  const top = size === 'large' ? 10000 : (rand() < 0.7 ? 30 : 10000);\n  const seen = new Set();\n  while (seen.size < n) seen.add(1 + Math.floor(rand() * top));\n  const houses = [...seen];\n  const k = 1 + Math.floor(rand() * n);\n  return [houses, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,4,8,10,20],3],"expected":5},
+    {"name":"Example 2","input":[[2,3,5,12,18],2],"expected":9}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],1]},
+    {"name":"Test 2","input":[[1,10000],1]},
+    {"name":"Test 3","input":[[1,10000],2]},
+    {"name":"Test 4","input":[[1,2,3,4,5,6,7,8],1]},
+    {"name":"Test 5","input":[[7,4,6,1],1]},
+    {"name":"Test 6","input":[[1,2,3,100,101,102],2]},
+    {"name":"Test 7","input":[[3,6,14,10],4]},
+    {"name":"Test 8","input":[[10,20,30,40,50,60,70,80,90,100],3]},
+    {"name":"Test 9","input":[[1,5,9,13,1000,2000,2010],3]},
+    {"name":"Test 10","input":[[9,1,8,2,7,3,6,4,5],2]},
+    {"name":"Test 11","input":[[1,3,9,27,81,243,729,2187,6561],4]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith one mailbox, the best spot is the median of the houses: moving away from it brings more houses farther than it brings closer. With `k` mailboxes, each mailbox serves a run of neighbouring houses once they are sorted, so the task becomes cutting the sorted list into `k` contiguous groups and putting one mailbox at each group's median. Trying every set of house positions for the mailboxes is correct but exponential; dynamic programming over \"how many houses are covered, with how many mailboxes\" is polynomial.\n\n## Approach\n\n1. Sort `houses`.\n2. Fill `cost[i][j]`, the total distance when one mailbox at the median serves houses `i..j`. Peeling off the two outer houses gives `cost[i][j] = cost[i + 1][j - 1] + houses[j] - houses[i]`, so fill `i` from right to left.\n3. Let `dp[boxes][end]` be the least total for the first `end` houses using `boxes` mailboxes. Start with `dp[0][0] = 0` and everything else `Infinity`.\n4. For each `boxes` and `end`, try every `start` for the last group (houses `start..end - 1`): `dp[boxes - 1][start] + cost[start][end - 1]`, keeping the minimum.\n5. Return `dp[k][n]`.\n\n## Example 1, step by step\n\nSorted `houses = [1, 4, 8, 10, 20]`, `k = 3`. Some costs: `cost[0][1] = 3`, `cost[2][3] = 2`, `cost[2][4] = 12`, `cost[4][4] = 0`.\n\n- One mailbox: `dp[1][2] = 3`, `dp[1][3] = 7`, `dp[1][4] = 13`.\n- Two mailboxes: `dp[2][4] = min(0 + 6, 3 + 2, 7 + 0) = 5` (groups `[1, 4]` and `[8, 10]`).\n- Three mailboxes: `dp[3][5] = min(dp[2][2] + 12, dp[2][3] + 10, dp[2][4] + 0) = min(12, 13, 5) = 5`.\n\nThe answer is `5`.\n\n## Complexity\n\n- Time: O(k · n²): every `(boxes, end)` pair tries up to `n` starts; `cost` takes O(n²).\n- Space: O(n² + k · n) for `cost` and `dp`.\n\n## Pitfalls\n\n- Sort first; groups are only contiguous in sorted order.\n- The median minimises the sum of distances, not the mean; using the average gives wrong (and fractional) costs.\n- `start` must be at least `boxes - 1`, or `dp[boxes - 1][start]` is unreachable (it stays `Infinity`, which is harmless but wasted work).\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `cost[i][j]` | distance total when one mailbox serves sorted houses `i..j` |\n| `dp[boxes][end]` | least total for the first `end` houses with `boxes` mailboxes |\n| `start` | first house of the last group |\n| `total` | cost of one candidate split |",
+  "narration": {
+    "2": "Sort the houses so each mailbox serves a contiguous run of them.",
+    "4": "cost[i][j] will hold the distance total when one mailbox serves houses i..j.",
+    "6": "Fill cost from the right so cost[i + 1][j - 1] is ready before it is needed.",
+    "8": "With the mailbox at the median, the two outer houses add their gap to the inner group's cost.",
+    "12": "dp[boxes][end] is the best total for the first end houses using boxes mailboxes.",
+    "13": "No houses with no mailboxes costs nothing.",
+    "15": "Add mailboxes one at a time.",
+    "16": "Consider covering the first end houses.",
+    "17": "The last mailbox serves houses start..end - 1; every earlier house needs one of the other boxes - 1 mailboxes.",
+    "18": "Cost of the earlier houses plus the cost of this last group.",
+    "19": "Keep the cheapest split.",
+    "23": "All n houses served by k mailboxes."
+  }
+}

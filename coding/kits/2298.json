@@ -1,0 +1,51 @@
+{
+  "number": 2298,
+  "title": "Tasks Count in the Weekend",
+  "spec": "recalled",
+  "statement": "One table lists submitted tasks:\n\n- `Tasks(task_id, assignee_id, submit_date)`: one row per task; `task_id` is unique. `submit_date` is the date the task was handed in. The table has at least one row.\n\nSaturday and Sunday are the weekend; Monday through Friday are working days. Report a single row with two columns:\n\n- `weekend_cnt`: how many tasks were submitted on a Saturday or a Sunday.\n- `working_cnt`: how many tasks were submitted on a working day.\n\nA count is `0` when no task falls on that kind of day. `assignee_id` plays no part in the answer.",
+  "constraints": [
+    "task_id is unique in Tasks",
+    "submit_date is a valid date",
+    "Tasks has at least one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tasks": [["task_id","INT"],["assignee_id","INT"],["submit_date","DATE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Tasks = [] }] = input;\n  if (Tasks.length === 0) return 'Tasks needs at least one row.';\n  const ids = new Set();\n  for (const [id, , day] of Tasks) {\n    if (id === null) return 'Every task needs a task_id.';\n    if (ids.has(id)) return `task_id ${id} appears twice in Tasks.`;\n    ids.add(id);\n    if (day === null) return `Task ${id} needs a submit_date.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH labeled AS (\n  SELECT\n    task_id,\n    submit_date,\n    DAYNAME(submit_date) AS day_name,\n    IF(WEEKDAY(submit_date) >= 5, 1, 0) AS is_weekend\n  FROM Tasks\n)\nSELECT\n  SUM(is_weekend) AS weekend_cnt,\n  SUM(1 - is_weekend) AS working_cnt\nFROM labeled;",
+  "brute": "SELECT\n  (SELECT COUNT(*) FROM Tasks WHERE DAYOFWEEK(submit_date) IN (1, 7)) AS weekend_cnt,\n  (SELECT COUNT(*) FROM Tasks WHERE DAYOFWEEK(submit_date) BETWEEN 2 AND 6) AS working_cnt",
+  "generator": "function generate(rand, size) {\n  const pad = value => String(value).padStart(2, '0');\n  const dayAt = (base, offset) => {\n    const d = new Date(base + offset * 86400000);\n    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;\n  };\n  const Tasks = [];\n  if (size === 'small') {\n    // Two weeks starting on Monday 2022-06-13; some sets keep only weekends or only weekdays.\n    const base = Date.UTC(2022, 5, 13);\n    const mode = rand();\n    const offsets = [];\n    for (let i = 0; i < 14; i++) {\n      const weekend = i % 7 >= 5;\n      if (mode < 0.15 && !weekend) continue;\n      if (mode >= 0.15 && mode < 0.3 && weekend) continue;\n      offsets.push(i);\n    }\n    const count = 1 + Math.floor(rand() * 8);\n    for (let id = 1; id <= count; id++) Tasks.push([id, 1 + Math.floor(rand() * 4), dayAt(base, offsets[Math.floor(rand() * offsets.length)])]);\n  } else {\n    const base = Date.UTC(2021, 0, 1);\n    for (let id = 1; id <= 2000; id++) Tasks.push([id, 1 + Math.floor(rand() * 50), dayAt(base, Math.floor(rand() * 730))]);\n  }\n  return [{ Tasks }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tasks":[[1,1,"2022-06-13"],[2,6,"2022-06-14"],[3,6,"2022-06-15"],[4,3,"2022-06-18"],[5,5,"2022-06-19"],[6,7,"2022-06-19"]]}],"expected":{"columns":["weekend_cnt","working_cnt"],"rows":[[3,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tasks":[[1,1,"2022-06-15"]]}]},
+    {"name":"Test 2","input":[{"Tasks":[[1,1,"2022-06-18"]]}]},
+    {"name":"Test 3","input":[{"Tasks":[[7,2,"2022-06-19"]]}]},
+    {"name":"Test 4","input":[{"Tasks":[[1,1,"2022-06-13"],[2,1,"2022-06-14"],[3,2,"2022-06-15"],[4,2,"2022-06-16"],[5,3,"2022-06-17"]]}]},
+    {"name":"Test 5","input":[{"Tasks":[[1,4,"2022-06-17"],[2,4,"2022-06-18"],[3,5,"2022-06-19"],[4,5,"2022-06-20"]]}]},
+    {"name":"Test 6","input":[{"Tasks":[[1,1,"2021-12-31"],[2,2,"2022-01-01"],[3,3,"2022-01-02"],[4,4,"2022-01-03"]]}]},
+    {"name":"Test 7","input":[{"Tasks":[[1,9,"2020-02-29"],[2,9,"2020-03-01"],[3,9,"2020-02-28"],[4,9,"2020-03-02"]]}]},
+    {"name":"Test 8","input":[{"Tasks":[[10,3,"2022-06-25"],[11,3,"2022-06-25"],[12,3,"2022-06-26"],[13,3,"2022-06-24"]]}]},
+    {"name":"Test 9","input":[{"Tasks":[[1,1,"2022-06-17"],[2,2,"2022-06-24"],[3,3,"2022-07-01"],[4,4,"2022-06-26"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe answer is one row of two counts, so the whole table collapses into a single group. The only question per task is \"does its date fall on a Saturday or Sunday?\". MySQL's `WEEKDAY(date)` numbers the days from Monday = 0 to Sunday = 6, so the weekend is exactly `WEEKDAY(...) >= 5`. Turn that test into a 0/1 flag per task and add the flags up.\n\n## Approach\n\n1. CTE `labeled`: for every task compute `day_name` (only to make the stage readable) and `is_weekend`, which is `1` when `WEEKDAY(submit_date) >= 5` and `0` otherwise.\n2. The final `SELECT` has no `GROUP BY`, so it aggregates the whole CTE into one row.\n3. `SUM(is_weekend)` counts weekend tasks; `SUM(1 - is_weekend)` counts the rest, which are the working-day tasks.\n\n## Example 1, step by step\n\n`labeled` holds:\n\n- task 1, 2022-06-13, Monday, `is_weekend = 0`\n- task 2, 2022-06-14, Tuesday, `0`\n- task 3, 2022-06-15, Wednesday, `0`\n- task 4, 2022-06-18, Saturday, `1`\n- task 5, 2022-06-19, Sunday, `1`\n- task 6, 2022-06-19, Sunday, `1`\n\n`SUM(is_weekend) = 3` and `SUM(1 - is_weekend) = 3`, so the answer is `weekend_cnt = 3`, `working_cnt = 3`.\n\n## Complexity\n\n- Time: O(T) for T tasks: one pass computes the flag and one aggregate adds it up.\n- Space: O(1) beyond the scan; the result is a single row.\n\n## Pitfalls\n\n- `WEEKDAY` and `DAYOFWEEK` number days differently: `WEEKDAY` gives Monday = 0 ... Sunday = 6, while `DAYOFWEEK` gives Sunday = 1 ... Saturday = 7. Mixing them up counts Friday as a weekend day or drops Sunday.\n- Grouping by `assignee_id` or `submit_date` returns many rows; the answer is one row for the whole table.\n- Two tasks on the same date both count; do not `COUNT(DISTINCT submit_date)`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `labeled` | every task with its weekday name and a 0/1 weekend flag |\n| `day_name` | `DAYNAME(submit_date)`, shown only to read the stage |\n| `is_weekend` | `1` for Saturday or Sunday, `0` for Monday to Friday |\n| `weekend_cnt` | sum of the flags |\n| `working_cnt` | sum of `1 - is_weekend`, the working-day tasks |",
+  "narration": {
+    "1": "The labeled stage tags every task with what kind of day it was submitted on.",
+    "5": "DAYNAME is only there so the stage shows which weekday each date is.",
+    "6": "WEEKDAY numbers Monday as 0 and Sunday as 6, so values 5 and 6 are the weekend and become a flag of 1.",
+    "10": "Adding the 0/1 flags counts the weekend tasks.",
+    "11": "Every other task was submitted on a working day, so 1 - is_weekend counts those.",
+    "12": "With no GROUP BY the whole stage collapses into the single output row."
+  }
+}

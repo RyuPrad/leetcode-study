@@ -1,0 +1,55 @@
+{
+  "number": 2324,
+  "title": "Product Sales Analysis IV",
+  "spec": "recalled",
+  "statement": "Two tables record what users bought:\n\n- `Sales(sale_id, product_id, user_id, quantity)`: one row per sale of `quantity` units of a product to a user; `sale_id` is unique and every `product_id` exists in `Product`. A user may buy the same product in several sales.\n- `Product(product_id, price)`: the unit price of each product; `product_id` is unique.\n\nA user's spending on a product is the sum of `quantity * price` over all of that user's sales of it. For every user who appears in `Sales`, find the product(s) on which they spent the most money. When several products tie for a user's highest spending, report each of them.\n\nOutput the columns `user_id` and `product_id`, one row per (user, top product) pair, in any order.",
+  "constraints": [
+    "sale_id is unique in Sales",
+    "product_id is unique in Product",
+    "Every Sales.product_id exists in Product",
+    "quantity >= 1 and price >= 1"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Sales": [["sale_id","INT"],["product_id","INT"],["user_id","INT"],["quantity","INT"]],
+    "Product": [["product_id","INT"],["price","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Sales = [], Product = [] }] = input;\n  const products = new Set(), sales = new Set();\n  for (const [id, price] of Product) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (products.has(id)) return `product_id ${id} appears twice in Product.`;\n    products.add(id);\n    if (price === null || price < 1) return `Product ${id} needs a price of at least 1.`;\n  }\n  for (const [id, productId, userId, quantity] of Sales) {\n    if (id === null) return 'Every sale needs a sale_id.';\n    if (sales.has(id)) return `sale_id ${id} appears twice in Sales.`;\n    sales.add(id);\n    if (!products.has(productId)) return `Sale ${id} names product_id ${productId}, which is not in Product.`;\n    if (userId === null) return `Sale ${id} needs a user_id.`;\n    if (quantity === null || quantity < 1) return `Sale ${id} needs a quantity of at least 1.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH spending AS (\n  SELECT s.user_id, s.product_id, SUM(s.quantity * p.price) AS spent\n  FROM Sales AS s\n  JOIN Product AS p\n    ON p.product_id = s.product_id\n  GROUP BY s.user_id, s.product_id\n),\nranked AS (\n  SELECT\n    user_id,\n    product_id,\n    RANK() OVER (PARTITION BY user_id ORDER BY spent DESC) AS spend_rank\n  FROM spending\n)\nSELECT user_id, product_id\nFROM ranked\nWHERE spend_rank = 1;",
+  "brute": "SELECT t.user_id, t.product_id\nFROM (\n  SELECT s.user_id, s.product_id, SUM(s.quantity * p.price) AS total\n  FROM Sales AS s, Product AS p\n  WHERE p.product_id = s.product_id\n  GROUP BY s.user_id, s.product_id\n) AS t\nJOIN (\n  SELECT x.user_id, MAX(x.total) AS best\n  FROM (\n    SELECT s2.user_id, s2.product_id, SUM(s2.quantity * p2.price) AS total\n    FROM Sales AS s2, Product AS p2\n    WHERE p2.product_id = s2.product_id\n    GROUP BY s2.user_id, s2.product_id\n  ) AS x\n  GROUP BY x.user_id\n) AS m\n  ON m.user_id = t.user_id AND m.best = t.total",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const small = size === 'small';\n  const productCount = small ? Math.floor(rand() * 4) : 300;\n  const saleCount = productCount === 0 ? 0 : small ? Math.floor(rand() * 9) : 2000;\n  const users = small ? [101, 102, 103] : Array.from({ length: 400 }, (_, i) => 1000 + i);\n  // Small prices and quantities share factors, so different products often tie for a user's top spending.\n  const prices = small ? [5, 10, 15, 20, 25, 30] : [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];\n  const quantities = small ? [1, 2, 3, 4, 6] : [1, 2, 3, 4, 5, 6, 8, 10];\n  const Product = [], Sales = [];\n  for (let id = 1; id <= productCount; id++) Product.push([id, pick(prices)]);\n  for (let id = 1; id <= saleCount; id++) Sales.push([id, 1 + Math.floor(rand() * productCount), pick(users), pick(quantities)]);\n  return [{ Sales, Product }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Sales":[[1,1,101,10],[2,3,101,7],[3,1,102,9],[4,2,102,6],[5,3,102,10],[6,1,102,6]],"Product":[[1,10],[2,25],[3,15]]}],"expected":{"columns":["user_id","product_id"],"rows":[[101,3],[102,1],[102,2],[102,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Sales":[],"Product":[[1,10],[2,20]]}]},
+    {"name":"Test 2","input":[{"Sales":[[1,2,7,3]],"Product":[[1,10],[2,20]]}]},
+    {"name":"Test 3","input":[{"Sales":[[1,1,5,3],[2,1,5,3],[3,2,5,1]],"Product":[[1,10],[2,50]]}]},
+    {"name":"Test 4","input":[{"Sales":[[1,1,5,10],[2,2,5,1]],"Product":[[1,1],[2,20]]}]},
+    {"name":"Test 5","input":[{"Sales":[[1,1,8,3],[2,2,8,2],[3,3,8,1]],"Product":[[1,10],[2,15],[3,20]]}]},
+    {"name":"Test 6","input":[{"Sales":[[1,1,1,2],[2,2,2,2],[3,3,3,2],[4,1,2,1],[5,3,1,1]],"Product":[[1,10],[2,10],[3,30]]}]},
+    {"name":"Test 7","input":[{"Sales":[[1,3,4,1],[2,3,9,1],[3,2,9,1]],"Product":[[1,100],[2,5],[3,5],[4,70]]}]},
+    {"name":"Test 8","input":[{"Sales":[[10,1,101,6],[11,2,101,3],[12,3,101,2],[13,1,102,1],[14,2,102,1],[15,2,102,1]],"Product":[[1,5],[2,10],[3,15]]}]},
+    {"name":"Test 9","input":[{"Sales":[[1,1,7,1],[2,1,7,1],[3,1,7,1],[4,2,7,2],[5,1,8,4],[6,2,8,1]],"Product":[[1,4],[2,7]]}]},
+    {"name":"Test 10","input":[{"Sales":[[1,1,101,10],[2,3,101,7],[3,1,102,9],[4,2,102,6],[5,3,102,10],[6,1,102,6],[7,2,103,1],[8,3,103,2]],"Product":[[1,10],[2,25],[3,15]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSpending belongs to a (user, product) pair, and a user may buy the same product several times, so first **total** each pair's money. After that it is a \"top per group\" question: within each user, keep the products whose total is the largest. `RANK()` gives every tied maximum rank 1, so filtering on rank 1 keeps all of them.\n\n## Approach\n\n1. CTE `spending`: join `Sales` (alias `s`) to `Product` (alias `p`) for the price, and `GROUP BY s.user_id, s.product_id` with `SUM(s.quantity * p.price)` as `spent`.\n2. CTE `ranked`: `RANK() OVER (PARTITION BY user_id ORDER BY spent DESC)` as `spend_rank`, so each user's biggest total ranks 1.\n3. Return `user_id` and `product_id` of the rows with `spend_rank = 1`.\n\n## Example 1, step by step\n\n`spending` totals each pair:\n\n| user_id | product_id | spent | spend_rank |\n| --- | --- | --- | --- |\n| 101 | 1 | 10 * 10 = 100 | 2 |\n| 101 | 3 | 7 * 15 = 105 | 1 |\n| 102 | 1 | (9 + 6) * 10 = 150 | 1 |\n| 102 | 2 | 6 * 25 = 150 | 1 |\n| 102 | 3 | 10 * 15 = 150 | 1 |\n\nUser 101 keeps product 3; user 102 ties on all three products, so all three are reported.\n\n## Complexity\n\n- Time: O(S) to join and group S sales by hashing, plus O(G log G) to rank the G (user, product) pairs.\n- Space: O(G) for the `spending` and `ranked` rows.\n\n## Pitfalls\n\n- Ranking single sales instead of per-product totals: user 102's two sales of product 1 only win together.\n- `ROW_NUMBER()` keeps one arbitrary product per user and drops the ties; use `RANK()` or `DENSE_RANK()`.\n- Ranking by `quantity` or by `price` alone ignores the other factor; the money spent is their product.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s` | `Sales`, one row per purchase |\n| `p` | `Product`, supplying the unit price |\n| `spending` | one row per (user, product) with the money `spent` |\n| `ranked` | `spending` with `spend_rank`, 1 for each user's largest total |",
+  "narration": {
+    "1": "Stage one totals the money each user spent on each product.",
+    "2": "A sale is worth quantity times the unit price; SUM adds up repeat purchases.",
+    "4": "Join Product to look up each sale's price.",
+    "6": "One group per user and product.",
+    "8": "Stage two ranks each user's products by money spent.",
+    "12": "RANK gives every product tied for the top the same rank 1.",
+    "17": "Keep only each user's top-spending products, ties included."
+  }
+}

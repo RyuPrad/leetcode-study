@@ -1,0 +1,53 @@
+{
+  "number": 2984,
+  "title": "Find Peak Calling Hours for Each City",
+  "spec": "recalled",
+  "statement": "A phone company logs every call:\n\n- `Calls(caller_id, recipient_id, call_time, city)`: one row per call. `(caller_id, recipient_id, call_time)` is unique. `call_time` is a datetime such as `'2021-08-24 22:46:07'` and `city` is where the call took place.\n\nFor every city, group its calls by the **hour of the day** of `call_time` (0 to 23; calls on different dates but in the same hour fall in the same group) and count them. A city's peak calling hour is the hour with the most calls in that city; when several hours tie for the most, each of them is a peak hour and gets its own row.\n\nReport `city`, `peak_calling_hour` (the hour, an integer) and `number_of_calls` (the calls in that hour). Order the rows by `peak_calling_hour` descending, then by `city` descending.",
+  "constraints": [
+    "(caller_id, recipient_id, call_time) is unique in Calls",
+    "call_time is a full datetime 'YYYY-MM-DD HH:MM:SS' and is never null",
+    "city is never null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Calls": [["caller_id","INT"],["recipient_id","INT"],["call_time","DATETIME"],["city","VARCHAR(40)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Calls = [] }] = input;\n  const seen = new Set();\n  for (const [caller, recipient, time, city] of Calls) {\n    if (caller === null || recipient === null) return 'caller_id and recipient_id cannot be null.';\n    if (typeof time !== 'string' || !/^\\d{4}-\\d{2}-\\d{2} ([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$/.test(time)) return `call_time ${time} is not a datetime.`;\n    if (city === null) return 'city cannot be null.';\n    const key = `${caller}|${recipient}|${time}`;\n    if (seen.has(key)) return `The call ${caller} -> ${recipient} at ${time} appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH hourly AS (\n  SELECT city, HOUR(call_time) AS peak_calling_hour, COUNT(*) AS number_of_calls\n  FROM Calls\n  GROUP BY city, HOUR(call_time)\n),\nranked AS (\n  SELECT city, peak_calling_hour, number_of_calls,\n    RANK() OVER (PARTITION BY city ORDER BY number_of_calls DESC) AS hour_rank\n  FROM hourly\n)\nSELECT city, peak_calling_hour, number_of_calls\nFROM ranked\nWHERE hour_rank = 1\nORDER BY peak_calling_hour DESC, city DESC;",
+  "brute": "SELECT h.city, h.peak_calling_hour, h.number_of_calls\nFROM (\n  SELECT city, CAST(SUBSTRING(call_time, 12, 2) AS UNSIGNED) AS peak_calling_hour, COUNT(*) AS number_of_calls\n  FROM Calls\n  GROUP BY city, SUBSTRING(call_time, 12, 2)\n) AS h\nWHERE h.number_of_calls = (\n  SELECT MAX(g.calls)\n  FROM (SELECT city, COUNT(*) AS calls FROM Calls GROUP BY city, SUBSTRING(call_time, 12, 2)) AS g\n  WHERE g.city = h.city\n)\nORDER BY h.peak_calling_hour DESC, h.city DESC",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const two = n => String(n).padStart(2, '0');\n  const small = size === 'small';\n  const cities = small ? ['Houston', 'New York', 'Boston'] : ['Houston', 'New York', 'Boston', 'Miami', 'Denver', 'Austin', 'Seattle', 'Chicago', 'Phoenix', 'Dallas'];\n  // Small cases use a few hours so counts tie; large ones spread over the whole day.\n  const hours = small ? [0, 13, 14, 22, 23] : Array.from({ length: 24 }, (_, h) => h);\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Calls = [], seen = new Set();\n  while (Calls.length < count) {\n    const caller = 1 + Math.floor(rand() * (small ? 6 : 200));\n    let recipient = 1 + Math.floor(rand() * (small ? 6 : 200));\n    if (recipient === caller) recipient = caller + 1;\n    const time = `2021-08-${two(1 + Math.floor(rand() * (small ? 3 : 28)))} ${two(pick(hours))}:${two(Math.floor(rand() * 60))}:${two(Math.floor(rand() * 60))}`;\n    const key = `${caller}|${recipient}|${time}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Calls.push([caller, recipient, time, pick(cities)]);\n  }\n  return [{ Calls }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Calls":[[8,4,"2021-08-24 22:46:07","Houston"],[4,8,"2021-08-24 22:57:13","Houston"],[5,1,"2021-08-11 21:28:44","Houston"],[8,3,"2021-08-17 22:04:15","Houston"],[11,3,"2021-08-17 13:07:00","New York"],[8,11,"2021-08-17 14:22:22","New York"]]}],"expected":{"columns":["city","peak_calling_hour","number_of_calls"],"rows":[["Houston",22,3],["New York",14,1],["New York",13,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Calls":[]}]},
+    {"name":"Test 2","input":[{"Calls":[[1,2,"2021-08-01 09:15:00","Boston"]]}]},
+    {"name":"Test 3","input":[{"Calls":[[1,2,"2021-08-01 13:00:00","Miami"],[2,3,"2021-08-01 22:10:00","Miami"],[3,4,"2021-08-02 09:30:00","Miami"]]}]},
+    {"name":"Test 4","input":[{"Calls":[[1,2,"2021-08-01 18:00:00","Austin"],[2,1,"2021-08-01 18:30:00","Boston"],[3,4,"2021-08-01 18:45:00","Chicago"],[4,3,"2021-08-01 18:50:00","Austin"]]}]},
+    {"name":"Test 5","input":[{"Calls":[[1,2,"2021-08-01 10:05:00","Denver"],[1,2,"2021-08-02 10:05:00","Denver"],[1,2,"2021-08-03 10:55:00","Denver"],[3,4,"2021-08-01 11:00:00","Denver"],[3,5,"2021-08-01 11:20:00","Denver"]]}]},
+    {"name":"Test 6","input":[{"Calls":[[1,2,"2021-08-01 00:00:00","Seattle"],[2,3,"2021-08-01 00:59:59","Seattle"],[3,4,"2021-08-01 23:59:59","Seattle"],[4,5,"2021-08-02 23:00:00","Seattle"],[5,6,"2021-08-02 12:00:00","Seattle"]]}]},
+    {"name":"Test 7","input":[{"Calls":[[1,2,"2021-08-01 08:59:59","Dallas"],[2,3,"2021-08-01 09:00:00","Dallas"],[3,4,"2021-08-01 09:00:01","Dallas"]]}]},
+    {"name":"Test 8","input":[{"Calls":[[1,2,"2021-08-01 07:10:00","Houston"],[2,3,"2021-08-01 07:20:00","Houston"],[3,4,"2021-08-01 23:00:00","Houston"],[4,5,"2021-08-01 20:00:00","Phoenix"],[5,6,"2021-08-01 05:00:00","Austin"],[6,7,"2021-08-01 05:40:00","Austin"],[7,8,"2021-08-01 06:00:00","Austin"]]}]},
+    {"name":"Test 9","input":[{"Calls":[[8,4,"2021-08-24 22:46:07","Houston"],[4,8,"2021-08-24 21:57:13","Houston"],[5,1,"2021-08-11 21:28:44","Houston"],[8,3,"2021-08-17 22:04:15","Houston"],[11,3,"2021-08-17 13:07:00","New York"],[8,11,"2021-08-17 13:22:22","New York"],[2,9,"2021-08-17 15:00:00","New York"]]}]},
+    {"name":"Test 10","input":[{"Calls":[[1,2,"2021-08-01 16:00:00","Boston"],[1,2,"2021-08-01 16:30:00","Boston"],[2,1,"2021-08-01 16:45:00","Boston"],[1,3,"2021-08-01 02:00:00","Miami"],[1,4,"2021-08-01 02:30:00","Miami"],[9,9,"2021-08-01 16:15:00","Miami"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a \"top per group, keep ties\" problem in two layers. First collapse the raw calls into one row per `(city, hour)` with its count. Then, inside each city, rank those rows by count; every row ranked 1 is a peak hour. `RANK()` gives tied rows the same rank, which is exactly the \"report every tied hour\" rule.\n\n## Approach\n\n1. CTE `hourly`: group `Calls` by `city` and `HOUR(call_time)`, counting rows as `number_of_calls`. The hour ignores the date, so 22:04 on the 17th and 22:46 on the 24th share a bucket.\n2. CTE `ranked`: `RANK() OVER (PARTITION BY city ORDER BY number_of_calls DESC)` numbers each city's hours from busiest down.\n3. Keep `hour_rank = 1` and sort by `peak_calling_hour DESC, city DESC`.\n\n## Example 1, step by step\n\n- `hourly`: Houston 22 → 3 calls (22:46, 22:57, 22:04), Houston 21 → 1; New York 13 → 1, New York 14 → 1.\n- `ranked`: Houston 22 gets rank 1, Houston 21 rank 2; both New York hours tie at 1 call and both get rank 1.\n- Filter and sort: `(Houston, 22, 3)`, `(New York, 14, 1)`, `(New York, 13, 1)`.\n\n## Complexity\n\n- Time: O(n) to bucket n calls, plus O(b log b) to rank and sort the b city-hour buckets (b ≤ 24 × cities).\n- Space: O(b) for the buckets.\n\n## Pitfalls\n\n- `ROW_NUMBER()` instead of `RANK()` keeps only one of several tied peak hours.\n- Bucketing by date and hour (`DATE_FORMAT(call_time, '%Y-%m-%d %H')`) splits calls of the same hour on different days.\n- Taking one global maximum instead of one per city drops cities whose peak is smaller than another city's.\n- Sorting by `city` first, or ascending, gives the right rows in the wrong order; the hour is the primary key, descending.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `hourly` | one row per city and hour of day, with its call count |\n| `peak_calling_hour` | `HOUR(call_time)`, 0 to 23 |\n| `number_of_calls` | calls in that city during that hour |\n| `ranked` | `hourly` plus each hour's rank inside its city |\n| `hour_rank` | 1 for the busiest hour or hours of the city |",
+  "narration": {
+    "1": "The CTE hourly turns raw calls into one row per city and hour of day.",
+    "2": "HOUR extracts 0 to 23 from the datetime, and COUNT(*) counts the calls in each bucket.",
+    "4": "Group by city and hour only, so calls on different dates in the same hour add up.",
+    "6": "The CTE ranked orders each city's hours by how busy they are.",
+    "8": "RANK restarts for every city and gives tied hours the same rank.",
+    "13": "Rank 1 marks the peak hour, or every tied peak hour, of each city.",
+    "14": "Sort by hour from latest to earliest, then by city in reverse alphabetical order."
+  }
+}

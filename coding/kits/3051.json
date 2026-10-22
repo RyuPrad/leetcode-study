@@ -1,0 +1,50 @@
+{
+  "number": 3051,
+  "title": "Find Candidates for Data Scientist Position",
+  "spec": "recalled",
+  "statement": "One table lists the skills of job candidates:\n\n- `Candidates(candidate_id, skill)`: one row per skill a candidate has; the pair `(candidate_id, skill)` is unique, so a candidate never lists the same skill twice.\n\nA candidate fits the Data Scientist position only if they have **all three** of the skills `Python`, `Tableau` and `PostgreSQL`. Other skills they list neither help nor hurt.\n\nReport one row per fitting candidate with the single column `candidate_id`, sorted by `candidate_id` in ascending order. If nobody fits, the result is empty.",
+  "constraints": [
+    "(candidate_id, skill) is unique in Candidates",
+    "candidate_id and skill are never null",
+    "The required skills are exactly Python, Tableau and PostgreSQL"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Candidates": [["candidate_id","INT"],["skill","VARCHAR(30)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Candidates = [] }] = input;\n  const seen = new Set();\n  for (const [id, skill] of Candidates) {\n    if (id === null || skill === null) return 'candidate_id and skill are required.';\n    const key = `${id}|${String(skill).toLowerCase()}`;\n    if (seen.has(key)) return `Candidate ${id} lists ${skill} twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT candidate_id\nFROM Candidates\nWHERE skill IN ('Python', 'Tableau', 'PostgreSQL')\nGROUP BY candidate_id\nHAVING COUNT(DISTINCT skill) = 3\nORDER BY candidate_id;",
+  "brute": "SELECT DISTINCT c.candidate_id\nFROM Candidates AS c\nWHERE EXISTS (SELECT 1 FROM Candidates AS p WHERE p.candidate_id = c.candidate_id AND p.skill = 'Python')\n  AND EXISTS (SELECT 1 FROM Candidates AS t WHERE t.candidate_id = c.candidate_id AND t.skill = 'Tableau')\n  AND EXISTS (SELECT 1 FROM Candidates AS g WHERE g.candidate_id = c.candidate_id AND g.skill = 'PostgreSQL')\nORDER BY c.candidate_id",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const required = ['Python', 'Tableau', 'PostgreSQL'];\n  const others = ['R', 'Java', 'PowerBI', 'SQL Server', 'DataAnalysis', 'Excel'];\n  const Candidates = [];\n  if (size === 'small') {\n    // A handful of candidates, each holding a random mix that is often one required skill short.\n    const ids = [102, 123, 147, 234, 256];\n    let budget = pick(9);\n    for (const id of ids) {\n      const skills = required.filter(() => rand() < 0.75).concat(others.filter(() => rand() < 0.15));\n      for (const skill of skills) {\n        if (budget === 0) break;\n        Candidates.push([id, skill]);\n        budget--;\n      }\n    }\n    // Shuffle so the input is not already sorted by candidate.\n    for (let i = Candidates.length - 1; i > 0; i--) { const j = pick(i + 1); [Candidates[i], Candidates[j]] = [Candidates[j], Candidates[i]]; }\n  } else {\n    // About 450 candidates with ids out of order; roughly 40% hold all three required skills.\n    for (let k = 0; k < 450; k++) {\n      const id = 1000 + ((k * 7919) % 4500);\n      for (const skill of required) if (rand() < 0.75) Candidates.push([id, skill]);\n      for (const skill of others) if (rand() < 0.2) Candidates.push([id, skill]);\n    }\n  }\n  return [{ Candidates }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Candidates":[[123,"Python"],[234,"R"],[123,"Tableau"],[123,"PostgreSQL"],[234,"PowerBI"],[234,"SQL Server"],[147,"Python"],[147,"Tableau"],[147,"Java"],[147,"PostgreSQL"],[256,"Tableau"],[102,"DataAnalysis"]]}],"expected":{"columns":["candidate_id"],"rows":[[123],[147]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Candidates":[]}]},
+    {"name":"Test 2","input":[{"Candidates":[[5,"PostgreSQL"],[5,"Python"],[5,"Tableau"]]}]},
+    {"name":"Test 3","input":[{"Candidates":[[8,"Python"],[8,"Tableau"],[8,"R"]]}]},
+    {"name":"Test 4","input":[{"Candidates":[[1,"Python"],[1,"Tableau"],[2,"PostgreSQL"],[3,"Tableau"]]}]},
+    {"name":"Test 5","input":[{"Candidates":[[30,"Python"],[10,"Tableau"],[20,"PostgreSQL"],[30,"Tableau"],[10,"PostgreSQL"],[20,"Python"],[30,"PostgreSQL"],[10,"Python"],[20,"Tableau"]]}]},
+    {"name":"Test 6","input":[{"Candidates":[[4,"Python"],[4,"Tableau"],[4,"Java"],[9,"Python"],[9,"Tableau"],[9,"PostgreSQL"],[9,"Java"],[9,"R"]]}]},
+    {"name":"Test 7","input":[{"Candidates":[[7,"Python"],[7,"Tableau"],[7,"Postgres"],[6,"Python"],[6,"Tableau"],[6,"PostgreSQL"]]}]},
+    {"name":"Test 8","input":[{"Candidates":[[300,"Excel"],[300,"R"],[300,"Java"],[200,"Python"],[200,"PostgreSQL"],[200,"Tableau"],[200,"Excel"],[100,"Tableau"],[100,"PowerBI"]]}]},
+    {"name":"Test 9","input":[{"Candidates":[[11,"Python"],[12,"Python"],[13,"Python"],[11,"Tableau"],[12,"Tableau"],[11,"PostgreSQL"],[13,"PostgreSQL"],[14,"Tableau"],[14,"PostgreSQL"],[14,"Python"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Has all three skills\" is a property of a whole candidate, not of a single row, so the rows must be grouped by candidate. If we first throw away every row whose skill is not one of the three required ones, a candidate qualifies exactly when three distinct skills survive in their group.\n\n## Approach\n\n1. Read `Candidates`.\n2. `WHERE skill IN (...)` keeps only rows for Python, Tableau or PostgreSQL; extra skills such as Java are dropped before grouping.\n3. `GROUP BY candidate_id` gathers each candidate's remaining rows.\n4. `HAVING COUNT(DISTINCT skill) = 3` keeps the groups that still contain all three skills.\n5. `ORDER BY candidate_id` sorts the result ascending.\n\n## Example 1, step by step\n\nAfter the `WHERE` filter the surviving rows are:\n\n- 123: Python, Tableau, PostgreSQL (3 skills)\n- 147: Python, Tableau, PostgreSQL (Java was dropped; 3 skills)\n- 256: Tableau (1 skill)\n\nCandidates 234 (R, PowerBI, SQL Server) and 102 (DataAnalysis) have no rows left at all. Only 123 and 147 reach a count of 3, so the result is 123 then 147.\n\n## Complexity\n\n- Time: O(R) to filter and group the R rows of `Candidates` with hashing (O(R log R) if the database sorts to group), plus sorting the qualifying ids.\n- Space: O(C) for one group per candidate C.\n\n## Pitfalls\n\n- `HAVING COUNT(*) = 3` without the `WHERE` filter accepts a candidate with any three skills, such as Python, Tableau and Java.\n- `WHERE skill = 'Python' AND skill = 'Tableau' ...` on a single row can never be true: one row holds one skill, so the condition has to be checked across the group.\n- Forgetting `ORDER BY candidate_id`: grouping does not guarantee any output order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `WHERE skill IN (...)` | keeps only rows for the three required skills |\n| `GROUP BY candidate_id` | one group per candidate |\n| `COUNT(DISTINCT skill)` | how many of the three required skills the candidate has |\n| `HAVING ... = 3` | keeps candidates who have all of them |",
+  "narration": {
+    "1": "The only output column is the id of each qualifying candidate.",
+    "3": "Drop every row whose skill is not one of the three required ones, so extra skills cannot count.",
+    "4": "Group the remaining rows by candidate, since the test is about all of a candidate's rows together.",
+    "5": "A candidate qualifies when all three distinct required skills are still present in their group.",
+    "6": "Sort the qualifying ids in ascending order, as the problem requires."
+  }
+}
