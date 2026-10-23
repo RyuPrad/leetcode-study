@@ -1,0 +1,71 @@
+{
+  "number": 2440,
+  "title": "Create Components With Same Value",
+  "spec": "leetcode",
+  "statement": "An undirected tree has `n` nodes numbered `0` to `n - 1`. Node `i` carries the value `nums[i]`, and each pair `edges[j] = [a, b]` is an edge joining nodes `a` and `b` (there are `n - 1` of them).\n\nYou may remove any set of edges, which breaks the tree into connected pieces. A piece's value is the sum of `nums` over its nodes. Return the largest number of edges you can remove so that all resulting pieces have equal value. Removing no edges is always allowed, so the answer is at least 0.",
+  "constraints": [
+    "1 <= n <= 2 * 10^4",
+    "nums.length == n",
+    "1 <= nums[i] <= 50",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "0 <= edges[i][0], edges[i][1] <= n - 1",
+    "edges forms a valid tree"
+  ],
+  "signature": "int componentValue(int[] nums, int[][] edges)",
+  "entry": "componentValue",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "edges"
+  ],
+  "validator": "function validate([nums, edges]) {\n  const n = Array.isArray(nums) ? nums.length : 0;\n  if (n < 1 || n > 20000) return 'nums needs 1 to 2 * 10^4 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 50)) return 'Each value is an integer from 1 to 50.';\n  if (!Array.isArray(edges) || edges.length !== n - 1) return 'A tree on n nodes has exactly n - 1 edges.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2 || edge.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each edge is a pair of node numbers from 0 to n - 1.';\n    const a = find(edge[0]), b = find(edge[1]);\n    if (a === b) return 'The edges must form a tree (no cycles or repeated edges).';\n    root[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function componentValue(nums, edges) {\n  const n = nums.length;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) {\n    graph[a].push(b);\n    graph[b].push(a);\n  }\n\n  const order = [];\n  const parent = new Array(n).fill(-1);\n  const visited = new Array(n).fill(false);\n  const stack = [0];\n  visited[0] = true;\n  while (stack.length > 0) {\n    const node = stack.pop();\n    order.push(node);\n    for (const next of graph[node]) {\n      if (!visited[next]) {\n        visited[next] = true;\n        parent[next] = node;\n        stack.push(next);\n      }\n    }\n  }\n\n  const total = nums.reduce((sum, value) => sum + value, 0);\n  for (let parts = n; parts > 1; parts--) {\n    if (total % parts !== 0) {\n      continue;\n    }\n    const target = total / parts;\n    const subtree = nums.slice();\n    let ok = true;\n    for (let i = n - 1; i > 0 && ok; i--) {\n      const node = order[i];\n      if (subtree[node] > target) {\n        ok = false;\n      } else if (subtree[node] < target) {\n        subtree[parent[node]] += subtree[node];\n      }\n    }\n    if (ok && subtree[0] === target) {\n      return parts - 1;\n    }\n  }\n  return 0;\n}",
+  "brute": "function componentValue(nums, edges) {\n  const n = nums.length, m = edges.length;\n  let best = 0;\n  for (let mask = 0; mask < (1 << m); mask++) {\n    // Keep the edges whose bit is 0, then label the pieces with a small union-find.\n    const root = Array.from({ length: n }, (_, i) => i);\n    const find = x => (root[x] === x ? x : (root[x] = find(root[x])));\n    let removed = 0;\n    for (let j = 0; j < m; j++) {\n      if (mask & (1 << j)) removed++;\n      else root[find(edges[j][0])] = find(edges[j][1]);\n    }\n    if (removed <= best) continue;\n    const sums = new Map();\n    for (let i = 0; i < n; i++) sums.set(find(i), (sums.get(find(i)) || 0) + nums[i]);\n    if (new Set(sums.values()).size === 1) best = removed;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = limit => Math.floor(rand() * limit);\n  const n = size === 'large' ? 2000 : 1 + pick(10);\n  const nums = new Array(n);\n  const pairs = [];\n  if (rand() < 0.4) {\n    // Plain random tree with random values.\n    const top = size === 'large' ? 50 : 1 + pick(4);\n    for (let i = 0; i < n; i++) nums[i] = 1 + pick(top);\n    for (let i = 1; i < n; i++) pairs.push([pick(i), i]);\n  } else {\n    // Build pieces with one shared sum, grow each into a tree, then join the pieces with extra edges.\n    const pieces = 1 + pick(size === 'large' ? 120 : n);\n    let members = Array.from({ length: pieces }, () => []);\n    for (let i = 0; i < n; i++) members[i < pieces ? i : pick(pieces)].push(i);\n    if (Math.max(...members.map(list => list.length)) > 50 * Math.min(...members.map(list => list.length))) {\n      // Sizes too uneven for one shared sum with values 1..50: deal the nodes out evenly instead.\n      members = Array.from({ length: pieces }, () => []);\n      for (let i = 0; i < n; i++) members[i % pieces].push(i);\n    }\n    const biggest = Math.max(...members.map(list => list.length));\n    const smallest = Math.min(...members.map(list => list.length));\n    // A piece of s nodes can sum to anything from s to 50 * s.\n    const target = biggest + pick(50 * smallest - biggest + 1);\n    for (const list of members) {\n      // Spread target over the piece's nodes, each value in 1..50.\n      let left = target;\n      for (let j = 0; j < list.length; j++) {\n        const rest = list.length - j - 1;\n        const low = Math.max(1, left - 50 * rest), high = Math.min(50, left - rest);\n        const value = j === list.length - 1 ? left : low + pick(high - low + 1);\n        nums[list[j]] = value;\n        left -= value;\n      }\n      for (let j = 1; j < list.length; j++) pairs.push([list[pick(j)], list[j]]);\n    }\n    for (let p = 1; p < pieces; p++) {\n      const from = members[pick(p)], to = members[p];\n      pairs.push([from[pick(from.length)], to[pick(to.length)]]);\n    }\n  }\n  // Relabel nodes and shuffle edge order and direction.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [label[i], label[j]] = [label[j], label[i]]; }\n  const values = new Array(n);\n  for (let i = 0; i < n; i++) values[label[i]] = nums[i];\n  const edges = pairs.map(([a, b]) => (rand() < 0.5 ? [label[a], label[b]] : [label[b], label[a]]));\n  for (let i = edges.length - 1; i > 0; i--) { const j = pick(i + 1); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  return [values, edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[6,2,2,2,6],[[0,1],[1,2],[1,3],[3,4]]],"expected":2},
+    {"name":"Example 2","input":[[2],[]],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],[]]},
+    {"name":"Test 2","input":[[5,5],[[0,1]]]},
+    {"name":"Test 3","input":[[3,4],[[1,0]]]},
+    {"name":"Test 4","input":[[1,1,1,1,1],[[0,1],[1,2],[2,3],[3,4]]]},
+    {"name":"Test 5","input":[[2,2,2,2,2,2],[[0,1],[0,2],[0,3],[0,4],[0,5]]]},
+    {"name":"Test 6","input":[[4,1,1,1,1,1,1,1,1],[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8]]]},
+    {"name":"Test 7","input":[[1,2,3,3,2,1],[[0,1],[1,2],[2,3],[3,4],[4,5]]]},
+    {"name":"Test 8","input":[[1,2,1,2,1,2,1,2],[[0,1],[1,2],[2,3],[1,4],[4,5],[0,6],[6,7]]]},
+    {"name":"Test 9","input":[[50,50,50,50,50,50,50,50,50,50],[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9]]]},
+    {"name":"Test 10","input":[[2,1,1,3,1,2],[[3,0],[1,3],[2,1],[5,3],[4,5]]]},
+    {"name":"Test 11","input":[[3,3,3,3,3,3,6],[[6,0],[6,1],[1,2],[6,3],[3,4],[4,5]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIf the tree ends up in `parts` pieces, every piece has value `total / parts`, so `parts` must divide the total. Trying every subset of edges is exponential, but once a piece value `target` is fixed the cuts are forced: walk the tree from the leaves up, and as soon as a subtree's remaining sum reaches exactly `target`, cut it off. If any remaining subtree sum goes above `target`, that value is impossible, because every value is positive and nothing can shrink it. Try piece counts from the largest down; the first one that works gives the most cuts.\n\n## Approach\n\n1. Build an adjacency list `graph` from `edges`.\n2. Run an iterative DFS from node 0, recording the visit `order` and each node's `parent`. In `order` every parent comes before its children.\n3. Compute `total`. For `parts` from `n` down to 2, skip it unless it divides `total`; otherwise set `target = total / parts`.\n4. Copy `nums` into `subtree` and walk `order` backwards (children first). A node whose remaining sum equals `target` is cut off; a smaller sum is added to its parent; a larger sum means this `target` fails.\n5. If nothing failed and the root's remaining sum is exactly `target`, return `parts - 1` edges. If no count works, return 0.\n\n## Example 1, step by step\n\n`nums = [6, 2, 2, 2, 6]`, `total = 18`. `parts = 5` and `4` do not divide 18. `parts = 3` gives `target = 6`: the DFS order is `0, 1, 3, 4, 2`. Backwards: node 2 has 2, add to node 1 (now 4). Node 4 has 6, cut. Node 3 has 2, add to node 1 (now 6). Node 1 has 6, cut. The root keeps 6, which equals `target`, so the answer is `3 - 1 = 2`.\n\n## Complexity\n\n- Time: O(n · d), where `d` is the number of divisors of `total` (at most a few hundred for totals up to 10^6); each check is one pass.\n- Space: O(n) for the graph, the DFS order and the subtree sums.\n\n## Pitfalls\n\n- Count from the largest `parts` down, so the first success is the maximum.\n- A subtree that hits `target` must pass 0 (not `target`) upward, because it has been cut off.\n- Check the root at the end: its remaining sum must equal `target`, not just stay below it.\n- A recursive DFS can overflow the stack on a long path of 2 * 10^4 nodes; an explicit stack avoids it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of the tree |\n| `order` | nodes in DFS visit order (parents before children) |\n| `parent` | each node's parent in the DFS from node 0 |\n| `total` | sum of all values |\n| `parts` | the number of pieces being tried |\n| `target` | the value every piece must have |\n| `subtree` | the not-yet-cut sum below and including each node |\n| `ok` | whether the current `target` is still possible |",
+  "narration": {
+    "3": "Build an adjacency list so each node knows its neighbours.",
+    "9": "order will list the nodes so that every parent comes before its children.",
+    "12": "Start an iterative DFS from node 0; an explicit stack avoids deep recursion.",
+    "18": "An unvisited neighbour is a child of the current node...",
+    "20": "...so remember who its parent is.",
+    "26": "Sum every value; each piece must hold the same share of it.",
+    "27": "Try the largest number of pieces first so the first success is the best.",
+    "28": "The pieces can only be equal when parts divides the total.",
+    "31": "Every piece must sum to exactly this target.",
+    "34": "Walk the DFS order backwards so each child is finished before its parent.",
+    "36": "A remaining sum above target can never shrink, so this target is impossible.",
+    "38": "Below target, the subtree must stay attached; exactly target means it is cut off and passes nothing up.",
+    "39": "Hand the attached subtree's sum to its parent.",
+    "42": "Everything below was split cleanly; the root's own piece must also hit target.",
+    "43": "parts pieces need parts - 1 removed edges.",
+    "46": "No split works, so no edge can be removed."
+  }
+}

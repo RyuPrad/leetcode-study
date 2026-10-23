@@ -1,0 +1,73 @@
+{
+  "number": 2307,
+  "title": "Check for Contradictions in Equations",
+  "spec": "recalled",
+  "statement": "Every variable is named by a string and stands for an unknown positive real number. The pair `equations[i] = [Ai, Bi]` together with `values[i]` states that `Ai` divided by `Bi` equals `values[i]`.\n\nReturn `true` if the equations contradict each other, meaning no choice of values for the variables satisfies all of them at once, and `false` if they are consistent. Treat two real numbers as equal when their absolute difference is below `10^-5`; the inputs never depend on more precision than a `double` gives.",
+  "constraints": [
+    "1 <= equations.length <= 100",
+    "equations[i].length == 2",
+    "1 <= Ai.length, Bi.length <= 5",
+    "Ai and Bi contain only lowercase English letters",
+    "values.length == equations.length",
+    "0.0 < values[i] <= 10.0",
+    "values[i] has at most 2 decimal places"
+  ],
+  "signature": "boolean checkContradictions(List<List<String>> equations, double[] values)",
+  "entry": "checkContradictions",
+  "kind": "function",
+  "parameters": [
+    "equations",
+    "values"
+  ],
+  "validator": "function validate([equations, values]) {\n  if (!Array.isArray(equations) || equations.length < 1 || equations.length > 100) return 'equations needs 1 to 100 entries.';\n  if (!Array.isArray(values) || values.length !== equations.length) return 'values must have one number per equation.';\n  for (const pair of equations) {\n    if (!Array.isArray(pair) || pair.length !== 2) return 'Each equation is a pair of variable names.';\n    if (pair.some(name => typeof name !== 'string' || !/^[a-z]{1,5}$/.test(name))) return 'Variable names are 1 to 5 lowercase letters.';\n  }\n  for (const v of values) {\n    if (typeof v !== 'number' || !(v > 0) || v > 10) return 'Each value is above 0 and at most 10.';\n    if (Math.abs(v * 100 - Math.round(v * 100)) > 1e-6) return 'Values have at most 2 decimal places.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function checkContradictions(equations, values) {\n  const parent = new Map();\n  const weight = new Map();\n\n  const find = (node) => {\n    if (!parent.has(node)) {\n      parent.set(node, node);\n      weight.set(node, 1);\n    }\n    const above = parent.get(node);\n    if (above === node) {\n      return node;\n    }\n    const root = find(above);\n    weight.set(node, weight.get(node) * weight.get(above));\n    parent.set(node, root);\n    return root;\n  };\n\n  for (let i = 0; i < equations.length; i++) {\n    const [a, b] = equations[i];\n    const rootA = find(a);\n    const rootB = find(b);\n    if (rootA === rootB) {\n      const implied = weight.get(a) / weight.get(b);\n      if (Math.abs(implied - values[i]) >= 1e-5) {\n        return true;\n      }\n    } else {\n      parent.set(rootA, rootB);\n      weight.set(rootA, values[i] * weight.get(b) / weight.get(a));\n    }\n  }\n  return false;\n}",
+  "brute": "function checkContradictions(equations, values) {\n  // Give each component's first variable the value 1, spread values by DFS, then test every equation.\n  const graph = Object.create(null);\n  equations.forEach(([a, b], i) => {\n    (graph[a] ??= []).push([b, 1 / values[i]]);\n    (graph[b] ??= []).push([a, values[i]]);\n  });\n  const value = Object.create(null);\n  for (const start of Object.keys(graph)) {\n    if (start in value) continue;\n    value[start] = 1;\n    const stack = [start];\n    while (stack.length) {\n      const node = stack.pop();\n      for (const [next, factor] of graph[node]) {\n        if (next in value) continue;\n        value[next] = value[node] * factor;\n        stack.push(next);\n      }\n    }\n  }\n  return equations.some(([a, b], i) => Math.abs(value[a] / value[b] - values[i]) >= 1e-5);\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (k) => Math.floor(rand() * k);\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  const count = large ? 30 + pick(40) : 2 + pick(4);\n  const names = new Set();\n  while (names.size < count) {\n    const length = large ? 1 + pick(5) : 1 + pick(2);\n    let name = '';\n    for (let j = 0; j < length; j++) name += letters[pick(large ? 26 : 4)];\n    names.add(name);\n  }\n  const vars = [...names];\n  // Hidden values from {1, 2, 4, 5, 10}: every ratio lies in [0.1, 10] with at most 2 decimals.\n  const scale = [1, 2, 4, 5, 10];\n  const hidden = vars.map(() => scale[pick(scale.length)]);\n  const m = large ? 100 : 1 + pick(7);\n  const equations = [];\n  const values = [];\n  for (let i = 0; i < m; i++) {\n    const x = pick(vars.length);\n    const y = rand() < 0.05 ? x : pick(vars.length);\n    equations.push([vars[x], vars[y]]);\n    values.push(Math.round(hidden[x] / hidden[y] * 100) / 100);\n  }\n  // At most one equation is altered, so any contradiction is far larger than 10^-5.\n  if (rand() < 0.6) {\n    const i = pick(m);\n    let changed;\n    do changed = (1 + pick(1000)) / 100; while (changed === values[i]);\n    values[i] = changed;\n  }\n  return [equations, values];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[["a","b"],["b","c"],["a","c"]],[3,0.5,1.5]],"expected":false},
+    {"name":"Example 2","input":[[["le","et"],["le","code"],["code","et"]],[2,5,0.5]],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[["a","b"]],[2]]},
+    {"name":"Test 2","input":[[["a","a"]],[2]]},
+    {"name":"Test 3","input":[[["a","b"],["b","a"]],[2,0.5]]},
+    {"name":"Test 4","input":[[["a","b"],["b","a"]],[2,2]]},
+    {"name":"Test 5","input":[[["x","y"],["x","y"]],[3,3.01]]},
+    {"name":"Test 6","input":[[["x","y"],["y","z"],["x","z"]],[0.25,0.4,0.1]]},
+    {"name":"Test 7","input":[[["a","b"],["c","d"],["e","f"]],[1.5,2.5,10]]},
+    {"name":"Test 8","input":[[["p","q"],["q","r"],["r","s"],["s","t"],["t","p"]],[2,0.5,4,0.25,1.01]]},
+    {"name":"Test 9","input":[[["abcde","fghij"],["fghij","klmno"],["abcde","klmno"],["pq","rs"],["rs","pq"]],[2.5,4,10,5,0.25]]},
+    {"name":"Test 10","input":[[["m","n"],["n","o"],["o","p"],["m","p"]],[10,10,10,10]]},
+    {"name":"Test 11","input":[[["a","b"],["c","d"],["b","c"],["d","a"]],[0.01,0.01,0.01,0.01]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRead every equation `A / B = v` as a weighted edge between two variables. Inside one connected group, fixing a single variable fixes all the others, so a contradiction appears exactly when an equation joins two variables that are already linked and the ratio it states differs from the ratio the earlier equations imply. A brute force would assign values by DFS and recheck every equation; a **weighted union-find** does the same check incrementally.\n\n## Approach\n\n1. Keep `parent` and `weight` maps, where `weight[x]` is the ratio `x / parent[x]`. A new variable is its own root with weight 1.\n2. `find` climbs to the root and, while compressing the path, multiplies weights so that `weight[x]` becomes `x / root`.\n3. For each equation `[a, b]` with value `values[i]`, find both roots.\n4. Same root: the implied ratio is `weight[a] / weight[b]`. If it differs from `values[i]` by `1e-5` or more, return `true`.\n5. Different roots: hang `rootA` under `rootB` with weight `values[i] * weight[b] / weight[a]`, which is exactly `rootA / rootB`.\n6. If no equation clashes, return `false`.\n\n## Example 1, step by step\n\n- `a / b = 3`: separate roots, so `a` hangs under `b` with weight 3.\n- `b / c = 0.5`: `b` hangs under `c` with weight 0.5.\n- `a / c = 1.5`: `find(a)` compresses `a` straight onto `c` with weight `3 * 0.5 = 1.5`. Both roots are `c`, the implied ratio is `1.5 / 1 = 1.5`, which matches, so the answer is `false`.\n\n## Complexity\n\n- Time: O(m · α(m)) for `m` equations, nearly linear thanks to path compression.\n- Space: O(m) for the two maps.\n\n## Pitfalls\n\n- Update `weight[node]` using the parent's weight **before** relinking the node to the root.\n- The new root weight is `values[i] * weight[b] / weight[a]`, not just `values[i]`: `a` and `b` are rarely roots themselves.\n- Compare with a tolerance; exact `===` fails on ratios like `0.25 * 0.4`.\n- An equation like `a / a = 2` is a contradiction too: both sides share a root and imply 1.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | each variable's parent in the union-find forest |\n| `weight` | ratio of a variable to its parent (to its root after `find`) |\n| `above` | the parent being followed inside `find` |\n| `rootA`, `rootB` | roots of the two sides of the equation |\n| `implied` | ratio `a / b` forced by earlier equations |",
+  "narration": {
+    "2": "parent links every variable to another variable in its group, forming a forest.",
+    "3": "weight stores each variable divided by its parent.",
+    "6": "A variable seen for the first time becomes its own root...",
+    "8": "...with weight 1, since it equals itself.",
+    "11": "A root is its own parent; stop climbing here.",
+    "14": "Find the root of the parent first, which also compresses that part of the path.",
+    "15": "Now the parent's weight is relative to the root, so multiply to get node / root.",
+    "16": "Link the node straight to the root for faster future lookups.",
+    "20": "Process the equations one by one.",
+    "22": "Find the group of the numerator...",
+    "23": "...and the group of the denominator.",
+    "24": "Both variables are already linked by earlier equations.",
+    "25": "Their ratio is forced: (a / root) divided by (b / root).",
+    "26": "If the stated value disagrees beyond the tolerance, the system is contradictory.",
+    "27": "Report the contradiction immediately.",
+    "30": "Otherwise merge the two groups by hanging rootA under rootB.",
+    "31": "Choose rootA / rootB so that a / b equals the stated value.",
+    "34": "Every equation agreed with the earlier ones, so there is no contradiction."
+  }
+}

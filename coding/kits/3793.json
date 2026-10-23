@@ -1,0 +1,51 @@
+{
+  "number": 3793,
+  "title": "Find Users with High Token Usage",
+  "spec": "leetcode",
+  "statement": "One table logs prompts sent to an AI assistant:\n\n- `prompts(user_id, prompt, tokens)`: one row per prompt a user submitted; `(user_id, prompt)` is unique and `tokens` (a positive integer) is how many tokens the prompt used.\n\nReport a user when both of these hold:\n\n- they submitted at least 3 prompts;\n- at least one of their prompts used **more** tokens than the user's average (the exact, unrounded average of their `tokens`).\n\nFor each such user return `user_id`, `prompt_count` (their number of prompts) and `avg_tokens` (their average tokens per prompt, rounded to 2 decimals). Sort by `avg_tokens` (the rounded value) descending, then by `user_id` ascending.",
+  "constraints": [
+    "(user_id, prompt) is unique in prompts",
+    "tokens is a positive integer",
+    "A user whose prompts all use the same number of tokens has no prompt above the average"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "prompts": [["user_id","INT"],["prompt","VARCHAR(255)"],["tokens","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ prompts = [] }] = input;\n  const seen = new Set();\n  for (const [user, prompt, tokens] of prompts) {\n    if (user === null || prompt === null || tokens === null) return 'No column may be null.';\n    const key = `${user}|${String(prompt).toLowerCase()}`;\n    if (seen.has(key)) return `User ${user} submits \"${prompt}\" twice.`;\n    seen.add(key);\n    if (!(Number.isInteger(tokens) && tokens >= 1)) return `tokens ${tokens} must be a positive integer.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT user_id,\n       COUNT(*) AS prompt_count,\n       ROUND(AVG(tokens), 2) AS avg_tokens\nFROM prompts\nGROUP BY user_id\nHAVING COUNT(*) >= 3\n   AND MAX(tokens) > AVG(tokens)\nORDER BY avg_tokens DESC, user_id;",
+  "brute": "SELECT u.user_id,\n       u.prompt_count,\n       ROUND(u.total_tokens / u.prompt_count, 2) AS avg_tokens\nFROM (\n  SELECT user_id, COUNT(*) AS prompt_count, SUM(tokens) AS total_tokens\n  FROM prompts\n  GROUP BY user_id\n) AS u\nWHERE u.prompt_count >= 3\n  AND EXISTS (\n    SELECT 1\n    FROM prompts AS p\n    WHERE p.user_id = u.user_id\n      AND p.tokens * u.prompt_count > u.total_tokens\n  )\nORDER BY avg_tokens DESC, u.user_id ASC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const topics = ['Write a blog outline', 'Generate SQL query', 'Summarize an article', 'Create resume bullet', 'Explain neural networks', 'Write cover letter', 'Optimize Python code', 'Translate an email'];\n  const levels = small ? [60, 80, 100, 100, 120, 200] : null;\n  const prompts = [];\n  let budget = small ? pick(9) : 2000;\n  for (let user = small ? 1 : 100; budget > 0; user++) {\n    // At most 30 prompts per user, so no average sits within rounding distance of a whole token count.\n    const count = Math.min(budget, small ? 1 + pick(5) : 1 + pick(30));\n    budget -= count;\n    // Some users always spend the same number of tokens, so no prompt beats their average.\n    const flat = rand() < 0.25;\n    const base = small ? levels[pick(levels.length)] : 10 + pick(990);\n    for (let i = 0; i < count; i++) {\n      const tokens = flat ? base : small ? levels[pick(levels.length)] : 10 + pick(990);\n      const name = i < topics.length ? topics[i] : `${topics[i % topics.length]} #${Math.floor(i / topics.length) + 1}`;\n      prompts.push([user, name, tokens]);\n    }\n  }\n  return [{ prompts }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"prompts":[[1,"Write a blog outline",120],[1,"Generate SQL query",80],[1,"Summarize an article",200],[2,"Create resume bullet",60],[2,"Improve LinkedIn bio",70],[3,"Explain neural networks",300],[3,"Generate interview Q&A",250],[3,"Write cover letter",180],[3,"Optimize Python code",220]]}],"expected":{"columns":["user_id","prompt_count","avg_tokens"],"rows":[[3,4,237.5],[1,3,133.33]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"prompts":[]}]},
+    {"name":"Test 2","input":[{"prompts":[[5,"Plan a trip",40],[5,"Draft an email",50],[5,"Fix a bug",90],[6,"Plan a trip",500],[6,"Draft an email",900]]}]},
+    {"name":"Test 3","input":[{"prompts":[[1,"Plan a trip",100],[1,"Draft an email",100],[1,"Fix a bug",100],[2,"Plan a trip",100],[2,"Draft an email",100],[2,"Fix a bug",100],[2,"Name a pet",101],[3,"Plan a trip",70],[3,"Draft an email",70],[3,"Fix a bug",70],[3,"Name a pet",70]]}]},
+    {"name":"Test 4","input":[{"prompts":[[9,"Plan a trip",100],[9,"Draft an email",200],[9,"Fix a bug",300],[4,"Plan a trip",150],[4,"Draft an email",250],[4,"Fix a bug",200],[6,"Plan a trip",100],[6,"Draft an email",300],[6,"Fix a bug",200],[6,"Name a pet",200],[7,"Plan a trip",210],[7,"Draft an email",190],[7,"Fix a bug",230]]}]},
+    {"name":"Test 5","input":[{"prompts":[[1,"Plan a trip",50],[1,"Draft an email",70],[1,"Fix a bug",80],[2,"Plan a trip",1],[2,"Draft an email",1],[2,"Fix a bug",2],[2,"Name a pet",1],[3,"Plan a trip",100],[3,"Draft an email",100],[3,"Fix a bug",101]]}]},
+    {"name":"Test 6","input":[{"prompts":[[1,"Plan a trip",30],[1,"Draft an email",20],[2,"Plan a trip",300],[3,"Plan a trip",45],[3,"Draft an email",46]]}]},
+    {"name":"Test 7","input":[{"prompts":[[8,"Plan a trip",10],[8,"Draft an email",10],[8,"Fix a bug",10],[8,"Name a pet",10],[8,"Write a poem",10],[8,"Sort a list",1000],[2,"Plan a trip",400],[2,"Draft an email",420],[2,"Fix a bug",380]]}]},
+    {"name":"Test 8","input":[{"prompts":[[1,"Write a blog outline",120],[1,"Generate SQL query",80],[1,"Summarize an article",200],[2,"Create resume bullet",60],[2,"Improve LinkedIn bio",70],[2,"Plan a trip",65],[3,"Explain neural networks",300],[3,"Generate interview Q&A",250],[3,"Write cover letter",180],[3,"Optimize Python code",220],[4,"Plan a trip",237],[4,"Draft an email",238],[4,"Fix a bug",237],[4,"Name a pet",238]]}]},
+    {"name":"Test 9","input":[{"prompts":[[11,"Plan a trip",7],[11,"Draft an email",8],[11,"Fix a bug",9],[11,"Name a pet",10],[11,"Write a poem",11],[12,"Plan a trip",5],[12,"Draft an email",5],[12,"Fix a bug",20],[13,"Plan a trip",9],[13,"Draft an email",9],[13,"Fix a bug",9],[13,"Name a pet",9],[13,"Write a poem",9]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEverything the problem asks about is a property of one user's group of prompts: how many there are, their average, and whether any prompt beats that average. The last one sounds like it needs to look at individual rows, but \"some prompt is above the average\" is the same as \"the **largest** prompt is above the average\". So one `GROUP BY user_id` with `COUNT`, `AVG` and `MAX` answers every question, and `HAVING` filters the groups.\n\n## Approach\n\n1. Group `prompts` by `user_id`.\n2. Select `COUNT(*)` as `prompt_count` and `ROUND(AVG(tokens), 2)` as `avg_tokens`.\n3. `HAVING COUNT(*) >= 3` keeps users with enough prompts.\n4. `HAVING MAX(tokens) > AVG(tokens)` keeps users whose biggest prompt beats their exact average; when every prompt has the same size, the maximum equals the average and the user is dropped.\n5. Sort by `avg_tokens` descending, then `user_id` ascending.\n\n## Example 1, step by step\n\n| user_id | COUNT(*) | AVG(tokens) | MAX(tokens) | kept? |\n| --- | --- | --- | --- | --- |\n| 1 | 3 | 400 / 3 = 133.33... | 200 | yes |\n| 2 | 2 | 65 | 70 | no, only 2 prompts |\n| 3 | 4 | 950 / 4 = 237.5 | 300 | yes |\n\nUser 3 (237.5) comes before user 1 (133.33).\n\n## Complexity\n\n- Time: O(N log N) for N prompts: one grouping pass and a sort of the surviving users.\n- Space: O(U) for the U user groups.\n\n## Pitfalls\n\n- Using `>=` instead of `>` keeps users whose prompts all have the same size.\n- Comparing tokens with the average in `WHERE` does not work: the average is only known after grouping, so the test belongs in `HAVING` (or in a subquery).\n- The count threshold is inclusive: exactly 3 prompts qualifies.\n- Users with equal `avg_tokens` must come out in increasing `user_id`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY user_id` | one group per user |\n| `prompt_count` | number of prompts the user submitted |\n| `avg_tokens` | the user's average tokens per prompt, rounded to 2 decimals |\n| `MAX(tokens) > AVG(tokens)` | true when at least one prompt beats the average |",
+  "narration": {
+    "1": "The output keeps one row per qualifying user.",
+    "2": "COUNT(*) counts the prompts in the user's group.",
+    "3": "AVG gives the mean tokens per prompt, rounded to 2 decimals for display.",
+    "5": "Grouping by user_id collapses each user's prompts into one row.",
+    "6": "Only users with at least 3 prompts survive.",
+    "7": "Some prompt beats the average exactly when the largest one does.",
+    "8": "Highest rounded average first; equal averages fall back to the smaller user_id."
+  }
+}

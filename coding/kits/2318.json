@@ -1,0 +1,62 @@
+{
+  "number": 2318,
+  "title": "Number of Distinct Roll Sequences",
+  "spec": "leetcode",
+  "statement": "A six-sided die (faces 1 to 6) is rolled `n` times, producing a sequence of `n` values. Count the sequences that obey both rules:\n\n- Any two neighbouring values have a greatest common divisor of exactly 1.\n- Two rolls with the same value must be more than 2 positions apart: if roll `i` and roll `j` show the same value, then `|i - j| > 2`.\n\nTwo sequences are different when they differ in at least one position. Return the count modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= n <= 10^4"
+  ],
+  "signature": "int distinctSequences(int n)",
+  "entry": "distinctSequences",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 10000) return 'n is an integer between 1 and 10^4.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function distinctSequences(n) {\n  const MOD = 1e9 + 7;\n  if (n === 1) {\n    return 6;\n  }\n  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));\n  let dp = Array.from({ length: 7 }, () => new Array(7).fill(0));\n  for (let prev = 1; prev <= 6; prev++) {\n    for (let last = 1; last <= 6; last++) {\n      if (prev !== last && gcd(prev, last) === 1) {\n        dp[prev][last] = 1;\n      }\n    }\n  }\n  for (let roll = 3; roll <= n; roll++) {\n    const next = Array.from({ length: 7 }, () => new Array(7).fill(0));\n    for (let prev = 1; prev <= 6; prev++) {\n      for (let last = 1; last <= 6; last++) {\n        for (let value = 1; value <= 6; value++) {\n          if (value !== prev && value !== last && gcd(last, value) === 1) {\n            next[last][value] = (next[last][value] + dp[prev][last]) % MOD;\n          }\n        }\n      }\n    }\n    dp = next;\n  }\n  let total = 0;\n  for (let prev = 1; prev <= 6; prev++) {\n    for (let last = 1; last <= 6; last++) {\n      total = (total + dp[prev][last]) % MOD;\n    }\n  }\n  return total;\n}",
+  "brute": "function distinctSequences(n) {\n  // Extend sequences one roll at a time, grouped by their last (up to) two rolls written as a string,\n  // checking each rule directly. BigInt counts keep the arithmetic exact before the final modulo.\n  const MOD = 1000000007n;\n  const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };\n  let counts = new Map([['', 1n]]);\n  for (let step = 0; step < n; step++) {\n    const next = new Map();\n    for (const [tail, count] of counts) {\n      const recent = tail ? tail.split(',').map(Number) : [];\n      for (let face = 1; face <= 6; face++) {\n        if (recent.includes(face)) continue;\n        if (recent.length && gcd(recent[recent.length - 1], face) !== 1) continue;\n        const key = [...recent, face].slice(-2).join(',');\n        next.set(key, ((next.get(key) ?? 0n) + count) % MOD);\n      }\n    }\n    counts = next;\n  }\n  let total = 0n;\n  for (const count of counts.values()) total += count;\n  return Number(total % MOD);\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') return [10000 - Math.floor(rand() * 2000)];\n  return [1 + Math.floor(rand() * 15)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[4],"expected":184},
+    {"name":"Example 2","input":[2],"expected":22}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[3]},
+    {"name":"Test 3","input":[5]},
+    {"name":"Test 4","input":[6]},
+    {"name":"Test 5","input":[7]},
+    {"name":"Test 6","input":[10]},
+    {"name":"Test 7","input":[25]},
+    {"name":"Test 8","input":[100]},
+    {"name":"Test 9","input":[1000]},
+    {"name":"Test 10","input":[9999]},
+    {"name":"Test 11","input":[10000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nListing all `6^n` sequences is hopeless beyond a dozen rolls. But whether a new roll is allowed depends only on the two rolls before it: it must be coprime with the last one, and it must differ from both of the last two (the \"more than 2 apart\" rule says exactly that). So the state for a DP is the pair of most recent values, giving just 36 states.\n\n## Approach\n\n1. With `n === 1` every face works, so return 6.\n2. Fill `dp[prev][last] = 1` for every valid first pair: different values with `gcd(prev, last) === 1`.\n3. For each further `roll` from 3 to `n`, build `next`: from state `(prev, last)`, a new `value` is allowed when it differs from `prev` and `last` and `gcd(last, value) === 1`; add `dp[prev][last]` to `next[last][value]` modulo `MOD`.\n4. Replace `dp` with `next`.\n5. Sum every `dp[prev][last]` into `total` and return it.\n\n## Example 1, step by step\n\n`n = 4`. Of the 36 ordered pairs, 22 have different coprime values (for example `(1,2)`, `(2,3)`, `(5,6)`; `(2,4)` and `(3,6)` fail), so the pair table sums to 22 (matching Example 2). Extending each pair by a third value that is coprime with `last` and differs from both gives 66 sequences of length 3. One more round, for `roll = 4`, gives the answer `184`. For example, `(1,2,3)` can be followed by 1, 4 or 5, but not by 2 (two rolls back), 3 (a repeat) or 6 (shares the factor 3).\n\n## Complexity\n\n- Time: O(n · 6³): each roll looks at 36 states and 6 next values.\n- Space: O(6²): two 7 × 7 tables (index 0 unused).\n\n## Pitfalls\n\n- The gap rule forbids a value equal to either of the last two rolls, not just the last one, so the state must hold two values.\n- `gcd(1, 1) === 1`, so the coprime test alone does not stop two 1s in a row; check `value !== last` explicitly.\n- Handle `n === 1` on its own: no pair exists yet, and the answer is 6.\n- Take the modulo on every addition so the counts stay small.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | the modulus `10^9 + 7` |\n| `dp[prev][last]` | valid sequences so far whose last two rolls are `prev`, `last` |\n| `roll` | length of the sequences being built |\n| `next` | the table for one roll more |\n| `value` | the face being appended |\n| `total` | sum of every state's count at the end |",
+  "narration": {
+    "2": "Counts are kept modulo 10^9 + 7.",
+    "3": "A single roll has no neighbours to clash with...",
+    "4": "...so all six faces are valid.",
+    "6": "Euclid's algorithm decides whether two faces are coprime.",
+    "8": "Enumerate every possible first pair of rolls (prev, last).",
+    "10": "A valid pair has two different, coprime values.",
+    "11": "Each valid pair is one sequence of length 2.",
+    "15": "Grow the sequences one roll at a time up to length n.",
+    "16": "next will hold the counts for sequences one roll longer.",
+    "19": "Try every face as the new roll.",
+    "20": "It must differ from both of the last two rolls and be coprime with the last one.",
+    "21": "Every sequence ending (prev, last) extends to one ending (last, value).",
+    "26": "The longer sequences become the current ones.",
+    "31": "Add up the counts over every final pair of rolls.",
+    "34": "Return the number of valid sequences of length n."
+  }
+}

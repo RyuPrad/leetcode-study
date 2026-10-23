@@ -1,0 +1,73 @@
+{
+  "number": 2493,
+  "title": "Divide Nodes Into the Maximum Number of Groups",
+  "spec": "leetcode",
+  "statement": "An undirected graph has `n` nodes numbered `1` to `n`, and each `edges[i] = [a_i, b_i]` joins nodes `a_i` and `b_i`. The graph does not have to be connected.\n\nPlace the nodes into `m` groups numbered `1` to `m` so that:\n\n- every node is in exactly one group, and\n- for every edge, the group numbers of its two ends differ by exactly 1.\n\nReturn the largest `m` for which such a placement exists, or `-1` if no placement satisfies the rules.",
+  "constraints": [
+    "1 <= n <= 500",
+    "1 <= edges.length <= 10^4",
+    "edges[i].length == 2",
+    "1 <= a_i, b_i <= n",
+    "a_i != b_i",
+    "No pair of nodes is joined by more than one edge"
+  ],
+  "signature": "int magnificentSets(int n, int[][] edges)",
+  "entry": "magnificentSets",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges"
+  ],
+  "validator": "function validate([n, edges]) {\n  if (!Number.isInteger(n) || n < 1 || n > 500) return 'n is between 1 and 500.';\n  if (!Array.isArray(edges) || edges.length < 1 || edges.length > 10000) return 'edges needs 1 to 10000 pairs.';\n  const seen = new Set();\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [a, b].';\n    const [a, b] = edge;\n    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || a > n || b < 1 || b > n) return 'Edge ends are nodes from 1 to n.';\n    if (a === b) return 'An edge must join two different nodes.';\n    const key = a < b ? a + ',' + b : b + ',' + a;\n    if (seen.has(key)) return 'Two nodes are joined by at most one edge.';\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function magnificentSets(n, edges) {\n  const graph = Array.from({ length: n + 1 }, () => []);\n  for (const [a, b] of edges) {\n    graph[a].push(b);\n    graph[b].push(a);\n  }\n\n  // best: component's smallest node -> most groups found for that component\n  const best = new Map();\n  for (let source = 1; source <= n; source++) {\n    const depth = new Array(n + 1).fill(-1);\n    depth[source] = 0;\n    const queue = [source];\n    let root = source;\n    let levels = 0;\n    for (let head = 0; head < queue.length; head++) {\n      const node = queue[head];\n      root = Math.min(root, node);\n      levels = Math.max(levels, depth[node] + 1);\n      for (const next of graph[node]) {\n        if (depth[next] === -1) {\n          depth[next] = depth[node] + 1;\n          queue.push(next);\n        } else if (depth[next] === depth[node]) {\n          return -1;\n        }\n      }\n    }\n    best.set(root, Math.max(best.get(root) ?? 0, levels));\n  }\n\n  let total = 0;\n  for (const groups of best.values()) {\n    total += groups;\n  }\n  return total;\n}",
+  "brute": "function magnificentSets(n, edges) {\n  // Try every labelling of nodes with groups 1..n; keep those that obey every edge\n  // and use each group number from 1 to the largest one.\n  const earlier = Array.from({ length: n + 1 }, () => []);\n  for (const [a, b] of edges) {\n    if (a < b) earlier[b].push(a); else earlier[a].push(b);\n  }\n  const label = new Array(n + 1).fill(0);\n  let answer = -1;\n  const place = node => {\n    if (node > n) {\n      const used = new Set(label.slice(1));\n      const top = Math.max(...used);\n      if (used.size === top) answer = Math.max(answer, top);\n      return;\n    }\n    for (let g = 1; g <= n; g++) {\n      if (earlier[node].every(other => Math.abs(label[other] - g) === 1)) {\n        label[node] = g;\n        place(node + 1);\n      }\n    }\n    label[node] = 0;\n  };\n  place(1);\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 500 : 2 + Math.floor(rand() * 5);\n  const pairs = new Set();\n  const edges = [];\n  const add = (a, b) => {\n    if (a === b) return;\n    const key = a < b ? a + ',' + b : b + ',' + a;\n    if (pairs.has(key)) return;\n    pairs.add(key);\n    edges.push([a, b]);\n  };\n  const bipartite = rand() < (size === 'large' ? 0.85 : 0.6);\n  const side = Array.from({ length: n + 1 }, () => (rand() < 0.5 ? 0 : 1));\n  if (size === 'large') {\n    // Several components: each is a random long-ish tree plus extra edges inside it.\n    const parts = 1 + Math.floor(rand() * 8);\n    const order = Array.from({ length: n }, (_, i) => i + 1);\n    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }\n    const comp = new Array(n + 1).fill(0);\n    let first = 0;\n    for (let i = 0; i < n; i++) {\n      const node = order[i];\n      comp[node] = Math.floor((i * parts) / n);\n      if (i === 0 || comp[node] !== comp[order[i - 1]]) { first = i; continue; }\n      const parent = order[Math.max(first, i - 1 - Math.floor(rand() * 4))];\n      side[node] = 1 - side[parent];\n      add(parent, node);\n    }\n    // groups[c][x]: nodes of component c on side x; extra edges join opposite sides of one component.\n    const groups = Array.from({ length: parts }, () => [[], []]);\n    for (let node = 1; node <= n; node++) groups[comp[node]][side[node]].push(node);\n    const extra = Math.floor(rand() * 1400);\n    const target = Math.min(1900, edges.length + extra);\n    for (let tries = 0; tries < 4 * extra && edges.length < target; tries++) {\n      const a = 1 + Math.floor(rand() * n);\n      const others = groups[comp[a]][1 - side[a]];\n      if (others.length) add(a, others[Math.floor(rand() * others.length)]);\n    }\n    // One edge inside a side makes an odd cycle, so the answer is -1.\n    if (!bipartite) {\n      const c = Math.floor(rand() * parts);\n      const same = groups[c][0].length >= 2 ? groups[c][0] : groups[c][1];\n      add(same[0], same[same.length - 1]);\n    }\n  } else {\n    for (let a = 1; a <= n; a++) {\n      for (let b = a + 1; b <= n; b++) {\n        if (bipartite && side[a] === side[b]) continue;\n        if (rand() < 0.45) add(a, b);\n      }\n    }\n    if (edges.length === 0) add(1, 2);\n  }\n  return [n, edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[6,[[1,2],[1,4],[1,5],[2,6],[2,3],[4,6]]],"expected":4},
+    {"name":"Example 2","input":[3,[[1,2],[2,3],[3,1]]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,[[1,2]]]},
+    {"name":"Test 2","input":[3,[[1,2]]]},
+    {"name":"Test 3","input":[4,[[1,2],[2,3],[3,4],[4,1]]]},
+    {"name":"Test 4","input":[6,[[1,2],[2,3],[3,4],[4,5],[5,6]]]},
+    {"name":"Test 5","input":[5,[[1,2],[1,3],[1,4],[1,5]]]},
+    {"name":"Test 6","input":[7,[[1,2],[2,3],[4,5],[5,6],[6,4]]]},
+    {"name":"Test 7","input":[5,[[1,3],[1,4],[1,5],[2,3],[2,4],[2,5]]]},
+    {"name":"Test 8","input":[5,[[1,2],[2,3],[3,4],[4,5],[5,1]]]},
+    {"name":"Test 9","input":[6,[[1,2],[2,3],[3,4],[4,5],[5,6],[6,1]]]},
+    {"name":"Test 10","input":[10,[[1,2],[2,3],[5,6],[6,7],[7,8],[8,5],[9,10]]]},
+    {"name":"Test 11","input":[8,[[1,2],[2,3],[3,4],[2,5],[5,6],[6,7],[1,8]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithin one connected piece of the graph, once you choose which node goes in group 1, every other node's group is forced: a node at distance `d` from it must sit in group `d + 1`. That is exactly the BFS level of the node. The placement fails only when an edge joins two nodes at the same level, which happens precisely when the piece has an odd cycle (it is not bipartite). So for each piece, run BFS from every node, keep the most levels seen, and add the pieces' best values together: separate pieces can be stacked without interfering.\n\n## Approach\n\n1. Build an adjacency list `graph`.\n2. For every `source`, run BFS, recording `depth` of each reached node.\n3. If an edge joins two nodes of equal `depth`, the graph has an odd cycle: return `-1`.\n4. The BFS from `source` gives `levels` groups. Identify its component by `root`, the smallest node it reached, and keep the largest `levels` per `root` in `best`.\n5. Return the sum of the values in `best`.\n\n## Example 1, step by step\n\n`n = 6`; node 1 touches 2, 4, 5; node 2 touches 1, 3, 6; node 4 touches 1, 6. All nodes form one component with `root = 1`.\n\n- BFS from 1: levels `{1}`, `{2, 4, 5}`, `{3, 6}` → 3 groups.\n- BFS from 5: levels `{5}`, `{1}`, `{2, 4}`, `{3, 6}` → 4 groups.\n- No BFS ever finds an edge inside one level, and none gives more than 4 levels.\n\n`best` is `{1 → 4}`, so the answer is `4`.\n\n## Complexity\n\n- Time: O(n · (n + E)): one BFS per node, each over the whole component.\n- Space: O(n + E) for the graph, the queue and `depth`.\n\n## Pitfalls\n\n- The graph may be disconnected: add one value per component, not one maximum overall.\n- The best starting node is not always a leaf or the smallest node; try every node.\n- Odd cycles make the whole answer `-1`, even if other components are fine.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list, indexed by node |\n| `best` | map from a component's smallest node to its most groups |\n| `source` | node placed in group 1 for this BFS |\n| `depth` | BFS distance from `source`, `-1` when not reached |\n| `queue`, `head` | BFS queue and the index of the node being expanded |\n| `root` | smallest node seen, naming the component |\n| `levels` | number of BFS levels, i.e. groups used from this `source` |\n| `total` | sum of the best group counts over all components |",
+  "narration": {
+    "2": "Make an empty neighbour list for every node; index 0 is unused.",
+    "3": "Record each edge in both directions because the graph is undirected.",
+    "9": "For each component, remember the most groups any starting node achieved.",
+    "10": "Try putting each node in group 1 and see how many groups that forces.",
+    "11": "No node has been reached yet in this search.",
+    "12": "The source sits at depth 0, which is group 1.",
+    "14": "Track the smallest node reached; it names this component.",
+    "15": "Count of BFS levels seen so far.",
+    "16": "Take nodes from the queue in order, level by level.",
+    "18": "Keep the smallest node of the component as its name.",
+    "19": "This node's group is its depth plus one, so the count of groups is at least that.",
+    "20": "Look at each neighbour of the current node.",
+    "21": "A neighbour not reached yet...",
+    "22": "...belongs in the next group.",
+    "24": "A neighbour already at the same depth means an odd cycle: neighbours would need equal groups.",
+    "25": "No valid placement exists at all.",
+    "29": "Keep the larger group count for this component.",
+    "33": "Add the best count of every component, since separate components can be stacked.",
+    "36": "Return the maximum number of groups."
+  }
+}

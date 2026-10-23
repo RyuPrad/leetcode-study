@@ -1,0 +1,67 @@
+{
+  "number": 2476,
+  "title": "Closest Nodes Queries in a Binary Search Tree",
+  "spec": "leetcode",
+  "statement": "`root` is a binary search tree: every value in a node's left subtree is smaller than the node's value, and every value in its right subtree is larger. `queries` is a list of `n` positive integers.\n\nReturn a list `answer` of `n` pairs, where `answer[i] = [min_i, max_i]` for the query `q = queries[i]`:\n\n- `min_i` is the biggest tree value that is at most `q`, or `-1` if every tree value is greater than `q`.\n- `max_i` is the smallest tree value that is at least `q`, or `-1` if every tree value is less than `q`.\n\nWhen `q` itself is in the tree, both numbers equal `q`.",
+  "constraints": [
+    "The tree has between 2 and 10^5 nodes",
+    "1 <= Node.val <= 10^6",
+    "n == queries.length",
+    "1 <= n <= 10^5",
+    "1 <= queries[i] <= 10^6"
+  ],
+  "signature": "List<List<Integer>> closestNodes(TreeNode root, List<Integer> queries)",
+  "entry": "closestNodes",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "queries"
+  ],
+  "validator": "function validate([root, queries]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs at least two nodes.';\n  const values = root.filter(v => v !== null);\n  if (values.length < 2 || values.length > 100000) return 'The tree has between 2 and 10^5 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < 1 || v > 1000000)) return 'Each node value is a whole number from 1 to 10^6.';\n  if (!Array.isArray(queries) || queries.length < 1 || queries.length > 100000) return 'queries has between 1 and 10^5 numbers.';\n  if (queries.some(q => !Number.isInteger(q) || q < 1 || q > 1000000)) return 'Each query is a whole number from 1 to 10^6.';\n  // Rebuild the links from the level order; an in-order walk must then give strictly rising values.\n  const nodes = [{ val: root[0], left: null, right: null }];\n  let next = 1;\n  for (let q = 0; q < nodes.length && next < root.length; q++) {\n    for (const side of ['left', 'right']) {\n      if (next >= root.length) break;\n      const value = root[next++];\n      if (value === null) continue;\n      const child = { val: value, left: null, right: null };\n      nodes[q][side] = child;\n      nodes.push(child);\n    }\n  }\n  if (next < root.length) return 'Every value after the root needs a parent node.';\n  const stack = [];\n  let node = nodes[0], last = -Infinity;\n  while (node || stack.length) {\n    while (node) { stack.push(node); node = node.left; }\n    node = stack.pop();\n    if (node.val <= last) return 'The tree must be a binary search tree with distinct values.';\n    last = node.val;\n    node = node.right;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function closestNodes(root, queries) {\n  const sorted = [];\n  const stack = [];\n  let node = root;\n  while (node || stack.length > 0) {\n    while (node) {\n      stack.push(node);\n      node = node.left;\n    }\n    node = stack.pop();\n    sorted.push(node.val);\n    node = node.right;\n  }\n\n  const answer = [];\n  for (const query of queries) {\n    let left = 0;\n    let right = sorted.length;\n    while (left < right) {\n      const mid = (left + right) >> 1;\n      if (sorted[mid] < query) {\n        left = mid + 1;\n      } else {\n        right = mid;\n      }\n    }\n    const ceiling = left < sorted.length ? sorted[left] : -1;\n    let floor = left > 0 ? sorted[left - 1] : -1;\n    if (ceiling === query) {\n      floor = query;\n    }\n    answer.push([floor, ceiling]);\n  }\n  return answer;\n}",
+  "brute": "function closestNodes(root, queries) {\n  const values = [];\n  const collect = (node) => {\n    if (!node) return;\n    values.push(node.val);\n    collect(node.left);\n    collect(node.right);\n  };\n  collect(root);\n  return queries.map(q => {\n    let low = -1, high = -1;\n    for (const v of values) {\n      if (v <= q && (low === -1 || v > low)) low = v;\n      if (v >= q && (high === -1 || v < high)) high = v;\n    }\n    return [low, high];\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const small = size === 'small';\n  for (;;) {\n    const count = small ? pick(2, 10) : pick(850, 950);\n    const top = small ? (rand() < 0.7 ? 25 : 1000000) : 1000000;\n    // Distinct values inserted in random order give a random BST shape.\n    const seen = new Set();\n    const order = [];\n    while (order.length < count) {\n      const value = pick(1, top);\n      if (seen.has(value)) continue;\n      seen.add(value);\n      order.push(value);\n    }\n    // Sometimes insert in sorted order to build a chain.\n    if (rand() < (small ? 0.2 : 0.1)) { const rising = rand() < 0.5; order.sort((a, b) => (rising ? a - b : b - a)); }\n    let root = null;\n    for (const value of order) {\n      const fresh = { val: value, left: null, right: null };\n      if (!root) { root = fresh; continue; }\n      let at = root;\n      for (;;) {\n        const side = value < at.val ? 'left' : 'right';\n        if (!at[side]) { at[side] = fresh; break; }\n        at = at[side];\n      }\n    }\n    const tree = [];\n    const queue = [root];\n    for (let q = 0; q < queue.length; q++) {\n      const at = queue[q];\n      tree.push(at ? at.val : null);\n      if (at) queue.push(at.left, at.right);\n    }\n    while (tree[tree.length - 1] === null) tree.pop();\n    if (tree.length > 2000) continue;\n    // Queries: tree values, their neighbours, and random numbers, including values past either end.\n    const qCount = small ? pick(1, 8) : 2000;\n    const queries = [];\n    for (let i = 0; i < qCount; i++) {\n      const style = rand();\n      let query;\n      if (style < 0.3) query = order[pick(0, order.length - 1)];\n      else if (style < 0.5) query = order[pick(0, order.length - 1)] + pick(-1, 1);\n      else if (style < 0.6) query = rand() < 0.5 ? 1 : 1000000;\n      else query = pick(1, Math.min(1000000, top + 5));\n      queries.push(Math.min(1000000, Math.max(1, query)));\n    }\n    return [tree, queries];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[6,2,13,1,4,9,15,null,null,null,null,null,null,14],[2,5,16]],"expected":[[2,2],[4,6],[15,-1]]},
+    {"name":"Example 2","input":[[4,null,9],[3]],"expected":[[-1,4]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,null,2],[1,2,3]]},
+    {"name":"Test 2","input":[[2,1],[1,2,3]]},
+    {"name":"Test 3","input":[[1000000,1],[1,1000000,500000]]},
+    {"name":"Test 4","input":[[5,3,8,2,4,7,9],[1,2,6,10,5]]},
+    {"name":"Test 5","input":[[1,null,2,null,3,null,4,null,5],[3,6,1]]},
+    {"name":"Test 6","input":[[9,7,null,5,null,3],[1,4,8,9,10]]},
+    {"name":"Test 7","input":[[10,5,15,null,null,12,20],[11,13,16,4,21]]},
+    {"name":"Test 8","input":[[50,30,70,20,40,60,80],[45,45,10,90,50]]},
+    {"name":"Test 9","input":[[500,250,750],[249,251,749,751,500]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFor each query you want the tree's nearest values on either side of it: the floor (largest value at most the query) and the ceiling (smallest value at least the query). Scanning the whole tree per query costs O(n) each, far too slow for 10^5 queries. Walking down from the root is O(height) per query, but the tree may be a long chain, so that can also be O(n).\n\nThe BST property gives a better route: an in-order walk visits the values in increasing order. Turn the tree into a sorted array once, then answer each query with a binary search in O(log n), whatever the tree's shape.\n\n## Approach\n\n1. Walk the tree in order with an explicit `stack` (no recursion, so a deep chain is safe), appending each value to `sorted`.\n2. For each `query`, binary search with `left` and `right` for the first index whose value is not below `query`.\n3. That index holds the `ceiling` (or `-1` if it is past the end).\n4. The value just before it is the `floor` (or `-1` at index 0), unless `ceiling` equals `query`, in which case the floor is `query` itself.\n5. Append `[floor, ceiling]` to `answer`.\n\n## Example 1, step by step\n\nThe in-order walk gives `sorted = [1, 2, 4, 6, 9, 13, 14, 15]`.\n\n- `query = 2`: the search stops at index 1, value 2. It equals the query, so the pair is `[2, 2]`.\n- `query = 5`: the first value not below 5 is 6 at index 3; the value before it is 4, so `[4, 6]`.\n- `query = 16`: every value is smaller, so `left = 8` is past the end: `ceiling = -1`, `floor = 15`, giving `[15, -1]`.\n\n## Complexity\n\n- Time: O(n + q log n): one walk over the n nodes, then a binary search per query.\n- Space: O(n) for `sorted` and the stack.\n\n## Pitfalls\n\n- Searching the tree from the root for every query times out on a chain-shaped tree; flatten it first.\n- When the query is in the tree, the floor is the query itself, not the value before it.\n- Use `-1` for a missing side, at both ends of the array.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `sorted` | the tree's values in increasing order |\n| `stack`, `node` | state of the iterative in-order walk |\n| `query` | the current query value |\n| `left`, `right` | binary-search bounds; `left` ends at the first value not below `query` |\n| `mid` | the middle index being tested |\n| `floor`, `ceiling` | the answer pair for this query |\n| `answer` | the list of pairs returned |",
+  "narration": {
+    "4": "Start the in-order walk at the root.",
+    "5": "Keep walking while there is a node to visit or one waiting on the stack.",
+    "6": "Slide down to the leftmost node, remembering the path.",
+    "10": "Take the deepest pending node: all of its smaller values are already recorded.",
+    "11": "In-order visits a BST's values in increasing order, so this keeps sorted sorted.",
+    "12": "Then walk its right subtree, which holds the next larger values.",
+    "16": "Answer each query independently using the sorted values.",
+    "19": "Binary search for the first index whose value is not below the query.",
+    "21": "This value is too small, so the answer lies to the right of mid.",
+    "24": "This value is big enough; it might be the first such value, so keep mid in range.",
+    "27": "The first value not below the query is the ceiling; past the end means none exists.",
+    "28": "The value just before it is the largest one below the query, if there is one.",
+    "29": "If the query itself is in the tree...",
+    "30": "...then it is also the floor.",
+    "32": "Record this query's pair.",
+    "34": "Every query has been answered."
+  }
+}

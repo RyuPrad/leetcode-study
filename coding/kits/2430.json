@@ -1,0 +1,63 @@
+{
+  "number": 2430,
+  "title": "Maximum Deletions on a String",
+  "spec": "leetcode",
+  "statement": "You get a string `s` of lowercase English letters and remove it piece by piece. Each operation does one of two things:\n\n- remove all of what is left of `s`, or\n- pick a length `i` with `1 <= i <= s.length / 2` such that the first `i` characters of the current `s` are identical to the `i` characters right after them, and remove those first `i` characters.\n\nKeep going until `s` is empty. Return the largest number of operations this can take.",
+  "constraints": [
+    "1 <= s.length <= 4000",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "int deleteString(String s)",
+  "entry": "deleteString",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 4000) return 's needs 1 to 4000 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function deleteString(s) {\n  const n = s.length;\n  const codes = Array.from(s, ch => ch.charCodeAt(0));\n  const dp = new Array(n + 1).fill(0);\n  let lcp = new Int32Array(n + 1);\n  let lcpNext = new Int32Array(n + 1);\n\n  for (let i = n - 1; i >= 0; i--) {\n    for (let j = n - 1; j > i; j--) {\n      lcp[j] = codes[i] === codes[j] ? lcpNext[j + 1] + 1 : 0;\n    }\n    dp[i] = 1;\n    for (let len = 1; i + 2 * len <= n; len++) {\n      if (lcp[i + len] >= len) {\n        dp[i] = Math.max(dp[i], dp[i + len] + 1);\n      }\n    }\n    [lcp, lcpNext] = [lcpNext, lcp];\n  }\n  return dp[0];\n}",
+  "brute": "function deleteString(s) {\n  // Try every legal deletion on the actual remaining string, memoised by that string.\n  const memo = new Map();\n  const most = rest => {\n    if (memo.has(rest)) return memo.get(rest);\n    let result = 1;\n    for (let i = 1; 2 * i <= rest.length; i++) {\n      if (rest.slice(0, i) === rest.slice(i, 2 * i)) result = Math.max(result, 1 + most(rest.slice(i)));\n    }\n    memo.set(rest, result);\n    return result;\n  };\n  return most(s);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  const alphabet = letters.slice(0, 1 + pick(size === 'large' ? 4 : 3));\n  const n = size === 'large' ? 1600 + pick(401) : 1 + pick(10);\n  const shape = pick(4);\n  let s = '';\n  if (shape === 0) {\n    // Random letters from a small alphabet.\n    while (s.length < n) s += alphabet[pick(alphabet.length)];\n  } else if (shape === 1) {\n    // A short block repeated, with a few letters changed so some repeats break.\n    let block = '';\n    const width = 1 + pick(size === 'large' ? 6 : 3);\n    while (block.length < width) block += alphabet[pick(alphabet.length)];\n    while (s.length < n) s += block;\n    const chars = s.slice(0, n).split('');\n    const changes = pick(size === 'large' ? 8 : 2);\n    for (let c = 0; c < changes; c++) chars[pick(n)] = letters[pick(26)];\n    s = chars.join('');\n  } else if (shape === 2) {\n    // Runs of one letter, so many short deletions are possible.\n    while (s.length < n) s += alphabet[pick(alphabet.length)].repeat(1 + pick(size === 'large' ? 40 : 4));\n  } else {\n    // Fully random lowercase letters.\n    while (s.length < n) s += letters[pick(26)];\n  }\n  return [s.slice(0, n)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abcabcdabc"],"expected":2},
+    {"name":"Example 2","input":["aaabaab"],"expected":4},
+    {"name":"Example 3","input":["aaaaa"],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["ab"]},
+    {"name":"Test 3","input":["aa"]},
+    {"name":"Test 4","input":["abababab"]},
+    {"name":"Test 5","input":["abcdefghijklmnopqrstuvwxyz"]},
+    {"name":"Test 6","input":["zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"]},
+    {"name":"Test 7","input":["aabaabaab"]},
+    {"name":"Test 8","input":["abaababaab"]},
+    {"name":"Test 9","input":["abcabcabcabcx"]},
+    {"name":"Test 10","input":["aaaab"]},
+    {"name":"Test 11","input":["baaaa"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery operation removes a prefix, so what remains is always a suffix `s[i..]`. That makes the suffix start `i` a complete description of the state: let `dp[i]` be the most operations that can clear `s[i..]`. Removing everything at once always works (one operation), and removing `len` letters is allowed exactly when `s[i..i+len)` equals `s[i+len..i+2·len)`, after which `dp[i + len]` more operations follow. Trying all choices recursively on the actual strings is the brute force; the DP does it in O(n²) once substring equality is O(1).\n\nFor that, let `lcp[j]` be the length of the longest common prefix of `s[i..]` and `s[j..]`. Then the two halves match exactly when `lcp[i + len] >= len`. These lengths satisfy `lcp(i, j) = lcp(i + 1, j + 1) + 1` when `s[i] === s[j]` (and `0` otherwise), so each row only needs the row for `i + 1`.\n\n## Approach\n\n1. Turn `s` into `codes`, its character codes, so comparisons are cheap.\n2. Walk `i` from the last index down to `0`, so `dp[i + len]` is ready when `dp[i]` needs it.\n3. Fill row `i` of the common-prefix table into `lcp` from `lcpNext`, the row for `i + 1`.\n4. Start `dp[i] = 1`: deleting the whole suffix.\n5. For every `len` with `i + 2·len <= n`, if `lcp[i + len] >= len`, try `dp[i + len] + 1`.\n6. Swap the two rows and continue. The answer is `dp[0]`.\n\n## Example 1, step by step\n\nFor `s = \"abcabcdabc\"` (`n = 10`), every suffix starting at `i = 9` down to `1` has no prefix immediately repeated, so `dp[1..9]` are all `1`. At `i = 0`, `len = 1` (`\"a\"` vs `\"b\"`) and `len = 2` (`\"ab\"` vs `\"ca\"`) fail, but `lcp[3] = 3` because `\"abc\"` repeats at index 3, so `len = 3` gives `dp[3] + 1 = 2`. Longer lengths fail, and the answer is `dp[0] = 2`.\n\n## Complexity\n\n- Time: O(n²): each `i` fills one row of `lcp` and tries up to `n / 2` lengths.\n- Space: O(n): `dp` plus two rows of the common-prefix table instead of the full n×n table.\n\n## Pitfalls\n\n- Greedily deleting the shortest repeat is wrong: in `\"aaabaab\"` the best plan deletes `\"a\"`, then `\"aab\"`, then `\"a\"`.\n- Comparing substrings with `slice` inside the DP makes it O(n³), too slow at 4000 characters. Even the O(n²) loop runs millions of times, so compare character codes (`codes`) rather than one-letter strings.\n- A full 4000×4000 table of lengths uses a lot of memory; two rows are enough.\n- The final \"delete everything\" counts as an operation, so `dp[i]` starts at `1`, not `0`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | length of `s` |\n| `codes` | character codes of `s`, for fast comparisons |\n| `dp[i]` | most operations that can clear the suffix `s[i..]` |\n| `lcp[j]` | longest common prefix of `s[i..]` and `s[j..]` |\n| `lcpNext[j]` | the same for `s[i + 1..]` and `s[j..]` |\n| `i`, `j` | start of the current suffix, start of the suffix compared with it |\n| `len` | length of the prefix we try to delete |",
+  "narration": {
+    "3": "Work with character codes, which are cheaper to compare than one-letter strings.",
+    "4": "dp[i] will hold the most operations that can clear the suffix starting at i.",
+    "5": "lcp holds, for the current i, how far s[i..] and s[j..] agree.",
+    "6": "lcpNext holds the same lengths for i + 1, which row i is built from.",
+    "8": "Go from the end so the shorter suffixes are solved first.",
+    "9": "Fill this row of common-prefix lengths for every later start j.",
+    "10": "Matching letters extend the match of the next positions by one; a mismatch resets it to zero.",
+    "12": "Deleting the whole suffix is always possible, so at least one operation.",
+    "13": "Try every prefix length whose copy still fits after it.",
+    "14": "Do the first len letters repeat right after themselves?",
+    "15": "Then delete them and add the best count for the suffix that remains.",
+    "18": "Reuse the old row's memory for the next i.",
+    "20": "The whole string is the suffix starting at 0."
+  }
+}

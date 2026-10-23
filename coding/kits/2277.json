@@ -1,0 +1,74 @@
+{
+  "number": 2277,
+  "title": "Closest Node to Path in Tree",
+  "spec": "recalled",
+  "statement": "A tree has `n` nodes labelled `0` to `n - 1`. Each pair `[a, b]` in `edges` is an undirected edge, and there are exactly `n - 1` of them, so every two nodes are joined by exactly one simple path.\n\nEach entry of `query` is a triple `[start, end, node]`. Look at the nodes on the path from `start` to `end` (both endpoints included; when `start == end` the path is that single node) and choose the one that needs the fewest edges to reach `node`. In a tree this choice is always unique.\n\nReturn an array `answer` of the same length as `query`, where `answer[i]` is the node chosen for `query[i]`.",
+  "constraints": [
+    "1 <= n <= 1000",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "0 <= edges[i][0], edges[i][1] <= n - 1",
+    "edges[i][0] != edges[i][1]",
+    "1 <= query.length <= 1000",
+    "query[i].length == 3",
+    "0 <= start, end, node <= n - 1",
+    "The edges form a tree"
+  ],
+  "signature": "int[] closestNode(int n, int[][] edges, int[][] query)",
+  "entry": "closestNode",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges",
+    "query"
+  ],
+  "validator": "function validate([n, edges, query]) {\n  if (!Number.isInteger(n) || n < 1 || n > 1000) return 'n is between 1 and 1000.';\n  if (!Array.isArray(edges) || edges.length !== n - 1) return 'edges must have exactly n - 1 pairs.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = v => { while (root[v] !== v) { root[v] = root[root[v]]; v = root[v]; } return v; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2 || edge.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each edge is a pair of nodes between 0 and n - 1.';\n    if (edge[0] === edge[1]) return 'An edge must join two different nodes.';\n    const a = find(edge[0]), b = find(edge[1]);\n    if (a === b) return 'The edges must form a tree (no cycles).';\n    root[a] = b;\n  }\n  if (!Array.isArray(query) || query.length < 1 || query.length > 1000) return 'query has 1 to 1000 entries.';\n  for (const q of query) {\n    if (!Array.isArray(q) || q.length !== 3 || q.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each query is [start, end, node] with nodes between 0 and n - 1.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function closestNode(n, edges, query) {\n  const graph = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) {\n    graph[a].push(b);\n    graph[b].push(a);\n  }\n  const dist = [];\n  for (let source = 0; source < n; source++) {\n    const row = new Array(n).fill(-1);\n    row[source] = 0;\n    const queue = [source];\n    for (let head = 0; head < queue.length; head++) {\n      const current = queue[head];\n      for (const next of graph[current]) {\n        if (row[next] === -1) {\n          row[next] = row[current] + 1;\n          queue.push(next);\n        }\n      }\n    }\n    dist.push(row);\n  }\n\n  const answer = [];\n  for (const [start, end, node] of query) {\n    const length = dist[start][end];\n    let best = start;\n    for (let candidate = 0; candidate < n; candidate++) {\n      const onPath = dist[start][candidate] + dist[candidate][end] === length;\n      if (onPath && dist[node][candidate] < dist[node][best]) {\n        best = candidate;\n      }\n    }\n    answer.push(best);\n  }\n  return answer;\n}",
+  "brute": "function closestNode(n, edges, query) {\n  const adj = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) { adj[a].push(b); adj[b].push(a); }\n  // Depth-first search from one node, giving parent pointers and depths.\n  const walk = from => {\n    const parent = new Array(n).fill(-1), depth = new Array(n).fill(-1);\n    const stack = [from];\n    depth[from] = 0;\n    while (stack.length) {\n      const v = stack.pop();\n      for (const w of adj[v]) if (depth[w] < 0) { depth[w] = depth[v] + 1; parent[w] = v; stack.push(w); }\n    }\n    return { parent, depth };\n  };\n  return query.map(([start, end, node]) => {\n    // Climb from end to start along the parent pointers to list the path explicitly.\n    const { parent } = walk(start);\n    const path = [end];\n    while (path[path.length - 1] !== start) path.push(parent[path[path.length - 1]]);\n    const { depth } = walk(node);\n    let best = path[0];\n    for (const v of path) if (depth[v] < depth[best]) best = v;\n    return best;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 1000 : 1 + pick(8);\n  const m = size === 'large' ? 1000 : 1 + pick(5);\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [label[i], label[j]] = [label[j], label[i]]; }\n  // Node i hangs off one of the 'reach' nodes just before it: a small reach makes long paths, a large one bushy trees.\n  const reach = size === 'large' ? [1, 3, n][pick(3)] : 1 + pick(n);\n  const edges = [];\n  for (let i = 1; i < n; i++) {\n    const parent = i - 1 - pick(Math.min(reach, i));\n    const edge = [label[i], label[parent]];\n    edges.push(rand() < 0.5 ? edge : edge.reverse());\n  }\n  for (let i = edges.length - 1; i > 0; i--) { const j = pick(i + 1); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const query = Array.from({ length: m }, () => [label[pick(n)], label[pick(n)], label[pick(n)]]);\n  return [n, edges, query];\n}",
+  "examples": [
+    {"name":"Example 1","input":[7,[[0,1],[0,2],[0,3],[1,4],[2,5],[2,6]],[[5,3,4],[5,3,6]]],"expected":[0,2]},
+    {"name":"Example 2","input":[3,[[0,1],[1,2]],[[0,1,2]]],"expected":[1]},
+    {"name":"Example 3","input":[3,[[0,1],[1,2]],[[0,0,0]]],"expected":[0]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[],[[0,0,0]]]},
+    {"name":"Test 2","input":[2,[[0,1]],[[0,1,0],[0,1,1],[1,1,0],[0,0,1]]]},
+    {"name":"Test 3","input":[6,[[0,1],[1,2],[2,3],[3,4],[4,5]],[[1,4,0],[1,4,5],[4,1,3],[2,2,5]]]},
+    {"name":"Test 4","input":[6,[[0,1],[0,2],[0,3],[0,4],[0,5]],[[1,2,3],[1,2,1],[3,0,4],[5,5,4]]]},
+    {"name":"Test 5","input":[7,[[0,1],[0,2],[0,3],[1,4],[2,5],[2,6]],[[4,6,5],[4,6,3],[1,1,6],[6,5,4],[3,4,0]]]},
+    {"name":"Test 6","input":[8,[[3,7],[7,1],[1,5],[5,0],[7,2],[1,6],[5,4]],[[3,0,6],[0,3,2],[2,4,6],[6,4,3],[4,4,4]]]},
+    {"name":"Test 7","input":[10,[[9,4],[4,7],[2,7],[2,0],[5,0],[5,8],[1,8],[1,3],[6,3]],[[6,9,0],[7,1,9],[7,1,6],[3,4,5]]]},
+    {"name":"Test 8","input":[15,[[1,0],[2,0],[3,1],[4,1],[5,2],[6,2],[7,3],[8,3],[9,4],[10,4],[11,5],[12,5],[13,6],[14,6]],[[7,14,0],[7,8,14],[11,12,9],[13,13,13],[3,10,6]]]},
+    {"name":"Test 9","input":[5,[[0,1],[1,2],[1,3],[3,4]],[[0,2,4],[2,4,0],[0,4,2],[4,0,1],[2,2,4],[4,4,2],[0,3,2],[2,3,0]]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe direct way is to list the path for each query (by following parent pointers from `end` back to `start`) and then measure how far each path node is from `node`. A shorter test avoids building the path at all: a node `candidate` lies on the path from `start` to `end` exactly when going `start → candidate → end` costs no more than going straight, that is `dist[start][candidate] + dist[candidate][end] == dist[start][end]`. With `n` at most 1000, a breadth-first search from every node fills the whole distance table in O(n²), and every query becomes a scan over the nodes.\n\n## Approach\n\n1. Build the adjacency list `graph` from `edges`, adding each edge in both directions.\n2. For every `source`, run a BFS with a `queue` and store each node's edge count from `source` in `row`; `dist[source]` is that row.\n3. For each query `[start, end, node]`, set `length = dist[start][end]` and start `best` at `start`, which is on the path.\n4. For every `candidate`, check `onPath` with the distance test; if it is on the path and closer to `node` than `best`, it becomes `best`.\n5. Push `best` into `answer`.\n\n## Example 1, step by step\n\nFor `[5, 3, 4]`, `length = dist[5][3] = 3` and the path is `5, 2, 0, 3`. `best` starts at `5`, which is 4 edges from node 4. Candidate `0` is on the path (`2 + 1 = 3`) and only 2 edges from node 4, so `best = 0`; candidates `2` (3 edges), `3` (3 edges) and `5` do not beat it. The answer is `0`. For `[5, 3, 6]`, candidate `0` is 2 edges from node 6, which ties `best = 5` and does not replace it, and candidate `2` is 1 edge away, so the answer is `2`. The result is `[0, 2]`.\n\n## Complexity\n\n- Time: O(n² + n·q) for q queries: `n` searches of O(n) each, then an O(n) scan per query.\n- Space: O(n²) for the distance table.\n\n## Pitfalls\n\n- Edges are undirected: add both directions, or a search from a leaf finds nothing.\n- Start `best` from a node that is on the path (`start`), not from `0`, which may lie off it.\n- When `start == end` the path is a single node, and the answer is that node whatever `node` is.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of the tree |\n| `dist` | `dist[u][v]` is the number of edges between `u` and `v` |\n| `row`, `queue`, `head`, `current` | the BFS from `source`: its distances, its queue, the read position and the node being expanded |\n| `length` | number of edges on the path from `start` to `end` |\n| `candidate`, `onPath` | a node being tested and whether it lies on the path |\n| `best` | the path node closest to `node` so far |",
+  "narration": {
+    "2": "Give every node an empty list of neighbours.",
+    "3": "Read each edge once.",
+    "4": "The edge is undirected, so record it from a to b...",
+    "5": "...and from b to a.",
+    "8": "Run one breadth-first search from every node to know all distances.",
+    "9": "-1 marks nodes this search has not reached yet.",
+    "12": "Process the queue in order; head is the next node to expand.",
+    "15": "Only an unvisited neighbour gets a distance.",
+    "16": "It is one edge further from source than the node we came from.",
+    "21": "Store this source's distances as one row of the table.",
+    "26": "The number of edges on the path from start to end.",
+    "27": "start is on the path, so it is a safe first choice.",
+    "28": "Try every node as the answer.",
+    "29": "A node is on the path exactly when the detour through it costs nothing extra.",
+    "30": "Keep it if it is on the path and strictly closer to node.",
+    "34": "The best path node answers this query.",
+    "36": "Return one answer per query."
+  }
+}

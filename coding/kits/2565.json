@@ -1,0 +1,64 @@
+{
+  "number": 2565,
+  "title": "Subsequence With the Minimum Score",
+  "spec": "leetcode",
+  "statement": "You are given two strings `s` and `t`. You may delete any set of characters from `t` (possibly none, possibly all) so that what remains of `t` is a subsequence of `s`: its characters appear in `s` in the same relative order, not necessarily next to each other. The *score* of a deletion is `0` when nothing is deleted; otherwise it is `right - left + 1`, where `left` and `right` are the smallest and largest original indices (0-indexed) in `t` of the deleted characters. Return the smallest score that makes `t` a subsequence of `s`. Deleting every character always works, since the empty string is a subsequence of any string.",
+  "constraints": [
+    "1 <= s.length, t.length <= 10^5",
+    "s and t contain only lowercase English letters"
+  ],
+  "signature": "int minimumScore(String s, String t)",
+  "entry": "minimumScore",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "t"
+  ],
+  "validator": "function validate([s, t]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 100000) return 's needs 1 to 100000 letters.';\n  if (typeof t !== 'string' || t.length < 1 || t.length > 100000) return 't needs 1 to 100000 letters.';\n  if (!/^[a-z]+$/.test(s) || !/^[a-z]+$/.test(t)) return 's and t use only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumScore(s, t) {\n  const n = s.length;\n  const m = t.length;\n  const suffix = new Array(m + 1).fill(-1);\n  suffix[m] = n;\n  let pos = n - 1;\n  for (let j = m - 1; j >= 0; j--) {\n    while (pos >= 0 && s[pos] !== t[j]) pos--;\n    if (pos < 0) break;\n    suffix[j] = pos;\n    pos--;\n  }\n  let right = 0;\n  while (suffix[right] < 0) right++;\n  let best = right;\n  let left = 0;\n  for (let i = 0; i < n && left < m; i++) {\n    if (s[i] !== t[left]) continue;\n    left++;\n    while (right < left || suffix[right] <= i) right++;\n    best = Math.min(best, right - left);\n  }\n  return best;\n}",
+  "brute": "function minimumScore(s, t) {\n  const m = t.length;\n  let best = m;\n  for (let mask = 0; mask < (1 << m); mask++) {\n    let kept = '';\n    let low = -1;\n    let high = -1;\n    for (let k = 0; k < m; k++) {\n      if (mask & (1 << k)) {\n        if (low < 0) low = k;\n        high = k;\n      } else kept += t[k];\n    }\n    let matched = 0;\n    for (const c of s) if (matched < kept.length && c === kept[matched]) matched++;\n    if (matched !== kept.length) continue;\n    const score = mask === 0 ? 0 : high - low + 1;\n    if (score < best) best = score;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const alphabets = ['ab', 'abc', 'abcd', 'xyz'];\n  const alphabet = alphabets[Math.floor(rand() * alphabets.length)];\n  const letter = () => alphabet[Math.floor(rand() * alphabet.length)];\n  const word = (length) => Array.from({ length }, letter).join('');\n  if (size !== 'large') {\n    const s = word(1 + Math.floor(rand() * 8));\n    let t = word(1 + Math.floor(rand() * 8));\n    if (rand() < 0.2) t = t.slice(0, -1) + 'q';\n    return [s, t];\n  }\n  const s = word(10000);\n  const mode = Math.floor(rand() * 3);\n  if (mode === 0) return [s, word(10000)];\n  // Take a subsequence of s and break it with a block that s cannot supply in place.\n  let kept = '';\n  for (const c of s) if (rand() < 0.7) kept += c;\n  const cut = Math.floor(rand() * kept.length);\n  const junk = mode === 1 ? 'q'.repeat(1 + Math.floor(rand() * 50)) : word(1 + Math.floor(rand() * 3000));\n  const t = (kept.slice(0, cut) + junk + kept.slice(cut)).slice(0, 10000);\n  return [s, t];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abacaba","bzaa"],"expected":1},
+    {"name":"Example 2","input":["cde","xyz"],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a","a"]},
+    {"name":"Test 2","input":["a","b"]},
+    {"name":"Test 3","input":["abc","abc"]},
+    {"name":"Test 4","input":["abc","cba"]},
+    {"name":"Test 5","input":["aaaa","aaaaaa"]},
+    {"name":"Test 6","input":["abcde","axxxe"]},
+    {"name":"Test 7","input":["xyz","zzzz"]},
+    {"name":"Test 8","input":["ab","ba"]},
+    {"name":"Test 9","input":["abacaba","aaaaa"]},
+    {"name":"Test 10","input":["ababab","bbbaaa"]},
+    {"name":"Test 11","input":["leetcode","lxyzetcode"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe score only depends on the first and last deleted positions, so once you delete `t[left]` and `t[right - 1]` you may as well delete everything between them for free: it never raises the score and only makes matching easier. So the real question is which contiguous block `t[left..right-1]` to delete so that the prefix `t[0..left-1]` followed by the suffix `t[right..]` is a subsequence of `s`. Trying every block and testing it is O(m² · n); greedy matching from both ends plus two pointers does it in linear time.\n\n## Approach\n\n1. Match `t` from the back against `s` from the back, as late as possible. `suffix[j]` is the latest index of `s` where `t[j..]` can start, or `-1` when `t[j..]` is not a subsequence. Set `suffix[m] = n` for the empty suffix.\n2. Let `right` be the first `j` with `suffix[j] >= 0`. Deleting `t[0..right-1]` works, so `best = right`.\n3. Scan `s` with index `i`, matching `t` from the front as early as possible; `left` counts the matched prefix.\n4. Each time `t[left]` matches `s[i]`, increase `left`, then push `right` forward until `right >= left` and the suffix starts after `i` (`suffix[right] > i`). Both conditions only get stricter, so `right` never moves back.\n5. The block `t[left..right-1]` is then deletable; update `best` with `right - left`. Return `best`.\n\n## Example 1, step by step\n\n`s = \"abacaba\"`, `t = \"bzaa\"`. From the back, `t[3] = 'a'` matches `s[6]`, `t[2] = 'a'` matches `s[4]`, and `'z'` never matches, so `suffix = [-1, -1, 4, 6, 7]`. The first valid suffix is `right = 2`, giving `best = 2`. Scanning `s`, `t[0] = 'b'` matches at `i = 1`, so `left = 1`; `suffix[2] = 4 > 1` keeps `right = 2`, and `best = 2 - 1 = 1`. `'z'` never matches again, so the answer is `1`.\n\n## Complexity\n\n- Time: O(n + m): each of `pos`, `i` and `right` only moves one way.\n- Space: O(m) for `suffix`.\n\n## Pitfalls\n\n- Matching the prefix early and the suffix late is what makes the test `suffix[right] > i` exact; matching them any other way can reject a valid split.\n- `right` must also stay at least `left`, or the kept prefix and suffix would overlap in `t`.\n- When `t` is already a subsequence the answer is `0`, not `1`; `suffix[0] >= 0` gives `best = 0` at once.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n`, `m` | lengths of `s` and `t` |\n| `suffix` | `suffix[j]` = latest start in `s` for `t[j..]`, `-1` if impossible |\n| `pos` | pointer into `s` while matching from the back |\n| `i`, `left` | pointer into `s` and length of the matched prefix of `t` |\n| `right` | start of the kept suffix of `t` |\n| `best` | smallest score found so far |",
+  "narration": {
+    "4": "suffix[j] will hold where t[j..] starts when matched as late as possible in s, or -1 when it cannot be matched.",
+    "5": "The empty suffix of t fits after all of s.",
+    "7": "Walk t from its last character towards its first.",
+    "8": "Slide left through s until a character equals t[j].",
+    "9": "s ran out, so this suffix and every longer one cannot be matched.",
+    "10": "Record the latest position where t[j..] can begin.",
+    "13": "Find the shortest suffix of t that is a subsequence of s on its own.",
+    "15": "Deleting the whole prefix before it is always allowed, so that is the first candidate score.",
+    "17": "Scan s from the left, matching the prefix of t as early as possible.",
+    "18": "Skip characters of s that are not the next prefix character.",
+    "19": "One more character of t's prefix is matched, ending at s[i].",
+    "20": "Move right until the kept suffix starts after the prefix in both t and s.",
+    "21": "Deleting t[left..right-1] works here; keep the smallest block length.",
+    "23": "Return the smallest score over every split."
+  }
+}

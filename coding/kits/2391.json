@@ -1,0 +1,63 @@
+{
+  "number": 2391,
+  "title": "Minimum Amount of Time to Collect Garbage",
+  "spec": "leetcode",
+  "statement": "Houses stand in a row, numbered from 0. The string `garbage[i]` describes what is waiting at house `i`: each character is one unit of trash, `'M'` for metal, `'P'` for paper and `'G'` for glass. Loading one unit of any kind onto a truck costs 1 minute, and driving from house `i` to house `i + 1` costs `travel[i]` minutes.\n\nThere is one truck per kind of trash. Every truck starts at house 0 and moves only forward through the houses in order, but it may stop as soon as all trash of its kind has been loaded, so it never has to reach the last house. At any moment only one truck is working (driving or loading), so the minutes of the three trucks add up.\n\nReturn the smallest total number of minutes needed to collect every unit of trash.",
+  "constraints": [
+    "2 <= garbage.length <= 10^5",
+    "garbage[i] contains only the letters 'M', 'P' and 'G'",
+    "1 <= garbage[i].length <= 10",
+    "travel.length == garbage.length - 1",
+    "1 <= travel[i] <= 100"
+  ],
+  "signature": "int garbageCollection(String[] garbage, int[] travel)",
+  "entry": "garbageCollection",
+  "kind": "function",
+  "parameters": [
+    "garbage",
+    "travel"
+  ],
+  "validator": "function validate([garbage, travel]) {\n  if (garbage.length < 2 || garbage.length > 100000) return 'garbage needs 2 to 10^5 houses.';\n  if (garbage.some(g => g.length < 1 || g.length > 10)) return 'Each house holds 1 to 10 units.';\n  if (garbage.some(g => !/^[MPG]+$/.test(g))) return \"Each house may only contain 'M', 'P' and 'G'.\";\n  if (travel.length !== garbage.length - 1) return 'travel must have one fewer entry than garbage.';\n  if (travel.some(t => t < 1 || t > 100)) return 'Each travel time is between 1 and 100.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function garbageCollection(garbage, travel) {\n  const prefix = [0];\n  for (let i = 0; i < travel.length; i++) {\n    prefix.push(prefix[i] + travel[i]);\n  }\n\n  const last = { M: 0, P: 0, G: 0 };\n  let total = 0;\n  for (let i = 0; i < garbage.length; i++) {\n    total += garbage[i].length;\n    for (const type of garbage[i]) {\n      last[type] = i;\n    }\n  }\n\n  for (const type of ['M', 'P', 'G']) {\n    total += prefix[last[type]];\n  }\n  return total;\n}",
+  "brute": "function garbageCollection(garbage, travel) {\n  // Drive each truck house by house; travel is only paid when a later house has its kind.\n  let minutes = 0;\n  for (const type of 'MPG') {\n    let pending = 0;\n    for (let i = 0; i < garbage.length; i++) {\n      if (i > 0) pending += travel[i - 1];\n      const count = garbage[i].split('').filter(c => c === type).length;\n      if (count > 0) {\n        minutes += pending + count;\n        pending = 0;\n      }\n    }\n  }\n  return minutes;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? 1500 : int(2, 6);\n  // Some inputs leave out a kind entirely, so its truck never moves.\n  let kinds = ['M', 'P', 'G'].filter(() => rand() < 0.75);\n  if (kinds.length === 0) kinds = ['G'];\n  const maxLen = size === 'large' ? 8 : 4;\n  const garbage = Array.from({ length: n }, () => Array.from({ length: int(1, maxLen) }, () => kinds[int(0, kinds.length - 1)]).join(''));\n  const maxTravel = size === 'large' || rand() < 0.3 ? 100 : 10;\n  const travel = Array.from({ length: n - 1 }, () => int(1, maxTravel));\n  return [garbage, travel];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["G","P","GP","GG"],[2,4,3]],"expected":21},
+    {"name":"Example 2","input":[["MMM","PGM","GP"],[3,10]],"expected":37}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["G","G"],[1]]},
+    {"name":"Test 2","input":[["M","P"],[5]]},
+    {"name":"Test 3","input":[["MPG","MPG","MPG"],[100,100]]},
+    {"name":"Test 4","input":[["MMMMMMMMMM","G"],[100]]},
+    {"name":"Test 5","input":[["P","P","P","P","M"],[1,2,3,4]]},
+    {"name":"Test 6","input":[["GPM","G","G","G"],[3,3,3]]},
+    {"name":"Test 7","input":[["MPGMPG","M","M","M"],[50,50,50]]},
+    {"name":"Test 8","input":[["M","G","M","G","M","G"],[10,1,10,1,10]]},
+    {"name":"Test 9","input":[["PPPPPPPPPP","PPPPPPPPPP"],[100]]},
+    {"name":"Test 10","input":[["G","M","P","GG","M","PPP","G"],[2,3,5,7,11,13]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nLoading costs one minute per unit no matter which truck does it, so that part is simply the total length of all strings. The only choice is how far each truck drives, and the best it can do is stop at the last house that holds its kind. Simulating each truck house by house works, but a prefix sum of `travel` gives the driving time from house 0 to any house in O(1).\n\n## Approach\n\n1. Build `prefix`, where `prefix[i]` is the time to drive from house 0 to house `i` (`prefix[0] = 0`).\n2. Scan the houses: add each string's length to `total`, and for every unit record `last[type] = i`, the furthest house that needs that truck.\n3. A kind that never appears keeps `last[type] = 0`, which costs no driving.\n4. Add `prefix[last[type]]` for each of the three kinds and return `total`.\n\n## Example 1, step by step\n\n`travel = [2, 4, 3]` gives `prefix = [0, 2, 6, 9]`. The houses hold 1 + 1 + 2 + 2 = 6 units, so `total = 6`. The scan ends with `last = { M: 0, P: 2, G: 3 }`. Driving adds `prefix[0] + prefix[2] + prefix[3] = 0 + 6 + 9 = 15`, and `total = 21`.\n\n## Complexity\n\n- Time: O(n + L), where L is the total number of characters: one pass over `travel` and one over every unit.\n- Space: O(n) for `prefix`; `last` has three entries.\n\n## Pitfalls\n\n- A truck must not drive past the last house with its kind; summing all of `travel` three times overcounts.\n- A missing kind should cost 0, not `prefix` of some default house; starting `last` at 0 handles it.\n- `prefix` has one more entry than `travel`: `prefix[i]` is the distance to house `i`, not from it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `prefix` | `prefix[i]` is the driving time from house 0 to house `i` |\n| `last` | for each kind, the highest house index that contains it |\n| `total` | minutes so far: all loading plus the driving added at the end |\n| `i` | the current house (or travel segment) index |\n| `type` | one unit's kind, `'M'`, `'P'` or `'G'` |",
+  "narration": {
+    "2": "prefix[i] will hold the driving time from house 0 to house i; house 0 itself costs nothing.",
+    "3": "Walk over every road segment between neighbouring houses.",
+    "4": "The time to reach house i + 1 is the time to reach house i plus this segment.",
+    "7": "Every kind starts with house 0 as its furthest stop, so a missing kind costs no driving.",
+    "8": "total collects the minutes spent loading and, later, driving.",
+    "9": "Visit the houses in order.",
+    "10": "Each character is one unit, and loading it costs one minute whatever its kind.",
+    "11": "Look at each unit at this house...",
+    "12": "...and mark this house as the furthest one its truck must reach so far.",
+    "16": "For each of the three trucks...",
+    "17": "...add the driving time to its last needed house, read straight from the prefix sums.",
+    "19": "Loading plus the three shortest drives is the minimum total."
+  }
+}

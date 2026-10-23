@@ -1,0 +1,75 @@
+{
+  "number": 2532,
+  "title": "Time to Cross a Bridge",
+  "spec": "leetcode",
+  "statement": "`n` boxes sit in a warehouse on the right bank of a river, and `k` workers must carry all of them to a warehouse on the left bank. A single bridge joins the banks, and every worker starts on the left bank. Worker `i` is described by `time[i] = [right_i, pick_i, left_i, put_i]`: walking over the bridge to the right bank takes `right_i` minutes, taking a box out of the right warehouse takes `pick_i`, walking back over to the left bank with it takes `left_i`, and storing it in the left warehouse takes `put_i`. A worker carries one box per round trip and may make several round trips.\n\nWorker `i` is **less efficient** than worker `j` when `left_i + right_i > left_j + right_j`, or when those two sums are equal and `i > j`. The bridge is shared by these rules:\n\n- The bridge holds a single worker at once. Picking and putting happen off the bridge, and any number of workers may do them at the same time.\n- Whenever the bridge is free, the workers holding a box and waiting on the right bank go first, the least efficient of them first. Only if nobody waits there does a worker waiting on the left bank start across, again the least efficient first. A worker who finishes picking or putting at the very minute the bridge becomes free is already waiting.\n- Each trip to the right fetches one box, so once `n` workers in total have been sent across from the left bank, nobody else is sent.\n\nReturn the minute at which the last box arrives on the left bank, which is when the final right-to-left crossing ends (the time to store that box is not counted).",
+  "constraints": [
+    "1 <= n, k <= 10^4",
+    "time.length == k",
+    "time[i].length == 4",
+    "1 <= right_i, pick_i, left_i, put_i <= 1000"
+  ],
+  "signature": "int findCrossingTime(int n, int k, int[][] time)",
+  "entry": "findCrossingTime",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "k",
+    "time"
+  ],
+  "validator": "function validate([n, k, time]) {\n  if (!Number.isInteger(n) || n < 1 || n > 10000) return 'n is between 1 and 10^4.';\n  if (!Number.isInteger(k) || k < 1 || k > 10000) return 'k is between 1 and 10^4.';\n  if (!Array.isArray(time) || time.length !== k) return 'time needs exactly k rows.';\n  for (const row of time) {\n    if (!Array.isArray(row) || row.length !== 4) return 'Each row of time has 4 values.';\n    if (row.some(v => !Number.isInteger(v) || v < 1 || v > 1000)) return 'Each time is between 1 and 1000.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findCrossingTime(n, k, time) {\n  const push = (heap, item, before) => {\n    heap.push(item);\n    let i = heap.length - 1;\n    while (i > 0 && before(heap[i], heap[(i - 1) >> 1])) {\n      const parent = (i - 1) >> 1;\n      [heap[i], heap[parent]] = [heap[parent], heap[i]];\n      i = parent;\n    }\n  };\n  const pop = (heap, before) => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length > 0) {\n      heap[0] = last;\n      let i = 0;\n      for (;;) {\n        let best = i;\n        for (const child of [2 * i + 1, 2 * i + 2]) {\n          if (child < heap.length && before(heap[child], heap[best])) best = child;\n        }\n        if (best === i) break;\n        [heap[i], heap[best]] = [heap[best], heap[i]];\n        i = best;\n      }\n    }\n    return top;\n  };\n  // Waiting workers: the least efficient one (bigger crossing sum, then bigger index) comes out first.\n  const cost = time.map(([right, , left]) => right + left);\n  const slower = (a, b) => (cost[a] !== cost[b] ? cost[a] > cost[b] : a > b);\n  // Busy workers are [finishTime, worker]: the earliest finish comes out first.\n  const sooner = (a, b) => a[0] < b[0];\n  const leftWait = [], rightWait = [], leftBusy = [], rightBusy = [];\n  for (let i = 0; i < k; i++) push(leftWait, i, slower);\n  let now = 0;\n  let remaining = n;\n  for (;;) {\n    while (leftBusy.length > 0 && leftBusy[0][0] <= now) push(leftWait, pop(leftBusy, sooner)[1], slower);\n    while (rightBusy.length > 0 && rightBusy[0][0] <= now) push(rightWait, pop(rightBusy, sooner)[1], slower);\n    if (rightWait.length > 0) {\n      const worker = pop(rightWait, slower);\n      now += time[worker][2];\n      if (remaining === 0 && rightWait.length === 0 && rightBusy.length === 0) return now;\n      push(leftBusy, [now + time[worker][3], worker], sooner);\n    } else if (remaining > 0 && leftWait.length > 0) {\n      const worker = pop(leftWait, slower);\n      now += time[worker][0];\n      remaining--;\n      push(rightBusy, [now + time[worker][1], worker], sooner);\n    } else {\n      let next = rightBusy.length > 0 ? rightBusy[0][0] : Infinity;\n      if (remaining > 0 && leftBusy.length > 0) next = Math.min(next, leftBusy[0][0]);\n      now = next;\n    }\n  }\n}",
+  "brute": "function findCrossingTime(n, k, time) {\n  // Event-driven state machine: every worker is in one state until the minute stored in until[i].\n  const state = Array(k).fill('left');\n  const until = Array(k).fill(0);\n  const weight = i => time[i][0] + time[i][2];\n  const slowest = ids => ids.reduce((a, b) => (weight(b) > weight(a) || (weight(b) === weight(a) && b > a) ? b : a));\n  let sent = 0, arrived = 0, bridgeFreeAt = 0, t = 0;\n  for (;;) {\n    for (let i = 0; i < k; i++) {\n      if (until[i] > t) continue;\n      if (state[i] === 'toRight') { state[i] = 'pick'; until[i] = t + time[i][1]; }\n      else if (state[i] === 'pick') state[i] = 'right';\n      else if (state[i] === 'toLeft') {\n        arrived++;\n        if (arrived === n) return t;\n        state[i] = 'put'; until[i] = t + time[i][3];\n      } else if (state[i] === 'put') state[i] = 'left';\n    }\n    if (bridgeFreeAt <= t) {\n      const right = [], left = [];\n      for (let i = 0; i < k; i++) {\n        if (state[i] === 'right') right.push(i);\n        else if (state[i] === 'left') left.push(i);\n      }\n      if (right.length) { const i = slowest(right); state[i] = 'toLeft'; until[i] = bridgeFreeAt = t + time[i][2]; }\n      else if (sent < n && left.length) { const i = slowest(left); sent++; state[i] = 'toRight'; until[i] = bridgeFreeAt = t + time[i][0]; }\n    }\n    let next = Infinity;\n    for (let i = 0; i < k; i++) if (until[i] > t) next = Math.min(next, until[i]);\n    t = next;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  let n, k, top;\n  if (size === 'large') {\n    const shape = pick(0, 3);\n    if (shape === 0) { n = 10000; k = 2000; }\n    else if (shape === 1) { n = 10000; k = pick(1, 12); }\n    else if (shape === 2) { n = pick(1, 60); k = 2000; }\n    else { n = pick(1000, 10000); k = pick(50, 2000); }\n    top = rand() < 0.3 ? pick(2, 6) : 1000;\n  } else {\n    n = pick(1, 7);\n    k = pick(1, 4);\n    top = rand() < 0.5 ? 3 : 10;\n  }\n  const time = Array.from({ length: k }, () => [pick(1, top), pick(1, top), pick(1, top), pick(1, top)]);\n  return [n, k, time];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,3,[[1,1,2,1],[1,1,3,1],[1,1,4,1]]],"expected":6},
+    {"name":"Example 2","input":[3,2,[[1,5,1,8],[10,10,10,10]]],"expected":37}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1,[[1,1,1,1]]]},
+    {"name":"Test 2","input":[3,1,[[2,3,4,5]]]},
+    {"name":"Test 3","input":[4,3,[[1,1,1,1],[1,1,1,1],[1,1,1,1]]]},
+    {"name":"Test 4","input":[5,2,[[1,10,1,1],[1,10,1,1]]]},
+    {"name":"Test 5","input":[2,4,[[3,1,2,1],[1,1,1,1],[2,2,3,2],[4,1,1,1]]]},
+    {"name":"Test 6","input":[6,3,[[10,1,10,1],[5,1,5,1],[1,1,1,1]]]},
+    {"name":"Test 7","input":[10000,1,[[1000,1000,1000,1000]]]},
+    {"name":"Test 8","input":[7,3,[[1,5,1,8],[10,10,10,10],[3,3,3,3]]]},
+    {"name":"Test 9","input":[5,2,[[1,1,1,100],[1,1,1,100]]]},
+    {"name":"Test 10","input":[1,3,[[4,1,6,1],[1,1,1,1],[7,5,3,1]]]},
+    {"name":"Test 11","input":[9,5,[[2,7,3,1],[5,2,1,6],[1,1,4,9],[3,3,3,3],[6,8,2,2]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a simulation, and the only hard part is answering \"who goes next?\" quickly. At any moment each worker is in one of four places: waiting on the left, waiting on the right with a box, busy picking on the right, or busy putting on the left. The waiting groups are asked \"who is least efficient?\", and the busy groups are asked \"who finishes soonest?\". Four priority queues answer both questions in O(log k), and the clock `now` only ever jumps to the next moment something can happen, so no minute-by-minute loop is needed.\n\n## Approach\n\n1. Put every worker in `leftWait`, a heap ordered by `slower` (bigger `right + left`, then bigger index). `rightWait` uses the same order; `leftBusy` and `rightBusy` hold `[finishTime, worker]` ordered by `sooner`. Set `remaining = n`, the boxes nobody has been sent for yet.\n2. Each round, move everyone whose picking or putting has finished by `now` into the matching waiting heap.\n3. If someone waits on the right, the least efficient one crosses left: add their `left` time to `now`. If no boxes remain unclaimed and nobody else is on the right bank, this was the last box: return `now`. Otherwise they start putting until `now + put`.\n4. Else, if `remaining > 0` and someone waits on the left, the least efficient one crosses right, claims a box (`remaining--`) and starts picking until `now + pick`.\n5. Else the bridge idles: jump `now` to the earliest finish time that matters (`leftBusy` only while boxes remain).\n\n## Example 1, step by step\n\nCrossing sums are 3, 4 and 5, so worker 2 is the least efficient. At `now = 0` worker 2 crosses right (`now = 1`, `remaining = 0`) and picks until 2. Nobody waits, so `now` jumps to 2; worker 2 crosses left in 4 minutes, `now = 6`. No box remains and the right bank is empty, so the answer is `6`.\n\n## Complexity\n\n- Time: O((n + k) log k): each box causes two crossings and two heap moves, and each idle jump is followed by a crossing.\n- Space: O(k) for the four heaps.\n\n## Pitfalls\n\n- \"Least efficient\" goes first: the **largest** `right + left`, and on a tie the **largest** index.\n- Release workers whose task ends exactly at `now` before choosing who crosses.\n- Count boxes when a worker is sent right, not when one arrives back; otherwise extra workers cross for boxes that are already claimed.\n- The answer is the arrival of the last box, not the end of its putting time.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `leftWait`, `rightWait` | workers waiting at each end of the bridge, least efficient on top |\n| `leftBusy`, `rightBusy` | `[finishTime, worker]` for workers putting (left) or picking (right) |\n| `cost` | each worker's crossing sum `right + left` |\n| `now` | the current minute |\n| `remaining` | boxes no worker has been sent for yet |\n| `worker` | the worker who just took the bridge |\n| `next` | the next minute at which a busy worker becomes free |",
+  "narration": {
+    "2": "push adds an item to a binary heap and sifts it up while it should come before its parent.",
+    "11": "pop removes the heap's top item and sifts the last item down into its place.",
+    "30": "A worker's crossing sum right + left decides how efficient they are.",
+    "31": "Waiting workers are ordered so that the least efficient (largest sum, then largest index) is on top.",
+    "33": "Busy workers are ordered by the minute their picking or putting ends.",
+    "35": "At the start every worker waits on the left bank.",
+    "37": "No worker has been sent yet, so every box is still unclaimed.",
+    "39": "Workers who finished putting by now line up on the left bank.",
+    "40": "Workers who finished picking by now line up on the right bank with their box.",
+    "41": "Workers holding a box always get the bridge first.",
+    "42": "Take the least efficient of them.",
+    "43": "They walk to the left bank, which moves the clock forward by their left time.",
+    "44": "If every box is claimed and nobody else is on the right bank, this was the last box to arrive.",
+    "45": "Otherwise the worker starts putting the box away and is free at now + put.",
+    "46": "With nobody on the right, a left-bank worker may cross, but only while some box is unclaimed.",
+    "47": "Take the least efficient worker waiting on the left.",
+    "48": "They walk to the right bank.",
+    "49": "That worker claims one of the remaining boxes.",
+    "50": "They start picking and will be free at now + pick.",
+    "52": "Nobody can use the bridge: the next event is a picker finishing...",
+    "53": "...or a putter finishing, which only matters while boxes are still unclaimed.",
+    "54": "Jump the clock straight to that moment."
+  }
+}

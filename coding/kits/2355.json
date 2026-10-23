@@ -1,0 +1,63 @@
+{
+  "number": 2355,
+  "title": "Maximum Number of Books You Can Take",
+  "spec": "recalled",
+  "statement": "A bookshelf has shelves in a row, and `books[i]` is the number of books on shelf `i`. Pick one contiguous run of shelves from `l` to `r` (`0 <= l <= r < books.length`) and take books from every shelf in it, between `0` and `books[i]` from shelf `i`. The amounts must strictly increase from left to right: for every `i` with `l <= i < r`, you take fewer books from shelf `i` than from shelf `i + 1`.\n\nReturn the largest total number of books you can take.",
+  "constraints": [
+    "1 <= books.length <= 10^5",
+    "0 <= books[i] <= 10^5"
+  ],
+  "signature": "long maximumBooks(int[] books)",
+  "entry": "maximumBooks",
+  "kind": "function",
+  "parameters": [
+    "books"
+  ],
+  "validator": "function validate([books]) {\n  if (!Array.isArray(books) || books.length < 1 || books.length > 100000) return 'books needs 1 to 10^5 shelves.';\n  if (!books.every(v => Number.isInteger(v) && v >= 0 && v <= 100000)) return 'Each shelf holds an integer from 0 to 10^5 books.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumBooks(books) {\n  const n = books.length;\n  const dp = new Array(n).fill(0);\n  const stack = [];\n  let best = 0;\n\n  for (let i = 0; i < n; i++) {\n    while (stack.length > 0 && books[stack.at(-1)] - stack.at(-1) >= books[i] - i) {\n      stack.pop();\n    }\n    const prev = stack.length > 0 ? stack.at(-1) : -1;\n    const count = Math.min(books[i], i - prev);\n    dp[i] = count * books[i] - (count * (count - 1)) / 2;\n    if (prev >= 0) {\n      dp[i] += dp[prev];\n    }\n    stack.push(i);\n    best = Math.max(best, dp[i]);\n  }\n  return best;\n}",
+  "brute": "function maximumBooks(books) {\n  let best = 0;\n  for (let r = 0; r < books.length; r++) {\n    // Ending at shelf r, take everything there and as much as allowed on each shelf to the left.\n    let take = books[r];\n    let total = take;\n    for (let k = r - 1; k >= 0 && take > 1; k--) {\n      take = Math.min(books[k], take - 1);\n      total += take;\n    }\n    best = Math.max(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    const n = int(1, 9);\n    const top = [0, 2, 5, 12][int(0, 3)];\n    const climb = rand() < 0.3;\n    return [Array.from({ length: n }, (_, i) => climb ? Math.min(12, i + int(0, 2)) : int(0, top))];\n  }\n  const n = 2000;\n  const shape = int(0, 2);\n  if (shape === 0) return [Array.from({ length: n }, () => int(0, 100000))];\n  if (shape === 1) return [Array.from({ length: n }, (_, i) => Math.max(0, Math.min(100000, 50 * i - int(0, 3000))))];\n  return [Array.from({ length: n }, (_, i) => Math.min(100000, i + int(0, 40)))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[8,5,2,7,9]],"expected":19},
+    {"name":"Example 2","input":[[7,0,3,4,5]],"expected":12},
+    {"name":"Example 3","input":[[8,2,3,7,3,4,0,1,4,3]],"expected":13}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0]]},
+    {"name":"Test 2","input":[[5]]},
+    {"name":"Test 3","input":[[0,0,0]]},
+    {"name":"Test 4","input":[[1,2,3,4,5]]},
+    {"name":"Test 5","input":[[5,4,3,2,1]]},
+    {"name":"Test 6","input":[[100000,100000,100000]]},
+    {"name":"Test 7","input":[[3,3,3,3,3,3]]},
+    {"name":"Test 8","input":[[1,1,1,10,1]]},
+    {"name":"Test 9","input":[[2,9,1,6,7,3,8]]},
+    {"name":"Test 10","input":[[10,0,10]]},
+    {"name":"Test 11","input":[[1,3,6,10,15,21,28]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFix the last shelf `i` of the run. Taking all `books[i]` there is best, and then each shelf to the left should give as many as allowed: one less than its right neighbour, unless the shelf itself holds fewer. Doing that walk for every `i` is the O(n²) brute force.\n\nThe walk from `i` takes `books[i]`, `books[i] - 1`, `books[i] - 2`, ... until it reaches a shelf `prev` that is too small for the next step, which happens exactly when `books[prev] - prev < books[i] - i`. From there on the walk is the same as a walk that ends at `prev`, whose total is already known. A monotonic stack finds the nearest such `prev` for every `i`.\n\n## Approach\n\n1. `dp[i]` is the most books a run ending at shelf `i` can give when it takes all `books[i]` from shelf `i`.\n2. Keep `stack` holding indices with strictly increasing `books[k] - k`. For shelf `i`, pop every index whose key is at least `books[i] - i`; the top that remains is `prev` (or `-1`).\n3. Shelves `prev + 1 .. i` take a falling run that starts at `books[i]`; it has `count = min(books[i], i - prev)` positive terms, whose sum is `count * books[i] - count * (count - 1) / 2`.\n4. If `prev` exists, add `dp[prev]`, then push `i` and update `best`.\n\n## Example 1, step by step\n\n`books = [8, 5, 2, 7, 9]`, keys `books[i] - i` are `[8, 4, 0, 4, 5]`.\n\n- `i = 0`: no `prev`, `count = 1`, `dp[0] = 8`.\n- `i = 1`: key 4 pops 0, `count = min(5, 2) = 2`, `dp[1] = 5 + 4 = 9`.\n- `i = 2`: key 0 pops 1, `count = 2`, `dp[2] = 2 + 1 = 3`.\n- `i = 3`: `prev = 2`, `count = 1`, `dp[3] = 7 + dp[2] = 10`.\n- `i = 4`: `prev = 3`, `count = 1`, `dp[4] = 9 + dp[3] = 19`, so `best = 19` (taking 1, 2, 7, 9).\n\n## Complexity\n\n- Time: O(n): each index is pushed and popped at most once.\n- Space: O(n) for `dp` and `stack`.\n\n## Pitfalls\n\n- A falling run that reaches zero cannot continue to the left, so cap `count` at `books[i]`; otherwise the formula adds negative terms.\n- The stopping shelf is found by comparing `books[k] - k`, not `books[k]` itself.\n- Totals reach about 5 * 10^9 on LeetCode's limits, beyond a 32-bit integer in Java and C.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[i]` | best total of a run that ends at shelf `i` taking all its books |\n| `stack` | indices with increasing `books[k] - k` |\n| `prev` | nearest shelf on the left where the falling run is cut off, or `-1` |\n| `count` | shelves covered by the falling run from `i` |\n| `best` | answer so far |",
+  "narration": {
+    "3": "dp[i] will hold the best total of a run that ends at shelf i and takes all of its books.",
+    "4": "The stack keeps indices whose key books[k] - k strictly increases from bottom to top.",
+    "7": "Treat each shelf in turn as the right end of the run.",
+    "8": "Shelves whose key is at least books[i] - i can follow the falling run from i without limiting it...",
+    "9": "...so they are popped; they will never be the cut-off shelf for a later index either.",
+    "11": "The remaining top is the nearest shelf too small for the falling run, or -1 if there is none.",
+    "12": "The falling run covers the shelves after prev, but stops early if it would drop to zero.",
+    "13": "Sum of the arithmetic run books[i], books[i] - 1, ... with count terms.",
+    "14": "If a cut-off shelf exists, the run continues from it exactly as the best run ending there.",
+    "15": "So add that shelf's already computed total.",
+    "17": "Shelf i becomes a candidate cut-off shelf for later indices.",
+    "18": "Keep the largest total seen over all right ends.",
+    "20": "Return the most books any contiguous run can give."
+  }
+}

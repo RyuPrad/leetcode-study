@@ -1,0 +1,60 @@
+{
+  "number": 2403,
+  "title": "Minimum Time to Kill All Monsters",
+  "spec": "recalled",
+  "statement": "There are several monsters, and `power[i]` is how strong monster `i` is. You start with `0` mana and a gain of `1`. At the start of each day your mana grows by your current gain. Later that same day you may defeat one monster whose power is at most your current mana; when you do, your mana drops back to `0` and your gain goes up by `1`.\n\nReturn the smallest number of days needed to defeat all the monsters.",
+  "constraints": [
+    "1 <= power.length <= 17",
+    "1 <= power[i] <= 10^9"
+  ],
+  "signature": "long minimumTime(int[] power)",
+  "entry": "minimumTime",
+  "kind": "function",
+  "parameters": [
+    "power"
+  ],
+  "validator": "function validate([power]) {\n  if (!Array.isArray(power) || power.length < 1 || power.length > 17) return 'power needs 1 to 17 values.';\n  if (power.some(v => !Number.isInteger(v) || v < 1 || v > 1000000000)) return 'Each power is a whole number from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumTime(power) {\n  const n = power.length;\n  const full = 1 << n;\n  const dp = new Array(full).fill(Infinity);\n  dp[0] = 0;\n  for (let mask = 0; mask < full; mask++) {\n    let gain = 1;\n    for (let i = 0; i < n; i++) {\n      if (mask & (1 << i)) {\n        gain++;\n      }\n    }\n    for (let i = 0; i < n; i++) {\n      if (mask & (1 << i)) {\n        continue;\n      }\n      const next = mask | (1 << i);\n      const days = Math.ceil(power[i] / gain);\n      dp[next] = Math.min(dp[next], dp[mask] + days);\n    }\n  }\n  return dp[full - 1];\n}",
+  "brute": "function minimumTime(power) {\n  // Try every kill order; equal powers are interchangeable, so each value is tried once per position.\n  let best = Infinity;\n  const used = power.map(() => false);\n  const walk = (count, total) => {\n    if (total >= best) return;\n    if (count === power.length) { best = total; return; }\n    const tried = new Set();\n    for (let i = 0; i < power.length; i++) {\n      if (used[i] || tried.has(power[i])) continue;\n      tried.add(power[i]);\n      used[i] = true;\n      const gain = count + 1;\n      let mana = 0, days = 0;\n      if (power[i] <= 1000) { while (mana < power[i]) { mana += gain; days++; } }\n      else days = Math.floor((power[i] - 1) / gain) + 1;\n      walk(count + 1, total + days);\n      used[i] = false;\n    }\n  };\n  walk(0, 0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const n = 15 + Math.floor(rand() * 3);\n    return [Array.from({ length: n }, () => 1 + Math.floor(rand() * 1000000000))];\n  }\n  const n = 1 + Math.floor(rand() * 7);\n  const style = rand();\n  const top = style < 0.4 ? 10 : style < 0.8 ? 60 : 1000000000;\n  return [Array.from({ length: n }, () => 1 + Math.floor(rand() * top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,1,4]],"expected":4},
+    {"name":"Example 2","input":[[1,1,4]],"expected":4},
+    {"name":"Example 3","input":[[1,2,4,9]],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5]]},
+    {"name":"Test 2","input":[[1000000000]]},
+    {"name":"Test 3","input":[[1,1,1,1]]},
+    {"name":"Test 4","input":[[6,6,6]]},
+    {"name":"Test 5","input":[[9,8,7,6,5,4,3,2,1]]},
+    {"name":"Test 6","input":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,17]]},
+    {"name":"Test 7","input":[[1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000,1000000000]]},
+    {"name":"Test 8","input":[[2,3,5,7,11,13,17,19,23,29]]},
+    {"name":"Test 9","input":[[100,1,50,3]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMana resets after every kill, so each kill is its own little race: if you have already defeated `k` monsters, your gain is `k + 1` and monster `i` takes `ceil(power[i] / (k + 1))` days. The total is the sum of these over the kill order. Trying all `n!` orders is hopeless for 17 monsters, but the cost of the next kill depends only on **which set** is already gone (its size fixes the gain), not on the order inside it. That makes it a dynamic program over subsets: `2^n` states instead of `n!` orders.\n\n## Approach\n\n1. Let `dp[mask]` be the fewest days to defeat exactly the monsters whose bits are set in `mask`. Start with `dp[0] = 0` and everything else `Infinity`.\n2. Visit masks in increasing order; every smaller subset of a mask is a smaller number, so `dp[mask]` is final when reached.\n3. Count the set bits to get `gain` (one more than the kills so far).\n4. For every monster `i` not in `mask`, it costs `days = ceil(power[i] / gain)`; relax `dp[next]` with `dp[mask] + days`.\n5. Return `dp[full - 1]`, the set with every monster.\n\n## Example 1, step by step\n\n`power = [3, 1, 4]`. From `mask = 000` with `gain = 1`: `dp[010] = 1`, `dp[001] = 3`, `dp[100] = 4`. From `010` (`gain = 2`), monster 2 costs `ceil(4 / 2) = 2`, so `dp[110] = 3`. From `110` (`gain = 3`), monster 0 costs `ceil(3 / 3) = 1`, so `dp[111] = 4`. Other routes, such as monster 1, then 0, then 2 (`1 + 2 + 2 = 5`), cost more, so the answer is `4`.\n\n## Complexity\n\n- Time: O(2^n · n): each mask counts its bits and tries every monster.\n- Space: O(2^n) for `dp`.\n\n## Pitfalls\n\n- Killing the weakest monster first is not always best: in Example 3 the order 1, 2, 4, 9 takes 7 days, but 1, 2, 9, 4 takes 6.\n- Use ceiling division; `power[i] / gain` rounded down undercounts by a day whenever it does not divide evenly.\n- The answer can reach about 1.7 · 10^10, which overflows a 32-bit integer in Java or C.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of monsters |\n| `full` | `2^n`, the number of subsets |\n| `dp[mask]` | fewest days to defeat the monsters in `mask` |\n| `gain` | mana per day after defeating the monsters in `mask` |\n| `next` | `mask` with monster `i` added |\n| `days` | days to defeat monster `i` at this gain |",
+  "narration": {
+    "3": "There are 2^n subsets of monsters; each is a bitmask below full.",
+    "4": "dp[mask] will hold the fewest days to defeat exactly the monsters in mask.",
+    "5": "Defeating nobody takes no days.",
+    "6": "Go through masks in increasing order, so every smaller subset is finished first.",
+    "7": "Gain starts at 1 before any kill...",
+    "9": "...and each monster already defeated in mask adds 1.",
+    "13": "Try each monster i as the next one to defeat.",
+    "14": "Skip monsters that are already defeated in mask.",
+    "17": "The new set of defeated monsters includes i.",
+    "18": "With mana reset to 0, it takes ceil(power[i] / gain) days to reach power[i].",
+    "19": "Keep the cheaper way of reaching the set next.",
+    "22": "The set with every monster holds the answer."
+  }
+}

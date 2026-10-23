@@ -1,0 +1,61 @@
+{
+  "number": 2547,
+  "title": "Minimum Cost to Split an Array",
+  "spec": "leetcode",
+  "statement": "You are given an integer array `nums` and an integer `k`. Cut `nums` into one or more non-empty contiguous pieces that together cover the whole array in order.\n\nFor a piece, drop every value that occurs exactly once in that piece; let `kept` be the number of elements that remain (so every copy of a value that appears two or more times in the piece counts). The piece costs `k + kept`, and a split costs the sum of the costs of its pieces. For example, the piece `[1,2,3,3,3,4,4]` keeps `[3,3,3,4,4]` and costs `k + 5`.\n\nReturn the smallest possible cost of a split of `nums`.",
+  "constraints": [
+    "1 <= nums.length <= 1000",
+    "0 <= nums[i] < nums.length",
+    "1 <= k <= 10^9"
+  ],
+  "signature": "int minCost(int[] nums, int k)",
+  "entry": "minCost",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  const n = nums.length;\n  if (n < 1 || n > 1000) return 'nums needs 1 to 1000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v >= n)) return 'Each nums[i] is an integer from 0 to nums.length - 1.';\n  if (!Number.isInteger(k) || k < 1 || k > 1000000000) return 'k is between 1 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minCost(nums, k) {\n  const n = nums.length;\n  const dp = new Array(n + 1).fill(Infinity);\n  dp[0] = 0;\n  for (let end = 1; end <= n; end++) {\n    const count = new Array(n).fill(0);\n    let trimmed = 0;\n    for (let start = end - 1; start >= 0; start--) {\n      const value = nums[start];\n      count[value]++;\n      if (count[value] === 2) {\n        trimmed += 2;\n      } else if (count[value] > 2) {\n        trimmed += 1;\n      }\n      dp[end] = Math.min(dp[end], dp[start] + k + trimmed);\n    }\n  }\n  return dp[n];\n}",
+  "brute": "function minCost(nums, k) {\n  // Try every set of cut positions and price each piece from scratch.\n  const n = nums.length;\n  const price = (piece) => {\n    const freq = new Map();\n    for (const v of piece) freq.set(v, (freq.get(v) || 0) + 1);\n    let kept = 0;\n    for (const c of freq.values()) if (c > 1) kept += c;\n    return k + kept;\n  };\n  let best = Infinity;\n  for (let mask = 0; mask < 1 << (n - 1); mask++) {\n    let total = 0;\n    let begin = 0;\n    for (let i = 1; i <= n; i++) {\n      if (i === n || (mask >> (i - 1)) & 1) {\n        total += price(nums.slice(begin, i));\n        begin = i;\n      }\n    }\n    best = Math.min(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? 1000 : pick(1, 9);\n  const distinct = rand() < 0.5 ? pick(1, Math.min(n, 4)) : n;\n  const nums = Array.from({ length: n }, () => pick(0, distinct - 1));\n  const roll = rand();\n  const k = roll < 0.4 ? pick(1, 3) : roll < 0.8 ? pick(1, size === 'large' ? 60 : 8) : pick(1, 1000000000);\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,1,2,1,3,3],2],"expected":8},
+    {"name":"Example 2","input":[[1,2,1,2,1],2],"expected":6},
+    {"name":"Example 3","input":[[1,2,1,2,1],5],"expected":10}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0],1]},
+    {"name":"Test 2","input":[[0],1000000000]},
+    {"name":"Test 3","input":[[0,0],1]},
+    {"name":"Test 4","input":[[0,0],5]},
+    {"name":"Test 5","input":[[0,0,0,0,0],1]},
+    {"name":"Test 6","input":[[0,0,0,0,0],3]},
+    {"name":"Test 7","input":[[0,1,2,3,4,5],7]},
+    {"name":"Test 8","input":[[1,2,1,2,1,3,3],1]},
+    {"name":"Test 9","input":[[3,1,3,1,0,2,0,2,4,4],3]},
+    {"name":"Test 10","input":[[5,5,1,0,2,5,5,6,7,1,0,3],4]},
+    {"name":"Test 11","input":[[0,1,0,1,0,1,0,1,0,1,0,1,0,1],2]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every set of cut positions is correct but exponential. Instead, think about where the last piece starts: if it is `nums[start..end-1]`, the best split of the first `end` elements is the best split of the first `start` elements plus that piece's cost. That is a 1-D DP over prefix lengths. Computing each piece's cost from scratch would make it O(n³); growing the piece leftwards one element at a time and keeping a frequency table updates its cost in O(1).\n\n## Approach\n\n1. `dp[end]` is the cheapest split of the first `end` elements; `dp[0] = 0`.\n2. For each `end`, start an empty frequency table `count` and `trimmed = 0`, then extend the last piece leftwards with `start = end - 1, end - 2, ..., 0`.\n3. Adding `value = nums[start]`: if it now occurs twice, both copies become kept, so `trimmed += 2`; if it occurs three or more times, only the new copy is added, so `trimmed += 1`; a first occurrence adds nothing.\n4. Update `dp[end]` with `dp[start] + k + trimmed`. The answer is `dp[n]`.\n\n## Example 1, step by step\n\n`nums = [1,2,1,2,1,3,3]`, `k = 2`. The table fills in as `dp = [0, 2, 2, 4, 4, 6, 6, 8]`: for example `dp[2] = 2` because `[1,2]` has no repeats. For `end = 7` the last piece `[1,2,1,3,3]` (`start = 2`) has `trimmed = 4`, giving `dp[2] + 2 + 4 = 8`; no other `start` gives less, so the answer is `8`.\n\n## Complexity\n\n- Time: O(n²): two nested loops, each step O(1).\n- Space: O(n) for `dp` and the frequency table.\n\n## Pitfalls\n\n- When a value reaches two copies, add 2, not 1: the copy counted as unique before now also stays.\n- Reset `count` and `trimmed` for every `end`; they describe only the current last piece.\n- `k` can be up to 10^9, so start `dp` at `Infinity` (or a large 64-bit value), not a small sentinel.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp` | `dp[i]`: minimum cost to split the first `i` elements |\n| `end` | the last piece ends just before index `end` |\n| `start` | the last piece begins at index `start` |\n| `count` | how often each value occurs in `nums[start..end-1]` |\n| `trimmed` | how many elements of that piece are kept (values seen at least twice) |\n| `value` | the element just added to the piece |",
+  "narration": {
+    "3": "dp[i] will hold the cheapest split of the first i elements; start every entry as unknown.",
+    "4": "Splitting nothing costs nothing.",
+    "5": "Compute the best split of the first end elements.",
+    "6": "A fresh frequency table describes the last piece, which grows leftwards from end - 1.",
+    "8": "Try every start for the last piece, extending it one element to the left each time.",
+    "10": "Count the new element in the last piece.",
+    "11": "Its second copy: both copies are now repeated, so two elements become kept.",
+    "13": "A third or later copy adds just itself to the kept elements.",
+    "16": "Best split of the prefix before start, plus this last piece's cost k + trimmed.",
+    "19": "dp[n] is the cheapest split of the whole array."
+  }
+}
