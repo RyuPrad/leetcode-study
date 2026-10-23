@@ -1,0 +1,60 @@
+{
+  "number": 2910,
+  "title": "Minimum Number of Groups to Create a Valid Assignment",
+  "spec": "leetcode",
+  "statement": "Each entry of `balls` is the number printed on one ball. Place every ball into a box, using as few non-empty boxes as possible, while obeying two rules:\n\n- A box may only hold balls that all carry the same number. Balls sharing a number may still be spread over several boxes.\n- The box with the most balls holds at most one ball more than the box with the fewest.\n\nReturn that smallest number of boxes. A valid placement always exists.",
+  "constraints": [
+    "1 <= balls.length <= 10^5",
+    "1 <= balls[i] <= 10^9"
+  ],
+  "signature": "int minGroupsForValidAssignment(int[] balls)",
+  "entry": "minGroupsForValidAssignment",
+  "kind": "function",
+  "parameters": [
+    "balls"
+  ],
+  "validator": "function validate([balls]) {\n  if (!Array.isArray(balls) || balls.length < 1 || balls.length > 100000) return 'balls needs 1 to 100000 values.';\n  if (balls.some(b => !Number.isInteger(b) || b < 1 || b > 1000000000)) return 'Each ball number is an integer from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minGroupsForValidAssignment(balls) {\n  const count = new Map();\n  for (const ball of balls) {\n    count.set(ball, (count.get(ball) ?? 0) + 1);\n  }\n  const freqs = [...count.values()];\n  const smallest = freqs.reduce((a, b) => Math.min(a, b));\n  for (let size = smallest; size >= 1; size--) {\n    let groups = 0;\n    let valid = true;\n    for (const freq of freqs) {\n      const boxes = Math.ceil(freq / (size + 1));\n      if (boxes * size > freq) {\n        valid = false;\n        break;\n      }\n      groups += boxes;\n    }\n    if (valid) {\n      return groups;\n    }\n  }\n  return balls.length;\n}",
+  "brute": "function minGroupsForValidAssignment(balls) {\n  const freq = {};\n  for (const b of balls) freq[b] = (freq[b] || 0) + 1;\n  const values = Object.values(freq);\n  const most = Math.max(...values);\n  let answer = Infinity;\n  // Try every smallest box size s; split each count into parts of size s or s + 1 by DP.\n  for (let s = 1; s <= most; s++) {\n    const parts = [0];\n    for (let t = 1; t <= most; t++) {\n      const a = t >= s ? parts[t - s] : Infinity;\n      const b = t >= s + 1 ? parts[t - s - 1] : Infinity;\n      parts.push(Math.min(a, b) + 1);\n    }\n    const total = values.reduce((sum, f) => sum + parts[f], 0);\n    if (total < answer) answer = total;\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 12);\n  const distinct = size === 'large' ? 1 + Math.floor(rand() * 30) : 1 + Math.floor(rand() * 4);\n  const big = rand() < 0.5;\n  const labels = [];\n  while (labels.length < distinct) {\n    const v = 1 + Math.floor(rand() * (big ? 1000000000 : distinct + 8));\n    if (!labels.includes(v)) labels.push(v);\n  }\n  // Uneven weights give a mix of large and small counts per number.\n  const weights = labels.map(() => 0.2 + rand());\n  const total = weights.reduce((a, b) => a + b, 0);\n  const balls = Array.from({ length: n }, () => {\n    let r = rand() * total;\n    for (let i = 0; i < labels.length; i++) {\n      r -= weights[i];\n      if (r < 0) return labels[i];\n    }\n    return labels[labels.length - 1];\n  });\n  return [balls];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,2,3,2,3]],"expected":2},
+    {"name":"Example 2","input":[[10,10,10,3,1,1]],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5]]},
+    {"name":"Test 2","input":[[1,1,1,1]]},
+    {"name":"Test 3","input":[[1,2,3,4]]},
+    {"name":"Test 4","input":[[1,1,2,2,2,2,2]]},
+    {"name":"Test 5","input":[[1,1,1,2,2,2,2,2,2,2,2,2,2]]},
+    {"name":"Test 6","input":[[7,9,7,9,9,7,9,9,9,7,9,9,9,9,9]]},
+    {"name":"Test 7","input":[[1000000000,1,1000000000,1,1000000000,1,1000000000]]},
+    {"name":"Test 8","input":[[4,8,8,8,8,8,8,8,8,8,8]]},
+    {"name":"Test 9","input":[[2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3]]},
+    {"name":"Test 10","input":[[6,6,6,5,5,5,5,5,5,5,5,5,5,5]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly how many times each number occurs matters. The size rule means every box holds either `size` or `size + 1` balls for some `size`, and `size` cannot exceed the smallest count (that number's balls must fill at least one box). For a fixed `size`, a count `freq` can be split into `g` boxes exactly when `g * size <= freq <= g * (size + 1)`, so the fewest boxes is `g = ceil(freq / (size + 1))` provided `g * size <= freq`. Bigger boxes never need more of them, so we **enumerate** `size` from the largest possible value downward and stop at the first one that works for every count.\n\n## Approach\n\n1. Count each number's occurrences in `count` and collect the counts in `freqs`.\n2. Let `smallest` be the least count; try `size = smallest, smallest - 1, ..., 1`.\n3. For each count, take `boxes = ceil(freq / (size + 1))`. If even that many boxes would need more than `freq` balls at `size` each, this `size` fails.\n4. The first `size` where every count fits returns its total `groups`. `size = 1` always fits, because any count splits into boxes of 1 and 2.\n\n## Example 1, step by step\n\n`balls = [3, 2, 3, 2, 3]` gives counts 3 (for the 3s) and 2 (for the 2s), so `smallest = 2`. With `size = 2`: count 3 needs `ceil(3 / 3) = 1` box and `1 * 2 <= 3` holds; count 2 needs `ceil(2 / 3) = 1` box and `2 <= 2` holds. Every count fits, so the answer is `1 + 1 = 2`.\n\n## Complexity\n\n- Time: O(n): there are at most `smallest` sizes and `freqs.length` counts, and `smallest * freqs.length <= n`.\n- Space: O(d) for the map of d distinct numbers.\n\n## Pitfalls\n\n- Using `floor` instead of `ceil` leaves balls unplaced; the remainder must fit into existing or extra boxes.\n- A size can fail for one count yet work for a smaller size, e.g. counts 4 and 11 fail at size 4 but succeed at size 3.\n- Taking the minimum with `Math.min(...freqs)` on a huge spread can overflow the call stack; reduce instead.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | map from ball number to how many balls carry it |\n| `freqs` | the list of those counts |\n| `smallest` | the least count, the largest possible box size |\n| `size` | the candidate smaller box size (boxes hold `size` or `size + 1`) |\n| `boxes` | fewest boxes for one count at this size |\n| `groups` | total boxes over all counts at this size |\n| `valid` | whether every count fits at this size |",
+  "narration": {
+    "3": "Look at every ball once.",
+    "4": "Count how many balls carry this number.",
+    "6": "Only the counts matter from here on.",
+    "7": "No box can be larger than the rarest number's count, so that bounds the size.",
+    "8": "Try box sizes from the largest possible down; larger boxes never need more of them.",
+    "12": "Fewest boxes of size at most size + 1 that can hold this count.",
+    "13": "Even those boxes would need more than freq balls at the smaller size...",
+    "14": "...so this size cannot work for this number.",
+    "17": "This number fits; add its boxes to the total.",
+    "19": "Every count fitted at this size.",
+    "20": "The first size that works gives the fewest boxes.",
+    "23": "Never reached, because size 1 always works (boxes of 1 or 2 balls)."
+  }
+}

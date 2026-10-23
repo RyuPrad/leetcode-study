@@ -1,0 +1,72 @@
+{
+  "number": 2901,
+  "title": "Longest Unequal Adjacent Groups Subsequence II",
+  "spec": "leetcode",
+  "statement": "You get two arrays of the same length `n`: `words`, whose strings are all different (and may have different lengths), and the integer array `groups`. Pick indices `i_0 < i_1 < ... < i_(k-1)` from `0` to `n - 1` so that every two consecutive picks `a` and `b` obey both rules:\n\n- `groups[a]` and `groups[b]` are not equal;\n- `words[a]` and `words[b]` have the same length and differ at exactly one position (their Hamming distance, the count of positions holding different characters, is 1).\n\nMake `k` as large as possible and return the picked words in index order. If several longest choices exist, any one of them is accepted.",
+  "constraints": [
+    "1 <= n == words.length == groups.length <= 1000",
+    "1 <= words[i].length <= 10",
+    "1 <= groups[i] <= n",
+    "All strings in words are distinct",
+    "words[i] contains only lowercase English letters"
+  ],
+  "signature": "List<String> getWordsInLongestSubsequence(String[] words, int[] groups)",
+  "entry": "getWordsInLongestSubsequence",
+  "kind": "function",
+  "parameters": [
+    "words",
+    "groups"
+  ],
+  "compare": "checker",
+  "checker": "function check([words, groups], actual, expected) {\n  if (!Array.isArray(actual) || actual.length !== expected.length) return false;\n  const position = new Map(words.map((word, i) => [word, i]));\n  let last = -1;\n  for (let k = 0; k < actual.length; k++) {\n    const index = position.get(actual[k]);\n    if (index === undefined || index <= last) return false;\n    if (k > 0) {\n      const a = words[last], b = words[index];\n      if (groups[last] === groups[index] || a.length !== b.length) return false;\n      let diff = 0;\n      for (let c = 0; c < a.length; c++) if (a[c] !== b[c]) diff++;\n      if (diff !== 1) return false;\n    }\n    last = index;\n  }\n  return true;\n}",
+  "validator": "function validate([words, groups]) {\n  const n = words.length;\n  if (n < 1 || n > 1000) return 'words needs 1 to 1000 strings.';\n  if (groups.length !== n) return 'groups must be as long as words.';\n  if (words.some(w => typeof w !== 'string' || !/^[a-z]{1,10}$/.test(w))) return 'Each word has 1 to 10 lowercase letters.';\n  if (new Set(words).size !== n) return 'The words must all be different.';\n  if (groups.some(g => !Number.isInteger(g) || g < 1 || g > n)) return 'Each group is an integer from 1 to n.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function getWordsInLongestSubsequence(words, groups) {\n  const n = words.length;\n  const dp = new Array(n).fill(1);\n  const prev = new Array(n).fill(-1);\n  let bestEnd = 0;\n\n  const oneApart = (a, b) => {\n    if (a.length !== b.length) return false;\n    let diff = 0;\n    for (let c = 0; c < a.length; c++) {\n      if (a[c] !== b[c]) diff++;\n    }\n    return diff === 1;\n  };\n\n  for (let i = 0; i < n; i++) {\n    for (let j = 0; j < i; j++) {\n      if (groups[j] === groups[i] || dp[j] + 1 <= dp[i]) {\n        continue;\n      }\n      if (oneApart(words[j], words[i])) {\n        dp[i] = dp[j] + 1;\n        prev[i] = j;\n      }\n    }\n    if (dp[i] > dp[bestEnd]) {\n      bestEnd = i;\n    }\n  }\n\n  const result = [];\n  for (let i = bestEnd; i !== -1; i = prev[i]) {\n    result.push(words[i]);\n  }\n  return result.reverse();\n}",
+  "brute": "function getWordsInLongestSubsequence(words, groups) {\n  // Try every subset of indices (as a bit mask) and keep the longest one that follows the rules.\n  const n = words.length;\n  const hamming = (a, b) => [...a].filter((ch, c) => ch !== b[c]).length;\n  let best = [0];\n  for (let mask = 1; mask < 1 << n; mask++) {\n    const picked = [];\n    for (let i = 0; i < n; i++) if (mask & (1 << i)) picked.push(i);\n    if (picked.length <= best.length) continue;\n    const fine = picked.every((b, t) => t === 0 || (groups[picked[t - 1]] !== groups[b] && words[picked[t - 1]].length === words[b].length && hamming(words[picked[t - 1]], words[b]) === 1));\n    if (fine) best = picked;\n  }\n  return best.map(i => words[i]);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  if (size === 'small') {\n    const letters = rand() < 0.5 ? 'ab' : 'abc';\n    const maxLength = pick(1, 3);\n    let available = 0;\n    for (let l = 1; l <= maxLength; l++) available += letters.length ** l;\n    const n = Math.min(pick(1, 9), available);\n    const seen = new Set();\n    const words = [];\n    // Small alphabets make one-letter differences common; retry until the words are distinct.\n    while (words.length < n) {\n      const length = pick(1, maxLength);\n      let word = '';\n      for (let c = 0; c < length; c++) word += letters[pick(0, letters.length - 1)];\n      if (seen.has(word)) continue;\n      seen.add(word);\n      words.push(word);\n    }\n    const top = rand() < 0.5 ? Math.min(2, n) : n;\n    const groups = Array.from({ length: n }, () => pick(1, top));\n    return [words, groups];\n  }\n  // Large inputs mostly walk from word to word one letter at a time, so long chains exist, with occasional jumps.\n  const n = 1000;\n  const letters = 'abcd';\n  const seen = new Set();\n  const words = [];\n  let current = 'aaaaa';\n  while (words.length < n) {\n    let next;\n    if (rand() < 0.1) {\n      const length = pick(1, 10);\n      next = '';\n      for (let c = 0; c < length; c++) next += letters[pick(0, 3)];\n    } else {\n      const chars = current.split('');\n      const at = pick(0, chars.length - 1);\n      chars[at] = letters[pick(0, 3)];\n      next = chars.join('');\n    }\n    current = next;\n    if (seen.has(next)) continue;\n    seen.add(next);\n    words.push(next);\n  }\n  const top = rand() < 0.5 ? 3 : n;\n  const groups = Array.from({ length: n }, () => pick(1, top));\n  return [words, groups];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["bab","dab","cab"],[1,2,2]],"expected":["bab","cab"]},
+    {"name":"Example 2","input":[["a","b","c","d"],[1,2,3,4]],"expected":["a","b","c","d"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["a"],[1]]},
+    {"name":"Test 2","input":[["a","b"],[1,1]]},
+    {"name":"Test 3","input":[["ab","cd"],[1,2]]},
+    {"name":"Test 4","input":[["abc","abd","abe"],[1,2,1]]},
+    {"name":"Test 5","input":[["a","ab","b","abc","ac"],[1,2,2,1,1]]},
+    {"name":"Test 6","input":[["aa","ab","ac","ad"],[3,3,3,3]]},
+    {"name":"Test 7","input":[["aaa","aab","abb","bbb","bba","baa"],[1,2,1,2,1,2]]},
+    {"name":"Test 8","input":[["cat","bat","cot","bot","cog","dog","dot"],[1,2,2,1,1,2,1]]},
+    {"name":"Test 9","input":[["abcdefghij","abcdefghik","xbcdefghik","abcdefghil","xbcdefghil","xbcdefghim"],[1,2,3,3,4,5]]},
+    {"name":"Test 10","input":[["ba","aa","ab","bb","ca","cb"],[1,2,3,1,2,3]]},
+    {"name":"Test 11","input":[["z","y","x","w","v"],[1,1,2,2,1]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every subsequence works for a handful of words but grows as 2^n. Notice that whether a word may follow another depends only on that pair, so this is a longest-increasing-subsequence shape: for each index, ask how long the best valid chain ending exactly there can be. A chain ending at `i` is a chain ending at some earlier compatible `j`, plus `i` itself. Remember which `j` gave the best length and the chain can be rebuilt backwards.\n\n## Approach\n\n1. `dp[i]` is the length of the longest valid chain ending at index `i` (at least 1, the word alone); `prev[i]` is the index before `i` in that chain, or -1.\n2. For each `i`, look at every earlier `j`. Skip it when the groups match or when it cannot improve `dp[i]`.\n3. Otherwise, if `words[j]` and `words[i]` have equal length and exactly one differing position (`oneApart`), set `dp[i] = dp[j] + 1` and `prev[i] = j`.\n4. Track `bestEnd`, the index with the largest `dp`.\n5. Follow `prev` from `bestEnd` back to -1, collecting words, and reverse them.\n\n## Example 1, step by step\n\n`words = [\"bab\", \"dab\", \"cab\"]`, `groups = [1, 2, 2]`. Index 0 starts a chain of 1. Index 1 (`\"dab\"`): index 0 has another group and differs only in the first letter, so `dp[1] = 2`, `prev[1] = 0`, and `bestEnd = 1`. Index 2 (`\"cab\"`): index 0 also gives `dp[2] = 2`; index 1 shares group 2 and is skipped. `dp[2]` does not beat `dp[1]`, so the walk back from 1 gives `[\"bab\", \"dab\"]`. LeetCode shows `[\"bab\", \"cab\"]`; both have the longest length 2, so both are accepted.\n\n## Complexity\n\n- Time: O(n² · L) with L ≤ 10 the word length: each pair is compared once, letter by letter.\n- Space: O(n) for `dp` and `prev`.\n\n## Pitfalls\n\n- Words of different lengths are never neighbours; check the lengths before counting differences.\n- The rules apply only to consecutive picks, so two picks further apart may share a group.\n- Rebuilding needs `prev`; storing only lengths tells you how long the answer is, not which words form it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[i]` | length of the longest valid chain ending at `i` |\n| `prev[i]` | index before `i` in that chain, or -1 |\n| `bestEnd` | index where the longest chain ends |\n| `oneApart` | true when two words have equal length and differ in one letter |\n| `diff` | count of differing letters inside `oneApart` |\n| `result` | the words collected while walking back |",
+  "narration": {
+    "3": "Every word alone is a valid chain of length 1.",
+    "4": "No word has a predecessor yet.",
+    "5": "Index 0 holds the longest chain so far.",
+    "7": "Helper: can these two words sit next to each other?",
+    "8": "Words of different lengths can never be neighbours.",
+    "10": "Compare the words letter by letter...",
+    "11": "...counting the positions where they differ.",
+    "13": "Neighbours must differ in exactly one letter.",
+    "16": "Find the best chain that ends at index i.",
+    "17": "Try every earlier index j as the word right before i.",
+    "18": "Same group, or j cannot make the chain at i any longer: skip it.",
+    "21": "The words are close enough to be neighbours.",
+    "22": "Extend the chain ending at j by word i.",
+    "23": "Remember j so the chain can be rebuilt later.",
+    "26": "Does the chain ending at i beat the best one so far?",
+    "27": "Yes: the longest chain now ends at i.",
+    "32": "Walk back from the best end through the stored predecessors.",
+    "33": "Collect each word on the way, last word first.",
+    "35": "Reverse so the words come in index order."
+  }
+}

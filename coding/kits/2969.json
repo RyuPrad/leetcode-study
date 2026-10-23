@@ -1,0 +1,61 @@
+{
+  "number": 2969,
+  "title": "Minimum Number of Coins for Fruits II",
+  "spec": "recalled",
+  "statement": "A market sells a row of fruits. Number them from `1`: the `i`-th fruit costs `prices[i]` coins (in code the list is 0-indexed, so fruit `i` is `prices[i - 1]`).\n\nPaying for fruit `i` comes with a reward: the `i` fruits right after it (fruits `i + 1` up to `2i`, as far as they exist) are yours at no cost. A fruit you already got for free may still be bought at its price, and buying it earns that fruit's own reward.\n\nReturn the fewest coins you need to spend so that you end up with every fruit.",
+  "constraints": [
+    "1 <= prices.length <= 10^5",
+    "1 <= prices[i] <= 10^5"
+  ],
+  "signature": "int minimumCoins(int[] prices)",
+  "entry": "minimumCoins",
+  "kind": "function",
+  "parameters": [
+    "prices"
+  ],
+  "validator": "function validate([prices]) {\n  if (!Array.isArray(prices) || prices.length < 1 || prices.length > 100000) return 'prices needs 1 to 10^5 values.';\n  if (prices.some(p => !Number.isInteger(p) || p < 1 || p > 100000)) return 'Each price is a whole number from 1 to 10^5.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumCoins(prices) {\n  const n = prices.length;\n  const dp = new Array(n).fill(0);\n  const deque = [];\n  let front = 0;\n  for (let i = n - 1; i >= 0; i--) {\n    while (front < deque.length && deque[front] > 2 * i + 2) {\n      front++;\n    }\n    if (2 * i + 2 >= n) {\n      dp[i] = prices[i];\n    } else {\n      dp[i] = prices[i] + dp[deque[front]];\n    }\n    while (deque.length > front && dp[deque[deque.length - 1]] >= dp[i]) {\n      deque.pop();\n    }\n    deque.push(i);\n  }\n  return dp[0];\n}",
+  "brute": "function minimumCoins(prices) {\n  // Try every set of fruits to buy; fruit index k (0-based) covers indices k + 1 .. 2k + 1.\n  const n = prices.length;\n  let best = Infinity;\n  for (let mask = 0; mask < (1 << n); mask++) {\n    let cost = 0;\n    const owned = new Array(n).fill(false);\n    for (let k = 0; k < n; k++) {\n      if (!(mask & (1 << k))) continue;\n      cost += prices[k];\n      owned[k] = true;\n      for (let j = k + 1; j <= 2 * k + 1 && j < n; j++) owned[j] = true;\n    }\n    if (owned.every(Boolean)) best = Math.min(best, cost);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const n = 2000;\n    const shape = Math.floor(rand() * 3);\n    const prices = Array.from({ length: n }, (_, i) => {\n      if (shape === 0) return 1 + Math.floor(rand() * 100000);\n      if (shape === 1) return rand() < 0.1 ? 1 + Math.floor(rand() * 10) : 50000 + Math.floor(rand() * 50001);\n      return Math.max(1, 100000 - i * 50 - Math.floor(rand() * 40));\n    });\n    return [prices];\n  }\n  const n = 1 + Math.floor(rand() * 10);\n  const span = rand() < 0.5 ? 5 : 100;\n  return [Array.from({ length: n }, () => 1 + Math.floor(rand() * span))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,1,2]],"expected":4},
+    {"name":"Example 2","input":[[1,10,1,1]],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5]]},
+    {"name":"Test 2","input":[[7,3]]},
+    {"name":"Test 3","input":[[1,1,1,1,1,1,1,1]]},
+    {"name":"Test 4","input":[[100,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 5","input":[[26,18,6,12,49,7,45,45]]},
+    {"name":"Test 6","input":[[10,9,8,7,6,5,4,3,2,1]]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,8,9,10]]},
+    {"name":"Test 8","input":[[100000,100000,100000]]},
+    {"name":"Test 9","input":[[1,100000,100000,1,100000,100000,100000,100000,100000,100000]]},
+    {"name":"Test 10","input":[[3,100,1,100,100,100,1,100,100,100,100,100,100,100,2]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFruit 1 can only be obtained by paying for it, so the first purchase is fixed. After paying for the fruit at 0-based index `i`, fruits `i + 1 .. 2i + 1` are free, so the next fruit you pay for must sit somewhere in `i + 1 .. 2i + 2` (any later and fruit `2i + 2` would be missed). Let `dp[i]` be the cheapest way to own every fruit from `i` onward given that you pay for fruit `i`. Then `dp[i] = prices[i] + min(dp[j])` over that window, or just `prices[i]` when the reward already reaches the end. Trying every subset of purchases is exponential, and scanning each window is O(n²); a monotonic deque gives each window's minimum in O(1) amortized.\n\n## Approach\n\n1. Fill `dp` from right to left, since `dp[i]` depends only on larger indices.\n2. Drop indices beyond `2i + 2` from the `front` of `deque`; they are out of the window for `i` and for every smaller index.\n3. If `2i + 2 >= n`, buying fruit `i` covers the rest: `dp[i] = prices[i]`. Otherwise add the cheapest window value `dp[deque[front]]`.\n4. Pop indices from the back whose `dp` is at least `dp[i]`: `i` is cheaper and stays in range longer, so they can never be the minimum again.\n5. Push `i` and continue. The answer is `dp[0]`.\n\n## Example 1, step by step\n\n`prices = [3, 1, 2]`, `n = 3`. At `i = 2` the reward reaches the end, so `dp[2] = 2`. At `i = 1` too: `dp[1] = 1`, and index 2 is popped because `2 >= 1`. At `i = 0` the window is indices 1..2 and the front is index 1, so `dp[0] = 3 + 1 = 4`: pay for fruit 1 (fruit 2 free), then pay for fruit 2 to get fruit 3. The answer is `4`.\n\n## Complexity\n\n- Time: O(n): each index is pushed once and removed at most once.\n- Space: O(n) for `dp` and the deque.\n\n## Pitfalls\n\n- With 1-indexed fruits the reward of fruit `i` is `i` fruits; in 0-based code that is indices `i + 1 .. 2i + 1`, and the next purchase may be at `2i + 2`.\n- Do not assume free fruits are never bought: in `[1, 10, 1, 1]` paying for the free third fruit is what makes the answer `2`.\n- Remove expired indices before reading the front, or you may use a purchase that leaves a gap.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of fruits |\n| `dp[i]` | fewest coins to own fruits `i..n-1` when fruit `i` is bought |\n| `deque` | indices with increasing `dp` values, front to back |\n| `front` | position of the deque's first live entry |\n| `i` | fruit being paid for (0-based) |",
+  "narration": {
+    "2": "Count the fruits.",
+    "3": "dp[i] will hold the cheapest cost of owning fruits i..n-1 when fruit i is bought.",
+    "4": "The deque keeps candidate next purchases, cheapest at the front.",
+    "6": "Work from the last fruit back to the first, because dp[i] looks only to the right.",
+    "7": "Indices beyond 2i + 2 are too far away to be the next purchase after fruit i.",
+    "8": "Skip them by moving the front forward.",
+    "10": "Does paying for fruit i already cover every remaining fruit?",
+    "11": "Then the cost from here is just its price.",
+    "13": "Otherwise pay for fruit i plus the cheapest next purchase in the window.",
+    "15": "Back entries costing at least dp[i] are beaten by i, which also stays in range longer.",
+    "16": "Throw them away so the deque stays increasing.",
+    "18": "Add fruit i as a candidate for the purchases to its left.",
+    "20": "Fruit 1 must always be bought, so dp[0] is the answer."
+  }
+}

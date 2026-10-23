@@ -1,0 +1,69 @@
+{
+  "number": 2999,
+  "title": "Count the Number of Powerful Integers",
+  "spec": "leetcode",
+  "statement": "You get integers `start`, `finish` and `limit`, and a string `s` of digits that spells a positive integer.\n\nA positive integer `x` is **powerful** when both of these hold:\n\n- the decimal form of `x` ends with `s` (`s` is a suffix of it; for example `25` is a suffix of `5125` but `512` is not), and\n- none of the digits of `x` is larger than `limit`.\n\nReturn how many powerful integers lie in the inclusive range `[start, finish]`.",
+  "constraints": [
+    "1 <= start <= finish <= 10^15",
+    "1 <= limit <= 9",
+    "1 <= s.length <= floor(log10(finish)) + 1 (s is no longer than finish has digits)",
+    "s contains only digits, each at most limit",
+    "s has no leading zeros"
+  ],
+  "signature": "long numberOfPowerfulInt(long start, long finish, int limit, String s)",
+  "entry": "numberOfPowerfulInt",
+  "kind": "function",
+  "parameters": [
+    "start",
+    "finish",
+    "limit",
+    "s"
+  ],
+  "validator": "function validate([start, finish, limit, s]) {\n  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(finish) || start < 1 || start > finish || finish > 1e15) return 'Need whole numbers with 1 <= start <= finish <= 10^15.';\n  if (!Number.isInteger(limit) || limit < 1 || limit > 9) return 'limit is a whole number from 1 to 9.';\n  if (typeof s !== 'string' || !/^[1-9][0-9]*$/.test(s)) return 's must be digits with no leading zero.';\n  if (s.length > String(finish).length) return 's cannot have more digits than finish.';\n  if ([...s].some(ch => Number(ch) > limit)) return 'Every digit of s must be at most limit.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numberOfPowerfulInt(start, finish, limit, s) {\n  const countUpTo = (x) => {\n    const digits = String(x);\n    const free = digits.length - s.length;\n    if (free < 0) {\n      return 0;\n    }\n    let below = 0;\n    let tight = 1;\n    for (let i = 0; i < free; i++) {\n      const digit = Number(digits[i]);\n      below = below * (limit + 1) + tight * Math.min(digit, limit + 1);\n      if (digit > limit) {\n        tight = 0;\n      }\n    }\n    const tail = digits.slice(free);\n    const tailFits = tight === 1 && tail >= s;\n    return below + (tailFits ? 1 : 0);\n  };\n  return countUpTo(finish) - countUpTo(start - 1);\n}",
+  "brute": "function numberOfPowerfulInt(start, finish, limit, s) {\n  // Every number ending with s is k * 10^len + s; walk the k values that land in range and test their digits.\n  const step = 10 ** s.length;\n  const tail = Number(s);\n  let k = Math.max(0, Math.ceil((start - tail) / step));\n  let total = 0;\n  for (let x = k * step + tail; x <= finish; x += step) {\n    if (x < start) continue;\n    if ([...String(x)].every(ch => Number(ch) <= limit)) total++;\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const digitsUpTo = (top, first) => String(first ? 1 + Math.floor(rand() * top) : Math.floor(rand() * (top + 1)));\n  const finishDigits = size === 'large' ? 10 + Math.floor(rand() * 6) : 1 + Math.floor(rand() * 6);\n  let finish = Math.floor(rand() * 10 ** finishDigits) + 1;\n  if (size === 'large' && rand() < 0.25) finish = 1000000000000000;\n  const start = rand() < 0.3 ? 1 : 1 + Math.floor(rand() * finish);\n  const limit = 1 + Math.floor(rand() * 9);\n  const maxLength = String(finish).length;\n  const length = 1 + Math.floor(rand() * Math.min(maxLength, size === 'large' ? 6 : maxLength));\n  let s = digitsUpTo(limit, true);\n  while (s.length < length) s += digitsUpTo(limit, false);\n  return [start, finish, limit, s];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,6000,4,"124"],"expected":5},
+    {"name":"Example 2","input":[15,215,6,"10"],"expected":2},
+    {"name":"Example 3","input":[1000,2000,4,"3000"],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1,1,"1"]},
+    {"name":"Test 2","input":[1,9,9,"5"]},
+    {"name":"Test 3","input":[2,8,1,"1"]},
+    {"name":"Test 4","input":[500,500,5,"500"]},
+    {"name":"Test 5","input":[501,600,5,"500"]},
+    {"name":"Test 6","input":[1,999999,3,"3"]},
+    {"name":"Test 7","input":[123456,7654321,7,"77"]},
+    {"name":"Test 8","input":[1,1000000000000000,9,"100000000000"]},
+    {"name":"Test 9","input":[1,1000000000000000,4,"4321012343"]},
+    {"name":"Test 10","input":[999999999999000,1000000000000000,9,"99"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCounting in a range is easier as a difference of prefix counts: the answer is `countUpTo(finish) - countUpTo(start - 1)`, where `countUpTo(x)` counts powerful integers in `[1, x]`. The brute force would test every number in the range, which is hopeless up to `10^15`. Instead, write `x` with `d` digits: a powerful number up to `x` is a `free = d - s.length` digit prefix (leading zeros allowed, every digit at most `limit`) followed by `s`. A digit DP over the prefix needs only two states: prefixes already smaller than `x`'s prefix, which are free to continue with any allowed digit, and the one prefix still equal to it.\n\n## Approach\n\n1. In `countUpTo(x)`, if `x` has fewer digits than `s`, nothing fits: return `0`.\n2. Keep `below` (prefixes strictly smaller than `x`'s prefix so far, all digits allowed) and `tight` (`1` while `x`'s own prefix still uses only allowed digits).\n3. For each prefix position with digit `digit`: every `below` prefix extends in `limit + 1` ways, and the tight prefix drops below by choosing one of `min(digit, limit + 1)` smaller allowed digits. If `digit > limit`, the tight path dies.\n4. After the prefix, the tight path counts only when `x`'s last digits `tail` are at least `s` (same length, so string comparison works).\n5. Return `countUpTo(finish) - countUpTo(start - 1)`.\n\n## Example 1, step by step\n\n`start = 1, finish = 6000, limit = 4, s = \"124\"`. For `6000`, `free = 1`. The prefix digit is `6`: `below = 0 * 5 + 1 * min(6, 5) = 5` (prefixes 0 to 4), and `tight` becomes `0` because `6 > 4`. So `countUpTo(6000) = 5`: 124, 1124, 2124, 3124, 4124. `countUpTo(0)` is `0`, so the answer is `5`.\n\n## Complexity\n\n- Time: O(log finish): one pass over the digits for each bound.\n- Space: O(log finish) for the digit strings.\n\n## Pitfalls\n\n- A prefix of all zeros is allowed: it stands for `s` itself, which is a positive integer.\n- Once a prefix digit of `x` exceeds `limit`, no number can stay equal to `x`'s prefix; stop counting the tight path, but keep the smaller choices you already added.\n- Counts reach about `10^15`, so Java and C need 64-bit integers; the subtraction `start - 1` can be `0`, which must count nothing.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `countUpTo(x)` | powerful integers in `[1, x]` |\n| `digits` | decimal string of `x` |\n| `free` | number of digits before the suffix `s` |\n| `below` | prefixes already smaller than `x`'s, all digits allowed |\n| `tight` | `1` if `x`'s own prefix is still allowed, else `0` |\n| `tail` | the last `s.length` digits of `x` |",
+  "narration": {
+    "2": "countUpTo(x) will count powerful integers from 1 to x.",
+    "3": "Work with the decimal digits of x.",
+    "4": "This many leading digits come before the suffix s.",
+    "5": "If x is shorter than s, no number up to x can end with s.",
+    "8": "No prefix is known to be smaller than x's prefix yet.",
+    "9": "The prefix equal to x's own prefix is still possible.",
+    "10": "Build the prefix one digit at a time.",
+    "12": "Smaller prefixes extend with any allowed digit, and the tight prefix can drop below with a smaller allowed digit.",
+    "13": "x's own digit is not allowed here...",
+    "14": "...so no number can match x's prefix from now on.",
+    "17": "These are x's last digits, where s would sit.",
+    "18": "Following x's prefix exactly works only if s is not larger than x's tail.",
+    "19": "Smaller prefixes always fit, and the tight one adds one more if allowed.",
+    "21": "Count up to finish and subtract everything below start."
+  }
+}

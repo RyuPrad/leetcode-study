@@ -1,0 +1,65 @@
+{
+  "number": 3007,
+  "title": "Maximum Number That Sum of the Prices Is Less Than or Equal to K",
+  "spec": "leetcode",
+  "statement": "You get two integers `k` and `x`. Number the bits of a positive integer's binary form 1, 2, 3, ... starting from the least significant bit. The **price** of a positive integer `num` is how many of its bits at the positions that are multiples of `x` (positions `x`, `2x`, `3x`, ...) equal 1. For example, with `x = 2` the number 233 (binary `11101001`) has price 3, because its bits 4, 6 and 8 are 1 and bit 2 is 0.\n\nThe **accumulated price** of `num` adds up the prices of every integer from 1 through `num`. Call `num` **cheap** when its accumulated price does not exceed `k`. Return the largest cheap integer.",
+  "constraints": [
+    "1 <= k <= 10^15",
+    "1 <= x <= 8"
+  ],
+  "signature": "long findMaximumNumber(long k, int x)",
+  "entry": "findMaximumNumber",
+  "kind": "function",
+  "parameters": [
+    "k",
+    "x"
+  ],
+  "validator": "function validate([k, x]) {\n  if (!Number.isInteger(k) || k < 1 || k > 1e15) return 'k is a whole number from 1 to 10^15.';\n  if (!Number.isInteger(x) || x < 1 || x > 8) return 'x is a whole number from 1 to 8.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMaximumNumber(k, x) {\n  // Total price of every number from 1 to num, stopping early once it passes k.\n  function accumulatedPrice(num) {\n    let total = 0;\n    for (let bit = x - 1; 2 ** bit <= num; bit += x) {\n      const half = 2 ** bit;\n      const block = 2 * half;\n      const fullBlocks = Math.floor((num + 1) / block);\n      const rest = (num + 1) % block;\n      total += fullBlocks * half + Math.max(0, rest - half);\n      if (total > k) break;\n    }\n    return total;\n  }\n\n  let low = 1;\n  let high = 2 * k + 2 ** x;\n  while (low < high) {\n    const mid = low + Math.ceil((high - low) / 2);\n    if (accumulatedPrice(mid) <= k) {\n      low = mid;\n    } else {\n      high = mid - 1;\n    }\n  }\n  return low;\n}",
+  "brute": "function findMaximumNumber(k, x) {\n  // Walk the numbers one by one, adding each price until the budget is broken.\n  let total = 0;\n  for (let num = 1; ; num++) {\n    const bits = num.toString(2).split('').reverse();\n    for (let pos = x; pos <= bits.length; pos += x) {\n      if (bits[pos - 1] === '1') total++;\n    }\n    if (total > k) return num - 1;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const x = 1 + Math.floor(rand() * 8);\n  if (size === 'small') {\n    const k = 1 + Math.floor(rand() * rand() * 600);\n    return [k, x];\n  }\n  if (rand() < 0.3) return [1e15 - Math.floor(rand() * 1000), x];\n  const k = Math.max(1, Math.floor(10 ** (6 + rand() * 9)));\n  return [Math.min(k, 1e15), x];\n}",
+  "examples": [
+    {"name":"Example 1","input":[9,1],"expected":6},
+    {"name":"Example 2","input":[7,2],"expected":9}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[1,8]},
+    {"name":"Test 3","input":[2,1]},
+    {"name":"Test 4","input":[13,2]},
+    {"name":"Test 5","input":[4,5]},
+    {"name":"Test 6","input":[1000,1]},
+    {"name":"Test 7","input":[1000,8]},
+    {"name":"Test 8","input":[54321,3]},
+    {"name":"Test 9","input":[100000,1]},
+    {"name":"Test 10","input":[100000,7]},
+    {"name":"Test 11","input":[255,8]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAdding one more number never lowers the accumulated price, so the cheap numbers form a prefix 1, 2, ..., answer. That makes the answer searchable: binary search on `num`, as long as the accumulated price of any `num` can be computed quickly. Walking the numbers one by one is the brute force, but the answer can be around 10^15.\n\nCounting by bit instead of by number does it. Among 0 through `num`, bit `b` (counted from 0) is 1 in a repeating pattern: blocks of `2^(b+1)` numbers, each with `2^b` zeros followed by `2^b` ones.\n\n## Approach\n\n1. `accumulatedPrice(num)` visits the bit indexes `x - 1`, `2x - 1`, ... (the positions `x`, `2x`, ... counted from 1) while `2^bit <= num`.\n2. For each, the `num + 1` values 0..num contain `fullBlocks` complete blocks, each giving `half` ones, plus a partial block of `rest` values giving `max(0, rest - half)` ones.\n3. Stop adding once `total` passes `k`; the exact excess does not matter.\n4. Binary search with `low = 1` (always cheap) and `high = 2k + 2^x`, which is safely past the answer since every `2^x` numbers contribute at least `2^(x-1)` from bit `x - 1` alone.\n5. If `mid` is cheap, move `low` up to it; otherwise the answer is below `mid`. Return `low`.\n\n## Example 1, step by step\n\n`k = 9`, `x = 1`, so every bit counts. The search starts with `low = 1`, `high = 20`. `mid = 11` has accumulated price 20 (the helper stops as soon as its total passes 9), so `high = 10`. `mid = 6` costs 1+1+2+1+2+2 = 9, which is cheap, so `low = 6`. `mid = 8` costs 13, so `high = 7`; `mid = 7` costs 12, so `high = 6`. Now `low === high` and the answer is `6`.\n\n## Complexity\n\n- Time: O(log k * log k / x): about 50 search steps, each scanning up to 50 / x bit positions.\n- Space: O(1).\n\n## Pitfalls\n\n- Count over the `num + 1` values 0..num; using `num` blocks gives an off-by-one in every bit.\n- Positions are 1-based in the statement, so position `x` is bit index `x - 1`.\n- Pick `mid` rounding up when the cheap side does `low = mid`, or the loop never ends.\n- Values exceed 32 bits, so use `2 **` and division instead of the shift operators.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `bit` | 0-based index of a bit whose position is a multiple of `x` |\n| `half`, `block` | `2^bit` and the pattern length `2^(bit+1)` |\n| `fullBlocks`, `rest` | complete patterns among 0..num and the leftover count |\n| `total` | accumulated price so far |\n| `low`, `high` | the answer lies in `[low, high]` |\n| `mid` | candidate tested in this step |",
+  "narration": {
+    "3": "This helper adds up the prices of 1 through num, one counted bit position at a time.",
+    "5": "Visit the bit indexes x - 1, 2x - 1, ... that are not above num's highest bit.",
+    "6": "In this bit's repeating pattern, half values have the bit 0 and the next half have it 1.",
+    "8": "Count how many complete patterns of 2^(bit+1) values fit into 0..num.",
+    "9": "The leftover values form a partial pattern at the end.",
+    "10": "Every full pattern contributes half ones; the partial one contributes whatever passes its zero half.",
+    "11": "Once the total exceeds k the exact amount no longer matters.",
+    "16": "1 is always cheap, so it is a safe lower end.",
+    "17": "2k + 2^x is beyond the answer: bit x - 1 alone already pushes the total past k there.",
+    "18": "Keep halving the range until one candidate is left.",
+    "19": "Round up so that low = mid always shrinks the range.",
+    "20": "Is mid still within the budget?",
+    "21": "Yes: the answer is mid or larger.",
+    "23": "No: every number from mid upward is too expensive.",
+    "26": "low is the largest cheap number."
+  }
+}

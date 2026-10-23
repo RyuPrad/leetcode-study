@@ -1,0 +1,73 @@
+{
+  "number": 2973,
+  "title": "Find Number of Coins to Place in Tree Nodes",
+  "spec": "leetcode",
+  "statement": "A tree has `n` nodes numbered `0` to `n - 1` and is rooted at node `0`. The list `edges` holds its `n - 1` undirected edges, each `[a, b]` joining nodes `a` and `b`, and `cost[i]` is the (nonzero) cost of node `i`.\n\nEvery node `i` receives some coins, decided by its subtree (node `i` together with all of its descendants):\n\n- If that subtree has fewer than 3 nodes, node `i` gets exactly 1 coin.\n- Otherwise, look at every choice of 3 different nodes of the subtree and multiply their costs; node `i` gets the largest such product, or 0 coins if that largest product is negative.\n\nReturn the array `coin` of length `n`, where `coin[i]` is the number of coins node `i` receives.",
+  "constraints": [
+    "2 <= n <= 2 * 10^4",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "0 <= a, b < n",
+    "cost.length == n",
+    "1 <= |cost[i]| <= 10^4",
+    "edges form a valid tree"
+  ],
+  "signature": "long[] placedCoins(int[][] edges, int[] cost)",
+  "entry": "placedCoins",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "cost"
+  ],
+  "validator": "function validate([edges, cost]) {\n  const n = cost.length;\n  if (n < 2 || n > 20000) return 'The tree needs 2 to 20000 nodes.';\n  if (edges.length !== n - 1) return 'edges must have exactly n - 1 entries.';\n  if (cost.some(c => !Number.isInteger(c) || c === 0 || Math.abs(c) > 10000)) return 'Each cost is a nonzero integer from -10^4 to 10^4.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [a, b].';\n    const [a, b] = edge;\n    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0 || a >= n || b >= n) return 'Edge endpoints must be node numbers from 0 to n - 1.';\n    const ra = find(a), rb = find(b);\n    if (ra === rb) return 'The edges must form a tree (no cycles).';\n    root[ra] = rb;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function placedCoins(edges, cost) {\n  const n = cost.length;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) {\n    graph[a].push(b);\n    graph[b].push(a);\n  }\n\n  const parent = new Array(n).fill(-1);\n  const order = [0];\n  for (let i = 0; i < order.length; i++) {\n    const node = order[i];\n    for (const next of graph[node]) {\n      if (next !== parent[node]) {\n        parent[next] = node;\n        order.push(next);\n      }\n    }\n  }\n\n  const size = new Array(n).fill(1);\n  const extremes = cost.map((value) => [value]);\n  const coin = new Array(n).fill(1);\n  for (let i = n - 1; i >= 0; i--) {\n    const node = order[i];\n    const values = extremes[node].sort((a, b) => a - b);\n    const m = values.length;\n    if (size[node] >= 3) {\n      const topThree = values[m - 1] * values[m - 2] * values[m - 3];\n      const twoLowest = values[0] * values[1] * values[m - 1];\n      coin[node] = Math.max(topThree, twoLowest, 0);\n    }\n    const kept = m > 5 ? [...values.slice(0, 2), ...values.slice(m - 3)] : values;\n    if (node !== 0) {\n      size[parent[node]] += size[node];\n      extremes[parent[node]].push(...kept);\n    }\n  }\n  return coin;\n}",
+  "brute": "function placedCoins(edges, cost) {\n  const n = cost.length;\n  const adj = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) { adj[a].push(b); adj[b].push(a); }\n  const up = new Array(n).fill(-1);\n  const seen = new Array(n).fill(false);\n  const stack = [0];\n  seen[0] = true;\n  while (stack.length) {\n    const u = stack.pop();\n    for (const v of adj[u]) if (!seen[v]) { seen[v] = true; up[v] = u; stack.push(v); }\n  }\n  // Every node's cost belongs to the subtree of each of its ancestors (and itself).\n  const members = Array.from({ length: n }, () => []);\n  for (let v = 0; v < n; v++) for (let a = v; a !== -1; a = up[a]) members[a].push(cost[v]);\n  return members.map(list => {\n    if (list.length < 3) return 1;\n    let best = -Infinity;\n    for (let i = 0; i < list.length; i++)\n      for (let j = i + 1; j < list.length; j++)\n        for (let k = j + 1; k < list.length; k++) best = Math.max(best, list[i] * list[j] * list[k]);\n    return best < 0 ? 0 : best;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(1800, 2000) : int(2, 9);\n  const shape = int(0, 3);\n  const links = [];\n  for (let i = 1; i < n; i++) {\n    // 0: random tree, 1: path, 2: star, 3: shallow bushy tree.\n    const p = shape === 0 ? int(0, i - 1) : shape === 1 ? i - 1 : shape === 2 ? 0 : int(Math.max(0, i - 4), i - 1) >> 1;\n    links.push([p, i]);\n  }\n  // Relabel the nodes so node 0 can sit anywhere in the shape.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = int(0, i); [label[i], label[j]] = [label[j], label[i]]; }\n  const edges = links.map(([a, b]) => rand() < 0.5 ? [label[a], label[b]] : [label[b], label[a]]);\n  for (let i = edges.length - 1; i > 0; i--) { const j = int(0, i); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const span = size === 'large' || rand() < 0.3 ? 10000 : 10;\n  const negativeShare = [0, 0.3, 0.5, 0.8, 1][int(0, 4)];\n  const cost = Array.from({ length: n }, () => (rand() < negativeShare ? -1 : 1) * int(1, span));\n  return [edges, cost];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1],[0,2],[0,3],[0,4],[0,5]],[1,2,3,4,5,6]],"expected":[120,1,1,1,1,1]},
+    {"name":"Example 2","input":[[[0,1],[0,2],[1,3],[1,4],[1,5],[2,6],[2,7],[2,8]],[1,4,2,3,5,7,8,-4,2]],"expected":[280,140,32,1,1,1,1,1,1]},
+    {"name":"Example 3","input":[[[0,1],[0,2]],[1,2,-2]],"expected":[0,1,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1]],[5,-3]]},
+    {"name":"Test 2","input":[[[0,1],[1,2]],[-1,-2,-3]]},
+    {"name":"Test 3","input":[[[2,0],[1,0]],[-5,-4,3]]},
+    {"name":"Test 4","input":[[[0,1],[1,2],[2,3],[3,4],[4,5]],[10000,-10000,10000,-10000,10000,-10000]]},
+    {"name":"Test 5","input":[[[0,1],[0,2],[0,3],[0,4]],[-1,-2,-3,-4,-5]]},
+    {"name":"Test 6","input":[[[3,0],[2,3],[1,2],[4,2]],[2,-7,6,1,-9]]},
+    {"name":"Test 7","input":[[[0,1],[0,2],[0,3],[0,4]],[1,-100,-99,2,3]]},
+    {"name":"Test 8","input":[[[0,1],[1,2],[1,3],[3,4],[3,5],[0,6]],[7,7,7,7,7,7,7]]},
+    {"name":"Test 9","input":[[[4,2],[0,4],[3,1],[4,3],[5,0],[6,5],[7,5]],[-3,9,-8,4,-6,5,-10000,1]]},
+    {"name":"Test 10","input":[[[1,0],[2,1],[3,2],[4,3],[5,4],[6,5],[7,6],[8,7]],[-1,2,-3,4,-5,6,-7,8,-9]]},
+    {"name":"Test 11","input":[[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7]],[-10000,9999,-9998,10000,1,-1,2,-2]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe brute force collects every subtree's costs and tries all triples, which is far too slow. But the best product of three numbers only ever uses extreme values: either the three largest, or the two smallest (two negatives make a positive) times the largest. So each subtree only needs to pass up its two smallest and three largest costs. A parent merges its children's short lists with its own cost, and the answer for every node comes from at most `1 + 5 * children` numbers.\n\n## Approach\n\n1. Build the adjacency list `graph` from `edges`.\n2. Walk the tree breadth-first from node `0`, recording each node's `parent` and the visiting `order`. In reverse `order`, every child is handled before its parent.\n3. Start every node with `size = 1`, `extremes = [cost[node]]` and `coin = 1`.\n4. For each node in reverse order, sort its `values`. If its subtree has at least 3 nodes, its coins are the larger of `topThree` and `twoLowest`, but never below 0.\n5. Keep only the two smallest and three largest values (`kept`), add them and the subtree size to the parent.\n\n## Example 1, step by step\n\nNodes 1 to 5 are leaves: each has `size = 1`, keeps 1 coin, and sends its single cost to node 0. Node 0 then holds `values = [1, 2, 3, 4, 5, 6]` with `size = 6`. `topThree = 6 * 5 * 4 = 120` and `twoLowest = 1 * 2 * 6 = 12`, so `coin = [120, 1, 1, 1, 1, 1]`.\n\n## Complexity\n\n- Time: O(n log n) at worst: each node sorts at most `1 + 5 * children` values, and these lists hold fewer than `6n` values in total.\n- Space: O(n) for the graph, the order and the kept lists.\n\n## Pitfalls\n\n- The coin rule depends on the true subtree size, not on how many values were kept, so `size` is tracked separately.\n- Do not forget the negative case: two very negative costs times the largest cost can beat the three largest.\n- A negative best product gives 0 coins, while a subtree with fewer than 3 nodes gives 1.\n- A path of 20,000 nodes is deep; processing nodes in reverse BFS order avoids recursion depth limits. Products reach 10^12, so Java and C need 64-bit values.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency lists of the tree |\n| `parent`, `order` | each node's parent, and nodes in BFS order from the root |\n| `size` | number of nodes in each subtree |\n| `extremes` | costs gathered for each node: its own plus its children's kept values |\n| `values`, `m` | a node's sorted gathered costs and their count |\n| `topThree`, `twoLowest` | the two candidate products |\n| `kept` | the two smallest and three largest values passed to the parent |\n| `coin` | the answer |",
+  "narration": {
+    "3": "Build an adjacency list so each node can reach its neighbours.",
+    "4": "Every undirected edge is stored in both directions.",
+    "10": "Breadth-first search from the root records the order nodes are reached.",
+    "11": "The order array doubles as the BFS queue.",
+    "14": "Any neighbour other than the parent is a child of this node.",
+    "15": "Remember the child's parent so its results can flow upward later.",
+    "22": "Each node starts with only its own cost in its list of gathered values.",
+    "24": "Walk the BFS order backwards so every child is finished before its parent.",
+    "26": "Sort the node's gathered values: its own cost plus a few from each child.",
+    "28": "Subtrees with fewer than 3 nodes keep their single coin.",
+    "29": "Candidate one: the three largest costs.",
+    "30": "Candidate two: the two smallest (possibly both negative) times the largest.",
+    "31": "Take the better candidate, but never place a negative number of coins.",
+    "33": "Only the two smallest and three largest values can matter higher up, so trim to those.",
+    "35": "Add this subtree's size to its parent's.",
+    "36": "Hand the trimmed values to the parent.",
+    "39": "Every node has its coin count."
+  }
+}

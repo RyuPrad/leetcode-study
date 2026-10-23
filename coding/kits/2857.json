@@ -1,0 +1,60 @@
+{
+  "number": 2857,
+  "title": "Count Pairs of Points With Distance k",
+  "spec": "leetcode",
+  "statement": "Each entry `coordinates[i] = [x_i, y_i]` is a point on the plane. Measure how far apart two points `(x1, y1)` and `(x2, y2)` are by the value `(x1 XOR x2) + (y1 XOR y2)`, where XOR is the bitwise exclusive or of two integers.\n\nReturn how many index pairs `(i, j)` with `i < j` have points whose distance under this measure is exactly `k`. Points at different indices count as separate points even when their coordinates are identical.",
+  "constraints": [
+    "2 <= coordinates.length <= 50000",
+    "0 <= x_i, y_i <= 10^6",
+    "0 <= k <= 100"
+  ],
+  "signature": "int countPairs(List<List<Integer>> coordinates, int k)",
+  "entry": "countPairs",
+  "kind": "function",
+  "parameters": [
+    "coordinates",
+    "k"
+  ],
+  "validator": "function validate([coordinates, k]) {\n  if (!Array.isArray(coordinates) || coordinates.length < 2 || coordinates.length > 50000) return 'coordinates needs 2 to 50000 points.';\n  for (const point of coordinates) {\n    if (!Array.isArray(point) || point.length !== 2) return 'Each point is a pair [x, y].';\n    if (point.some(v => !Number.isInteger(v) || v < 0 || v > 1000000)) return 'Each coordinate is an integer from 0 to 10^6.';\n  }\n  if (!Number.isInteger(k) || k < 0 || k > 100) return 'k is an integer from 0 to 100.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countPairs(coordinates, k) {\n  const seen = new Map();\n  let count = 0;\n\n  for (const [x, y] of coordinates) {\n    for (let dx = 0; dx <= k; dx++) {\n      const partnerX = x ^ dx;\n      const partnerY = y ^ (k - dx);\n      const partnerKey = partnerX * 2097152 + partnerY;\n      count += seen.get(partnerKey) ?? 0;\n    }\n    const key = x * 2097152 + y;\n    seen.set(key, (seen.get(key) ?? 0) + 1);\n  }\n  return count;\n}",
+  "brute": "function countPairs(coordinates, k) {\n  let total = 0;\n  for (let i = 0; i < coordinates.length; i++) {\n    for (let j = i + 1; j < coordinates.length; j++) {\n      const [a, b] = coordinates[i];\n      const [c, d] = coordinates[j];\n      if ((a ^ c) + (b ^ d) === k) total++;\n    }\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (limit) => Math.floor(rand() * (limit + 1));\n  if (size === 'large') {\n    const n = 2000;\n    const style = pick(2);\n    // Narrow ranges make many pairs land at distance k; the wide range checks big coordinates.\n    const span = style === 0 ? 63 : style === 1 ? 255 : 1000000;\n    const base = style === 2 ? 0 : pick(1000000 - span);\n    const k = style === 0 ? pick(100) : 50 + pick(50);\n    const coordinates = Array.from({ length: n }, () => [base + pick(span), base + pick(span)]);\n    return [coordinates, k];\n  }\n  const n = 2 + pick(8);\n  const span = [1, 3, 7, 15][pick(3)];\n  const shift = rand() < 0.2 ? 1000000 - span : 0;\n  const coordinates = Array.from({ length: n }, () => [shift + pick(span), shift + pick(span)]);\n  const k = rand() < 0.2 ? 0 : pick(2 * span + 2);\n  return [coordinates, Math.min(k, 100)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2],[4,2],[1,3],[5,2]],5],"expected":2},
+    {"name":"Example 2","input":[[[1,3],[1,3],[1,3],[1,3],[1,3]],0],"expected":10}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0],[0,0]],0]},
+    {"name":"Test 2","input":[[[0,0],[1,0]],0]},
+    {"name":"Test 3","input":[[[0,0],[1000000,1000000]],100]},
+    {"name":"Test 4","input":[[[0,0],[100,0],[0,100],[50,50],[100,100]],100]},
+    {"name":"Test 5","input":[[[999998,1000000],[999999,1000000],[999999,999999],[1000000,1000000],[999998,999999]],1]},
+    {"name":"Test 6","input":[[[3,5],[5,3],[6,6],[0,0],[3,5]],12]},
+    {"name":"Test 7","input":[[[2,2],[2,2],[3,2],[2,3],[3,3],[2,2]],1]},
+    {"name":"Test 8","input":[[[7,0],[0,7],[7,7],[0,0],[1,6],[6,1]],7]},
+    {"name":"Test 9","input":[[[10,20],[30,40]],0]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking every pair costs O(n²), far too slow for 50,000 points. The trick is that `k` is tiny. If a partner point is exactly `k` away, its two XOR parts split `k` as `dx + (k - dx)` for some `dx` from 0 to `k`. Because XOR undoes itself, each split names exactly one partner: `(x ^ dx, y ^ (k - dx))`. So every point has at most `k + 1` possible partners, and a hash map can count how many of them were seen earlier.\n\n## Approach\n\n1. Keep `seen`, a map from a point's key to how many earlier points have those coordinates, and `count = 0`.\n2. For each point `(x, y)`, try every split `dx` from 0 to `k`.\n3. The partner for that split is `(x ^ dx, y ^ (k - dx))`; add how many such points are already in `seen`.\n4. Then record the current point in `seen`, so it can pair with later points only (this enforces `i < j`).\n5. Return `count`.\n\nThe key packs a point into one number, `x * 2^21 + y`, which is safe because coordinates and their XORs stay below 2^21.\n\n## Example 1, step by step\n\n`k = 5`. Point `(1, 2)` finds nothing; `seen` holds it. Point `(4, 2)` tries six partners; with `dx = 5` the partner is `(4 ^ 5, 2 ^ 0) = (1, 2)`, seen once, so `count = 1`. Point `(1, 3)` matches nothing. Point `(5, 2)` with `dx = 4` asks for `(1, 3)`, which is there, so `count = 2`. The answer is `2`.\n\n## Complexity\n\n- Time: O(n · k): each point does `k + 1` map lookups.\n- Space: O(n) for the map of earlier points.\n\n## Pitfalls\n\n- Look up partners before adding the current point; otherwise `k = 0` pairs a point with itself.\n- Distinct splits give distinct partners, so no pair is counted twice, but counting both orders would double the answer.\n- Identical points are separate pairs; store a count per key, not just presence.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `seen` | map from point key to how many earlier points have it |\n| `count` | pairs found so far |\n| `x`, `y` | the current point |\n| `dx` | the part of `k` assigned to the x XOR |\n| `partnerX`, `partnerY` | the only point at that split |\n| `partnerKey`, `key` | packed keys of the partner and the current point |",
+  "narration": {
+    "2": "The map remembers how many earlier points sit at each coordinate.",
+    "3": "No pairs found yet.",
+    "5": "Visit the points in order, so every match is with an earlier index.",
+    "6": "Try every way of splitting k between the x XOR and the y XOR.",
+    "7": "XOR undoes itself, so the partner's x must be x XOR dx.",
+    "8": "Likewise its y must be y XOR (k - dx).",
+    "9": "Pack the partner's coordinates into one map key.",
+    "10": "Every earlier copy of that partner forms one more pair.",
+    "12": "Pack the current point's coordinates.",
+    "13": "Record it only now, so it never pairs with itself.",
+    "15": "All points are processed; return the number of pairs."
+  }
+}

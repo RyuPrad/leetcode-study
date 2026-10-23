@@ -1,0 +1,64 @@
+{
+  "number": 2945,
+  "title": "Find Maximum Non-decreasing Array Length",
+  "spec": "leetcode",
+  "statement": "You may apply the following move to `nums` as many times as you like (possibly never): choose a contiguous, non-empty block of elements and collapse it into one element whose value is the block's sum. Your goal is an array that is non-decreasing, meaning every element is at least as large as the one before it.\n\nReturn the largest length such a non-decreasing array can have. Put differently, cut `nums` into contiguous groups whose sums never go down from left to right, and return the greatest possible number of groups.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "1 <= nums[i] <= 10^5"
+  ],
+  "signature": "int findMaximumLength(int[] nums)",
+  "entry": "findMaximumLength",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 100000)) return 'Each value is an integer from 1 to 10^5.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMaximumLength(nums) {\n  const n = nums.length;\n  const prefix = new Array(n + 1).fill(0);\n  for (let i = 0; i < n; i++) {\n    prefix[i + 1] = prefix[i] + nums[i];\n  }\n  const dp = new Array(n + 1).fill(0);\n  const need = new Array(n + 1).fill(0);\n  const queue = [0];\n  let head = 0;\n  for (let i = 1; i <= n; i++) {\n    while (head + 1 < queue.length && need[queue[head + 1]] <= prefix[i]) {\n      head++;\n    }\n    const j = queue[head];\n    dp[i] = dp[j] + 1;\n    need[i] = 2 * prefix[i] - prefix[j];\n    while (queue.length > head && need[queue[queue.length - 1]] >= need[i]) {\n      queue.pop();\n    }\n    queue.push(i);\n  }\n  return dp[n];\n}",
+  "brute": "function findMaximumLength(nums) {\n  const n = nums.length;\n  let best = 0;\n  // Each bit of mask says whether a cut is placed after that position.\n  for (let mask = 0; mask < 1 << (n - 1); mask++) {\n    const sums = [];\n    let current = 0;\n    for (let k = 0; k < n; k++) {\n      current += nums[k];\n      if (k === n - 1 || (mask >> k) & 1) {\n        sums.push(current);\n        current = 0;\n      }\n    }\n    let ok = true;\n    for (let k = 1; k < sums.length; k++) if (sums[k] < sums[k - 1]) ok = false;\n    if (ok && sums.length > best) best = sums.length;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'small') {\n    const n = 1 + Math.floor(rand() * 10);\n    const top = [3, 10, 30][Math.floor(rand() * 3)];\n    return [Array.from({ length: n }, () => 1 + Math.floor(rand() * top))];\n  }\n  const n = 2000;\n  rand(); // The first draw follows the seed closely, so skip it before choosing a shape.\n  const mode = Math.floor(rand() * 3);\n  if (mode === 0) return [Array.from({ length: n }, () => 1 + Math.floor(rand() * 100000))];\n  if (mode === 1) return [Array.from({ length: n }, (_, k) => Math.max(1, 100000 - k * 50 - Math.floor(rand() * 40)))];\n  return [Array.from({ length: n }, () => (rand() < 0.1 ? 50000 + Math.floor(rand() * 50001) : 1 + Math.floor(rand() * 100)))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[5,2,2]],"expected":1},
+    {"name":"Example 2","input":[[1,2,3,4]],"expected":4},
+    {"name":"Example 3","input":[[4,3,2,6]],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[100000,1]]},
+    {"name":"Test 3","input":[[1,100000]]},
+    {"name":"Test 4","input":[[7,7,7,7,7]]},
+    {"name":"Test 5","input":[[5,4,3,2,1]]},
+    {"name":"Test 6","input":[[10,1,1,1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 7","input":[[2,1,3,1,4,1,5,1,6]]},
+    {"name":"Test 8","input":[[3,9,2,2,2,8,1,1,20,4,4,4,4]]},
+    {"name":"Test 9","input":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 10","input":[[6,5,1,2,3,10,2,2,2,2,9,1,1,8]]},
+    {"name":"Test 11","input":[[2,1,3,3]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":18,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery sequence of collapses ends up cutting `nums` into contiguous groups, so the task is to choose cut points that keep the group sums non-decreasing while making as many groups as possible. Trying every set of cuts is exponential. A prefix DP works: let `dp[i]` be the best group count for the first `i` elements. Among all optimal ways to split that prefix, the one with the **smallest last group** is the most useful for what follows, and taking the **latest** valid previous cut gives both the largest count and the smallest last group at once.\n\n## Approach\n\n1. Build `prefix`, where `prefix[i]` is the sum of the first `i` elements.\n2. A cut at `j` (with last group sum `prefix[j] - prefix[cut before j]`) lets the next group end at `i` when `prefix[i] - prefix[j]` is at least that last group. Rewrite it as `prefix[i] >= need[j]`, where `need[j] = prefix[j] + lastGroup(j)`.\n3. Keep candidate cuts in a monotonic `queue` (front at `head`) whose `need` values increase. For each `i`, advance `head` while the next candidate is also valid, because `prefix` only grows and the later valid cut is always better.\n4. With `j = queue[head]`, set `dp[i] = dp[j] + 1` and `need[i] = prefix[i] + (prefix[i] - prefix[j])`.\n5. Before adding `i`, pop candidates from the back whose `need` is not smaller than `need[i]`: `i` is later and easier to satisfy, so they can never be preferred again.\n6. Return `dp[n]`.\n\n## Example 1, step by step\n\n`nums = [5, 2, 2]`, so `prefix = [0, 5, 7, 9]` and `queue = [0]` with `need[0] = 0`.\n\n- `i = 1`: only cut 0 exists, so `dp[1] = 1` and `need[1] = 10`. Queue `[0, 1]`.\n- `i = 2`: `need[1] = 10 > 7`, so `j = 0`; `dp[2] = 1`, `need[2] = 14`. Queue `[0, 1, 2]`.\n- `i = 3`: `need[1] = 10 > 9`, so `j = 0` again; `dp[3] = 1`.\n\nThe answer is `1`: everything must merge into one element.\n\n## Complexity\n\n- Time: O(n): each index enters and leaves the queue at most once.\n- Space: O(n) for `prefix`, `dp`, `need` and the queue.\n\n## Pitfalls\n\n- Closing each group as soon as it reaches the previous sum looks natural but fails: on `[2, 1, 3, 3]` it builds `[2] [1, 3]` and must merge the last `3`, giving 2, while `[2, 1] [3] [3]` gives 3. The best previous cut must be chosen for every `i`.\n- The front advances only while the **next** candidate is valid; cut 0 (`need = 0`) is always valid, so `j` always exists.\n- Use `>=` when popping from the back: equal `need` with a later index is never worse.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `prefix[i]` | sum of the first `i` elements |\n| `dp[i]` | most groups for the first `i` elements |\n| `need[i]` | smallest prefix sum at which a new group can follow a cut at `i` |\n| `queue`, `head` | candidate cuts with increasing `need`; `head` is the front |\n| `j` | the latest valid previous cut for `i` |",
+  "narration": {
+    "3": "Allocate prefix sums so any block's sum is a single subtraction.",
+    "5": "prefix[i + 1] is the total of the first i + 1 elements.",
+    "7": "dp[i] will hold the most groups the first i elements can be cut into.",
+    "8": "need[i] is the prefix sum the array must reach before a new group can follow a cut at i.",
+    "9": "The queue of candidate cuts starts with the empty prefix, cut 0.",
+    "11": "Decide the best split for every prefix length i.",
+    "12": "If the next candidate is also reachable, it is a later cut and therefore better, so move past the front.",
+    "15": "The front of the queue is the latest valid previous cut.",
+    "16": "One more group than the best split ending at j.",
+    "17": "The new last group is prefix[i] - prefix[j]; the next group must reach at least that much beyond prefix[i].",
+    "18": "Older candidates whose need is not smaller than need[i] are dominated by the later cut i.",
+    "19": "Drop them from the back of the queue.",
+    "21": "Add i as a candidate cut; the queue's need values stay increasing.",
+    "23": "dp[n] is the longest non-decreasing array reachable from the whole input."
+  }
+}

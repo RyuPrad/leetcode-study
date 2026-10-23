@@ -1,0 +1,63 @@
+{
+  "number": 2935,
+  "title": "Maximum Strong Pair XOR II",
+  "spec": "leetcode",
+  "statement": "Call two integers `x` and `y` a **strong pair** when `|x - y| <= min(x, y)`.\n\nGiven an integer array `nums`, choose two of its elements that form a strong pair and make their bitwise XOR as large as possible; return that largest XOR. The same element may be chosen as both `x` and `y` (such a pair is always strong and has XOR 0).",
+  "constraints": [
+    "1 <= nums.length <= 5 * 10^4",
+    "1 <= nums[i] <= 2^20 - 1"
+  ],
+  "signature": "int maximumStrongPairXor(int[] nums)",
+  "entry": "maximumStrongPairXor",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 50000) return 'nums needs 1 to 5 * 10^4 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1048575)) return 'Each value is an integer from 1 to 2^20 - 1.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumStrongPairXor(nums) {\n  const BITS = 20;\n  nums.sort((a, b) => a - b);\n  const children = [[0, 0]];\n  const count = [0];\n\n  function update(value, delta) {\n    let node = 0;\n    for (let bit = BITS - 1; bit >= 0; bit--) {\n      const b = (value >> bit) & 1;\n      if (children[node][b] === 0) {\n        children[node][b] = children.length;\n        children.push([0, 0]);\n        count.push(0);\n      }\n      node = children[node][b];\n      count[node] += delta;\n    }\n  }\n\n  function bestXor(value) {\n    let node = 0;\n    let result = 0;\n    for (let bit = BITS - 1; bit >= 0; bit--) {\n      const b = (value >> bit) & 1;\n      const opposite = children[node][1 - b];\n      if (opposite !== 0 && count[opposite] > 0) {\n        result |= 1 << bit;\n        node = opposite;\n      } else {\n        node = children[node][b];\n      }\n    }\n    return result;\n  }\n\n  let best = 0;\n  let left = 0;\n  for (let right = 0; right < nums.length; right++) {\n    update(nums[right], 1);\n    while (2 * nums[left] < nums[right]) {\n      update(nums[left], -1);\n      left++;\n    }\n    best = Math.max(best, bestXor(nums[right]));\n  }\n  return best;\n}",
+  "brute": "function maximumStrongPairXor(nums) {\n  let best = 0;\n  for (const x of nums)\n    for (const y of nums)\n      if (Math.abs(x - y) <= Math.min(x, y)) best = Math.max(best, x ^ y);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const MAX = (1 << 20) - 1;\n  const logUniform = () => Math.min(MAX, Math.max(1, Math.floor(2 ** (rand() * 20))));\n  if (size === 'large') {\n    const uniform = rand() < 0.5;\n    return [Array.from({ length: 2000 }, () => (uniform ? 1 + Math.floor(rand() * MAX) : logUniform()))];\n  }\n  const n = 1 + Math.floor(rand() * 8);\n  const ranges = [8, 64, 1000];\n  const range = ranges[Math.floor(rand() * ranges.length)];\n  const nums = Array.from({ length: n }, () => 1 + Math.floor(rand() * range));\n  if (rand() < 0.2) nums[Math.floor(rand() * n)] = logUniform();\n  return [nums];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4,5]],"expected":7},
+    {"name":"Example 2","input":[[10,100]],"expected":0},
+    {"name":"Example 3","input":[[500,520,2500,3000]],"expected":1020}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[7,7,7]]},
+    {"name":"Test 3","input":[[1,2]]},
+    {"name":"Test 4","input":[[1,3]]},
+    {"name":"Test 5","input":[[1048575,524288]]},
+    {"name":"Test 6","input":[[524288,524287]]},
+    {"name":"Test 7","input":[[30,5,25,6]]},
+    {"name":"Test 8","input":[[1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288]]},
+    {"name":"Test 9","input":[[33,24,17,12,9,6,5,3]]},
+    {"name":"Test 10","input":[[100,401,150,199,200,201,400,1000,63,64,127]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking every pair is O(n²). After sorting, write a pair as `x <= y`; the condition `y - x <= x` becomes `y <= 2x`. So for each `y` the partners it may use are exactly the earlier values with `2x >= y`, and as `y` grows that set only loses small values from the front: a sliding window. To get the best XOR with `y` inside the window, keep the window's values in a binary trie with a count on each node, so removing a value just lowers counts. Walking the trie from the highest bit and taking the opposite bit whenever a live branch exists gives the largest XOR greedily, because a higher bit outweighs all lower bits together.\n\n## Approach\n\n1. Sort `nums`. The trie starts as one root; `count` says how many window values pass through each node.\n2. For each `right`, insert `nums[right]` with `update(value, 1)`; pairing it with itself is allowed.\n3. While `2 * nums[left] < nums[right]`, remove `nums[left]` with `update(value, -1)` and advance `left`.\n4. `bestXor(nums[right])` walks bits 19 down to 0, preferring the child with the opposite bit when its count is positive.\n5. Keep the largest result in `best`.\n\n## Example 1, step by step\n\nSorted `nums = [1, 2, 3, 4, 5]`.\n\n- `right = 0`: window `[1]`, best XOR with 1 is 0.\n- `right = 1`: window `[1, 2]`, `2 ^ 1 = 3`, so `best = 3`.\n- `right = 2`: `2 * 1 < 3`, so 1 leaves; window `[2, 3]`, best XOR is `3 ^ 2 = 1`.\n- `right = 3`: window `[2, 3, 4]`, `4 ^ 3 = 7`, so `best = 7`.\n- `right = 4`: 2 leaves; window `[3, 4, 5]`, best XOR is `5 ^ 3 = 6`. The answer is `7`.\n\n## Complexity\n\n- Time: O(n log n + n · B) with `B = 20` bits: sorting, then each value is inserted, removed and queried once.\n- Space: O(n · B) trie nodes.\n\n## Pitfalls\n\n- The strong condition is not symmetric in form; only after sorting does it reduce to `y <= 2x`.\n- Removed values leave their nodes behind, so check `count > 0`, not just that a child exists.\n- Insert `nums[right]` before querying: the window is then never empty and the walk always finds a live branch.\n- Use all 20 bits; starting lower drops the top bit of values near `2^20 - 1`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `children`, `count` | trie child indices per node and how many window values pass through each node |\n| `left`, `right` | window bounds over sorted `nums`; `nums[right]` is the larger element |\n| `b` | the current bit of the value |\n| `opposite` | trie child holding the other bit value |\n| `result` | XOR built bit by bit in `bestXor` |\n| `best` | largest strong-pair XOR so far |",
+  "narration": {
+    "3": "Sort so that for a pair x <= y the strong condition becomes y <= 2x.",
+    "4": "The trie starts as a single root; each node stores its two child indices (0 means none).",
+    "9": "Walk the value's bits from the highest to the lowest.",
+    "11": "Create the child for this bit the first time a value needs it.",
+    "17": "Adding or removing a value changes the count on every node of its path.",
+    "24": "Build the XOR greedily from the highest bit, which outweighs all lower ones.",
+    "27": "If a window value has the opposite bit here, take it: this bit of the XOR becomes 1.",
+    "31": "Otherwise follow the same bit; this XOR bit stays 0.",
+    "39": "Treat each nums[right] as the larger element y of a pair.",
+    "40": "Add y to the window first, so pairing it with itself is possible.",
+    "41": "A value x with 2x < y cannot pair with y, nor with any later, larger y.",
+    "42": "Remove that value from the trie by lowering its counts.",
+    "45": "Query the best XOR of y with any value still in the window.",
+    "47": "Return the largest XOR over all strong pairs."
+  }
+}

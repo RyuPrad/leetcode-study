@@ -1,0 +1,58 @@
+{
+  "number": 2930,
+  "title": "Number of Strings Which Can Be Rearranged to Contain Substring",
+  "spec": "leetcode",
+  "statement": "Call a string *good* when it is made only of lowercase English letters and its letters can be put in some order so that `\"leet\"` shows up as a contiguous piece of the result. For example, `\"lteer\"` is good (it can become `\"leetr\"`), while `\"letl\"` is not.\n\nGiven an integer `n`, count how many different good strings have length exactly `n`. The count can be huge, so return it modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= n <= 10^5"
+  ],
+  "signature": "int stringCount(int n)",
+  "entry": "stringCount",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 100000) return 'n is between 1 and 100000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function stringCount(n) {\n  const MOD = 1000000007n;\n  const len = BigInt(n);\n\n  function power(base, exponent) {\n    let result = 1n;\n    while (exponent > 0n) {\n      if (exponent % 2n === 1n) {\n        result = result * base % MOD;\n      }\n      base = base * base % MOD;\n      exponent /= 2n;\n    }\n    return result;\n  }\n\n  const all = power(26n, len);\n  const singles = 3n * power(25n, len) + len * power(25n, len - 1n);\n  const pairs = 3n * power(24n, len) + 2n * len * power(24n, len - 1n);\n  const triples = power(23n, len) + len * power(23n, len - 1n);\n  const good = all - singles + pairs - triples;\n  return Number((good % MOD + MOD) % MOD);\n}",
+  "brute": "function stringCount(n) {\n  // Build strings letter by letter, tracking only: seen an 'l'?, seen a 't'?, and how many 'e's (capped at 2).\n  // Each step appends 'l', 't', 'e', or one of the 23 other letters.\n  const MOD = 1000000007;\n  const empty = () => [0, 1].map(() => [0, 1].map(() => [0, 0, 0]));\n  let ways = empty();\n  ways[0][0][0] = 1;\n  for (let step = 0; step < n; step++) {\n    const next = empty();\n    const add = (l, t, e, count) => { next[l][t][e] = (next[l][t][e] + count) % MOD; };\n    for (let l = 0; l < 2; l++)\n      for (let t = 0; t < 2; t++)\n        for (let e = 0; e < 3; e++) {\n          const count = ways[l][t][e];\n          if (!count) continue;\n          add(1, t, e, count);\n          add(l, 1, e, count);\n          add(l, t, Math.min(2, e + 1), count);\n          add(l, t, e, count * 23 % MOD);\n        }\n    ways = next;\n  }\n  return ways[1][1][2];\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') return [50000 + Math.floor(rand() * 50001)];\n  return [1 + Math.floor(rand() * 40)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[4],"expected":12},
+    {"name":"Example 2","input":[10],"expected":83943898}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[3]},
+    {"name":"Test 3","input":[5]},
+    {"name":"Test 4","input":[6]},
+    {"name":"Test 5","input":[7]},
+    {"name":"Test 6","input":[20]},
+    {"name":"Test 7","input":[100]},
+    {"name":"Test 8","input":[1000]},
+    {"name":"Test 9","input":[100000]},
+    {"name":"Test 10","input":[99999]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nReordering is free, so only the letter counts matter: a string is good exactly when it has at least one `l`, at least one `t` and at least two `e`s. Counting the good strings directly is awkward, but counting the **bad** ones is easy, because each way of being bad is a simple condition:\n\n- A: no `l` (25^n strings), B: no `t` (25^n), C: at most one `e` (25^n with no `e` plus n·25^(n-1) with exactly one).\n\nInclusion-exclusion gives |A ∪ B ∪ C| from the sizes of the sets and their overlaps, and the answer is 26^n minus that. A letter-by-letter DP over (has `l`, has `t`, number of `e`s up to 2) also works in O(n); the formula needs only a few fast powers.\n\n## Approach\n\n1. Work in `BigInt` with `MOD = 10^9 + 7`, and write `power` as fast exponentiation by squaring.\n2. `all = 26^n` counts every string.\n3. `singles = |A| + |B| + |C| = 3·25^n + n·25^(n-1)`.\n4. `pairs = |A∩B| + |A∩C| + |B∩C| = 24^n + 2(24^n + n·24^(n-1))`: two letters are banned (or limited).\n5. `triples = |A∩B∩C| = 23^n + n·23^(n-1)`.\n6. `good = all - singles + pairs - triples`; bring it back into `[0, MOD)` and return it as a number.\n\n## Example 1, step by step\n\nFor `n = 4` nothing reaches the modulus: `all = 456976`, `singles = 1171875 + 62500 = 1234375`, `pairs = 995328 + 110592 = 1105920`, `triples = 279841 + 48668 = 328509`. Then `456976 - 1234375 + 1105920 - 328509 = 12`: the 12 orderings of l, e, e, t.\n\n## Complexity\n\n- Time: O(log n): a handful of fast powers.\n- Space: O(1).\n\n## Pitfalls\n\n- Products of two residues reach about 10^18, past what a JavaScript number holds exactly; use `BigInt` (or split the multiplication).\n- After subtracting, `good` can be negative modulo `MOD`; add `MOD` before the final `%`.\n- C is \"at most one `e`\", not \"no `e`\": forgetting the n·25^(n-1) strings with a single `e` overcounts.\n- For `n < 4` the answer is 0; the formula gives that on its own.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD`, `len` | the modulus and `n` as `BigInt`s |\n| `power` | fast modular exponentiation |\n| `all` | number of strings of length `n` |\n| `singles`, `pairs`, `triples` | inclusion-exclusion sums over one, two and three bad conditions |\n| `good` | strings that meet all three conditions |",
+  "narration": {
+    "2": "Work with BigInt so products of two large residues stay exact.",
+    "5": "Fast exponentiation: base^exponent modulo MOD.",
+    "7": "Keep going while bits of the exponent remain.",
+    "8": "The lowest bit is 1, so this power of the base is part of the result.",
+    "11": "Square the base for the next bit of the exponent.",
+    "12": "Drop the lowest bit of the exponent.",
+    "17": "Every string of length n: 26 choices per position.",
+    "18": "Strings with no l, plus no t, plus at most one e.",
+    "19": "Overlaps of two conditions: no l and no t, and each of those with at most one e.",
+    "20": "Strings breaking all three: no l, no t and at most one e.",
+    "21": "Inclusion-exclusion removes every bad string exactly once.",
+    "22": "Bring the result into [0, MOD) and return it as a plain number."
+  }
+}

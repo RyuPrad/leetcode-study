@@ -1,0 +1,61 @@
+{
+  "number": 2906,
+  "title": "Construct Product Matrix",
+  "spec": "leetcode",
+  "statement": "`grid` is an `n x m` matrix of positive integers. Return a matrix `p` with the same shape in which `p[i][j]` equals the product of all the other `n * m - 1` entries of `grid` (every cell except `grid[i][j]` itself), reduced modulo `12345`.",
+  "constraints": [
+    "1 <= n == grid.length <= 10^5",
+    "1 <= m == grid[i].length <= 10^5",
+    "2 <= n * m <= 10^5",
+    "1 <= grid[i][j] <= 10^9"
+  ],
+  "signature": "int[][] constructProductMatrix(int[][] grid)",
+  "entry": "constructProductMatrix",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 1) return 'grid needs at least one row.';\n  const m = Array.isArray(grid[0]) ? grid[0].length : 0;\n  if (m < 1) return 'Each row needs at least one value.';\n  if (!grid.every(row => Array.isArray(row) && row.length === m)) return 'All rows must have the same length.';\n  if (grid.length * m < 2 || grid.length * m > 100000) return 'grid holds 2 to 10^5 cells.';\n  if (!grid.every(row => row.every(v => Number.isInteger(v) && v >= 1 && v <= 1e9))) return 'Each value is an integer from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function constructProductMatrix(grid) {\n  const MOD = 12345;\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const result = Array.from({ length: rows }, () => new Array(cols).fill(0));\n\n  let prefix = 1;\n  for (let i = 0; i < rows; i++) {\n    for (let j = 0; j < cols; j++) {\n      result[i][j] = prefix;\n      prefix = (prefix * (grid[i][j] % MOD)) % MOD;\n    }\n  }\n\n  let suffix = 1;\n  for (let i = rows - 1; i >= 0; i--) {\n    for (let j = cols - 1; j >= 0; j--) {\n      result[i][j] = (result[i][j] * suffix) % MOD;\n      suffix = (suffix * (grid[i][j] % MOD)) % MOD;\n    }\n  }\n  return result;\n}",
+  "brute": "function constructProductMatrix(grid) {\n  const cells = grid.flat();\n  const out = cells.map((_, skip) => {\n    let product = 1;\n    for (let k = 0; k < cells.length; k++) if (k !== skip) product = (product * cells[k]) % 12345;\n    return product;\n  });\n  const width = grid[0].length;\n  return grid.map((_, r) => out.slice(r * width, (r + 1) * width));\n}",
+  "generator": "function generate(rand, size) {\n  const value = () => {\n    const pick = rand();\n    if (pick < 0.08) return 12345 * (1 + Math.floor(rand() * 5));\n    if (pick < 0.16) return [3, 5, 823, 15, 2469, 4115][Math.floor(rand() * 6)];\n    if (pick < 0.3) return 1;\n    if (pick < 0.4) return 1e9 - Math.floor(rand() * 3);\n    return size === 'large' ? 1 + Math.floor(rand() * 1e9) : 1 + Math.floor(rand() * 30);\n  };\n  let rows, cols;\n  if (size === 'large') {\n    const shape = rand();\n    if (shape < 0.5) { rows = 100; cols = 100; }\n    else if (shape < 0.75) { rows = 1; cols = 2000; }\n    else { rows = 2000; cols = 1; }\n  } else {\n    do {\n      rows = 1 + Math.floor(rand() * 4);\n      cols = 1 + Math.floor(rand() * 4);\n    } while (rows * cols < 2);\n  }\n  return [Array.from({ length: rows }, () => Array.from({ length: cols }, value))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2],[3,4]]],"expected":[[24,12],[8,6]]},
+    {"name":"Example 2","input":[[[12345],[2],[1]]],"expected":[[2],[0],[0]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,2]]]},
+    {"name":"Test 2","input":[[[5],[7]]]},
+    {"name":"Test 3","input":[[[12345,1],[1,1]]]},
+    {"name":"Test 4","input":[[[12345,24690],[3,4]]]},
+    {"name":"Test 5","input":[[[1000000000,1000000000],[1000000000,1000000000]]]},
+    {"name":"Test 6","input":[[[1,1,1,1,1]]]},
+    {"name":"Test 7","input":[[[3,5,823,2]]]},
+    {"name":"Test 8","input":[[[2,3,4],[5,6,7],[8,9,10]]]},
+    {"name":"Test 9","input":[[[123456789],[987654321]]]},
+    {"name":"Test 10","input":[[[17,999999937,4,12346],[61,2,2,88],[101,7,512,31]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRecomputing the product of all other cells for every cell costs O((nm)²). Dividing the full product by `grid[i][j]` does not work either: the modulus 12345 = 3 · 5 · 823 is not prime, and once a factor of 12345 has entered, the reduced product is 0 and the division cannot be undone. This is \"Product of Array Except Self\" on a grid: read the cells in row-major order as one long list, and the answer for a cell is (product of all cells before it) × (product of all cells after it).\n\n## Approach\n\n1. Make `result`, the same shape as `grid`.\n2. Forward pass in row-major order: write the running `prefix` (product of every earlier cell, mod 12345) into `result[i][j]`, then multiply `prefix` by the cell.\n3. Backward pass in reverse order: multiply `result[i][j]` by the running `suffix` (product of every later cell), then multiply `suffix` by the cell.\n4. Every cell now holds prefix × suffix, the product of all other cells. Return `result`.\n\n## Example 1, step by step\n\n`grid = [[1, 2], [3, 4]]`, read as 1, 2, 3, 4. The forward pass writes the prefixes 1, 1, 2, 6. The backward pass meets the cells as 4, 3, 2, 1 with suffixes 1, 4, 12, 24, so the cells become 6·1 = 6, 2·4 = 8, 1·12 = 12 and 1·24 = 24. The answer is `[[24, 12], [8, 6]]`.\n\n## Complexity\n\n- Time: O(n·m): two passes over the cells.\n- Space: O(1) besides the returned matrix.\n\n## Pitfalls\n\n- Reduce each value mod 12345 before multiplying: `prefix` (below 12345) times a raw value up to 10⁹ is still safe in JavaScript, but in Java or C an `int` overflows, so use `long` or reduce first.\n- Do not use division or modular inverses; many values share factors with 12345.\n- Write `prefix` into the cell before multiplying it by that cell, so a cell never includes itself.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | the modulus 12345 |\n| `rows`, `cols` | the grid's size `n` and `m` |\n| `result` | the product matrix being built |\n| `prefix` | product of all cells before the current one (row-major), mod 12345 |\n| `suffix` | product of all cells after the current one, mod 12345 |",
+  "narration": {
+    "2": "Every product is reduced modulo 12345.",
+    "5": "Allocate the answer with the same shape as grid.",
+    "7": "prefix starts as the empty product: nothing comes before the first cell.",
+    "8": "Walk the cells in row-major order, as if the grid were one long list.",
+    "10": "Store the product of every earlier cell before this cell is included.",
+    "11": "Now fold this cell into the running product for the cells after it.",
+    "15": "suffix is the empty product: nothing comes after the last cell.",
+    "16": "Walk the cells again, this time from the last one back to the first.",
+    "18": "Multiply in the product of every later cell, so the cell holds all the others.",
+    "19": "Fold this cell into the running suffix for the earlier cells.",
+    "22": "Each cell now holds the product of every other cell, mod 12345."
+  }
+}

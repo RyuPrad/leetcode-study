@@ -1,0 +1,64 @@
+{
+  "number": 3022,
+  "title": "Minimize OR of Remaining Elements Using Operations",
+  "spec": "leetcode",
+  "statement": "You are given an integer array `nums` and an integer `k`. An operation picks two neighbouring elements `nums[i]` and `nums[i + 1]` and replaces the pair by a single element equal to `nums[i] & nums[i + 1]` (bitwise AND), so the array becomes one element shorter.\n\nYou may perform anywhere from `0` to `k` operations. Afterwards, take the bitwise OR of every element still in the array. Return the smallest value that OR can have.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "0 <= nums[i] < 2^30",
+    "0 <= k < nums.length"
+  ],
+  "signature": "int minOrAfterOperations(int[] nums, int k)",
+  "entry": "minOrAfterOperations",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 100000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v >= 2 ** 30)) return 'Each value is an integer from 0 to 2^30 - 1.';\n  if (!Number.isInteger(k) || k < 0 || k >= nums.length) return 'k must be at least 0 and less than nums.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minOrAfterOperations(nums, k) {\n  let answer = 0;\n  let mask = 0;\n  for (let bit = 29; bit >= 0; bit--) {\n    mask |= 1 << bit;\n    let operations = 0;\n    let current = mask;\n    for (const num of nums) {\n      current &= num;\n      if ((current & mask) === 0) {\n        current = mask;\n      } else {\n        operations++;\n      }\n    }\n    if (operations > k) {\n      mask ^= 1 << bit;\n      answer |= 1 << bit;\n    }\n  }\n  return answer;\n}",
+  "brute": "function minOrAfterOperations(nums, k) {\n  // Every result is a split of nums into contiguous groups; a split into g groups costs n - g operations.\n  const n = nums.length;\n  let best = Infinity;\n  for (let cuts = 0; cuts < 1 << (n - 1); cuts++) {\n    let groups = 1;\n    for (let b = 0; b < n - 1; b++) if (cuts & (1 << b)) groups++;\n    if (n - groups > k) continue;\n    let total = 0, part = nums[0];\n    for (let i = 1; i < n; i++) {\n      if (cuts & (1 << (i - 1))) { total |= part; part = nums[i]; }\n      else part &= nums[i];\n    }\n    total |= part;\n    best = Math.min(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 10);\n  const bits = size === 'large' ? 30 : [3, 4, 5, 30][Math.floor(rand() * 4)];\n  const limit = 2 ** bits;\n  const common = Math.floor(rand() * limit);\n  const shareChance = rand();\n  const nums = Array.from({ length: n }, () => {\n    let value = Math.floor(rand() * limit);\n    if (rand() < shareChance) value |= common;\n    return value;\n  });\n  const mode = rand();\n  let k;\n  if (mode < 0.15) k = 0;\n  else if (mode < 0.3) k = n - 1;\n  else if (mode < 0.6) k = Math.floor(rand() * Math.max(1, Math.floor(n / 4)));\n  else k = Math.floor(rand() * n);\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,3,2,7],2],"expected":3},
+    {"name":"Example 2","input":[[7,3,15,14,2,8],4],"expected":2},
+    {"name":"Example 3","input":[[10,7,10,3,9,14,9,4],1],"expected":15}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0],0]},
+    {"name":"Test 2","input":[[5],0]},
+    {"name":"Test 3","input":[[1,2],1]},
+    {"name":"Test 4","input":[[1,2],0]},
+    {"name":"Test 5","input":[[1073741823,1073741823],1]},
+    {"name":"Test 6","input":[[1073741823,0,1073741823],1]},
+    {"name":"Test 7","input":[[7,7,7,7],3]},
+    {"name":"Test 8","input":[[8,4,2,1,8,4,2,1],4]},
+    {"name":"Test 9","input":[[13,11,14,7,12,9,6,15,10],3]},
+    {"name":"Test 10","input":[[536870913,536870914,536870916,3,5,6],2]},
+    {"name":"Test 11","input":[[3,5,3,2,7],4]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every way to merge neighbours (every split of `nums` into contiguous groups) is exponential. Instead, decide the answer one bit at a time from the most significant bit down: clearing a high bit is worth more than clearing all lower bits together. Keep a `mask` of bits we have managed to force to zero. For a new bit, ask whether at most `k` operations can make every remaining element have *all* mask bits plus this bit cleared. If yes, keep the bit in the mask; if not, the bit must appear in the answer.\n\nThe check is greedy. The final array is a split of `nums` into contiguous groups, each replaced by its AND, and a group of size `s` costs `s - 1` operations. Scanning left to right, close a group as soon as its AND clears the mask bits; closing early never hurts. Elements left over at the end are merged into the previous group, one operation each.\n\n## Approach\n\n1. Start with `answer = 0` and an empty `mask`. Go through `bit` from 29 down to 0.\n2. Add `bit` to `mask`. Scan `nums`, keeping `current`, the AND of the open group restricted to the mask bits.\n3. If `current & mask` is zero, the group is done: reset `current`. Otherwise this element must be merged, so count one more operation.\n4. If `operations > k`, the bit cannot be cleared: remove it from `mask` and add it to `answer`.\n5. Return `answer`.\n\n## Example 1, step by step\n\n`nums = [3, 5, 3, 2, 7]`, `k = 2`. Bits 29 to 3 are absent from every value, so each costs 0 operations. For bit 2, the groups are `[3]`, `[5, 3]`, `[2]` and a trailing `7` costing one more: 2 operations, so bit 2 can be cleared. For bit 1 (bit 2 still in the mask), the scan closes `[3, 5]` with one operation, but `3, 2, 7` never clear bit 1 and cost three more: 4 operations, so `answer = 2`. For bit 0 (mask: bit 2 and up, plus bit 0), the group `[3, 5, 3, 2]` takes 3 operations and the trailing `7` one more: 4 again, so `answer = 3`.\n\n## Complexity\n\n- Time: O(30 · n): one scan of `nums` per bit.\n- Space: O(1) extra.\n\n## Pitfalls\n\n- A bit that cannot be cleared must be removed from `mask`; otherwise later checks demand the impossible.\n- The test is `operations > k`; a trailing open group is still counted, which correctly makes \"no group ever closes\" cost `n > k` operations.\n- Checking each bit on its own is wrong: clearing bit 3 and clearing bit 2 may need different groupings, so earlier zero bits must stay in the mask.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `answer` | bits that are forced to stay in the final OR |\n| `mask` | bits we require every final element to have cleared |\n| `bit` | the bit being decided |\n| `current` | AND of the open group, on the mask bits |\n| `operations` | merges the greedy scan needs for this `mask` |",
+  "narration": {
+    "4": "Decide bits from the most significant down, since a high bit outweighs all lower ones.",
+    "5": "Tentatively demand that this bit be cleared too.",
+    "7": "Start an empty group; all mask bits are still set.",
+    "8": "Scan the array left to right, building groups greedily.",
+    "9": "Merge this element into the open group with AND.",
+    "10": "Have all mask bits been cleared in this group?",
+    "11": "Yes: close the group and start a fresh one.",
+    "13": "No: this element must be merged with a neighbour, costing one operation.",
+    "16": "Too many operations: this bit cannot be cleared.",
+    "17": "Drop the bit from the mask so later checks stay achievable.",
+    "18": "The bit is forced into the final OR.",
+    "21": "Every bit is decided; return the smallest possible OR."
+  }
+}

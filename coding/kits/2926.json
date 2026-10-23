@@ -1,0 +1,64 @@
+{
+  "number": 2926,
+  "title": "Maximum Balanced Subsequence Sum",
+  "spec": "leetcode",
+  "statement": "You get an integer array `nums`. Choose a non-empty subsequence, that is, some indices `i_0 < i_1 < ... < i_(m-1)` kept in their original order. The choice is **balanced** when every pair of consecutive chosen indices satisfies\n\n`nums[i_j] - nums[i_(j-1)] >= i_j - i_(j-1)`\n\nfor each `j` from 1 to `m - 1`, so the value must climb by at least as much as the index does. A single chosen index is always balanced. Return the largest total of the chosen values over all balanced subsequences.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "-10^9 <= nums[i] <= 10^9"
+  ],
+  "signature": "long maxBalancedSubsequenceSum(int[] nums)",
+  "entry": "maxBalancedSubsequenceSum",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < -1000000000 || v > 1000000000)) return 'Each value is an integer from -10^9 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxBalancedSubsequenceSum(nums) {\n  const n = nums.length;\n  const keys = [...new Set(nums.map((value, i) => value - i))].sort((a, b) => a - b);\n  const rank = new Map(keys.map((key, index) => [key, index + 1]));\n  const tree = new Array(keys.length + 1).fill(0);\n  let best = -Infinity;\n\n  for (let i = 0; i < n; i++) {\n    const position = rank.get(nums[i] - i);\n    let before = 0;\n    for (let p = position; p > 0; p -= p & -p) {\n      before = Math.max(before, tree[p]);\n    }\n    const sum = nums[i] + before;\n    best = Math.max(best, sum);\n    for (let p = position; p < tree.length; p += p & -p) {\n      tree[p] = Math.max(tree[p], sum);\n    }\n  }\n  return best;\n}",
+  "brute": "function maxBalancedSubsequenceSum(nums) {\n  // Try every non-empty set of indices and keep the balanced ones.\n  const n = nums.length;\n  let best = -Infinity;\n  for (let mask = 1; mask < (1 << n); mask++) {\n    let last = -1;\n    let total = 0;\n    let ok = true;\n    for (let i = 0; i < n; i++) {\n      if (!(mask >> i & 1)) continue;\n      if (last >= 0 && nums[i] - nums[last] < i - last) ok = false;\n      total += nums[i];\n      last = i;\n    }\n    if (ok && total > best) best = total;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  if (size === 'large') {\n    const n = pick(1500, 2000);\n    const mode = Math.floor(rand() * 3);\n    if (mode === 0) return [Array.from({ length: n }, () => pick(-1000000000, 1000000000))];\n    // Values that climb with the index (plus noise) give long balanced chains.\n    const step = pick(1, 400000);\n    return [Array.from({ length: n }, (_, i) => Math.max(-1000000000, Math.min(1000000000, -400000000 + i * step + pick(-3 * step, 3 * step))))];\n  }\n  const n = pick(1, 12);\n  const span = [3, 10, 1000000000][Math.floor(rand() * 3)];\n  if (rand() < 0.4) {\n    const step = pick(0, 3);\n    return [Array.from({ length: n }, (_, i) => Math.max(-span, Math.min(span, i * step - pick(0, span) + pick(0, span))))];\n  }\n  return [Array.from({ length: n }, () => pick(-span, span))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,3,5,6]],"expected":14},
+    {"name":"Example 2","input":[[5,-1,-3,8]],"expected":13},
+    {"name":"Example 3","input":[[-2,-1]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5]]},
+    {"name":"Test 2","input":[[-7]]},
+    {"name":"Test 3","input":[[-5,-3,-9,-1]]},
+    {"name":"Test 4","input":[[1,2,3,4,5]]},
+    {"name":"Test 5","input":[[5,4,3,2,1]]},
+    {"name":"Test 6","input":[[0,0,0,0]]},
+    {"name":"Test 7","input":[[1000000000,-1000000000,1000000000]]},
+    {"name":"Test 8","input":[[-1000000000,1000000000,-1000000000,1000000000]]},
+    {"name":"Test 9","input":[[0,2,4,6,8,10,1,3,5,7]]},
+    {"name":"Test 10","input":[[3,-1,2,7,-5,10,4,12,0,15]]},
+    {"name":"Test 11","input":[[2,1,0,3,6,5,8,-4,9,11,10,13]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRearrange the rule `nums[j] - nums[i] >= j - i` into `nums[j] - j >= nums[i] - i`. So if each index gets the key `nums[i] - i`, a balanced subsequence is just one whose keys never decrease, much like a longest non-decreasing subsequence, except we maximise the sum of values instead of the length. Trying every subsequence is exponential and the plain DP over all earlier indices is O(n²); a Fenwick tree over the sorted keys answers \"best sum ending at any earlier index with key at most mine\" in O(log n).\n\n## Approach\n\n1. Compute every key `nums[i] - i`, deduplicate and sort them, and map each key to a 1-based `rank`.\n2. Keep a Fenwick `tree` of prefix maxima over ranks, starting at 0 (0 stands for \"start a new subsequence here\").\n3. Walk the indices left to right. Query the prefix up to this index's `position` to get `before`, the best sum of a balanced subsequence that this index can extend (or 0).\n4. `sum = nums[i] + before` is the best balanced sum ending at `i`; update `best` with it.\n5. Write `sum` into the tree at `position` so later indices can extend it.\n6. Return `best`.\n\n## Example 1, step by step\n\n`nums = [3, 3, 5, 6]` gives keys `[3, 2, 3, 3]`, so ranks are `2 -> 1`, `3 -> 2`.\n\n- `i = 0`: key 3, `before = 0`, `sum = 3`; store 3 at rank 2.\n- `i = 1`: key 2, `before = 0`, `sum = 3`; store 3 at rank 1.\n- `i = 2`: key 3, `before = 3`, `sum = 8`; store 8 at rank 2.\n- `i = 3`: key 3, `before = 8`, `sum = 14`.\n\n`best = 14`.\n\n## Complexity\n\n- Time: O(n log n) for sorting the keys and two Fenwick walks per index.\n- Space: O(n) for the keys, ranks and tree.\n\n## Pitfalls\n\n- Keys must be compared as `nums[i] - i`; comparing raw values ignores the index gap.\n- Equal keys are allowed to follow each other, so the query must include the current rank.\n- If every value is negative the answer is the single largest value, so start `best` at `-Infinity`, not 0.\n- Sums can reach about 10^14: use a 64-bit type in Java or C.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `keys` | sorted distinct values of `nums[i] - i` |\n| `rank` | key to its 1-based position in `keys` |\n| `tree` | Fenwick tree of the best sums ending at each rank (prefix maximum) |\n| `position` | the rank of index `i`'s key |\n| `before` | best sum this index can extend, or 0 to start fresh |\n| `sum` | best balanced sum ending at index `i` |\n| `best` | largest `sum` seen so far |",
+  "narration": {
+    "3": "Give each index the key nums[i] - i, then keep the distinct keys in sorted order.",
+    "4": "Map every key to a 1-based rank so it can index the Fenwick tree.",
+    "5": "The Fenwick tree stores prefix maxima of best sums; 0 means starting a new subsequence.",
+    "6": "No subsequence has been seen yet, so the best total starts below any real sum.",
+    "8": "Process the indices in order, so the tree only holds earlier indices.",
+    "9": "Find where this index's key sits among the sorted keys.",
+    "10": "With no earlier index to extend, we can still start fresh with 0.",
+    "11": "Walk down the Fenwick tree to cover every rank up to and including ours.",
+    "12": "Keep the largest sum ending at an earlier index whose key is not bigger than ours.",
+    "14": "The best balanced subsequence ending here adds nums[i] to that best earlier sum.",
+    "15": "Update the overall answer with it.",
+    "16": "Walk up the Fenwick tree so later queries covering this rank can see the new sum.",
+    "17": "Store the larger of the existing value and the new sum.",
+    "20": "best now holds the largest balanced subsequence sum."
+  }
+}
