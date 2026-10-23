@@ -89,6 +89,15 @@ function addMysqlFunctions(db: Database) {
   const fn = (name: string, body: (...args: any[]) => unknown) => db.create_function(name, Object.defineProperty((...args: unknown[]) => body(...args), 'length', { value: -1 }) as any);
   const strict = (name: string, body: (...args: any[]) => unknown) => fn(name, (...args: unknown[]) => nullish(args) ? null : body(...args));
   fn('IF', (c, a, b) => c && Number(c) !== 0 ? a : b);
+  // MySQL's bit aggregates work on unsigned 64-bit values and skip NULLs; BIT_AND of no values has every bit set.
+  const bits = (name: string, combine: (a: bigint, b: bigint) => bigint, empty: bigint) => db.create_aggregate(name, {
+    init: () => null,
+    step: (state: bigint | null, value: unknown) => { if (value === null || value === undefined) return state; const v = BigInt.asUintN(64, BigInt(Math.trunc(Number(value)))); return state === null ? v : combine(state, v); },
+    finalize: (state: bigint | null) => { const v = state ?? empty; return v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v.toString(); },
+  });
+  bits('BIT_AND', (a, b) => a & b, (1n << 64n) - 1n);
+  bits('BIT_OR', (a, b) => a | b, 0n);
+  bits('BIT_XOR', (a, b) => a ^ b, 0n);
   strict('DATEDIFF', (a, b) => { const x = date(a), y = date(b); return x && y ? Math.round((Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate()) - Date.UTC(y.getUTCFullYear(), y.getUTCMonth(), y.getUTCDate())) / 86400000) : null; });
   strict('DATE_ADD', (d, spec) => typeof spec === 'number' ? shift(d, `${spec} DAY`, 1) : shift(d, spec, 1)); strict('ADDDATE', (d, spec) => typeof spec === 'number' ? shift(d, `${spec} DAY`, 1) : shift(d, spec, 1));
   strict('DATE_SUB', (d, spec) => typeof spec === 'number' ? shift(d, `${spec} DAY`, -1) : shift(d, spec, -1)); strict('SUBDATE', (d, spec) => typeof spec === 'number' ? shift(d, `${spec} DAY`, -1) : shift(d, spec, -1));
@@ -102,7 +111,9 @@ function addMysqlFunctions(db: Database) {
     ['WEEK', (d: Date) => { const jan1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1)), yday = Math.floor((d.getTime() - jan1.getTime()) / 86400000) + 1; return Math.floor((yday - 1 - (7 - jan1.getUTCDay()) % 7) / 7) + 1; }],
     ['WEEKOFYEAR', (d: Date) => { const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 3 - (d.getUTCDay() + 6) % 7)); return 1 + Math.round(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 4)) / 86400000 - 3 + (new Date(Date.UTC(t.getUTCFullYear(), 0, 4)).getUTCDay() + 6) % 7) / 7); }]] as const)
     fn(name, v => { const d = date(v); return d ? part(d) : null; });
-  strict('TIMESTAMPDIFF', (unit, a, b) => { const x = date(a), y = date(b); if (!x || !y) return null; const s = (y.getTime() - x.getTime()) / 1000, u = String(unit).toUpperCase(); return Math.trunc(s / ({ SECOND: 1, MINUTE: 60, HOUR: 3600, DAY: 86400, WEEK: 604800 } as Record<string, number>)[u] || (u === 'MONTH' ? (y.getUTCFullYear() - x.getUTCFullYear()) * 12 + y.getUTCMonth() - x.getUTCMonth() - (y.getUTCDate() < x.getUTCDate() ? 1 : 0) : u === 'YEAR' ? y.getUTCFullYear() - x.getUTCFullYear() - (y.getUTCMonth() * 100 + y.getUTCDate() < x.getUTCMonth() * 100 + x.getUTCDate() ? 1 : 0) : NaN)); });
+  // Whole units from a to b, truncated toward zero; months and years count only completed months, time of day included.
+  const months = (x: Date, y: Date): number => { if (y < x) return -months(y, x); const rest = (d: Date) => d.getUTCDate() * 86400000 + ((d.getTime() % 86400000) + 86400000) % 86400000; return (y.getUTCFullYear() - x.getUTCFullYear()) * 12 + y.getUTCMonth() - x.getUTCMonth() - (rest(y) < rest(x) ? 1 : 0); };
+  strict('TIMESTAMPDIFF', (unit, a, b) => { const x = date(a), y = date(b); if (!x || !y) return null; const u = String(unit).toUpperCase(), seconds = ({ SECOND: 1, MINUTE: 60, HOUR: 3600, DAY: 86400, WEEK: 604800 } as Record<string, number>)[u]; if (seconds) return Math.trunc((y.getTime() - x.getTime()) / 1000 / seconds); const m = months(x, y); return u === 'MONTH' ? m : u === 'QUARTER' ? Math.trunc(m / 3) : u === 'YEAR' ? Math.trunc(m / 12) : null; });
   strict('TIME_TO_SEC', seconds); strict('SEC_TO_TIME', n => duration(Math.trunc(Number(n))));
   strict('TIMEDIFF', (a, b) => { const x = seconds(a), y = seconds(b), dx = date(a), dy = date(b); return /^\d{4}-/.test(String(a)) && dx && dy ? duration(Math.round((dx.getTime() - dy.getTime()) / 1000)) : x === null || y === null ? null : duration(x - y); });
   fn('NOW', () => '2020-01-01 00:00:00'); fn('CURDATE', () => '2020-01-01'); fn('CURRENT_DATE', () => '2020-01-01');

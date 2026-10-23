@@ -7,6 +7,8 @@ declare module 'sql.js' {
     exec(sql: string): QueryExecResult[];
     prepare(sql: string): Statement;
     create_function(name: string, fn: (...args: any[]) => unknown): Database;
+    // The step function's length minus one (the state) is the aggregate's argument count.
+    create_aggregate(name: string, functions: { init?: () => unknown; step: (state: any, ...args: any[]) => unknown; finalize?: (state: any) => unknown }): Database;
     close(): void;
   }
   export interface SqlJsStatic { Database: new () => Database; }

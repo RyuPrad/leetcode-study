@@ -20,6 +20,9 @@ test('MySQL syntax and functions run in the SQL sandbox with MySQL semantics', (
   assert.deepEqual(rows("SELECT GROUP_CONCAT(name ORDER BY id DESC SEPARATOR ';') FROM T"), [['bob;Alice']]);
   assert.deepEqual(rows("SELECT CONCAT(name, '!') FROM T ORDER BY id"), [['Alice!'], ['bob!'], [null]], 'CONCAT is null when a part is null');
   assert.deepEqual(rows("SELECT EXTRACT(YEAR FROM d), CAST('2020-01-05 10:00:00' AS DATE), DATE_FORMAT(d, '%Y-%m'), TIMESTAMPDIFF(MONTH, '2020-01-31', '2020-02-29') FROM T WHERE id = 1"), [[2020, '2020-01-05', '2020-01', 0]]);
+  assert.deepEqual(rows("SELECT TIMESTAMPDIFF(SECOND, '2020-01-01 10:00:00', '2020-01-01 10:00:00'), TIMESTAMPDIFF(HOUR, '2020-01-01 10:00:00', '2020-01-01 10:59:59'), TIMESTAMPDIFF(DAY, '2020-01-02', '2020-01-01'), TIMESTAMPDIFF(MONTH, '2020-03-15', '2020-01-20'), TIMESTAMPDIFF(MONTH, '2020-01-31 12:00:00', '2020-02-29 11:00:00'), TIMESTAMPDIFF(QUARTER, '2020-01-01', '2020-07-01'), TIMESTAMPDIFF(YEAR, '2019-02-28', '2020-02-28')"), [[0, 0, -1, -1, 0, 2, 1]], 'TIMESTAMPDIFF truncates toward zero, including to 0');
+  assert.deepEqual(rows('SELECT BIT_AND(id), BIT_OR(id), BIT_XOR(id) FROM T'), [[0, 3, 0]], 'bit aggregates over 1, 2, 3');
+  assert.deepEqual(rows('SELECT BIT_AND(id), BIT_OR(id) FROM T WHERE id > 9'), [['18446744073709551615', 0]], 'BIT_AND of no rows has every bit set');
   assert.deepEqual(rows("SELECT IF(id > 1, 'big', 'small'), IFNULL(name, '-'), ISNULL(name), LEAST(id, 2) FROM T ORDER BY id"), [['small', 'Alice', 0, 1], ['big', 'bob', 0, 2], ['big', '-', 1, 2]]);
   assert.deepEqual(rows('SELECT id, RANK() OVER (ORDER BY amount DESC) FROM T ORDER BY id'), [[1, 1], [2, 3], [3, 2]]);
   assert.deepEqual(rows('SELECT id -- a comment; with a semicolon\nFROM T /* another; */ WHERE id < 2;'), [[1]]);
