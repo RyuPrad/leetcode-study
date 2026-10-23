@@ -1,0 +1,65 @@
+{
+  "number": 2182,
+  "title": "Construct String With Repeat Limit",
+  "spec": "leetcode",
+  "statement": "Build a new string from the letters of `s`: each letter may be used at most as many times as it occurs in `s`, in any order, and you may leave letters out. No letter may occur more than `repeatLimit` times consecutively in the result.\n\nReturn the lexicographically greatest string that can be built this way. One string is greater than another when, at the first index where they differ, its letter comes later in the alphabet; when one string is a prefix of the other, the longer one is greater.",
+  "constraints": [
+    "1 <= repeatLimit <= s.length <= 10^5",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "String repeatLimitedString(String s, int repeatLimit)",
+  "entry": "repeatLimitedString",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "repeatLimit"
+  ],
+  "validator": "function validate([s, repeatLimit]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 100000) return 's needs 1 to 100000 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may only contain lowercase letters.';\n  if (!Number.isInteger(repeatLimit) || repeatLimit < 1 || repeatLimit > s.length) return 'repeatLimit is between 1 and the length of s.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function repeatLimitedString(s, repeatLimit) {\n  const count = new Array(26).fill(0);\n  for (const ch of s) {\n    count[ch.charCodeAt(0) - 97]++;\n  }\n\n  const parts = [];\n  let top = 25;\n  while (top >= 0) {\n    if (count[top] === 0) {\n      top--;\n      continue;\n    }\n    const take = Math.min(count[top], repeatLimit);\n    parts.push(String.fromCharCode(97 + top).repeat(take));\n    count[top] -= take;\n    if (count[top] === 0) {\n      continue;\n    }\n    let next = top - 1;\n    while (next >= 0 && count[next] === 0) {\n      next--;\n    }\n    if (next < 0) {\n      break;\n    }\n    parts.push(String.fromCharCode(97 + next));\n    count[next]--;\n  }\n  return parts.join('');\n}",
+  "brute": "function repeatLimitedString(s, repeatLimit) {\n  // Any letter that may legally come next leads to a valid string, so the greatest\n  // answer always places the largest such letter; build it one character at a time.\n  const left = {};\n  for (const ch of s) left[ch] = (left[ch] || 0) + 1;\n  const letters = Object.keys(left).sort().reverse();\n  let out = '';\n  for (;;) {\n    const run = out.length >= repeatLimit && out.slice(-repeatLimit).split('').every(c => c === out[out.length - 1]);\n    const pick = letters.find(ch => left[ch] > 0 && !(run && ch === out[out.length - 1]));\n    if (pick === undefined) return out;\n    out += pick;\n    left[pick]--;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 10000 : 1 + Math.floor(rand() * 7);\n  const kinds = size === 'large' ? 1 + Math.floor(rand() * 26) : 1 + Math.floor(rand() * 4);\n  const pool = [];\n  while (pool.length < kinds) {\n    const ch = String.fromCharCode(97 + Math.floor(rand() * 26));\n    if (!pool.includes(ch)) pool.push(ch);\n  }\n  pool.sort().reverse();\n  // Skew toward the largest letters so the repeat limit actually binds.\n  const skew = 1 + rand() * 4;\n  let s = '';\n  for (let i = 0; i < n; i++) {\n    s += pool[Math.floor(Math.pow(rand(), skew) * pool.length)];\n  }\n  const limitCap = size === 'large' && rand() < 0.7 ? Math.min(n, 5) : n;\n  const repeatLimit = 1 + Math.floor(rand() * limitCap);\n  return [s, repeatLimit];\n}",
+  "examples": [
+    {"name":"Example 1","input":["cczazcc",3],"expected":"zzcccac"},
+    {"name":"Example 2","input":["aababab",2],"expected":"bbabaa"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a",1]},
+    {"name":"Test 2","input":["aaaa",1]},
+    {"name":"Test 3","input":["aaaa",4]},
+    {"name":"Test 4","input":["zzzzza",2]},
+    {"name":"Test 5","input":["abcdef",1]},
+    {"name":"Test 6","input":["bbbbbbaaa",2]},
+    {"name":"Test 7","input":["zyzyzyzyzy",1]},
+    {"name":"Test 8","input":["aaabbbccc",3]},
+    {"name":"Test 9","input":["qqqqqqqqqqqqp",3]},
+    {"name":"Test 10","input":["leetcodeisgreat",2]},
+    {"name":"Test 11","input":["cccccccccbbbbbbbbbbaaaa",1]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTo be lexicographically greatest, every position should hold the largest letter still allowed there. So we spend the biggest letter as fast as the limit lets us. When its run hits `repeatLimit` and copies of it remain, we insert exactly one copy of the next largest available letter to break the run, then return to the biggest letter. If no smaller letter exists, nothing more can be appended, and stopping is right because a longer string would need a forbidden run. (Listing every valid arrangement and keeping the largest would be exponential.)\n\n## Approach\n\n1. Count each letter of `s` into `count`.\n2. Let `top` be the largest letter index still worth considering; skip it once its count is 0.\n3. Append `take = min(count[top], repeatLimit)` copies of `top`.\n4. If `top` is used up, continue with smaller letters. Otherwise find `next`, the largest smaller letter with copies left.\n5. If there is none, stop. Otherwise append one `next` as a separator and go back to step 3.\n\n## Example 1, step by step\n\n`s = \"cczazcc\"`, `repeatLimit = 3`: `z` occurs 2 times, `c` 4 times, `a` once. Both `z` fit, giving `\"zz\"`, and `z` is exhausted. For `c` we take 3, giving `\"zzccc\"`, with one `c` left, so the separator `a` follows: `\"zzccca\"`. Back at `c`, the last copy gives `\"zzcccac\"`, and every count is now 0.\n\n## Complexity\n\n- Time: O(n + 26 · k), where k is the number of separators, at most n: counting is linear and each separator search scans at most 26 letters.\n- Space: O(26) for the counts plus the output.\n\n## Pitfalls\n\n- Insert only **one** separator letter; more would push a smaller letter earlier than necessary.\n- After the separator, go back to the largest letter instead of moving on.\n- When no smaller letter remains, stop: the leftover copies of `top` cannot be placed.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | remaining copies of each letter (index 0 is `a`) |\n| `parts` | pieces of the answer, joined at the end |\n| `top` | index of the largest letter still in use |\n| `take` | how many copies of `top` go in this run |\n| `next` | the separator letter's index |",
+  "narration": {
+    "2": "Prepare a counter for each of the 26 letters.",
+    "4": "Tally how many times each letter occurs in s.",
+    "7": "parts collects the runs of the answer.",
+    "8": "Begin with the largest letter, z.",
+    "9": "Keep building while some letter could still be placed.",
+    "10": "This letter has no copies left, so move to the next smaller one.",
+    "14": "Use as many copies of the largest letter as the limit allows.",
+    "15": "Append that run to the answer.",
+    "16": "Those copies are now spent.",
+    "17": "If the letter is used up, the loop moves on to smaller letters.",
+    "20": "Search for the largest smaller letter that still has copies.",
+    "24": "No separator exists, so nothing more can be added.",
+    "27": "Insert exactly one separator to break the run of top.",
+    "28": "The separator copy is spent; the loop returns to top.",
+    "30": "Glue the runs together into the answer."
+  }
+}

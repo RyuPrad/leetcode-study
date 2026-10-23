@@ -1,0 +1,77 @@
+{
+  "number": 2065,
+  "title": "Maximum Path Quality of a Graph",
+  "spec": "leetcode",
+  "statement": "An undirected graph has `n = values.length` nodes labelled `0` to `n - 1`; node `i` is worth `values[i]`. Each entry `edges[j] = [u, v, time]` joins nodes `u` and `v`, and crossing that edge in either direction takes `time` seconds.\n\nConsider walks that leave node `0`, finish back at node `0`, and spend no more than `maxTime` seconds in total. A walk may pass through nodes and edges repeatedly. Its quality is the sum of `values` over the **distinct** nodes it touches (a node counts once no matter how often it is visited, and node `0` always counts). Return the highest quality any such walk achieves; the walk that never leaves node `0` is allowed.\n\nEvery node has at most four edges, no pair of nodes is joined twice, and the graph need not be connected.",
+  "constraints": [
+    "n == values.length",
+    "1 <= n <= 1000",
+    "0 <= values[i] <= 10^8",
+    "0 <= edges.length <= 2000",
+    "edges[j].length == 3",
+    "0 <= u < v <= n - 1",
+    "10 <= time, maxTime <= 100",
+    "All pairs [u, v] are unique",
+    "Each node has at most four edges",
+    "The graph may be disconnected"
+  ],
+  "signature": "int maximalPathQuality(int[] values, int[][] edges, int maxTime)",
+  "entry": "maximalPathQuality",
+  "kind": "function",
+  "parameters": [
+    "values",
+    "edges",
+    "maxTime"
+  ],
+  "validator": "function validate([values, edges, maxTime]) {\n  const n = values.length;\n  if (n < 1 || n > 1000) return 'values needs 1 to 1000 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < 0 || v > 1e8)) return 'Each value is an integer between 0 and 10^8.';\n  if (edges.length > 2000) return 'There are at most 2000 edges.';\n  if (!Number.isInteger(maxTime) || maxTime < 10 || maxTime > 100) return 'maxTime is between 10 and 100.';\n  const degree = new Array(n).fill(0);\n  const seen = new Set();\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3) return 'Each edge is [u, v, time].';\n    const [u, v, time] = edge;\n    if (!Number.isInteger(u) || !Number.isInteger(v) || u < 0 || u >= v || v >= n) return 'Each edge needs 0 <= u < v <= n - 1.';\n    if (!Number.isInteger(time) || time < 10 || time > 100) return 'Each edge time is between 10 and 100.';\n    const key = u * n + v;\n    if (seen.has(key)) return 'No pair of nodes may be joined twice.';\n    seen.add(key);\n    if (++degree[u] > 4 || ++degree[v] > 4) return 'Each node has at most four edges.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximalPathQuality(values, edges, maxTime) {\n  const graph = values.map(() => []);\n  for (const [u, v, time] of edges) {\n    graph[u].push([v, time]);\n    graph[v].push([u, time]);\n  }\n  const visits = new Array(values.length).fill(0);\n  let best = 0;\n\n  function dfs(node, elapsed, quality) {\n    if (node === 0) {\n      best = Math.max(best, quality);\n    }\n    for (const [next, time] of graph[node]) {\n      if (elapsed + time > maxTime) {\n        continue;\n      }\n      const gain = visits[next] === 0 ? values[next] : 0;\n      visits[next]++;\n      dfs(next, elapsed + time, quality + gain);\n      visits[next]--;\n    }\n  }\n\n  visits[0] = 1;\n  dfs(0, 0, values[0]);\n  return best;\n}",
+  "brute": "function maximalPathQuality(values, edges, maxTime) {\n  // Enumerate every walk from node 0 with an explicit stack, scoring walks that end at 0 by their set of nodes.\n  let best = values[0];\n  const stack = [[[0], 0]];\n  while (stack.length > 0) {\n    const [path, spent] = stack.pop();\n    const last = path[path.length - 1];\n    if (last === 0) {\n      let total = 0;\n      for (const node of new Set(path)) total += values[node];\n      best = Math.max(best, total);\n    }\n    for (const [u, v, t] of edges) {\n      if (spent + t > maxTime) continue;\n      if (u === last) stack.push([[...path, v], spent + t]);\n      else if (v === last) stack.push([[...path, u], spent + t]);\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  const n = large ? 1000 : int(1, 6);\n  const values = Array.from({ length: n }, () => large || rand() < 0.15 ? int(0, 1e8) : int(0, 50));\n  const degree = new Array(n).fill(0);\n  const seen = new Set();\n  const edges = [];\n  const target = n < 2 ? 0 : large ? int(1500, 2000) : int(0, Math.min(10, (n * (n - 1)) / 2));\n  // Small graphs keep walks short (at most 6 edges) so the brute force stays fast.\n  const maxTime = large ? int(60, 100) : int(10, 60);\n  const edgeTime = () => large ? (rand() < 0.6 ? int(10, 20) : int(10, 100)) : int(10, 40);\n  for (let tries = 0; edges.length < target && tries < 20 * target + 50; tries++) {\n    // Large graphs pick most edges near node 0 so the search from 0 has plenty to explore.\n    const spread = large && rand() < 0.5 ? 60 : n;\n    let u = int(0, spread - 1);\n    let v = int(0, spread - 1);\n    if (u === v) continue;\n    if (u > v) [u, v] = [v, u];\n    const key = u * n + v;\n    if (seen.has(key) || degree[u] >= 4 || degree[v] >= 4) continue;\n    seen.add(key);\n    degree[u]++;\n    degree[v]++;\n    edges.push([u, v, edgeTime()]);\n  }\n  return [values, edges, maxTime];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[0,32,10,43],[[0,1,10],[1,2,15],[0,3,10]],49],"expected":75},
+    {"name":"Example 2","input":[[5,10,15,20],[[0,1,10],[1,2,10],[0,3,10]],30],"expected":25},
+    {"name":"Example 3","input":[[1,2,3,4],[[0,1,10],[1,2,11],[2,3,12],[1,3,13]],50],"expected":7}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],[],10]},
+    {"name":"Test 2","input":[[0,100],[[0,1,50]],99]},
+    {"name":"Test 3","input":[[0,100],[[0,1,50]],100]},
+    {"name":"Test 4","input":[[1,10,20,30,40],[[0,1,10],[0,2,10],[0,3,10],[0,4,10]],60]},
+    {"name":"Test 5","input":[[3,1000,7],[[1,2,10]],100]},
+    {"name":"Test 6","input":[[0,1,2,3,4,5],[[0,1,10],[1,2,10],[2,3,10],[3,4,10],[4,5,10]],100]},
+    {"name":"Test 7","input":[[1,2,3,4],[[0,1,25],[1,2,25],[2,3,25],[0,3,25]],100]},
+    {"name":"Test 8","input":[[0,0,0,0],[[0,1,10],[1,2,10],[2,3,10]],100]},
+    {"name":"Test 9","input":[[100000000,100000000,100000000,100000000,100000000],[[0,1,10],[0,2,10],[0,3,10],[0,4,10],[1,2,10],[1,3,10],[1,4,10],[2,3,10],[2,4,10],[3,4,10]],40]},
+    {"name":"Test 10","input":[[2,50,1,1,60],[[0,1,45],[0,2,10],[2,3,10],[3,4,10],[1,4,20]],80]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe limits make exhaustive search affordable. Every edge takes at least 10 seconds and `maxTime` is at most 100, so a walk uses at most 10 edges; with at most four edges per node that is at most about 4^10 ≈ 10^6 walks. So we can try every walk from node `0` by backtracking and record the quality each time the walk is back at `0`.\n\nThe only subtlety is scoring repeated visits. Keeping a visit counter per node lets us add a node's value only on its first visit and undo that exactly when we backtrack.\n\n## Approach\n\n1. Build an adjacency list `graph` of `[next, time]` pairs for both directions of every edge.\n2. Set `visits[0] = 1` and start `dfs(0, 0, values[0])`.\n3. In `dfs(node, elapsed, quality)`, whenever `node` is `0` the walk is a valid closed walk, so update `best`.\n4. For each neighbour `next` reachable within `maxTime`, compute `gain` (its value if `visits[next]` is 0, otherwise 0), increment `visits[next]`, recurse, then decrement it to backtrack.\n5. Return `best`.\n\n## Example 1, step by step\n\n`values = [0, 32, 10, 43]`, `maxTime = 49`. Going `0 → 1` gives quality 32 at time 10; returning to `0` at time 20 records `best = 32`. From there `0 → 3` adds 43 (time 30, quality 75) and `3 → 0` at time 40 records `best = 75`. Node 2 can never count: reaching it and returning costs `10 + 15 + 15 + 10 = 50 > 49`. The answer is `75`.\n\n## Complexity\n\n- Time: O(4^(maxTime / 10)) in the worst case, about 10^6 calls, plus O(n + edges) to build the graph.\n- Space: O(n + edges) for the graph and counters, and recursion depth at most `maxTime / 10`.\n\n## Pitfalls\n\n- Use a visit **count**, not a boolean: after backtracking out of a second visit, the node must still count as visited by the outer path.\n- Record `best` only at node `0`, since the walk has to end there.\n- Node `0`'s own value always counts, even if no edge can be used.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of `[next, time]` pairs |\n| `visits` | how many times each node is on the current walk |\n| `best` | highest quality of a closed walk found so far |\n| `node`, `elapsed`, `quality` | current position, time used, and value collected |\n| `next`, `time`, `gain` | neighbour, travel time, and value it would add |",
+  "narration": {
+    "2": "Create an empty neighbour list for every node.",
+    "3": "Each edge can be crossed both ways...",
+    "4": "...so add it to u's list...",
+    "5": "...and to v's list.",
+    "7": "Count how many times each node appears on the current walk.",
+    "8": "The best quality of a walk that is back at node 0.",
+    "10": "Explore every walk that continues from node with elapsed seconds used and quality collected.",
+    "11": "Standing on node 0 means the walk so far is a valid closed walk.",
+    "12": "Keep the best quality seen at node 0.",
+    "14": "Try every edge leaving the current node.",
+    "15": "Skip edges that would exceed the time budget.",
+    "18": "A node adds its value only on its first visit.",
+    "19": "Mark the step onto next.",
+    "20": "Continue the walk from next with the updated time and quality.",
+    "21": "Backtrack: undo the visit so sibling walks see the old state.",
+    "25": "Node 0 is visited at the start.",
+    "26": "Begin at node 0 with no time used and its value already counted.",
+    "27": "Every walk has been tried; return the best quality."
+  }
+}

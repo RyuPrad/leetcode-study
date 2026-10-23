@@ -1,0 +1,67 @@
+{
+  "number": 2052,
+  "title": "Minimum Cost to Separate Sentence Into Rows",
+  "spec": "recalled",
+  "statement": "You are given a string `sentence` made of words separated by single spaces, and an integer `k`. Break the sentence into one or more rows by choosing where the line breaks go between words: the words keep their order, no word is split across rows, and inside a row consecutive words are separated by one space. The length of a row is its number of characters, counting those spaces, and every row must have length at most `k` (every word is guaranteed to fit on a row by itself).\n\nA row of length `len` costs `(k - len)^2`, except the **last** row, which is free. Return the smallest possible total cost of all rows.",
+  "constraints": [
+    "1 <= sentence.length <= 5000",
+    "1 <= k <= 5000",
+    "Every word of sentence has length at most k",
+    "sentence contains only lowercase English letters and spaces",
+    "sentence does not start or end with a space",
+    "Words in sentence are separated by exactly one space"
+  ],
+  "signature": "int minimumCost(String sentence, int k)",
+  "entry": "minimumCost",
+  "kind": "function",
+  "parameters": [
+    "sentence",
+    "k"
+  ],
+  "validator": "function validate([sentence, k]) {\n  if (typeof sentence !== 'string' || sentence.length < 1 || sentence.length > 5000) return 'sentence needs 1 to 5000 characters.';\n  if (!/^[a-z]+( [a-z]+)*$/.test(sentence)) return 'sentence is lowercase words separated by single spaces.';\n  if (!Number.isInteger(k) || k < 1 || k > 5000) return 'k is between 1 and 5000.';\n  if (sentence.split(' ').some(word => word.length > k)) return 'Every word must fit in k characters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumCost(sentence, k) {\n  const words = sentence.split(' ');\n  const count = words.length;\n  const dp = new Array(count).fill(Infinity);\n\n  for (let start = count - 1; start >= 0; start--) {\n    let length = -1;\n    for (let end = start; end < count; end++) {\n      length += words[end].length + 1;\n      if (length > k) {\n        break;\n      }\n      if (end === count - 1) {\n        dp[start] = 0;\n      } else {\n        const cost = (k - length) ** 2;\n        dp[start] = Math.min(dp[start], cost + dp[end + 1]);\n      }\n    }\n  }\n  return dp[0];\n}",
+  "brute": "function minimumCost(sentence, k) {\n  const words = sentence.split(' ');\n  const gaps = words.length - 1;\n  let best = Infinity;\n  // Each bit of mask says whether a row break goes after that word.\n  for (let mask = 0; mask < 1 << gaps; mask++) {\n    const rows = [];\n    let row = words[0];\n    for (let g = 0; g < gaps; g++) {\n      if (mask & (1 << g)) { rows.push(row); row = words[g + 1]; }\n      else row += ' ' + words[g + 1];\n    }\n    rows.push(row);\n    if (rows.some(r => r.length > k)) continue;\n    let total = 0;\n    for (let r = 0; r + 1 < rows.length; r++) total += (k - rows[r].length) * (k - rows[r].length);\n    best = Math.min(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  const maxWord = size === 'large' ? 1 + Math.floor(rand() * 12) : 1 + Math.floor(rand() * 5);\n  const wordCount = size === 'large' ? 300 + Math.floor(rand() * 500) : 1 + Math.floor(rand() * 8);\n  const words = [];\n  let longest = 0;\n  let total = -1;\n  for (let w = 0; w < wordCount; w++) {\n    const len = 1 + Math.floor(rand() * maxWord);\n    if (total + len + 1 > 5000) break;\n    let word = '';\n    for (let c = 0; c < len; c++) word += letters[Math.floor(rand() * (size === 'large' ? 26 : 3))];\n    words.push(word);\n    total += len + 1;\n    longest = Math.max(longest, len);\n  }\n  const slack = size === 'large' ? Math.floor(rand() * 60) : Math.floor(rand() * 10);\n  return [words.join(' '), longest + slack];\n}",
+  "examples": [
+    {"name":"Example 1","input":["i love leetcode",12],"expected":36},
+    {"name":"Example 2","input":["apples and bananas taste great",7],"expected":21},
+    {"name":"Example 3","input":["a",5],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a",1]},
+    {"name":"Test 2","input":["abc de",4]},
+    {"name":"Test 3","input":["a b c d e",1]},
+    {"name":"Test 4","input":["a b c d e",4]},
+    {"name":"Test 5","input":["hello world",11]},
+    {"name":"Test 6","input":["hello world",10]},
+    {"name":"Test 7","input":["aaa bb cc ddddd",6]},
+    {"name":"Test 8","input":["the quick brown fox jumps over the lazy dog",10]},
+    {"name":"Test 9","input":["i love leetcode",8]},
+    {"name":"Test 10","input":["x y",5000]},
+    {"name":"Test 11","input":["a bb ccc dddd eeeee ffffff ggggggg",9]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFilling each row as much as possible looks tempting but can be wrong: for `\"aaa bb cc ddddd\"` with `k = 6`, packing `\"aaa bb\"` leaves `\"cc\"` alone at cost 16, while `\"aaa\"` / `\"bb cc\"` costs only 9 + 1 = 10. Trying every set of break points is correct but exponential. Instead, notice that once you decide which word starts a row, the best way to lay out everything from there on does not depend on earlier rows. That is a 1-D DP over word positions.\n\n## Approach\n\n1. Split `sentence` into `words`; let `count` be how many there are.\n2. `dp[start]` is the cheapest cost of laying out `words[start..]` when a row begins at `start`; every entry starts at `Infinity`.\n3. For `start` from the last word down to 0, grow a row word by word with index `end`, keeping its `length` (word lengths plus one space between words).\n4. Stop as soon as `length > k`, since adding words only makes it longer.\n5. If `end` is the last word, this row is the final one and costs nothing, so `dp[start] = 0`. Otherwise try `(k - length)^2 + dp[end + 1]`.\n6. Return `dp[0]`.\n\n## Example 1, step by step\n\n`words = [\"i\", \"love\", \"leetcode\"]`, `k = 12`. `dp[2] = 0` because `\"leetcode\"` fits as the last row. For `start = 1`, `\"love leetcode\"` has length 13, too long, so the only choice is `\"love\"`: `(12 - 4)^2 + dp[2] = 64`. For `start = 0`: `\"i\"` gives `121 + 64 = 185`, `\"i love\"` (length 6) gives `36 + dp[2] = 36`, and adding `\"leetcode\"` overflows. So `dp[0] = 36`.\n\n## Complexity\n\n- Time: O(n * k) in the worst case, where n is the number of words: each row holds at most about k / 2 words before the inner loop breaks.\n- Space: O(n) for `words` and `dp`.\n\n## Pitfalls\n\n- The last row is free, so any start whose remaining words all fit gets cost 0, even if that row is short.\n- Count the spaces: starting `length` at -1 and adding `word.length + 1` gives exactly one space between words.\n- Greedy packing is not optimal because the cost is squared; small gaps on several rows beat one large gap.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `words`, `count` | the words of the sentence and their number |\n| `dp` | `dp[start]` = cheapest cost when a row begins at word `start` |\n| `start`, `end` | first and last word of the row being tried |\n| `length` | characters in the row `words[start..end]`, spaces included |\n| `cost` | price of that row when it is not the last one |",
+  "narration": {
+    "2": "Split the sentence into its words.",
+    "4": "dp[start] will be the cheapest cost when a row begins at word start; unknown values start as Infinity.",
+    "6": "Fill dp from the last word backwards so later answers are ready when needed.",
+    "7": "Start with -1 so that adding each word plus one space counts spaces only between words.",
+    "8": "Extend the row that begins at start by one more word.",
+    "9": "Add this word and the space before it.",
+    "10": "The row is now too long, and adding more words only makes it longer.",
+    "13": "This row reaches the final word, so it is the last row.",
+    "14": "The last row is free, which is the best possible cost.",
+    "16": "Otherwise this row is charged for its unused space, squared.",
+    "17": "Keep the cheaper of the current best and this row plus the best layout of the remaining words.",
+    "21": "The answer is the cheapest layout starting from the first word."
+  }
+}

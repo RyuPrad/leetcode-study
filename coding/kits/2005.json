@@ -1,0 +1,53 @@
+{
+  "number": 2005,
+  "title": "Subtree Removal Game with Fibonacci Tree",
+  "spec": "recalled",
+  "statement": "A Fibonacci tree `order(k)` is a binary tree defined recursively:\n\n- `order(0)` is the empty tree.\n- `order(1)` is a single node.\n- For `k >= 2`, `order(k)` is a root whose left subtree is `order(k - 2)` and whose right subtree is `order(k - 1)`.\n\nAlice and Bob play a game on `order(n)`, taking turns with Alice first. On each turn the current player chooses any node still in the tree and deletes it together with its entire subtree. Whoever deletes the root loses, so a player only does that when the root is the last node left. Return `true` if Alice wins when both players play optimally, and `false` if Bob wins.",
+  "constraints": [
+    "1 <= n <= 100"
+  ],
+  "signature": "boolean findGameWinner(int n)",
+  "entry": "findGameWinner",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 100) return 'n is an integer from 1 to 100.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findGameWinner(n) {\n  const grundy = new Array(n + 1).fill(0);\n  grundy[1] = 0;\n  if (n >= 2) {\n    grundy[2] = 1;\n  }\n  for (let k = 3; k <= n; k++) {\n    const left = grundy[k - 2] + 1;\n    const right = grundy[k - 1] + 1;\n    grundy[k] = left ^ right;\n  }\n  return grundy[n] !== 0;\n}",
+  "brute": "function findGameWinner(n) {\n  // Every distinct tree shape gets an id; a shape is the sorted list of its children's ids.\n  const ids = new Map();\n  const kidsOf = [];\n  const shape = kids => {\n    const sorted = [...kids].sort((x, y) => x - y);\n    const key = sorted.join(',');\n    if (!ids.has(key)) { ids.set(key, kidsOf.length); kidsOf.push(sorted); }\n    return ids.get(key);\n  };\n  const tree = [null, shape([])];\n  for (let k = 2; k <= n; k++) tree.push(shape(k === 2 ? [tree[1]] : [tree[k - 2], tree[k - 1]]));\n  // All shapes reachable by deleting one non-root node together with everything below it.\n  const movesMemo = new Map();\n  const moves = id => {\n    if (movesMemo.has(id)) return movesMemo.get(id);\n    const kids = kidsOf[id], result = new Set();\n    kids.forEach((kid, i) => {\n      const rest = kids.filter((_, j) => j !== i);\n      result.add(shape(rest));\n      for (const smaller of moves(kid)) result.add(shape([...rest, smaller]));\n    });\n    movesMemo.set(id, result);\n    return result;\n  };\n  // The player to move wins when some deletion leaves the opponent in a losing shape;\n  // with no such deletion left, they must delete the root and lose.\n  const winMemo = new Map();\n  const wins = id => {\n    if (winMemo.has(id)) return winMemo.get(id);\n    let result = false;\n    for (const next of moves(id)) if (!wins(next)) { result = true; break; }\n    winMemo.set(id, result);\n    return result;\n  };\n  return wins(tree[n]);\n}",
+  "generator": "function generate(rand, size) {\n  // The full game search only copes with trees up to order(6).\n  if (size === 'small') return [1 + Math.floor(rand() * 6)];\n  // Half of the large sizes are one more than a multiple of 6, where the first player loses.\n  if (rand() < 0.5) return [61 + 6 * Math.floor(rand() * 7)];\n  return [60 + Math.floor(rand() * 41)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[3],"expected":true},
+    {"name":"Example 2","input":[1],"expected":false},
+    {"name":"Example 3","input":[2],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[2]},
+    {"name":"Test 3","input":[3]},
+    {"name":"Test 4","input":[4]},
+    {"name":"Test 5","input":[5]},
+    {"name":"Test 6","input":[6]},
+    {"name":"Test 7","generate":{"seed":1,"size":"large"}},
+    {"name":"Test 8","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 9","generate":{"seed":29,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSearching every position directly is hopeless: `order(100)` has about 10^21 nodes. Instead treat it as an impartial game. Nobody deletes the root willingly, so the real game is \"delete a non-root node; a player with no such move loses\", which is normal play. By the Sprague–Grundy theorem each position has a Grundy number, and the player to move loses exactly when it is `0`.\n\nThe root's branches are independent games played side by side, so their values combine with XOR. A branch is a subtree hanging from the root by an edge; deleting its top clears the whole branch. A classic lemma (the colon principle of Green Hackenbush) says such a branch is worth the subtree's own value plus one. For `order(k)` that gives `(g(k - 2) + 1) XOR (g(k - 1) + 1)`.\n\n## Approach\n\n1. `grundy[1] = 0`: a lone root offers no safe move.\n2. `grundy[2] = 1`: `order(2)` has only a right branch, `order(1)`, worth `0 + 1`.\n3. For `k` from 3 to `n`, compute `left = grundy[k - 2] + 1` and `right = grundy[k - 1] + 1`, and store `left ^ right`.\n4. Alice wins exactly when `grundy[n] !== 0`.\n\n## Example 1, step by step\n\nFor `n = 3`: `grundy[1] = 0` and `grundy[2] = 1`. At `k = 3`, `left = 0 + 1 = 1` and `right = 1 + 1 = 2`, so `grundy[3] = 1 ^ 2 = 3`. It is not zero, so the answer is `true`. Indeed Alice can delete the lowest leaf of the right branch, leaving a root with two leaves; Bob takes one, Alice takes the other, and Bob must delete the root.\n\n## Complexity\n\n- Time: O(n): one XOR per tree order.\n- Space: O(n) for `grundy` (two variables would do).\n\n## Pitfalls\n\n- `order(2)` has no left subtree. An empty subtree adds nothing; it is not a branch worth `0 + 1`.\n- Add 1 to each child's value before XOR; XORing the raw values gives wrong answers.\n- The values stay below 128, so JavaScript's 32-bit `^` is safe. The table shows Alice loses exactly when `n % 6 === 1`, a pattern the Grundy numbers reveal rather than one to guess.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `grundy[k]` | Grundy number of `order(k)` when the root is never deleted |\n| `k` | the tree order being computed |\n| `left` | value of the left branch, `order(k - 2)` hanging by an edge |\n| `right` | value of the right branch, `order(k - 1)` hanging by an edge |",
+  "narration": {
+    "2": "grundy[k] will hold the Grundy number of the tree order(k), played without touching the root.",
+    "3": "A single node offers no safe deletion, so its value is 0.",
+    "4": "order(2) exists only when n is at least 2.",
+    "5": "Its only branch is order(1) hanging by an edge, worth 0 + 1.",
+    "7": "Build the values up from small trees to order(n).",
+    "8": "The left branch is order(k - 2) hanging by an edge: its value plus one.",
+    "9": "The right branch is order(k - 1) hanging by an edge: its value plus one.",
+    "10": "The two branches are independent games, so their values combine with XOR.",
+    "12": "A nonzero Grundy number means the first player, Alice, has a winning move."
+  }
+}

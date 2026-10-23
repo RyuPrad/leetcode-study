@@ -1,0 +1,55 @@
+{
+  "number": 2029,
+  "title": "Stone Game IX",
+  "spec": "leetcode",
+  "statement": "Alice and Bob play with the stones in `stones`, where `stones[i]` is the value of stone `i`. They move alternately, Alice first, and each move takes away one remaining stone of the mover's choice.\n\n- If, right after a move, the combined value of every stone taken so far (by either player) is a multiple of 3, the player who just moved loses at once.\n- If all stones have been taken and nobody has lost that way, Bob is the winner, no matter whose turn it would be.\n\nBoth players play perfectly. Return `true` when Alice wins and `false` when Bob wins.",
+  "constraints": [
+    "1 <= stones.length <= 10^5",
+    "1 <= stones[i] <= 10^4"
+  ],
+  "signature": "boolean stoneGameIX(int[] stones)",
+  "entry": "stoneGameIX",
+  "kind": "function",
+  "parameters": [
+    "stones"
+  ],
+  "validator": "function validate([stones]) {\n  if (!Array.isArray(stones) || stones.length < 1 || stones.length > 100000) return 'stones needs 1 to 100000 values.';\n  if (stones.some(v => !Number.isInteger(v) || v < 1 || v > 10000)) return 'Each stone value is an integer from 1 to 10000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function stoneGameIX(stones) {\n  const count = [0, 0, 0];\n  for (const stone of stones) {\n    count[stone % 3]++;\n  }\n  if (count[0] % 2 === 0) {\n    return count[1] > 0 && count[2] > 0;\n  }\n  return Math.abs(count[1] - count[2]) > 2;\n}",
+  "brute": "function stoneGameIX(stones) {\n  const n = stones.length;\n  const full = (1 << n) - 1;\n  const memo = new Map();\n  // moverWins(mask, sum): does the player about to move win, given the taken stones and their total mod 3?\n  const moverWins = (mask, sum) => {\n    if (mask === full) return n % 2 === 1; // no stones left: Bob wins, and Bob moves next exactly when n is odd\n    if (memo.has(mask)) return memo.get(mask);\n    let result = false;\n    for (let i = 0; i < n && !result; i++) {\n      if (mask & (1 << i)) continue;\n      const next = (sum + stones[i]) % 3;\n      if (next === 0) continue; // this move loses on the spot\n      if (!moverWins(mask | (1 << i), next)) result = true;\n    }\n    memo.set(mask, result);\n    return result;\n  };\n  return moverWins(0, 0);\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1000 + Math.floor(rand() * 1001) : 1 + Math.floor(rand() * 9);\n  const max = size === 'large' ? 10000 : 12;\n  // Skewed residue weights so that both parities of zeros and lopsided ones/twos counts appear.\n  const weights = [rand(), rand(), rand()];\n  if (rand() < 0.3) weights[Math.floor(rand() * 3)] = 0;\n  if (weights[0] + weights[1] + weights[2] === 0) weights[1] = 1;\n  const total = weights[0] + weights[1] + weights[2];\n  const stones = [];\n  for (let i = 0; i < n; i++) {\n    let pick = rand() * total;\n    let residue = 0;\n    while (residue < 2 && pick >= weights[residue]) { pick -= weights[residue]; residue++; }\n    if (weights[residue] === 0) residue = weights.findIndex(w => w > 0);\n    const lo = residue === 0 ? 1 : 0;\n    const hi = Math.floor((max - residue) / 3);\n    stones.push(residue + 3 * (lo + Math.floor(rand() * (hi - lo + 1))));\n  }\n  return [stones];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,1]],"expected":true},
+    {"name":"Example 2","input":[[2]],"expected":false},
+    {"name":"Example 3","input":[[5,1,2,4,3]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[3]]},
+    {"name":"Test 2","input":[[1]]},
+    {"name":"Test 3","input":[[1,1,1,1]]},
+    {"name":"Test 4","input":[[3,1,1,1,1]]},
+    {"name":"Test 5","input":[[3,1,1]]},
+    {"name":"Test 6","input":[[6,3,4,2]]},
+    {"name":"Test 7","input":[[9,2,1,5,8,11]]},
+    {"name":"Test 8","input":[[3,6,9,1,2,2,2,2]]},
+    {"name":"Test 9","input":[[10000,9999,9998,1,7,13,4]]},
+    {"name":"Test 10","input":[[3,3,3,3]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly each stone's remainder mod 3 matters. A stone with remainder 0 never changes the running total mod 3, so taking it simply hands the turn to the other player. Among the other stones the order is forced: when the total is 1 mod 3 a 2 would hit a multiple of 3, so the mover needs a 1 (or a 0); when it is 2 mod 3 the mover needs a 2. Starting with a 1 the remainders must run 1, 1, 2, 1, 2, ...; starting with a 2 they run 2, 2, 1, 2, 1, ... The player whose needed remainder has run out (with no 0 to spare) loses, and if the stones run out first, Bob wins.\n\nZeros cancel in pairs (each one can be answered by another), so only whether their count is even matters. A brute force can try every move order with memoised minimax, but the counts alone decide the game.\n\n## Approach\n\n1. Count the stones by remainder into `count[0]`, `count[1]`, `count[2]`.\n2. If `count[0]` is even, Alice opens with the rarer of 1 and 2; Bob is then the one who runs out first. That works exactly when both `count[1]` and `count[2]` are positive.\n3. If `count[0]` is odd, the extra zero swaps the roles, so Alice must open with the more common remainder and needs it to exceed the other by more than 2; otherwise she gets stuck or the stones run out.\n\n## Example 1, step by step\n\n`stones = [2, 1]` gives `count = [0, 1, 1]`. `count[0] = 0` is even and both `count[1]` and `count[2]` are 1, so the answer is `true`: Alice takes either stone and Bob must take the other, making the total 3.\n\n## Complexity\n\n- Time: O(n): one pass to count remainders.\n- Space: O(1): three counters.\n\n## Pitfalls\n\n- Running out of stones is a win for Bob, so Alice must force Bob onto a multiple of 3, not just survive.\n- Remainder-0 stones are not irrelevant: their parity flips the result.\n- In the odd case the gap must be greater than 2; a gap of exactly 2 still loses for Alice.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | how many stones have remainder 0, 1 and 2 mod 3 |\n| `stone` | the value of the stone being counted |",
+  "narration": {
+    "2": "Prepare one counter for each remainder mod 3.",
+    "3": "Visit every stone once.",
+    "4": "Only the remainder matters, so bump the counter for this stone's remainder.",
+    "6": "With an even number of zeros, the zeros cancel each other out.",
+    "7": "Alice wins exactly when she can open with one remainder and the other remainder exists to trap Bob.",
+    "9": "With an odd number of zeros the roles swap, so Alice needs one remainder to outnumber the other by more than 2."
+  }
+}

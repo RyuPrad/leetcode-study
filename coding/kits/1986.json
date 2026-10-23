@@ -1,0 +1,65 @@
+{
+  "number": 1986,
+  "title": "Minimum Number of Work Sessions to Finish the Tasks",
+  "spec": "leetcode",
+  "statement": "You have `n` tasks, and task `i` needs `tasks[i]` hours of work. You work in sessions, and one session lasts at most `sessionTime` hours in a row before you must break. A task cannot be split: once started it must be finished inside the same session. Tasks may be done in any order, and the next task may begin as soon as the previous one ends.\n\nReturn the fewest sessions that let you finish every task. It is guaranteed that `sessionTime` is at least the largest value in `tasks`.",
+  "constraints": [
+    "n == tasks.length",
+    "1 <= n <= 14",
+    "1 <= tasks[i] <= 10",
+    "max(tasks[i]) <= sessionTime <= 15"
+  ],
+  "signature": "int minSessions(int[] tasks, int sessionTime)",
+  "entry": "minSessions",
+  "kind": "function",
+  "parameters": [
+    "tasks",
+    "sessionTime"
+  ],
+  "validator": "function validate([tasks, sessionTime]) {\n  if (!Array.isArray(tasks) || tasks.length < 1 || tasks.length > 14) return 'tasks needs 1 to 14 values.';\n  if (tasks.some(t => !Number.isInteger(t) || t < 1 || t > 10)) return 'Each task takes 1 to 10 hours.';\n  if (!Number.isInteger(sessionTime) || sessionTime > 15) return 'sessionTime is at most 15.';\n  if (sessionTime < Math.max(...tasks)) return 'sessionTime must be at least the longest task.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minSessions(tasks, sessionTime) {\n  const n = tasks.length;\n  const full = 1 << n;\n  const sessions = new Array(full).fill(Infinity);\n  const used = new Array(full).fill(Infinity);\n  sessions[0] = 1;\n  used[0] = 0;\n  for (let mask = 0; mask < full; mask++) {\n    for (let i = 0; i < n; i++) {\n      if (mask & (1 << i)) {\n        continue;\n      }\n      const next = mask | (1 << i);\n      let count = sessions[mask];\n      let time = used[mask] + tasks[i];\n      if (time > sessionTime) {\n        count++;\n        time = tasks[i];\n      }\n      if (count < sessions[next] || (count === sessions[next] && time < used[next])) {\n        sessions[next] = count;\n        used[next] = time;\n      }\n    }\n  }\n  return sessions[full - 1];\n}",
+  "brute": "function minSessions(tasks, sessionTime) {\n  // best[set] = fewest sessions for the tasks in set, choosing the whole last session as a subset at once.\n  const n = tasks.length;\n  const all = (1 << n) - 1;\n  const total = new Array(all + 1).fill(0);\n  for (let set = 1; set <= all; set++) {\n    for (let i = 0; i < n; i++) if (set & (1 << i)) total[set] += tasks[i];\n  }\n  const best = new Array(all + 1).fill(Infinity);\n  best[0] = 0;\n  for (let set = 1; set <= all; set++) {\n    for (let last = set; last > 0; last = (last - 1) & set) {\n      if (total[last] <= sessionTime) best[set] = Math.min(best[set], best[set ^ last] + 1);\n    }\n  }\n  return best[all];\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(12, 14) : int(1, 8);\n  const top = [3, 6, 10][int(0, 2)];\n  const tasks = Array.from({ length: n }, () => int(1, top));\n  const largest = Math.max(...tasks);\n  const sessionTime = int(largest, 15);\n  return [tasks, sessionTime];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3],3],"expected":2},
+    {"name":"Example 2","input":[[3,1,3,1,1],8],"expected":2},
+    {"name":"Example 3","input":[[1,2,3,4,5],15],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],5]},
+    {"name":"Test 2","input":[[10,10,10],10]},
+    {"name":"Test 3","input":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1],15]},
+    {"name":"Test 4","input":[[10,10,10,10,10,10,10,10,10,10,10,10,10,10],10]},
+    {"name":"Test 5","input":[[8,5,4,5,4,2],14]},
+    {"name":"Test 6","input":[[2,6,4,6,3,7],14]},
+    {"name":"Test 7","input":[[6,6,6],10]},
+    {"name":"Test 8","input":[[9,8,7,6,5,4,3,2,1],15]},
+    {"name":"Test 9","input":[[1,10],10]},
+    {"name":"Test 10","input":[[3,7,9,4,4,6,2,4,2],14]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is bin packing with at most 14 items, so a bitmask can name every set of finished tasks. Greedy packing (for example, longest task first) can waste a session, and trying every assignment by backtracking repeats work. Instead, imagine doing the tasks one at a time and opening a new session only when the next task does not fit. For a set of finished tasks, the best state is the one with the fewest sessions and, among those, the least time used in the current session: no other state for that set can lead to a better finish.\n\n## Approach\n\n1. `sessions[mask]` and `used[mask]` hold the best state for the tasks in `mask`. Start with `mask = 0`: one empty session, `used = 0`.\n2. Visit masks in increasing order; adding a task always makes a larger mask, so each mask is final when visited.\n3. For each task `i` not in `mask`, add it to the current session. If `time` exceeds `sessionTime`, open a new session (`count++`) that holds only this task.\n4. Keep the result for `next` if it has fewer sessions, or the same number with less `time` used.\n5. Return `sessions` for the mask containing every task.\n\n## Example 1, step by step\n\n`tasks = [1, 2, 3]`, `sessionTime = 3`. From mask `000` (1 session, 0 used), adding task 0 gives `(1, 1)`; then task 1 fits: `(1, 3)` for mask `011`. Task 2 (3 hours) does not fit in the remaining 0 hours, so mask `111` becomes `(2, 3)`. Every other order also needs 2 sessions, so the answer is `2`.\n\n## Complexity\n\n- Time: O(n · 2^n): each of the 2^n masks tries each of the n tasks.\n- Space: O(2^n) for the two tables.\n\n## Pitfalls\n\n- Compare states by sessions first and used time second; keeping only the smallest `used` would be wrong.\n- A new session starts with `time = tasks[i]`, not 0.\n- `ceil(sum / sessionTime)` is only a lower bound: `[6, 6, 6]` with `sessionTime = 10` needs 3 sessions, not 2.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `full` | number of masks, `2^n` |\n| `mask` | set of tasks already finished |\n| `sessions` | fewest sessions for each mask |\n| `used` | hours used in the last session for that best count |\n| `next` | `mask` plus task `i` |\n| `count`, `time` | sessions and last-session hours after adding task `i` |",
+  "narration": {
+    "3": "Every subset of tasks gets a bitmask, so there are 2^n states.",
+    "6": "With no tasks done, one session is open and nothing of it is used.",
+    "8": "Visit sets in increasing order; adding a task always gives a larger mask.",
+    "9": "Try finishing each task next.",
+    "10": "Skip tasks that are already in the set.",
+    "13": "The set after task i is finished.",
+    "14": "Start from the best state for the current set...",
+    "15": "...and try to fit task i into the open session.",
+    "16": "It does not fit in the time left.",
+    "17": "So open a new session...",
+    "18": "...which so far holds only task i.",
+    "20": "Keep this state if it uses fewer sessions, or as many with more room left.",
+    "26": "The mask with every bit set is all tasks done; return its session count."
+  }
+}

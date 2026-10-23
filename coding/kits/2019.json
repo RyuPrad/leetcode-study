@@ -1,0 +1,72 @@
+{
+  "number": 2019,
+  "title": "The Score of Students Solving Math Expression",
+  "spec": "leetcode",
+  "statement": "The string `s` is a valid arithmetic expression built from single-digit numbers (`0` to `9`) joined by `+` and `*`, such as `\"3+5*2\"`. Its **correct value** follows the usual precedence: first every multiplication is carried out from left to right, then every addition from left to right.\n\nEach entry of `answers` is one student's submitted result (in no particular order). Grade each answer and return the total of all grades:\n\n- 5 points if it equals the correct value;\n- otherwise 2 points if it equals a value the expression can produce when its operators are applied in some other order with correct arithmetic, that is, the value of some full parenthesization of `s`;\n- otherwise 0 points.",
+  "constraints": [
+    "3 <= s.length <= 31",
+    "s is a valid expression of digits 0-9 separated by '+' and '*'",
+    "Every operand is a single digit from 0 to 9",
+    "1 <= number of operators in s <= 15",
+    "The correct value of s is between 0 and 1000",
+    "Intermediate products of the correct evaluation never exceed 10^9",
+    "n == answers.length",
+    "1 <= n <= 10^4",
+    "0 <= answers[i] <= 1000"
+  ],
+  "signature": "int scoreOfStudents(String s, int[] answers)",
+  "entry": "scoreOfStudents",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "answers"
+  ],
+  "validator": "function validate([s, answers]) {\n  if (typeof s !== 'string' || s.length < 3 || s.length > 31 || s.length % 2 === 0) return 's must be an expression of 2 to 16 digits (length 3 to 31).';\n  for (let i = 0; i < s.length; i++) {\n    if (i % 2 === 0 ? !/[0-9]/.test(s[i]) : s[i] !== '+' && s[i] !== '*') return 's must alternate single digits with + or *.';\n  }\n  let sum = 0, term = Number(s[0]);\n  for (let i = 1; i < s.length; i += 2) {\n    if (s[i] === '*') { term *= Number(s[i + 1]); if (term > 1e9) return 'A product in the correct evaluation exceeds 10^9.'; }\n    else { sum += term; term = Number(s[i + 1]); }\n  }\n  if (sum + term > 1000) return 'The correct value of s must be at most 1000.';\n  if (!Array.isArray(answers) || answers.length < 1 || answers.length > 10000) return 'answers needs 1 to 10000 entries.';\n  if (answers.some(a => !Number.isInteger(a) || a < 0 || a > 1000)) return 'Each answer is between 0 and 1000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function scoreOfStudents(s, answers) {\n  const LIMIT = 1001;\n  const digits = [];\n  const ops = [];\n  for (let i = 0; i < s.length; i++) {\n    if (i % 2 === 0) digits.push(Number(s[i]));\n    else ops.push(s[i]);\n  }\n  const stack = [digits[0]];\n  for (let i = 0; i < ops.length; i++) {\n    if (ops[i] === '*') stack.push(stack.pop() * digits[i + 1]);\n    else stack.push(digits[i + 1]);\n  }\n  const correct = stack.reduce((sum, term) => sum + term, 0);\n  const n = digits.length;\n  const dp = Array.from({ length: n }, () => Array.from({ length: n }, () => new Set()));\n  for (let i = 0; i < n; i++) {\n    dp[i][i].add(digits[i]);\n  }\n  for (let len = 2; len <= n; len++) {\n    for (let left = 0; left + len - 1 < n; left++) {\n      const right = left + len - 1;\n      for (let mid = left; mid < right; mid++) {\n        for (const a of dp[left][mid]) {\n          for (const b of dp[mid + 1][right]) {\n            const value = ops[mid] === '+' ? a + b : a * b;\n            dp[left][right].add(Math.min(value, LIMIT));\n          }\n        }\n      }\n    }\n  }\n  const possible = dp[0][n - 1];\n  let score = 0;\n  for (const answer of answers) {\n    if (answer === correct) {\n      score += 5;\n    } else if (possible.has(answer)) {\n      score += 2;\n    }\n  }\n  return score;\n}",
+  "brute": "function scoreOfStudents(s, answers) {\n  // Correct value: split into terms at '+', multiply inside each term.\n  const correct = s.split('+').reduce((sum, term) => sum + term.split('*').reduce((p, d) => p * Number(d), 1), 0);\n  // Exact values of every full parenthesization, top-down by substring, never capped\n  // (16 digits keep every value below 2^53).\n  const memo = new Map();\n  const all = (expr) => {\n    if (memo.has(expr)) return memo.get(expr);\n    const out = new Set();\n    if (expr.length === 1) out.add(Number(expr));\n    for (let k = 1; k < expr.length; k += 2) {\n      for (const a of all(expr.slice(0, k))) for (const b of all(expr.slice(k + 1))) out.add(expr[k] === '+' ? a + b : a * b);\n    }\n    memo.set(expr, out);\n    return out;\n  };\n  const values = all(s);\n  let total = 0;\n  for (const x of answers) total += x === correct ? 5 : values.has(x) ? 2 : 0;\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const operands = size === 'large' ? 12 + Math.floor(rand() * 5) : 2 + Math.floor(rand() * 6);\n  const evaluate = (digits, ops) => {\n    let sum = 0, term = digits[0], peak = term;\n    for (let i = 0; i < ops.length; i++) {\n      if (ops[i] === '*') { term *= digits[i + 1]; peak = Math.max(peak, term); }\n      else { sum += term; term = digits[i + 1]; }\n    }\n    return [sum + term, peak];\n  };\n  let digits, ops, correct;\n  for (;;) {\n    const star = 0.2 + rand() * 0.5;\n    digits = Array.from({ length: operands }, () => rand() < 0.15 ? 0 : Math.floor(rand() * (rand() < 0.5 ? 4 : 10)));\n    ops = Array.from({ length: operands - 1 }, () => rand() < star ? '*' : '+');\n    const [value, peak] = evaluate(digits, ops);\n    if (value <= 1000 && peak <= 1e9) { correct = value; break; }\n  }\n  const s = digits.map((d, i) => d + (i < ops.length ? ops[i] : '')).join('');\n  // All values of every parenthesization (capped at 1001), used to plant 2-point answers.\n  const memo = new Map();\n  const values = (l, r) => {\n    const key = l * 32 + r;\n    if (memo.has(key)) return memo.get(key);\n    const out = new Set();\n    if (l === r) out.add(digits[l]);\n    for (let m = l; m < r; m++) for (const a of values(l, m)) for (const b of values(m + 1, r)) out.add(Math.min(ops[m] === '+' ? a + b : a * b, 1001));\n    memo.set(key, out);\n    return out;\n  };\n  const wrong = [...values(0, operands - 1)].filter(v => v <= 1000 && v !== correct);\n  const count = size === 'large' ? 2000 : 1 + Math.floor(rand() * 8);\n  const answers = [];\n  for (let i = 0; i < count; i++) {\n    const pick = rand();\n    if (pick < 0.3) answers.push(correct);\n    else if (pick < 0.65 && wrong.length) answers.push(wrong[Math.floor(rand() * wrong.length)]);\n    else answers.push(Math.floor(rand() * (size === 'large' ? 1001 : 30)));\n  }\n  return [s, answers];\n}",
+  "examples": [
+    {"name":"Example 1","input":["7+3*1*2",[20,13,42]],"expected":7},
+    {"name":"Example 2","input":["3+5*2",[13,0,10,13,13,16,16]],"expected":19},
+    {"name":"Example 3","input":["6+0*1",[12,9,6,4,8,6]],"expected":10}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["1+1",[2,2,1,0]]},
+    {"name":"Test 2","input":["2*3",[6,5]]},
+    {"name":"Test 3","input":["0*9+9",[9,0,81]]},
+    {"name":"Test 4","input":["9*9*9*9*0+5",[5,0,45,405,1000]]},
+    {"name":"Test 5","input":["1*1*1*1*1*1*1*1*1*1*1*1*1*1*1*1",[1,0,2,1]]},
+    {"name":"Test 6","input":["9+9+9+9+9+9+9+9+9+9+9+9+9+9+9+9",[144,143,145,144]]},
+    {"name":"Test 7","input":["1+2*3+4*5+6",[33,105,45,63,77,51,1000,0]]},
+    {"name":"Test 8","input":["5+0*0+5*0",[5,0,10,25,50]]},
+    {"name":"Test 9","input":["2+2*2+2*2+2*2+2",[14,32,40,64,80,128,256,0]]},
+    {"name":"Test 10","input":["4*0+3*7+0*9+1",[22,25,28,84,0,1,7]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe correct value is ordinary precedence evaluation, which a stack of pending terms handles in one pass. The 2-point answers are all values of all parenthesizations of `s`. Listing every parenthesization separately explodes (there are Catalan-many trees), but the values of an expression span depend only on the values of its two parts, so an **interval DP** over digit ranges builds the set of reachable values bottom-up.\n\nAnswers never exceed 1000. Once a value passes 1000 it can only shrink by being multiplied by `0`, and then it becomes `0` whatever it was. So every value above 1000 behaves the same and is stored as one marker, `LIMIT = 1001`, which keeps each set at most 1002 values.\n\n## Approach\n\n1. Split `s` into `digits` (even positions) and `ops` (odd positions).\n2. Find `correct`: on `*` multiply the top of `stack` by the next digit, on `+` push the next digit; then add the stack up.\n3. Let `dp[left][right]` be the set of values of digits `left..right`. A single digit gives itself.\n4. For each longer span, try every last operator `ops[mid]`, combine each `a` from the left part with each `b` from the right part, and add `min(value, LIMIT)`.\n5. Score each answer: 5 if it equals `correct`, else 2 if it is in `dp[0][n - 1]`, else 0.\n\n## Example 1, step by step\n\n`s = \"7+3*1*2\"`: `digits = [7,3,1,2]`, `ops = [+,*,*]`. The stack becomes `[7,3]`, then `[7,3]`, then `[7,6]`, so `correct = 13`. The DP finds the values of the whole span: `(7+3)*1*2 = 20`, `7+3*1*2 = 13` and `(7+3*1)*2 = 20`, so `possible = {13, 20}`. Answer `20` scores 2, `13` scores 5 and `42` scores 0: total `7`.\n\n## Complexity\n\n- Time: O(m³ · V²) where m ≤ 16 is the number of digits and V ≤ 1002 bounds each set; in practice the sets are much smaller. Grading is O(n).\n- Space: O(m² · V) for the sets.\n\n## Pitfalls\n\n- A correct answer earns 5, never 5 + 2, even when a wrong order also produces it.\n- Do not let values grow without bound: with sixteen digits the sets get huge. Cap them, but keep a marker so a big value times `0` still yields `0`.\n- Evaluate `correct` with precedence (multiplication first), not left to right.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `digits`, `ops` | operands and operators of `s` |\n| `stack` | pending terms while computing the correct value |\n| `correct` | the value with normal precedence |\n| `dp[left][right]` | values the digits `left..right` can produce (capped) |\n| `mid` | index of the operator applied last in the span |\n| `possible` | values of the whole expression |\n| `score` | total points |",
+  "narration": {
+    "2": "Every value above 1000 is stored as this single marker; answers never exceed 1000.",
+    "5": "Walk over s; digits sit at even positions and operators at odd ones.",
+    "10": "Compute the correct value with precedence using a stack of pending terms.",
+    "11": "A multiplication folds the next digit into the current term.",
+    "12": "An addition starts a new term.",
+    "14": "The correct value is the sum of all terms.",
+    "18": "A single digit can only produce its own value.",
+    "20": "Build sets for longer and longer spans of digits.",
+    "23": "Try every operator in the span as the one applied last.",
+    "26": "Combine a value of the left part with a value of the right part.",
+    "27": "Store it, capping big values: they can only come back down as 0, when multiplied by 0.",
+    "33": "These are all values the whole expression can produce in some order.",
+    "36": "A correct answer earns 5 points.",
+    "38": "Otherwise a value from some other order earns 2 points.",
+    "42": "Return the total of all grades."
+  }
+}

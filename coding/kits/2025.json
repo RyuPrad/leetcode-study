@@ -1,0 +1,67 @@
+{
+  "number": 2025,
+  "title": "Maximum Number of Ways to Partition an Array",
+  "spec": "leetcode",
+  "statement": "You have an integer array `nums` of length `n` and an integer `k`. Call an index `pivot` a **split point** when `1 <= pivot < n` and the elements before it, `nums[0..pivot-1]`, add up to the same total as the elements from it onward, `nums[pivot..n-1]`. The number of split points is the number of ways to partition `nums`.\n\nBefore counting, you may overwrite at most one element of `nums` with the value `k`, or leave the array as it is. Return the largest number of ways to partition `nums` that you can reach.",
+  "constraints": [
+    "n == nums.length",
+    "2 <= n <= 10^5",
+    "-10^5 <= k <= 10^5",
+    "-10^5 <= nums[i] <= 10^5"
+  ],
+  "signature": "int waysToPartition(int[] nums, int k)",
+  "entry": "waysToPartition",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 2 || nums.length > 100000) return 'nums needs 2 to 10^5 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < -100000 || v > 100000)) return 'Each value of nums is an integer from -10^5 to 10^5.';\n  if (!Number.isInteger(k) || k < -100000 || k > 100000) return 'k is an integer from -10^5 to 10^5.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function waysToPartition(nums, k) {\n  const n = nums.length;\n  const total = nums.reduce((sum, value) => sum + value, 0);\n  const add = (map, key, step) => map.set(key, (map.get(key) ?? 0) + step);\n  const left = new Map();\n  const right = new Map();\n  let prefix = 0;\n\n  for (let pivot = 1; pivot < n; pivot++) {\n    prefix += nums[pivot - 1];\n    add(right, 2 * prefix - total, 1);\n  }\n  let best = right.get(0) ?? 0;\n\n  prefix = 0;\n  for (let i = 0; i < n; i++) {\n    const delta = k - nums[i];\n    best = Math.max(best, (left.get(delta) ?? 0) + (right.get(-delta) ?? 0));\n    if (i + 1 < n) {\n      prefix += nums[i];\n      const gap = 2 * prefix - total;\n      add(right, gap, -1);\n      add(left, gap, 1);\n    }\n  }\n  return best;\n}",
+  "brute": "function waysToPartition(nums, k) {\n  const count = (arr) => {\n    let ways = 0;\n    for (let p = 1; p < arr.length; p++) {\n      let before = 0, after = 0;\n      for (let j = 0; j < arr.length; j++) if (j < p) before += arr[j]; else after += arr[j];\n      if (before === after) ways++;\n    }\n    return ways;\n  };\n  let best = count(nums);\n  for (let i = 0; i < nums.length; i++) best = Math.max(best, count(nums.map((v, j) => (j === i ? k : v))));\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 2000 : 2 + Math.floor(rand() * 7);\n  const spans = size === 'large' ? [2, 5, 40] : [1, 2, 3, 6];\n  const span = spans[Math.floor(rand() * spans.length)];\n  const value = (s) => Math.floor(rand() * (2 * s + 1)) - s;\n  return [Array.from({ length: n }, () => value(span)), value(2 * span)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,-1,2],3],"expected":1},
+    {"name":"Example 2","input":[[0,0,0],1],"expected":2},
+    {"name":"Example 3","input":[[22,4,-25,-20,-15,15,-16,7,19,-10,0,-13,-14],-33],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0,0],0]},
+    {"name":"Test 2","input":[[1,2],1]},
+    {"name":"Test 3","input":[[1,2],5]},
+    {"name":"Test 4","input":[[0,0,0,0,0],0]},
+    {"name":"Test 5","input":[[0,0,0,0,0],7]},
+    {"name":"Test 6","input":[[100000,-100000,100000,-100000,100000,-100000],-100000]},
+    {"name":"Test 7","input":[[1,-1,1,-1,1,-1,1],0]},
+    {"name":"Test 8","input":[[3,1,2,5,-4,0,6,-2],2]},
+    {"name":"Test 9","input":[[-5,5,-5,5,-5,5,-5,5,-5,5,-5,5],5]},
+    {"name":"Test 10","input":[[2,2,2,2,2,2,2,2,2,2],-2]},
+    {"name":"Test 11","input":[[1,0,0,0,0,0,9],-8]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every element as the one to overwrite and recounting the split points costs O(n²). Instead, describe each split point by its **gap**: the sum before it minus the sum after it, which is `2 * prefix - total`. A split point counts when its gap is `0`. Overwriting `nums[i]` with `k` adds `delta = k - nums[i]` to one side. For split points to the right of `i` (where `nums[i]` is in the left part) the gap grows by `delta`, so the ones that start at `-delta` become `0`. For split points at or before `i` the gap shrinks by `delta`, so the ones at `delta` become `0`. Counting gaps in two hash maps answers each `i` in O(1).\n\n## Approach\n\n1. Compute `total`, then the gap of every split point, and count them all in `right`.\n2. Leaving the array unchanged gives `right.get(0)` ways; start `best` there.\n3. Sweep `i` from left to right. `left` holds gaps of split points `1..i` and `right` those of `i+1..n-1`.\n4. For `delta = k - nums[i]`, the ways are `left[delta] + right[-delta]`; keep the maximum in `best`.\n5. Move split point `i + 1` from `right` to `left` before the next `i`.\n\n## Example 1, step by step\n\n`nums = [2, -1, 2]`, `k = 3`, `total = 3`. Split point 1 has gap `2·2 - 3 = 1` and split point 2 has gap `2·1 - 3 = -1`, so `right = {1: 1, -1: 1}` and `best = 0`. At `i = 0`, `delta = 1` and `right[-1] = 1`, so `best = 1`. Split point 1 moves to `left`. At `i = 1`, `delta = 4` finds nothing. At `i = 2`, `delta = 1` finds `left[1] = 1`. The answer is `1`.\n\n## Complexity\n\n- Time: O(n): two passes with O(1) map work per step.\n- Space: O(n) for the two maps.\n\n## Pitfalls\n\n- The side matters: a split point after `i` needs gap `-delta`, one at or before `i` needs gap `delta`.\n- Do not forget the option of changing nothing (`right.get(0)`).\n- Sums reach about 10^10, so Java and C need 64-bit integers.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | sum of all of `nums` |\n| `prefix` | sum of the elements before the current split point |\n| `left`, `right` | counts of gaps for split points at or before `i`, and after `i` |\n| `best` | most ways found so far |\n| `delta` | how much overwriting `nums[i]` with `k` changes the sum |\n| `gap` | sum before a split point minus the sum after it |",
+  "narration": {
+    "3": "The sum of the whole array, used to turn a prefix into a gap.",
+    "4": "A small helper that adjusts a count in a map.",
+    "9": "Visit every split point from 1 to n - 1.",
+    "10": "prefix is now the sum of the elements before this split point.",
+    "11": "Its gap is left sum minus right sum; count it on the right side for now.",
+    "13": "With no change, the split points with gap 0 are the answer.",
+    "16": "Now try overwriting each element in turn.",
+    "17": "Overwriting nums[i] with k shifts one side's sum by delta.",
+    "18": "Earlier split points need gap delta, later ones need gap -delta.",
+    "19": "Split point i + 1 exists only while i is not the last index.",
+    "21": "Gap of split point i + 1.",
+    "22": "It leaves the right group...",
+    "23": "...and joins the left group, because from the next index on the overwritten element lies to its right.",
+    "26": "The best over no change and every single change."
+  }
+}

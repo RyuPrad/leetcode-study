@@ -1,0 +1,53 @@
+{
+  "number": 3293,
+  "title": "Calculate Product Final Price",
+  "spec": "recalled",
+  "statement": "A store keeps its products and the discounts it runs per category:\n\n- `Products(product_id, category, price)`: one row per product; `product_id` is unique.\n- `Discounts(category, discount)`: at most one row per `category`; `discount` is a percentage from 0 to 100. Some categories have no row here, and some rows name categories no product belongs to.\n\nFor every product report `product_id`, `final_price` and `category`, in that column order. `final_price` is `price` reduced by its category's `discount` percent, that is `price * (100 - discount) / 100`, kept exact (it may have up to two decimal places; do not round). A product whose category has no discount keeps its `price`.\n\nOrder the rows by `product_id` ascending.",
+  "constraints": [
+    "product_id is unique in Products",
+    "category is unique in Discounts",
+    "discount is an integer from 0 to 100",
+    "price is a non-negative integer"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Products": [["product_id","INT"],["category","VARCHAR(50)"],["price","INT"]],
+    "Discounts": [["category","VARCHAR(50)"],["discount","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Products = [], Discounts = [] }] = input;\n  const ids = new Set(), categories = new Set();\n  for (const [id, category, price] of Products) {\n    if (id === null || category === null || price === null) return 'Products rows may not contain null.';\n    if (ids.has(id)) return `product_id ${id} appears twice.`;\n    ids.add(id);\n    if (price < 0) return `Product ${id} has a negative price.`;\n  }\n  for (const [category, discount] of Discounts) {\n    if (category === null || discount === null) return 'Discounts rows may not contain null.';\n    const key = category.toLowerCase();\n    if (categories.has(key)) return `Category ${category} has two discounts.`;\n    categories.add(key);\n    if (discount < 0 || discount > 100) return `The discount for ${category} must be from 0 to 100.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT p.product_id,\n  p.price * (100 - IFNULL(d.discount, 0)) / 100 AS final_price,\n  p.category\nFROM Products AS p\nLEFT JOIN Discounts AS d\n  ON d.category = p.category\nORDER BY p.product_id;",
+  "brute": "SELECT p.product_id, p.price - p.price * d.discount / 100 AS final_price, p.category\nFROM Products AS p, Discounts AS d\nWHERE d.category = p.category\nUNION ALL\nSELECT p.product_id, p.price, p.category\nFROM Products AS p\nWHERE NOT EXISTS (SELECT 1 FROM Discounts AS d WHERE d.category = p.category)\nORDER BY product_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const small = size === 'small';\n  const categories = small ? ['Electronics', 'Clothing', 'Home', 'Toys', 'Books'] : Array.from({ length: 25 }, (_, i) => `Category ${i + 1}`);\n  const rates = [0, 5, 10, 15, 20, 25, 33, 50, 75, 100];\n  const Products = [], Discounts = [];\n  const count = small ? pick(9) : 2000;\n  for (let i = 0; i < count; i++) {\n    const id = small ? 1 + 2 * i + pick(2) : i + 1;\n    // Small cases mix round prices with odd ones so some final prices have decimals.\n    const price = small ? (pick(2) ? 50 * (1 + pick(30)) : 1 + pick(999)) : pick(10000);\n    Products.push([id, categories[pick(categories.length)], price]);\n  }\n  for (const category of categories) if (rand() < (small ? 0.5 : 0.7)) Discounts.push([category, small ? rates[pick(rates.length)] : pick(101)]);\n  for (const rows of [Products, Discounts]) for (let i = rows.length - 1; i > 0; i--) { const j = pick(i + 1); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ Products, Discounts }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Products":[[1,"Electronics",1000],[2,"Clothing",50],[3,"Electronics",1200],[4,"Home",500]],"Discounts":[["Electronics",10],["Clothing",20]]}],"expected":{"columns":["product_id","final_price","category"],"rows":[[1,900,"Electronics"],[2,40,"Clothing"],[3,1080,"Electronics"],[4,500,"Home"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Products":[],"Discounts":[["Toys",30]]}]},
+    {"name":"Test 2","input":[{"Products":[[1,"Books",120],[2,"Toys",75]],"Discounts":[]}]},
+    {"name":"Test 3","input":[{"Products":[[1,"Toys",80],[2,"Books",80]],"Discounts":[["Toys",0],["Books",100]]}]},
+    {"name":"Test 4","input":[{"Products":[[1,"Home",999],[2,"Toys",7],[3,"Books",1]],"Discounts":[["Home",15],["Toys",33],["Books",50]]}]},
+    {"name":"Test 5","input":[{"Products":[[30,"Clothing",200],[10,"Home",300],[20,"Clothing",100]],"Discounts":[["Garden",40],["Clothing",25]]}]},
+    {"name":"Test 6","input":[{"Products":[[5,"Electronics",2500]],"Discounts":[["Clothing",20]]}]},
+    {"name":"Test 7","input":[{"Products":[[1,"Electronics",0],[2,"Electronics",1999],[3,"Electronics",400],[4,"Electronics",15]],"Discounts":[["Electronics",12]]}]},
+    {"name":"Test 8","input":[{"Products":[[4,"Home",640],[1,"Toys",90],[3,"Books",45],[2,"Home",55],[5,"Garden",300]],"Discounts":[["Home",5],["Books",60],["Toys",10]]}]},
+    {"name":"Test 9","input":[{"Products":[[7,"Books",333]],"Discounts":[["Books",1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery product must appear once, discount or not, so `Products` drives the query and `Discounts` is attached with a **left join** on `category`. When nothing matches, the joined `discount` is `null`, and `IFNULL(discount, 0)` turns that into \"no discount\" so one formula covers both cases.\n\n## Approach\n\n1. Read `Products` as `p`.\n2. `LEFT JOIN Discounts` as `d` on equal `category`; at most one discount row matches because categories are unique there.\n3. Compute `final_price = price * (100 - IFNULL(discount, 0)) / 100`, and output it between `product_id` and `category`.\n4. Order by `product_id`.\n\n## Example 1, step by step\n\n- Product 1 (Electronics, 1000) joins the 10% row: 1000 · 90 / 100 = 900.\n- Product 2 (Clothing, 50) joins the 20% row: 50 · 80 / 100 = 40.\n- Product 3 (Electronics, 1200): 1200 · 90 / 100 = 1080.\n- Product 4 (Home, 500) finds no discount, so `d.discount` is null, `IFNULL` gives 0, and the price stays 500.\n\nThe result lists products 1 to 4 with 900, 40, 1080 and 500.\n\n## Complexity\n\n- Time: O(P + D) with a hash or index on `Discounts.category` (P products, D discounts), plus O(P log P) for the ordering.\n- Space: O(P) for the result.\n\n## Pitfalls\n\n- An inner join drops products whose category has no discount (product 4 in Example 1).\n- Without `IFNULL`, `100 - null` is `null`, so undiscounted products would get a `null` price instead of their own.\n- The columns go `product_id`, `final_price`, `category`; selecting `category` second fails the comparison.\n- Rounding (or integer division in other databases) changes prices such as 999 at 15%, which must stay 849.15.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Products`, one output row per product |\n| `d` | the discount row of the product's category, or nulls when there is none |\n| `IFNULL(d.discount, 0)` | the discount percentage, 0 when the category has none |\n| `final_price` | price after taking that percentage off |",
+  "narration": {
+    "1": "Every output row starts from a product.",
+    "2": "The discounted price: keep (100 - discount) percent of the price, treating a missing discount as 0.",
+    "3": "category is the last output column.",
+    "4": "Products drives the query, so every product is reported.",
+    "5": "A left join keeps products whose category has no discount row.",
+    "6": "Products and discounts are matched by category.",
+    "7": "Rows come out by product_id, as required."
+  }
+}

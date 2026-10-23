@@ -1,0 +1,49 @@
+{
+  "number": 3338,
+  "title": "Second Highest Salary II",
+  "spec": "recalled",
+  "statement": "One table lists employees:\n\n- `Employees(emp_id, salary, dept)`: one row per employee; `emp_id` is unique, and every employee has a `salary` and a `dept`.\n\nIn each department, look at the **distinct** salary values and find the second largest one. Report every employee of that department who earns exactly that salary, so several employees can share it. A department with fewer than two distinct salaries contributes no rows.\n\nReturn the columns `emp_id` and `dept`, ordered by `emp_id` ascending.",
+  "constraints": [
+    "emp_id is unique in Employees",
+    "salary and dept are never null",
+    "salary is a non-negative integer"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Employees": [["emp_id","INT"],["salary","INT"],["dept","VARCHAR(50)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Employees = [] }] = input;\n  const ids = new Set();\n  for (const [id, salary, dept] of Employees) {\n    if (id === null || salary === null || dept === null) return 'Employees rows may not contain null.';\n    if (ids.has(id)) return `emp_id ${id} appears twice.`;\n    ids.add(id);\n    if (salary < 0) return `Employee ${id} has a negative salary.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT emp_id,\n    dept,\n    salary,\n    DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS salary_rank\n  FROM Employees\n)\nSELECT emp_id, dept\nFROM ranked\nWHERE salary_rank = 2\nORDER BY emp_id;",
+  "brute": "SELECT e.emp_id, e.dept\nFROM Employees AS e\nWHERE (\n  SELECT COUNT(DISTINCT o.salary)\n  FROM Employees AS o\n  WHERE o.dept = e.dept\n    AND o.salary > e.salary\n) = 1\nORDER BY e.emp_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const shuffle = (list) => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = pick(i + 1);\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  const Employees = [];\n  if (size === 'small') {\n    const depts = ['Sales', 'IT', 'HR', 'Marketing'];\n    const salaries = [50000, 55000, 65000, 70000, 80000, 90000];\n    const count = pick(9);\n    const ids = shuffle(Array.from({ length: 20 }, (_, i) => i + 1)).slice(0, count);\n    // Mostly one or two departments, so second-highest salaries and ties appear.\n    const used = depts.slice(0, 1 + pick(depts.length));\n    for (const id of ids) {\n      const dept = used[pick(used.length)];\n      Employees.push([id, salaries[pick(salaries.length)], dept]);\n    }\n    return [{ Employees }];\n  }\n  const ids = shuffle(Array.from({ length: 2000 }, (_, i) => i + 1));\n  for (const id of ids) {\n    Employees.push([id, 40000 + 1000 * pick(20), `Dept ${pick(50) + 1}`]);\n  }\n  return [{ Employees }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Employees":[[1,70000,"Sales"],[2,80000,"Sales"],[3,80000,"Sales"],[4,90000,"Sales"],[5,55000,"IT"],[6,65000,"IT"],[7,65000,"IT"],[8,50000,"Marketing"],[9,55000,"Marketing"],[10,55000,"HR"]]}],"expected":{"columns":["emp_id","dept"],"rows":[[2,"Sales"],[3,"Sales"],[5,"IT"],[8,"Marketing"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Employees":[]}]},
+    {"name":"Test 2","input":[{"Employees":[[1,50000,"HR"]]}]},
+    {"name":"Test 3","input":[{"Employees":[[1,60000,"HR"],[2,60000,"HR"],[3,60000,"HR"],[4,40000,"IT"],[5,45000,"IT"]]}]},
+    {"name":"Test 4","input":[{"Employees":[[1,100000,"Sales"],[2,100000,"Sales"],[3,90000,"Sales"]]}]},
+    {"name":"Test 5","input":[{"Employees":[[1,90000,"IT"],[2,70000,"IT"],[3,80000,"IT"],[4,80000,"IT"],[5,70000,"IT"],[6,80000,"IT"]]}]},
+    {"name":"Test 6","input":[{"Employees":[[9,30000,"Ops"],[4,50000,"Legal"],[7,40000,"Legal"],[2,20000,"Ops"],[5,35000,"Legal"],[1,20000,"Ops"],[8,40000,"Legal"]]}]},
+    {"name":"Test 7","input":[{"Employees":[[1,10,"Small"],[2,20,"Small"],[3,100,"Big"],[4,200,"Big"],[5,150,"Big"]]}]},
+    {"name":"Test 8","input":[{"Employees":[[1,50000,"Eng"],[2,60000,"Eng"],[3,70000,"Eng"],[4,80000,"Eng"],[5,90000,"Eng"],[6,50000,"Eng"],[7,50000,"Eng"],[8,0,"Eng"]]}]},
+    {"name":"Test 9","input":[{"Employees":[[1,80000,"A"],[2,70000,"A"],[3,70000,"B"],[4,60000,"B"],[5,60000,"C"],[6,50000,"C"],[7,80000,"D"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Second highest\" here means the second **distinct** salary level of a department, and everyone on that level counts. Ranking the salaries inside each department with `DENSE_RANK` gives exactly that: equal salaries share a rank and the next level gets the very next number, so level two is always rank 2 no matter how many people tie at the top.\n\n## Approach\n\n1. `ranked`: for every employee compute `salary_rank = DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)`.\n2. Keep the rows with `salary_rank = 2`. A department with a single salary level has no rank 2, so it contributes nothing.\n3. Return `emp_id, dept` ordered by `emp_id`.\n\n## Example 1, step by step\n\n`ranked` per department:\n\n- Sales: 90000 (emp 4) rank 1; 80000 (emps 2, 3) rank 2; 70000 (emp 1) rank 3.\n- IT: 65000 (emps 6, 7) rank 1; 55000 (emp 5) rank 2.\n- Marketing: 55000 (emp 9) rank 1; 50000 (emp 8) rank 2.\n- HR: 55000 (emp 10) rank 1, and nothing else.\n\nRank 2 rows are employees 2, 3, 5 and 8, which is the answer in `emp_id` order. Note IT: its two top earners tie, yet employee 5 is still rank 2.\n\n## Complexity\n\n- Time: O(n log n) for n employees, from sorting each department's salaries and the final sort.\n- Space: O(n) for `ranked`.\n\n## Pitfalls\n\n- `RANK()` skips numbers after a tie: in IT it gives employee 5 rank 3, so IT would disappear. `ROW_NUMBER()` picks one of two tied top earners as \"second\".\n- Forgetting `PARTITION BY dept` finds the company-wide second salary.\n- `LIMIT 1 OFFSET 1` returns one row overall, not every tied employee in every department.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every employee with their salary and its dense rank inside their department |\n| `salary_rank` | 1 for the department's top salary level, 2 for the next one |\n| `WHERE salary_rank = 2` | keeps the employees on the second salary level |",
+  "narration": {
+    "1": "The ranked stage attaches a per-department salary level to every employee.",
+    "5": "DENSE_RANK gives equal salaries the same rank and no gaps, partitioned by department and highest salary first.",
+    "10": "Only employees on the second distinct salary level of their department survive.",
+    "11": "Rows are listed by employee id, as the problem requires."
+  }
+}

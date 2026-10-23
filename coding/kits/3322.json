@@ -1,0 +1,53 @@
+{
+  "number": 3322,
+  "title": "Premier League Table Ranking III",
+  "spec": "recalled",
+  "statement": "One table holds every team's record for each season:\n\n- `SeasonStats(season_id, team_id, team_name, matches_played, wins, draws, losses, goals_for, goals_against)`: one row per team per season; `(season_id, team_id)` is unique, no two teams in the same season share a `team_name`, and `matches_played = wins + draws + losses`.\n\nA win is worth **3 points**, a draw **1 point** and a loss nothing. The **goal difference** is `goals_for - goals_against`.\n\nBuild each season's league table. For every row report `season_id`, `team_id`, `team_name`, `points`, `goal_difference` and `position`, where `position` is the team's place within its own season (starting at 1) when the season's teams are sorted by:\n\n1. `points`, highest first;\n2. then `goal_difference`, highest first;\n3. then `team_name`, alphabetically.\n\nOrder the rows by `season_id` ascending, then `position` ascending, then `team_name` ascending.",
+  "constraints": [
+    "(season_id, team_id) is unique in SeasonStats",
+    "team_name is unique within a season",
+    "wins, draws, losses, goals_for and goals_against are non-negative integers",
+    "matches_played = wins + draws + losses"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "SeasonStats": [["season_id","INT"],["team_id","INT"],["team_name","VARCHAR(255)"],["matches_played","INT"],["wins","INT"],["draws","INT"],["losses","INT"],["goals_for","INT"],["goals_against","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ SeasonStats = [] }] = input;\n  const keys = new Set(), names = new Set();\n  for (const row of SeasonStats) {\n    if (row.some((v) => v === null)) return 'SeasonStats rows may not contain null.';\n    const [season, team, name, played, wins, draws, losses, scored, conceded] = row;\n    if (keys.has(`${season}|${team}`)) return `Team ${team} appears twice in season ${season}.`;\n    keys.add(`${season}|${team}`);\n    const nameKey = `${season}|${String(name).toLowerCase()}`;\n    if (names.has(nameKey)) return `team_name ${name} appears twice in season ${season}.`;\n    names.add(nameKey);\n    if (wins < 0 || draws < 0 || losses < 0 || scored < 0 || conceded < 0) return `Team ${team} in season ${season} has a negative count.`;\n    if (played !== wins + draws + losses) return `Team ${team} in season ${season}: matches_played must equal wins + draws + losses.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH scored AS (\n  SELECT season_id,\n    team_id,\n    team_name,\n    3 * wins + draws AS points,\n    goals_for - goals_against AS goal_difference\n  FROM SeasonStats\n)\nSELECT season_id,\n  team_id,\n  team_name,\n  points,\n  goal_difference,\n  RANK() OVER (\n    PARTITION BY season_id\n    ORDER BY points DESC, goal_difference DESC, team_name\n  ) AS position\nFROM scored\nORDER BY season_id, position, team_name;",
+  "brute": "SELECT s.season_id, s.team_id, s.team_name,\n  3 * s.wins + s.draws AS points,\n  s.goals_for - s.goals_against AS goal_difference,\n  1 + (\n    SELECT COUNT(*)\n    FROM SeasonStats AS o\n    WHERE o.season_id = s.season_id\n      AND (3 * o.wins + o.draws > 3 * s.wins + s.draws\n        OR (3 * o.wins + o.draws = 3 * s.wins + s.draws\n          AND o.goals_for - o.goals_against > s.goals_for - s.goals_against)\n        OR (3 * o.wins + o.draws = 3 * s.wins + s.draws\n          AND o.goals_for - o.goals_against = s.goals_for - s.goals_against\n          AND o.team_name < s.team_name))\n  ) AS position\nFROM SeasonStats AS s\nORDER BY s.season_id, position, s.team_name",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const SeasonStats = [];\n  const record = (season, team, name, maxCount, maxGoals) => {\n    const wins = pick(maxCount + 1), draws = pick(maxCount + 1), losses = pick(maxCount + 1);\n    SeasonStats.push([season, team, name, wins + draws + losses, wins, draws, losses, pick(maxGoals + 1), pick(maxGoals + 1)]);\n  };\n  if (size === 'small') {\n    // Team ids are deliberately not in alphabetical order of their names.\n    const names = ['Wolves', 'Arsenal', 'Everton', 'Chelsea', 'Brighton', 'Fulham'];\n    const seasons = [2021, 2022, 2023];\n    const target = pick(9);\n    const used = new Set();\n    for (let tries = 0; tries < 40 && SeasonStats.length < target; tries++) {\n      const season = seasons[pick(seasons.length)], team = 1 + pick(names.length);\n      if (used.has(`${season}|${team}`)) continue;\n      used.add(`${season}|${team}`);\n      record(season, team, names[team - 1], 3, 5);\n    }\n    return [{ SeasonStats }];\n  }\n  // 50 seasons of 40 teams; small ranges make points and goal-difference ties common.\n  const teams = 40;\n  for (let season = 2049; season >= 2000; season--) {\n    for (let team = 1; team <= teams; team++) {\n      record(season, team, `Team ${String((team * 17) % teams).padStart(2, '0')}`, 5, 10);\n    }\n  }\n  return [{ SeasonStats }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"SeasonStats":[[2021,1,"Manchester City",38,29,6,3,99,26],[2021,2,"Liverpool",38,28,8,2,94,26],[2021,3,"Chelsea",38,21,11,6,76,33],[2021,4,"Tottenham",38,22,5,11,69,40],[2021,5,"Arsenal",38,22,3,13,61,48],[2022,1,"Manchester City",38,28,5,5,94,33],[2022,2,"Arsenal",38,26,6,6,88,43],[2022,3,"Manchester United",38,23,6,9,58,43],[2022,4,"Newcastle",38,19,14,5,68,33],[2022,5,"Liverpool",38,19,10,9,75,47]]}],"expected":{"columns":["season_id","team_id","team_name","points","goal_difference","position"],"rows":[[2021,1,"Manchester City",93,73,1],[2021,2,"Liverpool",92,68,2],[2021,3,"Chelsea",74,43,3],[2021,4,"Tottenham",71,29,4],[2021,5,"Arsenal",69,13,5],[2022,1,"Manchester City",89,61,1],[2022,2,"Arsenal",84,45,2],[2022,3,"Manchester United",75,15,3],[2022,4,"Newcastle",71,35,4],[2022,5,"Liverpool",67,28,5]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"SeasonStats":[]}]},
+    {"name":"Test 2","input":[{"SeasonStats":[[2023,7,"Fulham",0,0,0,0,0,0]]}]},
+    {"name":"Test 3","input":[{"SeasonStats":[[2024,1,"Arsenal",5,2,0,3,5,4],[2024,2,"Brentford",5,1,3,1,6,2],[2024,3,"Chelsea",5,0,1,4,2,9]]}]},
+    {"name":"Test 4","input":[{"SeasonStats":[[2024,1,"Wolves",4,2,1,1,5,3],[2024,2,"Everton",4,2,1,1,6,4],[2024,3,"Burnley",4,2,1,1,4,2]]}]},
+    {"name":"Test 5","input":[{"SeasonStats":[[2025,1,"Leeds",10,6,0,4,12,14],[2025,2,"Fulham",10,5,2,3,30,5],[2025,3,"Everton",10,0,10,0,3,3]]}]},
+    {"name":"Test 6","input":[{"SeasonStats":[[2022,1,"Spurs",3,1,0,2,4,5],[2022,2,"Villa",3,0,3,0,2,2],[2022,3,"Burnley",3,0,2,1,2,3]]}]},
+    {"name":"Test 7","input":[{"SeasonStats":[[2023,2,"Arsenal",2,1,1,0,3,1],[2022,1,"Chelsea",2,2,0,0,5,0],[2023,1,"Chelsea",2,0,0,2,0,4],[2022,2,"Arsenal",2,0,1,1,1,2],[2021,3,"Everton",2,1,0,1,2,2]]}]},
+    {"name":"Test 8","input":[{"SeasonStats":[[2020,1,"Wolves",6,3,1,2,8,6],[2020,2,"Arsenal",6,3,1,2,7,5],[2020,3,"Leeds",6,2,4,0,6,3],[2020,4,"Fulham",6,1,2,3,4,9],[2020,5,"Brentford",6,1,2,3,5,7],[2020,6,"Chelsea",6,0,2,4,1,1]]}]},
+    {"name":"Test 9","input":[{"SeasonStats":[[2019,10,"Norwich",4,0,4,0,1,1],[2019,11,"Leicester",4,1,1,2,3,3],[2019,12,"Brighton",4,1,1,2,2,5],[2020,10,"Norwich",4,4,0,0,9,0],[2020,11,"Leicester",4,0,0,4,0,9]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach season is its own league table, so the ranking must restart for every `season_id`. That is exactly what a window function partitioned by season does: it sorts the teams of one season by the three tie-break keys and numbers them, without collapsing any rows. The only preparation is turning wins and draws into points and goals into a difference, so those values can be both reported and used as sort keys.\n\n## Approach\n\n1. `scored`: for every row compute `points = 3 * wins + draws` and `goal_difference = goals_for - goals_against`.\n2. Over `scored`, `RANK() OVER (PARTITION BY season_id ORDER BY points DESC, goal_difference DESC, team_name)` gives each team its `position` inside its season. Team names are unique within a season, so no two teams share a position.\n3. Sort the output by `season_id`, `position`, `team_name`.\n\n## Example 1, step by step\n\n`scored` for 2021: Manchester City 29·3 + 6 = 93 points, goal difference 99 − 26 = 73; Liverpool 92, 68; Chelsea 74, 43; Tottenham 71, 29; Arsenal 69, 13. Points already differ, so positions 1 to 5 follow that order.\n\nFor 2022: Manchester City 89, 61; Arsenal 84, 45; Manchester United 75, 15; Newcastle 71, 35; Liverpool 67, 28. Manchester United finishes above Newcastle despite a smaller goal difference, because points are compared first. The partition restarts at position 1 for 2022, so Manchester City is first in both seasons.\n\n## Complexity\n\n- Time: O(n log n) for n rows, from sorting each season's partition and the final sort.\n- Space: O(n) for `scored` and the window's sort buffer.\n\n## Pitfalls\n\n- Without `PARTITION BY season_id` positions run across all seasons instead of restarting each season.\n- Leaving `team_name` out of the window's `ORDER BY` makes teams level on points and goal difference share a position; adding it only to the final `ORDER BY` does not fix that.\n- MySQL does not let a window's `ORDER BY` use the `points` alias defined in the same `SELECT`; compute it in a CTE first or repeat the expression.\n- A draw is worth 1 point, not 0 and not 2: `3 * wins + draws`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `scored` | every season row with its `points` and `goal_difference` |\n| `PARTITION BY season_id` | ranks each season's teams separately |\n| `position` | the team's place in its season's table, 1 for the leader |",
+  "narration": {
+    "1": "The scored stage prepares the two derived values that the ranking sorts on.",
+    "5": "Each win gives 3 points and each draw 1, so points is 3 * wins + draws.",
+    "6": "Goal difference is goals scored minus goals conceded.",
+    "14": "RANK numbers the teams; it does not merge rows, so every team stays in the output.",
+    "15": "Partitioning by season restarts the numbering at 1 for every season.",
+    "16": "Within a season, teams sort by points, then goal difference, both highest first, then by name alphabetically.",
+    "19": "The output lists each season in turn, leader first, as the problem asks."
+  }
+}

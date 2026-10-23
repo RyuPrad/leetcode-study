@@ -1,0 +1,72 @@
+{
+  "number": 2060,
+  "title": "Check if an Original String Exists Given Two Encoded Strings",
+  "spec": "leetcode",
+  "statement": "A string of lowercase letters is *encoded* in three steps: cut it into consecutive non-empty pieces in any way, replace any of those pieces you like (possibly none) by its length written in decimal, and join the pieces back together in their original order.\n\nYou are given two encoded strings `s1` and `s2`, made of lowercase letters and the digits `1` to `9`. Return `true` if at least one original string could have been encoded as `s1` and also as `s2`; otherwise return `false`.\n\nBecause replaced pieces sit side by side with nothing between them, a run of digits may stand for several pieces: `\"12\"` can mean one piece of length 12 or two pieces of lengths 1 and 2. No run of consecutive digits in either string is longer than 3.",
+  "constraints": [
+    "1 <= s1.length, s2.length <= 40",
+    "s1 and s2 contain only lowercase English letters and the digits 1-9",
+    "No more than 3 digits appear consecutively in s1 or in s2"
+  ],
+  "signature": "boolean possiblyEquals(String s1, String s2)",
+  "entry": "possiblyEquals",
+  "kind": "function",
+  "parameters": [
+    "s1",
+    "s2"
+  ],
+  "validator": "function validate([s1, s2]) {\n  for (const [name, s] of [['s1', s1], ['s2', s2]]) {\n    if (typeof s !== 'string' || s.length < 1 || s.length > 40) return `${name} needs 1 to 40 characters.`;\n    if (!/^[a-z1-9]+$/.test(s)) return `${name} may contain only lowercase letters and the digits 1-9.`;\n    if (/[1-9]{4}/.test(s)) return `${name} may not have more than 3 digits in a row.`;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function possiblyEquals(s1, s2) {\n  const failed = new Set();\n  const isDigit = (ch) => ch >= '1' && ch <= '9';\n\n  function canMatch(i, j, diff) {\n    if (i === s1.length && j === s2.length) {\n      return diff === 0;\n    }\n    const key = (i * 41 + j) * 2000 + diff + 1000;\n    if (failed.has(key)) {\n      return false;\n    }\n    let found = false;\n    if (i < s1.length && isDigit(s1[i])) {\n      let value = 0;\n      for (let k = i; k < s1.length && isDigit(s1[k]) && !found; k++) {\n        value = value * 10 + Number(s1[k]);\n        found = canMatch(k + 1, j, diff + value);\n      }\n    } else if (j < s2.length && isDigit(s2[j])) {\n      let value = 0;\n      for (let k = j; k < s2.length && isDigit(s2[k]) && !found; k++) {\n        value = value * 10 + Number(s2[k]);\n        found = canMatch(i, k + 1, diff - value);\n      }\n    } else if (diff > 0) {\n      found = j < s2.length && canMatch(i, j + 1, diff - 1);\n    } else if (diff < 0) {\n      found = i < s1.length && canMatch(i + 1, j, diff + 1);\n    } else {\n      found = i < s1.length && j < s2.length && s1[i] === s2[j] && canMatch(i + 1, j + 1, 0);\n    }\n    if (!found) {\n      failed.add(key);\n    }\n    return found;\n  }\n\n  return canMatch(0, 0, 0);\n}",
+  "brute": "function possiblyEquals(s1, s2) {\n  // Expand each encoded string into every pattern it can stand for, with '?' for an unknown letter.\n  const expand = (s) => {\n    let patterns = [''];\n    let i = 0;\n    while (i < s.length) {\n      if (s[i] >= 'a' && s[i] <= 'z') { patterns = patterns.map(p => p + s[i]); i++; continue; }\n      let end = i;\n      while (end < s.length && s[end] >= '1' && s[end] <= '9') end++;\n      const sums = new Set();\n      const split = (rest, total) => {\n        if (rest === '') { sums.add(total); return; }\n        for (let cut = 1; cut <= rest.length; cut++) split(rest.slice(cut), total + Number(rest.slice(0, cut)));\n      };\n      split(s.slice(i, end), 0);\n      patterns = patterns.flatMap(p => [...sums].map(t => p + '?'.repeat(t)));\n      i = end;\n    }\n    return patterns;\n  };\n  const fits = (a, b) => {\n    if (a.length !== b.length) return false;\n    for (let k = 0; k < a.length; k++) if (a[k] !== '?' && b[k] !== '?' && a[k] !== b[k]) return false;\n    return true;\n  };\n  const first = expand(s1), second = expand(s2);\n  return first.some(a => second.some(b => fits(a, b)));\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (chars) => chars[Math.floor(rand() * chars.length)];\n  const valid = (s) => s.length >= 1 && s.length <= 40 && !/[1-9]{4}/.test(s);\n  // Encode an original string: replace random pieces by their lengths, keep other letters as they are.\n  const encode = (original, maxPiece, replaceRate) => {\n    let out = '', run = 0, pos = 0;\n    while (pos < original.length) {\n      const len = 1 + Math.floor(rand() * Math.min(maxPiece, original.length - pos));\n      const digits = String(len);\n      if (rand() < replaceRate && !digits.includes('0') && run + digits.length <= 3) { out += digits; run += digits.length; pos += len; }\n      else { out += original[pos]; run = 0; pos += 1; }\n    }\n    return out;\n  };\n  const flipLetter = (s) => {\n    const spots = [...s].map((c, k) => (c >= 'a' && c <= 'z' ? k : -1)).filter(k => k >= 0);\n    if (!spots.length) return s + 'a';\n    const k = spots[Math.floor(rand() * spots.length)];\n    return s.slice(0, k) + (s[k] === 'a' ? 'b' : 'a') + s.slice(k + 1);\n  };\n  for (;;) {\n    let s1, s2;\n    if (size === 'small') {\n      if (rand() < 0.4) {\n        const make = () => Array.from({ length: 1 + Math.floor(rand() * 6) }, () => (rand() < 0.55 ? pick('ab') : pick(rand() < 0.85 ? '1234' : '123456789'))).join('');\n        s1 = make();\n        s2 = make();\n      } else {\n        const original = Array.from({ length: 1 + Math.floor(rand() * 10) }, () => pick('ab')).join('');\n        s1 = encode(original, 6, 0.5);\n        s2 = encode(original, 6, 0.5);\n        if (rand() < 0.3) s2 = flipLetter(s2);\n      }\n    } else {\n      const original = Array.from({ length: 100 + Math.floor(rand() * 500) }, () => pick(rand() < 0.7 ? 'a' : 'ab')).join('');\n      s1 = encode(original, 120, 0.85);\n      s2 = encode(original, 120, 0.85);\n      if (rand() < 0.5) {\n        const at = Math.floor(rand() * (s2.length + 1));\n        s2 = rand() < 0.5 ? flipLetter(s2) : s2.slice(0, at) + pick('ab') + s2.slice(at);\n      }\n    }\n    if (valid(s1) && valid(s2)) return [s1, s2];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["internationalization","i18n"],"expected":true},
+    {"name":"Example 2","input":["l123e","44"],"expected":true},
+    {"name":"Example 3","input":["a5b","c5b"],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a","a"]},
+    {"name":"Test 2","input":["a","b"]},
+    {"name":"Test 3","input":["1","z"]},
+    {"name":"Test 4","input":["2","a"]},
+    {"name":"Test 5","input":["123","6"]},
+    {"name":"Test 6","input":["111","4"]},
+    {"name":"Test 7","input":["x1y","xy1"]},
+    {"name":"Test 8","input":["ab","a1b"]},
+    {"name":"Test 9","input":["a999","999b"]},
+    {"name":"Test 10","input":["99a99b9c","2c9b3a"]},
+    {"name":"Test 11","input":["9a9b9c","29c"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRead both strings from left to right at the same time. A letter is a known character of the original; a number is a block of unknown characters. Instead of deciding what those unknown characters are, keep one integer `diff`: how many unknown characters `s1` has produced beyond `s2` (negative when `s2` is ahead). A letter on the other side can always fill an unknown slot, and two letters can only be compared when neither side has unknown slots pending. Trying every way to split each run of digits gives a search over `(i, j, diff)`, a two-sequence DP with one extra dimension. The brute-force alternative, expanding both strings into every possible pattern and comparing them, explodes as the digit runs multiply.\n\n## Approach\n\n1. `canMatch(i, j, diff)` answers whether `s1[i..]` and `s2[j..]` can still agree given `diff`.\n2. When both strings are used up, they agree only if `diff` is 0.\n3. If `s1[i]` is a digit, try each prefix of its digit run as one number `value` and add it to `diff`.\n4. Otherwise, if `s2[j]` is a digit, do the same with `s2`, subtracting `value`.\n5. Now both sides show letters (or an end). If `diff > 0`, the letter `s2[j]` fills one of `s1`'s unknown slots; if `diff < 0`, `s1[i]` fills one of `s2`'s.\n6. If `diff` is 0, the two letters must be equal to advance both.\n7. Remember every state that failed in `failed` so it is never explored twice.\n\n## Example 1, step by step\n\n`s1 = \"internationalization\"`, `s2 = \"i18n\"`. The `i`s match, giving state `(1, 1, 0)`. The run `\"18\"` is first read as `1` and then `8`: `diff` becomes `-9`, so nine letters of `s1` are absorbed, both strings show `n` at `(10, 3)`, they match, but `s2` then ends while `s1` still has `\"alization\"`, so this path fails. Reading `\"18\"` as `18` gives `diff = -18`; eighteen letters of `s1` are absorbed to reach `(19, 3, 0)`, both show `n`, and `(20, 4, 0)` returns `true`.\n\n## Complexity\n\n- Time: O(n1 · n2 · D) with D about 2,000, because `diff` stays within -999..999 and each state tries at most three numbers.\n- Space: O(n1 · n2 · D) for `failed` in the worst case; the recursion depth is at most n1 + n2.\n\n## Pitfalls\n\n- A digit run can be split anywhere: `\"123\"` may mean 123, 12 + 3, 1 + 23 or 1 + 2 + 3. Reading only the whole number misses `\"123\"` versus `\"6\"`.\n- Compare letters only when `diff` is 0; with slots pending, a letter is simply absorbed.\n- Reaching the end of both strings is not enough: leftover unknown slots (`diff !== 0`) mean the lengths differ.\n- Without remembering failed states, the search revisits the same `(i, j, diff)` exponentially often.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `failed` | keys of states already known to fail |\n| `canMatch` | the memoized search |\n| `i`, `j` | next position in `s1` and in `s2` |\n| `diff` | unknown characters from `s1` minus unknown characters from `s2` not yet matched |\n| `key` | one number encoding `(i, j, diff)` |\n| `k`, `value` | end of the current digit prefix and the number it spells |\n| `found` | whether some choice from this state succeeds |",
+  "narration": {
+    "2": "Remember the states (i, j, diff) that are already known to fail.",
+    "5": "canMatch asks whether s1 from i and s2 from j can still describe the same string, with diff unknown characters of s1 not yet matched by s2.",
+    "6": "Both strings are fully read...",
+    "7": "...so they agree only if no unknown characters are left over on either side.",
+    "9": "Pack the state into one number; diff is shifted by 1000 because it can be negative.",
+    "10": "This state failed before, so it fails again.",
+    "14": "s1 shows a digit: its run of digits must be read as numbers first.",
+    "16": "Try every prefix of the run as one number; the rest of the run is read later.",
+    "17": "Extend the number by one more digit.",
+    "18": "Those value characters of s1 are unknown, so diff grows by value.",
+    "20": "Otherwise, s2 shows a digit: read its run the same way.",
+    "24": "Unknown characters from s2 lower diff.",
+    "26": "Both sides show letters, but s1 still has unknown characters pending.",
+    "27": "The letter of s2 fills one of them, so only j moves on.",
+    "28": "s2 has unknown characters pending.",
+    "29": "The letter of s1 fills one of them, so only i moves on.",
+    "31": "Nothing is pending: the two letters must be equal for both strings to move on.",
+    "33": "Every choice from this state failed...",
+    "34": "...so record it to avoid exploring it again.",
+    "39": "Start at the beginning of both strings with nothing pending."
+  }
+}

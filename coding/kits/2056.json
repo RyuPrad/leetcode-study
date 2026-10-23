@@ -1,0 +1,68 @@
+{
+  "number": 2056,
+  "title": "Number of Valid Move Combinations On Chessboard",
+  "spec": "leetcode",
+  "statement": "An 8 by 8 board holds `n` pieces. Piece `i` is a rook, queen or bishop as named by `pieces[i]`, and it stands on the 1-based square `positions[i] = [r, c]` (row, column).\n\nEvery piece picks a destination at the same time, and the set of all these choices is a *move combination*:\n\n- A rook's destination lies along one of the four straight lines (up, down, left, right) from its square; a bishop's lies along one of the four diagonals; a queen may use any of those eight lines.\n- A piece may also pick its own square, meaning it does not move.\n- All pieces start at second 0. During every second, each piece that has not reached its destination steps one square along its line toward it; pieces that have arrived stay put.\n\nA combination is invalid when at some moment two or more pieces stand on the same square. Two adjacent pieces may swap squares within one second; that is not a collision. Return how many move combinations are valid. No two pieces start on the same square.",
+  "constraints": [
+    "n == pieces.length == positions.length",
+    "1 <= n <= 4",
+    "Each pieces[i] is \"rook\", \"queen\" or \"bishop\"",
+    "At most one piece is a queen",
+    "1 <= r, c <= 8 for every positions[i] = [r, c]",
+    "All positions are distinct"
+  ],
+  "signature": "int countCombinations(String[] pieces, int[][] positions)",
+  "entry": "countCombinations",
+  "kind": "function",
+  "parameters": [
+    "pieces",
+    "positions"
+  ],
+  "validator": "function validate([pieces, positions]) {\n  if (!Array.isArray(pieces) || pieces.length < 1 || pieces.length > 4) return 'pieces needs 1 to 4 entries.';\n  if (!Array.isArray(positions) || positions.length !== pieces.length) return 'positions needs one square per piece.';\n  if (pieces.some(p => p !== 'rook' && p !== 'queen' && p !== 'bishop')) return 'Each piece is \"rook\", \"queen\" or \"bishop\".';\n  if (pieces.filter(p => p === 'queen').length > 1) return 'There is at most one queen.';\n  const seen = new Set();\n  for (const square of positions) {\n    if (!Array.isArray(square) || square.length !== 2) return 'Each position is [r, c].';\n    const [r, c] = square;\n    if (!Number.isInteger(r) || !Number.isInteger(c) || r < 1 || r > 8 || c < 1 || c > 8) return 'Rows and columns are between 1 and 8.';\n    if (seen.has(r * 10 + c)) return 'Pieces start on different squares.';\n    seen.add(r * 10 + c);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countCombinations(pieces, positions) {\n  const straight = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];\n  const directions = { rook: straight, bishop: diagonal, queen: [...straight, ...diagonal] };\n  const n = pieces.length;\n  const taken = new Array(7 * 64).fill(false);\n\n  function trace(row, col, dr, dc, steps) {\n    const cells = [];\n    for (let time = 1; time <= 7; time++) {\n      const walked = Math.min(time, steps);\n      const square = (row - 1 + dr * walked) * 8 + (col - 1 + dc * walked);\n      cells.push((time - 1) * 64 + square);\n    }\n    return cells;\n  }\n\n  const moves = positions.map(([row, col], i) => {\n    const list = [trace(row, col, 0, 0, 0)];\n    for (const [dr, dc] of directions[pieces[i]]) {\n      for (let steps = 1; ; steps++) {\n        const r = row + dr * steps;\n        const c = col + dc * steps;\n        if (r < 1 || r > 8 || c < 1 || c > 8) break;\n        list.push(trace(row, col, dr, dc, steps));\n      }\n    }\n    return list;\n  });\n\n  function place(i) {\n    if (i === n) return 1;\n    let count = 0;\n    for (const cells of moves[i]) {\n      if (cells.some(cell => taken[cell])) continue;\n      for (const cell of cells) taken[cell] = true;\n      count += place(i + 1);\n      for (const cell of cells) taken[cell] = false;\n    }\n    return count;\n  }\n\n  return place(0);\n}",
+  "brute": "function countCombinations(pieces, positions) {\n  const n = pieces.length;\n  const targets = positions.map(([r, c], i) => {\n    const list = [];\n    for (let tr = 1; tr <= 8; tr++) for (let tc = 1; tc <= 8; tc++) {\n      const line = tr === r || tc === c;\n      const diag = Math.abs(tr - r) === Math.abs(tc - c);\n      const ok = pieces[i] === 'rook' ? line : pieces[i] === 'bishop' ? diag : line || diag;\n      if (ok) list.push([tr, tc]);\n    }\n    return list;\n  });\n  let total = 0;\n  const pick = new Array(n);\n  const simulate = () => {\n    const rows = positions.map(p => p[0]);\n    const cols = positions.map(p => p[1]);\n    for (let sec = 0; sec < 8; sec++) {\n      for (let i = 0; i < n; i++) {\n        rows[i] += Math.sign(pick[i][0] - rows[i]);\n        cols[i] += Math.sign(pick[i][1] - cols[i]);\n      }\n      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (rows[i] === rows[j] && cols[i] === cols[j]) return false;\n    }\n    return true;\n  };\n  const go = (i) => {\n    if (i === n) { if (simulate()) total++; return; }\n    for (const t of targets[i]) { pick[i] = t; go(i + 1); }\n  };\n  go(0);\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 4 : 1 + Math.floor(rand() * 4);\n  const kinds = ['rook', 'bishop', 'queen'];\n  const pieces = [];\n  let queens = 0;\n  for (let i = 0; i < n; i++) {\n    let kind = kinds[Math.floor(rand() * 3)];\n    if (kind === 'queen' && queens > 0) kind = rand() < 0.5 ? 'rook' : 'bishop';\n    if (kind === 'queen') queens++;\n    pieces.push(kind);\n  }\n  // Small inputs often crowd the pieces together so their paths cross.\n  const span = size === 'small' && rand() < 0.6 ? 3 : 8;\n  const low = 1 + Math.floor(rand() * (9 - span));\n  const used = new Set();\n  const positions = [];\n  while (positions.length < n) {\n    const r = low + Math.floor(rand() * span);\n    const c = low + Math.floor(rand() * span);\n    if (used.has(r * 10 + c)) continue;\n    used.add(r * 10 + c);\n    positions.push([r, c]);\n  }\n  return [pieces, positions];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["rook"],[[1,1]]],"expected":15},
+    {"name":"Example 2","input":[["queen"],[[1,1]]],"expected":22},
+    {"name":"Example 3","input":[["bishop"],[[4,3]]],"expected":12}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["bishop"],[[1,1]]]},
+    {"name":"Test 2","input":[["queen"],[[4,5]]]},
+    {"name":"Test 3","input":[["rook","rook"],[[1,1],[1,2]]]},
+    {"name":"Test 4","input":[["bishop","bishop"],[[1,1],[2,2]]]},
+    {"name":"Test 5","input":[["queen","bishop"],[[4,4],[4,5]]]},
+    {"name":"Test 6","input":[["rook","rook","rook","rook"],[[1,1],[1,8],[8,1],[8,8]]]},
+    {"name":"Test 7","input":[["queen","bishop","rook","rook"],[[4,4],[4,5],[5,4],[5,5]]]},
+    {"name":"Test 8","input":[["rook","bishop","bishop"],[[1,8],[2,7],[3,6]]]},
+    {"name":"Test 9","input":[["bishop","rook"],[[8,8],[1,1]]]},
+    {"name":"Test 10","input":[["rook","queen","bishop","rook"],[[2,2],[2,3],[3,2],[3,3]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThere are at most four pieces and each has at most 28 choices (a queen in the middle of the board), so trying every combination is cheap. What needs care is deciding whether chosen moves ever meet. A move is fixed by its start, direction and number of steps: at second `t` the piece has walked `min(t, steps)` squares. No path is longer than 7 squares, so seconds 1 to 7 decide everything. The brute force picks a destination for every piece and simulates the board second by second; the reference builds the choices one piece at a time and abandons a partial combination as soon as a new move hits a cell (second, square) already taken.\n\n## Approach\n\n1. Map each piece type to its directions: four straight ones, four diagonal ones, or all eight for the queen.\n2. `trace` turns a move into the 7 cells it occupies, one per second, each encoded as `second * 64 + square`.\n3. `moves[i]` lists piece `i`'s options: staying still (`steps = 0`) plus every step count along each direction that stays on the board.\n4. `place(i)` tries each option of piece `i`; it is skipped when any of its cells is already `taken`.\n5. Otherwise mark its cells, count the completions with `place(i + 1)`, and unmark them (backtracking).\n6. When all `n` pieces have a move, the combination is valid and counts 1.\n\n## Example 1, step by step\n\nA single rook on `[1, 1]`. `moves[0]` holds the option to stay, 7 options going down (to rows 2..8) and 7 going right (to columns 2..8); going up or left leaves the board at once. Nothing is `taken` yet, so every option reaches `place(1)`, which returns 1. The total is `1 + 7 + 7 = 15`.\n\n## Complexity\n\n- Time: O(28 · 15³ · 7) in the worst case, a constant: each partial combination costs 7 cell checks per option.\n- Space: O(64 · 7) for `taken`, plus at most 28 traced moves of 7 cells per piece.\n\n## Pitfalls\n\n- Count \"stay put\" only once, not once per direction, or combinations are counted several times.\n- Check every second, not just the destinations: pieces can meet mid-way, and a stopped piece can be hit by one still moving (a stopped piece keeps its square for all later seconds).\n- Swapping two adjacent pieces is legal; comparing whole-second positions handles that automatically.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `directions` | the step vectors each piece type may use |\n| `taken` | which (second, square) cells the moves chosen so far occupy |\n| `dr`, `dc`, `steps` | a move's direction and length |\n| `walked` | squares covered by a given second |\n| `moves` | for each piece, the cell lists of all its moves |\n| `cells` | the 7 cells of one move |\n| `count` | valid combinations found from this level down |",
+  "narration": {
+    "4": "Rooks use straight lines, bishops diagonals, and the queen both.",
+    "6": "One flag per (second, square) pair, for seconds 1 through 7.",
+    "10": "Record where the piece is at each second from 1 to 7.",
+    "11": "The piece walks until it reaches its step count, then stays.",
+    "13": "Encode second and square into one cell index.",
+    "19": "Staying on the start square is one option, counted once.",
+    "20": "Try every direction this piece type may move in.",
+    "24": "Stop extending this direction once it leaves the board.",
+    "25": "Each in-board distance along the direction is one more option.",
+    "32": "Every piece has a move without any clash: this is one valid combination.",
+    "35": "Skip a move that occupies a cell some earlier piece already holds at that second.",
+    "36": "Claim this move's cells.",
+    "37": "Count all valid ways to move the remaining pieces.",
+    "38": "Release the cells so the next option starts from a clean state.",
+    "43": "Start with the first piece and an empty board."
+  }
+}

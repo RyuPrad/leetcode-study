@@ -1,0 +1,58 @@
+{
+  "number": 3236,
+  "title": "CEO Subordinate Hierarchy",
+  "spec": "recalled",
+  "statement": "One table describes a company's reporting tree:\n\n- `employees(employee_id, employee_name, manager_id, salary)`: one row per employee; `employee_id` is unique. `manager_id` is the `employee_id` of the employee's direct manager, and it is `null` only for the CEO. There is exactly one CEO (unless the table is empty), every other manager exists in the table, and following managers upward from anyone always ends at the CEO.\n\nReport every subordinate of the CEO, direct or indirect (that is, every employee except the CEO), with these columns:\n\n- `subordinate_id`: the employee's `employee_id`.\n- `subordinate_name`: the employee's `employee_name`.\n- `hierarchy_level`: how many steps below the CEO the employee sits: `1` for people who report to the CEO directly, `2` for their reports, and so on.\n- `salary_difference`: the employee's salary minus the CEO's salary (negative when the employee earns less).\n\nOrder the rows by `hierarchy_level` ascending, then by `subordinate_id` ascending.",
+  "constraints": [
+    "employee_id is unique in employees",
+    "Exactly one employee (the CEO) has manager_id null, unless the table is empty",
+    "Every non-null manager_id is the employee_id of another employee",
+    "The managers form a tree: there are no cycles",
+    "salary is a positive integer"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "employees": [["employee_id","INT"],["employee_name","VARCHAR(100)"],["manager_id","INT"],["salary","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ employees = [] }] = input;\n  const boss = new Map();\n  let ceos = 0;\n  for (const [id, name, manager, salary] of employees) {\n    if (id === null || name === null || salary === null) return 'employee_id, employee_name and salary may not be null.';\n    if (boss.has(id)) return `employee_id ${id} appears twice.`;\n    if (salary <= 0) return `Employee ${id} needs a positive salary.`;\n    if (manager === null) ceos++;\n    boss.set(id, manager);\n  }\n  if (employees.length && ceos !== 1) return 'Exactly one employee must have a null manager_id.';\n  for (const [id, manager] of boss) if (manager !== null && !boss.has(manager)) return `Employee ${id} has a manager_id that is not an employee.`;\n  for (const id of boss.keys()) {\n    let at = id, steps = 0;\n    while (at !== null && steps <= boss.size) { at = boss.get(at); steps++; }\n    if (at !== null) return `Employee ${id} is in a management cycle.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE ceo AS (\n  SELECT employee_id, salary\n  FROM employees\n  WHERE manager_id IS NULL\n),\nchain AS (\n  SELECT e.employee_id, e.employee_name, e.salary, 1 AS hierarchy_level\n  FROM employees AS e\n  JOIN ceo AS c\n    ON e.manager_id = c.employee_id\n  UNION ALL\n  SELECT e.employee_id, e.employee_name, e.salary, ch.hierarchy_level + 1\n  FROM employees AS e\n  JOIN chain AS ch\n    ON e.manager_id = ch.employee_id\n)\nSELECT ch.employee_id AS subordinate_id,\n  ch.employee_name AS subordinate_name,\n  ch.hierarchy_level,\n  ch.salary - c.salary AS salary_difference\nFROM chain AS ch\nCROSS JOIN ceo AS c\nORDER BY ch.hierarchy_level, ch.employee_id;",
+  "brute": "WITH RECURSIVE climb AS (\n  SELECT employee_id AS start_id, manager_id AS above_id, 1 AS steps\n  FROM employees\n  WHERE manager_id IS NOT NULL\n  UNION ALL\n  SELECT cl.start_id, m.manager_id, cl.steps + 1\n  FROM climb AS cl, employees AS m\n  WHERE m.employee_id = cl.above_id AND m.manager_id IS NOT NULL\n)\nSELECT e.employee_id AS subordinate_id, e.employee_name AS subordinate_name,\n  cl.steps AS hierarchy_level, e.salary - top.salary AS salary_difference\nFROM climb AS cl, employees AS e, employees AS top\nWHERE e.employee_id = cl.start_id AND top.employee_id = cl.above_id AND top.manager_id IS NULL\nORDER BY hierarchy_level, subordinate_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const names = ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Helen', 'Ivan', 'Judy'];\n  const small = size === 'small';\n  const count = small ? pick(9) : 2000;\n  const pool = small ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 20, 31] : Array.from({ length: 3000 }, (_, i) => i + 1);\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const pay = [90000, 95000, 100000, 120000, 150000];\n  const salary = () => (small ? pay[pick(pay.length)] : 30000 + 1000 * pick(171));\n  const rows = [];\n  // The first employee is the CEO; each later one reports to someone already placed,\n  // often the newest one so that chains get deep.\n  for (let i = 0; i < count; i++) {\n    const manager = i === 0 ? null : rows[rand() < 0.3 ? i - 1 : pick(i)][0];\n    rows.push([pool[i], names[pick(names.length)], manager, salary()]);\n  }\n  for (let i = rows.length - 1; i > 0; i--) { const j = pick(i + 1); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ employees: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"employees":[[1,"Alice",null,150000],[2,"Bob",1,120000],[3,"Charlie",1,110000],[4,"David",2,105000],[5,"Eve",2,100000],[6,"Frank",3,95000],[7,"Grace",3,98000],[8,"Helen",5,90000]]}],"expected":{"columns":["subordinate_id","subordinate_name","hierarchy_level","salary_difference"],"rows":[[2,"Bob",1,-30000],[3,"Charlie",1,-40000],[4,"David",2,-45000],[5,"Eve",2,-50000],[6,"Frank",2,-55000],[7,"Grace",2,-52000],[8,"Helen",3,-60000]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"employees":[]}]},
+    {"name":"Test 2","input":[{"employees":[[1,"Alice",null,150000]]}]},
+    {"name":"Test 3","input":[{"employees":[[10,"Judy",null,100000],[30,"Ivan",10,120000],[20,"Eve",10,100000],[40,"Bob",10,90000]]}]},
+    {"name":"Test 4","input":[{"employees":[[6,"Frank",5,50000],[5,"Eve",4,60000],[4,"David",3,70000],[3,"Charlie",2,80000],[2,"Bob",1,90000],[1,"Alice",null,100000]]}]},
+    {"name":"Test 5","input":[{"employees":[[50,"Grace",null,150000],[40,"Helen",50,140000],[30,"Ivan",50,130000],[3,"Bob",40,90000],[1,"Eve",30,95000],[2,"David",40,99000]]}]},
+    {"name":"Test 6","input":[{"employees":[[7,"Bob",9,80000],[9,"Alice",null,80000],[8,"Charlie",7,90000],[3,"David",8,80000]]}]},
+    {"name":"Test 7","input":[{"employees":[[1,"Alice",null,200000],[2,"Bob",1,150000],[3,"Bob",1,150000],[4,"Eve",2,100000],[5,"Eve",3,100000],[6,"Frank",4,90000],[7,"Grace",6,95000],[8,"Helen",3,120000]]}]},
+    {"name":"Test 8","input":[{"employees":[[12,"Ivan",20,70000],[20,"Judy",31,110000],[31,"Helen",null,100000],[5,"Frank",31,100000],[4,"Grace",5,105000]]}]},
+    {"name":"Test 9","input":[{"employees":[[100,"Alice",null,90000],[1,"Bob",100,95000],[2,"Charlie",1,100000],[3,"David",2,120000],[4,"Eve",100,150000]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe CEO is easy to find (the only row with a null `manager_id`), but the subordinates sit at unknown depths, so a fixed number of self-joins cannot reach them all. A **recursive CTE** walks the tree one layer at a time: start with the CEO's direct reports at level 1, then repeatedly add anyone whose manager is already in the result, one level deeper. When a layer finds nobody new, the recursion stops.\n\n## Approach\n\n1. `ceo`: the single row with `manager_id IS NULL`, keeping its id and salary.\n2. `chain` anchor: employees whose `manager_id` is the CEO's id, at `hierarchy_level = 1`.\n3. `chain` recursive step: join `employees` to rows already in `chain` on `e.manager_id = ch.employee_id`, adding 1 to the level.\n4. Final select: cross join `chain` with the one-row `ceo` to subtract the CEO's salary, rename the columns, and order by level, then id.\n\n## Example 1, step by step\n\n- `ceo` is Alice (id 1, salary 150000).\n- Anchor: Bob (2) and Charlie (3) report to 1, so they enter at level 1.\n- Round 2: David (4) and Eve (5) report to Bob; Frank (6) and Grace (7) report to Charlie: level 2.\n- Round 3: Helen (8) reports to Eve: level 3.\n- Round 4 finds nobody whose manager is Helen, so the walk ends.\n\nSubtracting 150000 gives Bob -30000, Charlie -40000, David -45000, Eve -50000, Frank -55000, Grace -52000 and Helen -60000, already in level-then-id order.\n\n## Complexity\n\n- Time: each employee enters `chain` once; with an index on `manager_id` the walk is O(n), and a database without one may scan the table once per row, O(n^2).\n- Space: O(n) for `chain`.\n\n## Pitfalls\n\n- Starting the anchor at the CEO with level 0 reports the CEO too, unless you filter it out afterwards.\n- The difference is subordinate minus CEO, so it is usually negative; reversing it flips every sign.\n- Ordering only by `subordinate_id` mixes levels: an id can be small and still deep in the tree.\n- A fixed chain of self-joins handles only a fixed depth; the recursion handles any depth.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ceo` | the one employee with no manager, with their salary |\n| `chain` | every subordinate found so far with its level |\n| `e` | an employee being tested for a manager already in `chain` (or the CEO) |\n| `ch` | a row of `chain`: a manager already placed in the tree |\n| `c` | the CEO row, used to compute `salary_difference` |",
+  "narration": {
+    "1": "Begin a recursive WITH clause; the first CTE finds the CEO.",
+    "4": "The CEO is the only employee without a manager.",
+    "6": "chain will collect every subordinate together with its level below the CEO.",
+    "7": "The anchor starts the walk with level 1.",
+    "9": "Its rows are the employees whose manager is the CEO.",
+    "11": "UNION ALL appends each new layer to the rows already found.",
+    "12": "Each new row sits one level deeper than its manager.",
+    "14": "An employee joins the chain when their manager is already in it.",
+    "20": "Subtract the CEO's salary from each subordinate's salary.",
+    "22": "The ceo CTE has one row, so the cross join just attaches its salary to every subordinate.",
+    "23": "Report shallow levels first, breaking ties by employee id."
+  }
+}

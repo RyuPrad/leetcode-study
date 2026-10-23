@@ -1,0 +1,61 @@
+{
+  "number": 1989,
+  "title": "Maximum Number of People That Can Be Caught in Tag",
+  "spec": "recalled",
+  "statement": "People stand in a line playing tag. The array `team` describes them by position: `team[i] = 1` means the person at index `i` is \"it\" (a catcher), and `team[i] = 0` means they are not.\n\nA catcher at index `i` may catch **at most one** person who is not \"it\" and whose index lies in `[i - dist, i + dist]` (both ends included). Each person can be caught by at most one catcher. Return the largest number of people the catchers can catch in total.",
+  "constraints": [
+    "1 <= team.length <= 10^5",
+    "team[i] is 0 or 1",
+    "1 <= dist <= team.length"
+  ],
+  "signature": "int catchMaximumAmountofPeople(int[] team, int dist)",
+  "entry": "catchMaximumAmountofPeople",
+  "kind": "function",
+  "parameters": [
+    "team",
+    "dist"
+  ],
+  "validator": "function validate([team, dist]) {\n  if (!Array.isArray(team) || team.length < 1 || team.length > 100000) return 'team needs 1 to 100000 entries.';\n  if (team.some(v => v !== 0 && v !== 1)) return 'Each entry of team is 0 or 1.';\n  if (!Number.isInteger(dist) || dist < 1 || dist > team.length) return 'dist must be between 1 and team.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function catchMaximumAmountofPeople(team, dist) {\n  const n = team.length;\n  let caught = 0;\n  let target = 0;\n  for (let i = 0; i < n; i++) {\n    if (team[i] !== 1) {\n      continue;\n    }\n    while (target < n && (team[target] !== 0 || target < i - dist)) {\n      target++;\n    }\n    if (target < n && target <= i + dist) {\n      caught++;\n      target++;\n    }\n  }\n  return caught;\n}",
+  "brute": "function catchMaximumAmountofPeople(team, dist) {\n  // Maximum bipartite matching (augmenting paths) between catchers and runners.\n  const owner = new Array(team.length).fill(-1);\n  const tryCatch = (i, visited) => {\n    for (let j = Math.max(0, i - dist); j <= Math.min(team.length - 1, i + dist); j++) {\n      if (team[j] !== 0 || visited.has(j)) continue;\n      visited.add(j);\n      if (owner[j] === -1 || tryCatch(owner[j], visited)) {\n        owner[j] = i;\n        return true;\n      }\n    }\n    return false;\n  };\n  let total = 0;\n  for (let i = 0; i < team.length; i++) if (team[i] === 1 && tryCatch(i, new Set())) total++;\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 12);\n  const density = [0.1, 0.3, 0.5, 0.7, 0.9][Math.floor(rand() * 5)];\n  const team = [];\n  if (size === 'large' && rand() < 0.3) {\n    // Long blocks of catchers and runners stress the pointer that skips ahead.\n    while (team.length < n) {\n      const value = team.length === 0 ? Math.floor(rand() * 2) : 1 - team[team.length - 1];\n      const block = 1 + Math.floor(rand() * 200);\n      for (let k = 0; k < block && team.length < n; k++) team.push(value);\n    }\n  } else {\n    for (let k = 0; k < n; k++) team.push(rand() < density ? 1 : 0);\n  }\n  const dist = rand() < 0.6 ? 1 + Math.floor(rand() * Math.min(n, 5)) : 1 + Math.floor(rand() * n);\n  return [team, dist];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[0,1,0,1,0],3],"expected":2},
+    {"name":"Example 2","input":[[1],1],"expected":0},
+    {"name":"Example 3","input":[[0],1],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,0],1]},
+    {"name":"Test 2","input":[[0,0,1,1],1]},
+    {"name":"Test 3","input":[[0,0,1,1],2]},
+    {"name":"Test 4","input":[[1,1,1,1],2]},
+    {"name":"Test 5","input":[[0,0,0,0,0],5]},
+    {"name":"Test 6","input":[[1,0,0,0,0,1],5]},
+    {"name":"Test 7","input":[[1,1,1,0,0,0],2]},
+    {"name":"Test 8","input":[[1,1,1,0,0,0],3]},
+    {"name":"Test 9","input":[[0,1,0,0,1,1,0,1,0,0,0,1],1]},
+    {"name":"Test 10","input":[[0,0,0,1,1,0,1,0,1,1,0,0],2]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a matching between catchers and runners, where each catcher can reach a window of positions. A general matching algorithm would work (the brute force uses augmenting paths), but the windows all have the same width and move right as the catcher moves right. That makes a greedy choice safe: going from left to right, each catcher should take the **leftmost** runner still free and in reach. Any runner further right is at least as useful to later catchers, so saving it never hurts. And because later catchers' windows start even further right, a runner skipped as too far left is useless to everyone after, so one forward-only pointer is enough.\n\n## Approach\n\n1. Keep `target`, a pointer to the next runner that might still be caught, starting at 0.\n2. Walk `i` over the line; skip people who are not catchers.\n3. For a catcher, move `target` forward past catchers and past runners left of `i - dist`.\n4. If `target` is now within `i + dist`, catch that runner: add 1 to `caught` and move `target` on. Otherwise leave `target` where it is for the next catcher.\n5. Return `caught`.\n\n## Example 1, step by step\n\n`team = [0, 1, 0, 1, 0]`, `dist = 3`. At `i = 1`, `target = 0` is a runner and `0 >= 1 - 3`, and `0 <= 4`, so it is caught (`caught = 1`, `target = 1`). At `i = 3`, `target` skips the catcher at 1 and stops at runner 2, which is within `3 + 3`, so `caught = 2`. The answer is `2`.\n\n## Complexity\n\n- Time: O(n): `i` and `target` each move forward at most n times.\n- Space: O(1).\n\n## Pitfalls\n\n- Each catcher catches at most one person; do not count every runner in range.\n- Never move `target` back: a runner left of `i - dist` is out of reach for this and every later catcher.\n- If the next free runner is beyond `i + dist`, keep `target` where it is; a later catcher may still reach it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of people |\n| `i` | position of the current catcher |\n| `target` | next runner that might still be caught |\n| `caught` | number of people caught so far |",
+  "narration": {
+    "3": "No one has been caught yet.",
+    "4": "target points at the next person who might still be caught.",
+    "5": "Walk the line from left to right.",
+    "6": "Only catchers act; everyone else is skipped here.",
+    "9": "Skip catchers, and runners too far left for this catcher (and so for every later one).",
+    "10": "Move the target pointer one step right; it never moves back.",
+    "12": "Is the leftmost free runner within this catcher's reach on the right?",
+    "13": "Yes: catch that runner.",
+    "14": "That runner is taken, so the next search starts after it.",
+    "17": "Every catcher has been handled; return the total caught."
+  }
+}

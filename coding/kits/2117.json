@@ -1,0 +1,70 @@
+{
+  "number": 2117,
+  "title": "Abbreviating the Product of a Range",
+  "spec": "leetcode",
+  "statement": "Let the product be every integer from `left` to `right` (both included) multiplied together. Return it as a string in this shortened form:\n\n1. Count the zeros at the very end of the product; call this count `C` and strip those zeros off.\n2. If the stripped number has 10 digits or fewer, write it out in full. If it has more than 10 digits, write only its first 5 digits, then three dots `...`, then its last 5 digits (keeping any zeros at the front of those 5).\n3. Finish with the letter `e` followed by `C` in decimal (`C` may be 0).\n\nSo the answer looks like `\"<digits>e<C>\"` or `\"<first five>...<last five>e<C>\"`.",
+  "constraints": [
+    "1 <= left <= right <= 10^4"
+  ],
+  "signature": "String abbreviateProduct(int left, int right)",
+  "entry": "abbreviateProduct",
+  "kind": "function",
+  "parameters": [
+    "left",
+    "right"
+  ],
+  "validator": "function validate([left, right]) {\n  if (!Number.isInteger(left) || !Number.isInteger(right)) return 'left and right are integers.';\n  if (left < 1 || right > 10000) return 'left and right are between 1 and 10^4.';\n  if (left > right) return 'left must not be greater than right.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function abbreviateProduct(left, right) {\n  let twos = 0;\n  let fives = 0;\n  for (let i = left; i <= right; i++) {\n    for (let x = i; x % 2 === 0; x /= 2) twos++;\n    for (let x = i; x % 5 === 0; x /= 5) fives++;\n  }\n  const zeros = Math.min(twos, fives);\n  let twosLeft = zeros;\n  let fivesLeft = zeros;\n  let suffix = 1;\n  let exact = 1;\n  let big = false;\n  let prefix = 1;\n  for (let i = left; i <= right; i++) {\n    let x = i;\n    while (twosLeft > 0 && x % 2 === 0) {\n      x /= 2;\n      twosLeft--;\n    }\n    while (fivesLeft > 0 && x % 5 === 0) {\n      x /= 5;\n      fivesLeft--;\n    }\n    suffix = (suffix * x) % 100000;\n    if (!big) {\n      exact *= x;\n      big = exact >= 1e10;\n    }\n    prefix *= i;\n    while (prefix >= 100000) {\n      prefix /= 10;\n    }\n  }\n  if (!big) {\n    return `${exact}e${zeros}`;\n  }\n  const head = Math.floor(prefix);\n  const tail = String(suffix).padStart(5, '0');\n  return `${head}...${tail}e${zeros}`;\n}",
+  "brute": "function abbreviateProduct(left, right) {\n  let product = 1n;\n  for (let i = left; i <= right; i++) product *= BigInt(i);\n  const text = product.toString();\n  const digits = text.replace(/0+$/, '');\n  const zeros = text.length - digits.length;\n  if (digits.length <= 10) return digits + 'e' + zeros;\n  return digits.slice(0, 5) + '...' + digits.slice(-5) + 'e' + zeros;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const left = 1 + Math.floor(rand() * 3000);\n    const right = 10000 - Math.floor(rand() * 1000);\n    return [left, right];\n  }\n  if (rand() < 0.5) {\n    const left = 1 + Math.floor(rand() * 30);\n    return [left, left + Math.floor(rand() * 25)];\n  }\n  const left = 1 + Math.floor(rand() * 10000);\n  return [left, Math.min(10000, left + Math.floor(rand() * 8))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,4],"expected":"24e0"},
+    {"name":"Example 2","input":[2,11],"expected":"399168e2"},
+    {"name":"Example 3","input":[371,375],"expected":"7219856259e3"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[10000,10000]},
+    {"name":"Test 3","input":[4,6]},
+    {"name":"Test 4","input":[1,15]},
+    {"name":"Test 5","input":[1,16]},
+    {"name":"Test 6","input":[1,25]},
+    {"name":"Test 7","input":[20,29]},
+    {"name":"Test 8","input":[3125,3125]},
+    {"name":"Test 9","input":[99,101]},
+    {"name":"Test 10","input":[9990,10000]},
+    {"name":"Test 11","input":[1,10000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe product of `1..10000` has over 35,000 digits; a brute force could build it with big integers, but the answer needs only three small facts, each found separately:\n\n- **Trailing zeros.** Each is a factor 10 = 2 · 5, so `C` is the smaller of the total counts of 2s and 5s in the range's factors.\n- **Last 5 digits.** Remove `C` twos and `C` fives from the factors and multiply the rest modulo 10⁵.\n- **First 5 digits.** Low digits barely affect the leading ones, so a floating-point number scaled down by 10 whenever it reaches 6 digits keeps them.\n\nWhile the stripped product is below 10¹⁰ its exact value is also cheap to keep, which settles the short form.\n\n## Approach\n\n1. Count `twos` and `fives` over all factors; `zeros` is their minimum.\n2. Walk the range again. For each `i`, divide out 2s and 5s from `x = i` until `twosLeft` and `fivesLeft` (both starting at `zeros`) are used up.\n3. Update `suffix = suffix · x mod 100000`, and while `big` is false also multiply `exact` by `x`; set `big` once `exact` reaches 10¹⁰.\n4. Multiply `prefix` by `i` and divide by 10 until it is below 100000.\n5. If not `big`, return `exact` and `e` + `zeros`. Otherwise return the integer part of `prefix`, `...`, `suffix` padded to 5 digits, and `e` + `zeros`.\n\n## Example 1, step by step\n\n`left = 1`, `right = 4`. The factors hold three 2s (from 2 and 4) and no 5s, so `zeros = 0` and nothing is divided out. `exact` grows 1, 2, 6, 24 and never reaches 10¹⁰, so `big` stays false and the answer is `\"24e0\"`.\n\n## Complexity\n\n- Time: O(n log right) for n = right - left + 1: each number is visited twice and divided at most log₂ right times.\n- Space: O(1): a handful of counters.\n\n## Pitfalls\n\n- Strip exactly `zeros` twos and fives in total, not every 2 and 5: the extra 2s still shape the remaining digits.\n- Pad `suffix` to 5 digits: `...00288` must not become `...288`.\n- Decide between the two formats with the stripped product, and use 10 digits as the cut: exactly 10 digits are written in full.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `twos`, `fives` | how many factors 2 and 5 the whole product has |\n| `zeros` | the trailing-zero count `C` |\n| `twosLeft`, `fivesLeft` | 2s and 5s still to strip |\n| `x` | the current number with stripped factors removed |\n| `suffix` | the stripped product modulo 10⁵ (its last 5 digits) |\n| `exact` | the stripped product, kept while it has at most 10 digits |\n| `big` | whether the stripped product has more than 10 digits |\n| `prefix` | the product scaled down to below 100000; its integer part is the first 5 digits |\n| `head`, `tail` | the first and last five digits as text |",
+  "narration": {
+    "2": "Count every factor 2 in the whole product.",
+    "3": "And every factor 5.",
+    "4": "Visit each number of the range.",
+    "5": "Halve while even, counting one 2 per halving.",
+    "6": "Divide by 5 while possible, counting one 5 each time.",
+    "8": "Each trailing zero needs one 2 and one 5, so the scarcer one decides how many zeros there are.",
+    "13": "big becomes true once the stripped product has more than 10 digits.",
+    "15": "Walk the range again to build the digits.",
+    "17": "Strip 2s from this number while some of the zeros' 2s are still to be removed.",
+    "21": "Do the same for the 5s.",
+    "25": "Keep only the last five digits of the stripped product.",
+    "26": "While the stripped product is still short, keep its exact value too.",
+    "27": "Multiply x in; the value stays below 10^14, well within double precision.",
+    "28": "Once it reaches 10^10 (11 digits) the answer will be abbreviated and exact is no longer needed.",
+    "30": "Multiply the full number into the floating leading part.",
+    "31": "Scale it down so only five digits stay before the decimal point.",
+    "35": "At most 10 digits remain after stripping, so write the number out in full.",
+    "36": "Return it with the zero count.",
+    "38": "The integer part of prefix is the first five digits.",
+    "39": "Pad the last five digits so inner zeros are not lost.",
+    "40": "Join both ends with three dots and append the zero count."
+  }
+}

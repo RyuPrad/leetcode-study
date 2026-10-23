@@ -1,0 +1,57 @@
+{
+  "number": 3278,
+  "title": "Find Candidates for Data Scientist Position II",
+  "spec": "recalled",
+  "statement": "Two tables describe what candidates can do and what projects need:\n\n- `Candidates(candidate_id, skill, proficiency)`: one row per skill a candidate has; `(candidate_id, skill)` is unique and `proficiency` is an integer from 1 to 5.\n- `Projects(project_id, skill, importance)`: one row per skill a project requires; `(project_id, skill)` is unique and `importance` is an integer from 1 to 5.\n\nA candidate is eligible for a project only if they have **every** skill the project requires. An eligible candidate's score for the project starts at **100**; then, for each skill the project requires, add **10** when the candidate's `proficiency` is greater than the skill's `importance`, subtract **5** when it is smaller, and change nothing when they are equal. Skills the project does not require play no part.\n\nFor each project, report its single best candidate as `project_id`, `candidate_id` and `score`: the highest score wins, and a tie goes to the smaller `candidate_id`. Projects with no eligible candidate are left out. Order the rows by `project_id` ascending.",
+  "constraints": [
+    "(candidate_id, skill) is unique in Candidates",
+    "(project_id, skill) is unique in Projects",
+    "proficiency and importance are integers from 1 to 5"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Candidates": [["candidate_id","INT"],["skill","VARCHAR(50)"],["proficiency","INT"]],
+    "Projects": [["project_id","INT"],["skill","VARCHAR(50)"],["importance","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Candidates = [], Projects = [] }] = input;\n  for (const [table, rows] of [['Candidates', Candidates], ['Projects', Projects]]) {\n    const keys = new Set();\n    for (const [id, skill, level] of rows) {\n      if (id === null || skill === null || level === null) return `${table} rows may not contain null.`;\n      if (level < 1 || level > 5) return `${table} levels must be from 1 to 5.`;\n      const key = `${id}|${skill.toLowerCase()}`;\n      if (keys.has(key)) return `${table} lists skill ${skill} twice for ${id}.`;\n      keys.add(key);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH matched AS (\n  SELECT p.project_id,\n    c.candidate_id,\n    COUNT(*) AS matched_skills,\n    100 + SUM(CASE WHEN c.proficiency > p.importance THEN 10 WHEN c.proficiency < p.importance THEN -5 ELSE 0 END) AS score\n  FROM Projects AS p\n  JOIN Candidates AS c\n    ON c.skill = p.skill\n  GROUP BY p.project_id, c.candidate_id\n),\nrequired AS (\n  SELECT project_id, COUNT(*) AS skill_count\n  FROM Projects\n  GROUP BY project_id\n),\nranked AS (\n  SELECT m.project_id,\n    m.candidate_id,\n    m.score,\n    ROW_NUMBER() OVER (PARTITION BY m.project_id ORDER BY m.score DESC, m.candidate_id) AS position\n  FROM matched AS m\n  JOIN required AS r\n    ON r.project_id = m.project_id\n    AND r.skill_count = m.matched_skills\n)\nSELECT project_id, candidate_id, score\nFROM ranked\nWHERE position = 1\nORDER BY project_id;",
+  "brute": "WITH people AS (\n  SELECT DISTINCT candidate_id FROM Candidates\n),\neligible AS (\n  SELECT p.project_id, w.candidate_id,\n    100 + 10 * SUM(c.proficiency > p.importance) - 5 * SUM(c.proficiency < p.importance) AS score\n  FROM Projects AS p\n  CROSS JOIN people AS w\n  LEFT JOIN Candidates AS c\n    ON c.candidate_id = w.candidate_id AND c.skill = p.skill\n  GROUP BY p.project_id, w.candidate_id\n  HAVING SUM(c.candidate_id IS NULL) = 0\n),\nbest AS (\n  SELECT project_id, MAX(score) AS top_score\n  FROM eligible\n  GROUP BY project_id\n)\nSELECT e.project_id, MIN(e.candidate_id) AS candidate_id, e.score\nFROM eligible AS e, best AS b\nWHERE b.project_id = e.project_id AND b.top_score = e.score\nGROUP BY e.project_id, e.score\nORDER BY e.project_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const small = size === 'small';\n  const skills = small ? ['Python', 'SQL', 'R', 'Spark', 'Tableau'] : ['Python', 'SQL', 'R', 'Spark', 'Tableau', 'Excel', 'Java', 'Scala'];\n  const subset = (count) => {\n    const pool = [...skills];\n    for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n    return pool.slice(0, count);\n  };\n  const Candidates = [], Projects = [];\n  // Small cases: few skills and levels, so eligibility gaps and score ties are common.\n  const people = small ? pick(4) : 300, projects = small ? 1 + pick(3) : 200;\n  for (let i = 0; i < people; i++) {\n    const id = small ? 101 + 2 * i + pick(2) : 1000 + i;\n    for (const skill of subset(small ? 1 + pick(4) : 4)) if (!small || Candidates.length < 8) Candidates.push([id, skill, 1 + pick(5)]);\n  }\n  for (let i = 0; i < projects; i++) {\n    const id = small ? 501 + 3 * i + pick(3) : 5000 + i;\n    for (const skill of subset(1 + pick(3))) if (!small || Projects.length < 8) Projects.push([id, skill, 1 + pick(5)]);\n  }\n  for (const rows of [Candidates, Projects]) for (let i = rows.length - 1; i > 0; i--) { const j = pick(i + 1); [rows[i], rows[j]] = [rows[j], rows[i]]; }\n  return [{ Candidates, Projects }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Candidates":[[101,"Python",5],[101,"Tableau",3],[101,"PostgreSQL",4],[101,"TensorFlow",2],[102,"Python",4],[102,"Tableau",5],[102,"PostgreSQL",4],[102,"R",4],[103,"Python",3],[103,"Tableau",5],[103,"PostgreSQL",5],[103,"Spark",4]],"Projects":[[501,"Python",4],[501,"Tableau",3],[501,"PostgreSQL",5],[502,"Python",3],[502,"Tableau",4],[502,"R",2]]}],"expected":{"columns":["project_id","candidate_id","score"],"rows":[[501,101,105],[502,102,130]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Candidates":[[1,"SQL",3]],"Projects":[]}]},
+    {"name":"Test 2","input":[{"Candidates":[],"Projects":[[10,"SQL",3]]}]},
+    {"name":"Test 3","input":[{"Candidates":[[1,"SQL",3],[1,"Python",4]],"Projects":[[10,"SQL",3],[10,"Python",4]]}]},
+    {"name":"Test 4","input":[{"Candidates":[[1,"SQL",5],[1,"Python",5],[2,"SQL",2]],"Projects":[[10,"SQL",3],[10,"Python",3],[10,"R",3],[20,"SQL",3]]}]},
+    {"name":"Test 5","input":[{"Candidates":[[205,"Spark",4],[205,"SQL",2],[103,"Spark",2],[103,"SQL",4],[150,"Spark",3],[150,"SQL",3]],"Projects":[[7,"Spark",3],[7,"SQL",3]]}]},
+    {"name":"Test 6","input":[{"Candidates":[[1,"Python",3],[1,"R",5],[1,"Spark",5],[2,"Python",4]],"Projects":[[30,"Python",3]]}]},
+    {"name":"Test 7","input":[{"Candidates":[[1,"SQL",1],[1,"Tableau",1],[2,"SQL",5]],"Projects":[[40,"SQL",4],[40,"Tableau",4]]}]},
+    {"name":"Test 8","input":[{"Candidates":[[8,"Python",2],[8,"SQL",2],[8,"R",2],[8,"Spark",5],[8,"Tableau",4],[9,"Python",5],[9,"SQL",5],[9,"R",5],[9,"Spark",5]],"Projects":[[60,"Python",1],[60,"SQL",2],[60,"R",3],[60,"Spark",4],[60,"Tableau",5]]}]},
+    {"name":"Test 9","input":[{"Candidates":[[11,"Python",5],[11,"SQL",3],[12,"Python",2],[12,"SQL",5],[12,"R",4],[13,"R",1]],"Projects":[[900,"R",3],[300,"Python",4],[300,"SQL",4],[600,"Spark",2]]}]},
+    {"name":"Test 10","input":[{"Candidates":[[5,"SQL",5],[5,"Python",5],[6,"SQL",5],[6,"Python",1]],"Projects":[[1,"SQL",1],[2,"SQL",2],[2,"Python",2]]}]},
+    {"name":"Test 11","input":[{"Candidates":[[3,"Tableau",5],[4,"Tableau",4],[2,"Tableau",5]],"Projects":[[50,"Tableau",5]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nJoining `Projects` to `Candidates` on `skill` lines up every required skill with every candidate who has it. Grouping that join by `(project_id, candidate_id)` gives two things at once: how many of the project's skills the candidate covers, and the sum of their +10 / -5 / 0 adjustments. A candidate is eligible exactly when the covered count equals the project's total number of skills. Picking the best eligible candidate per project is then a ranking problem for `ROW_NUMBER()`.\n\n## Approach\n\n1. `matched`: join on `skill`, group by project and candidate, count the matched skills and compute `score = 100 + SUM(CASE ...)`.\n2. `required`: the number of skills each project lists.\n3. `ranked`: keep only pairs whose `matched_skills` equals `skill_count`, and number them per project by `score DESC, candidate_id`.\n4. Final select: `position = 1`, ordered by `project_id`.\n\n## Example 1, step by step\n\n- `matched` for project 501 (Python 4, Tableau 3, PostgreSQL 5): candidate 101 covers 3 skills, +10 - 5 + 0 = 105; candidate 102 covers 3, 0 + 10 - 5 = 105; candidate 103 covers 3, -5 + 10 + 0 = 105. For project 502 (Python 3, Tableau 4, R 2): 101 and 103 cover 2 skills, 102 covers 3 with +10 +10 +10 = 130.\n- `required`: 501 needs 3 skills, 502 needs 3.\n- `ranked`: all three candidates are eligible for 501 and tie at 105, so 101 gets position 1; only 102 is eligible for 502.\n- Result: `(501, 101, 105)` and `(502, 102, 130)`.\n\n## Complexity\n\n- Time: the join produces one row per (required skill, candidate having it), at most P · C for P project rows and C candidate rows; grouping and ranking add a sort, O(J log J) for J joined rows.\n- Space: O(J) for the join and its groups.\n\n## Pitfalls\n\n- Scoring without the eligibility check lets a candidate with a high score but a missing skill win (Test 7).\n- Joining on candidate skills alone, or counting the candidate's extra skills, changes the score; only required skills count.\n- `RANK()` or `MAX(score)` without a tie-break returns several rows on ties; order by `candidate_id` as the second key.\n- Equal proficiency and importance leave the score unchanged; it is neither +10 nor -5.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p`, `c` | a required skill of a project, and a candidate's row for the same skill |\n| `matched` | per project and candidate: skills covered and the score |\n| `required` | per project: how many skills it needs |\n| `m`, `r` | `matched` and `required` in the eligibility join |\n| `ranked` | eligible pairs numbered by score, then candidate id |\n| `position` | 1 for each project's chosen candidate |",
+  "narration": {
+    "1": "The first stage scores every candidate against every project they share a skill with.",
+    "4": "COUNT(*) is how many required skills the candidate has; it decides eligibility later.",
+    "5": "Each required skill adds 10, subtracts 5 or adds nothing, on top of the base 100.",
+    "8": "Joining on skill keeps only skills the project requires and the candidate has.",
+    "9": "One group per project and candidate.",
+    "11": "Count how many skills each project lists.",
+    "20": "Number eligible candidates per project, best score first and smaller id on ties.",
+    "24": "Only candidates covering all of the project's skills are ranked.",
+    "28": "Keep each project's first-ranked candidate.",
+    "29": "Rows come out by project_id, as required."
+  }
+}

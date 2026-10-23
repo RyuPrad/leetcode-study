@@ -1,0 +1,74 @@
+{
+  "number": 1932,
+  "title": "Merge BSTs to Create Single BST",
+  "spec": "leetcode",
+  "statement": "You get `trees`, a list of `n` tiny binary search trees given by their root nodes. Each tree is a root with at most two children (no grandchildren), and no two of the roots hold the same value.\n\nA *merge* chooses two different trees `trees[i]` and `trees[j]` such that some leaf of `trees[i]` (a node with no children) has the same value as the root of `trees[j]`. That leaf is replaced by the whole tree `trees[j]`, and `trees[j]` is taken out of the list.\n\nYour goal is to make exactly `n - 1` merges, leaving a single tree that is a valid BST: for every node, all values in its left subtree are strictly smaller than its value and all values in its right subtree are strictly larger. Return the root of that tree. If no sequence of `n - 1` merges is possible, or the tree they produce is not a valid BST, return `null`.\n\nEach tree in a case is written as a level-order array: `[root]`, `[root, left]`, `[root, null, right]` or `[root, left, right]`. The returned tree is shown as a level-order array with `null` for missing children, and `null` is shown as `[]`.",
+  "constraints": [
+    "n == trees.length",
+    "1 <= n <= 5 * 10^4",
+    "Each tree has 1 to 3 nodes: a root and at most two children, no grandchildren",
+    "Every tree is a valid BST",
+    "No two roots have the same value",
+    "1 <= TreeNode.val <= 5 * 10^4"
+  ],
+  "signature": "TreeNode canMerge(List<TreeNode> trees)",
+  "entry": "canMerge",
+  "kind": "function",
+  "parameters": [
+    "trees"
+  ],
+  "validator": "function validate([trees]) {\n  if (!Array.isArray(trees) || trees.length < 1 || trees.length > 50000) return 'trees needs 1 to 5 * 10^4 trees.';\n  const roots = new Set();\n  for (const tree of trees) {\n    if (!Array.isArray(tree) || tree.length < 1 || tree.length > 3 || tree[0] === null) return 'Each tree is [root], [root, left], [root, null, right] or [root, left, right].';\n    const [root, left = null, right = null] = tree;\n    for (const value of [root, left, right]) {\n      if (value !== null && (!Number.isInteger(value) || value < 1 || value > 50000)) return 'Node values are whole numbers from 1 to 5 * 10^4.';\n    }\n    if (left !== null && left >= root) return 'A left child must be smaller than its root.';\n    if (right !== null && right <= root) return 'A right child must be larger than its root.';\n    if (roots.has(root)) return 'No two trees may have the same root value.';\n    roots.add(root);\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [trees] = input;\n  const roots = trees.map(values => kit.toTree(values));\n  const result = solve(roots);\n  if (result === undefined) throw new Error('Return the root of the merged tree, or null.');\n  return kit.fromTree(result);\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function canMerge(trees) {\n  const rootOf = new Map();\n  const leafValues = new Set();\n  for (const tree of trees) {\n    rootOf.set(tree.val, tree);\n    if (tree.left) {\n      leafValues.add(tree.left.val);\n    }\n    if (tree.right) {\n      leafValues.add(tree.right.val);\n    }\n  }\n  let top = null;\n  for (const tree of trees) {\n    if (!leafValues.has(tree.val)) {\n      top = tree;\n      break;\n    }\n  }\n  if (top === null) {\n    return null;\n  }\n  rootOf.delete(top.val);\n  const grow = (node, low, high) => {\n    if (node === null) {\n      return true;\n    }\n    if (node.val <= low || node.val >= high) {\n      return false;\n    }\n    const sub = rootOf.get(node.val);\n    if (!node.left && !node.right && sub) {\n      node.left = sub.left;\n      node.right = sub.right;\n      rootOf.delete(node.val);\n    }\n    return grow(node.left, low, node.val) && grow(node.right, node.val, high);\n  };\n  if (!grow(top, -Infinity, Infinity)) {\n    return null;\n  }\n  return rootOf.size === 0 ? top : null;\n}",
+  "brute": "function canMerge(trees) {\n  // Perform any available merge until none is left, then check the single survivor in order.\n  const list = [...trees];\n  const leafSlots = root => {\n    const slots = [];\n    const stack = [root];\n    while (stack.length) {\n      const node = stack.pop();\n      for (const side of ['left', 'right']) {\n        const child = node[side];\n        if (!child) continue;\n        if (!child.left && !child.right) slots.push([node, side]);\n        else stack.push(child);\n      }\n    }\n    return slots;\n  };\n  let merged = true;\n  while (list.length > 1 && merged) {\n    merged = false;\n    for (let i = 0; i < list.length && !merged; i++) {\n      for (const [parent, side] of leafSlots(list[i])) {\n        const j = list.findIndex((tree, k) => k !== i && tree.val === parent[side].val);\n        if (j >= 0) {\n          parent[side] = list[j];\n          list.splice(j, 1);\n          merged = true;\n          break;\n        }\n      }\n    }\n  }\n  if (list.length !== 1) return null;\n  const values = [];\n  const inorder = node => {\n    if (!node) return;\n    inorder(node.left);\n    values.push(node.val);\n    inorder(node.right);\n  };\n  inorder(list[0]);\n  for (let k = 1; k < values.length; k++) if (values[k] <= values[k - 1]) return null;\n  return list[0];\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const large = size === 'large';\n  const limit = large || rand() < 0.4 ? 50000 : 30;\n  const count = large ? 1500 + pick(400) : 1 + pick(Math.min(limit, 10));\n  // Pick increasing values with random gaps, then shape one BST over them by choosing each subtree's root in its range.\n  const gap = Math.max(1, Math.floor(limit / count));\n  const values = [];\n  for (let i = 0, v = pick(limit - count * gap + 1); i < count; i++) {\n    v += 1 + pick(gap);\n    values.push(v);\n  }\n  const shape = rand();\n  const all = [];\n  const stack = [[0, count - 1, null, null]];\n  while (stack.length) {\n    const [lo, hi, parent, side] = stack.pop();\n    if (lo > hi) continue;\n    // Mostly random splits; sometimes always the smallest (a long right chain) or a lopsided split.\n    const m = shape < 0.1 ? lo : shape < 0.25 ? (rand() < 0.5 ? lo : hi) : lo + pick(hi - lo + 1);\n    const node = { val: values[m], left: null, right: null };\n    if (parent) parent[side] = node;\n    all.push(node);\n    stack.push([lo, m - 1, node, 'left'], [m + 1, hi, node, 'right']);\n  }\n  const root = all[0];\n  // Cut the BST into pieces of height at most one: every node with children becomes a piece's root.\n  const piece = node => {\n    const out = [node.val, node.left ? node.left.val : null, node.right ? node.right.val : null];\n    while (out.length > 1 && out[out.length - 1] === null) out.pop();\n    return out;\n  };\n  let trees = all.filter(node => node === root || node.left || node.right).map(piece);\n  const roots = new Set(trees.map(t => t[0]));\n  // A leaf may also appear as a one-node tree of its own.\n  for (const node of all) {\n    if (trees.length >= 2000) break;\n    if (!roots.has(node.val) && rand() < 0.1) { trees.push([node.val]); roots.add(node.val); }\n  }\n  const fresh = () => {\n    let v = 1 + pick(limit);\n    while (roots.has(v)) v = v % limit + 1;\n    return v;\n  };\n  // Half of the inputs are disturbed so that the merge fails or yields a smaller tree.\n  const changes = rand() < 0.5 ? 0 : 1 + pick(2);\n  for (let c = 0; c < changes; c++) {\n    const kind = pick(3);\n    if (kind === 0) {\n      // Change one child to another value that keeps its own piece a valid BST.\n      const t = trees[pick(trees.length)];\n      if (t[0] > 1 && rand() < 0.5) t[1] = Math.max(1, t[0] - 1 - pick(large ? 50 : 6));\n      else if (t[0] < limit) { while (t.length < 2) t.push(null); t[2] = Math.min(limit, t[0] + 1 + pick(large ? 50 : 6)); }\n    } else if (kind === 1 && trees.length > 1) {\n      // Drop one piece.\n      const i = pick(trees.length);\n      roots.delete(trees[i][0]);\n      trees.splice(i, 1);\n    } else if (trees.length < 2000 && roots.size < limit) {\n      // Add a piece with a new root and maybe some children.\n      const v = fresh();\n      const t = [v];\n      if (v > 1 && rand() < 0.5) t.push(Math.max(1, v - 1 - pick(6)));\n      if (v < limit && rand() < 0.5) { if (t.length < 2) t.push(null); t.push(Math.min(limit, v + 1 + pick(6))); }\n      trees.push(t);\n      roots.add(v);\n    }\n  }\n  for (let i = trees.length - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [trees[i], trees[j]] = [trees[j], trees[i]];\n  }\n  return [trees];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[2,1],[3,2,5],[5,4]]],"expected":[3,2,5,1,null,4]},
+    {"name":"Example 2","input":[[[5,3,8],[3,2,6]]],"expected":[]},
+    {"name":"Example 3","input":[[[5,4],[3]]],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[7]]]},
+    {"name":"Test 2","input":[[[2,1,3],[1],[3]]]},
+    {"name":"Test 3","input":[[[8,6,9],[3,1,4],[5,3,8]]]},
+    {"name":"Test 4","input":[[[2,null,3],[3,2]]]},
+    {"name":"Test 5","input":[[[5,4],[10,9]]]},
+    {"name":"Test 6","input":[[[4,2,6],[2,1,3],[6,3,7]]]},
+    {"name":"Test 7","input":[[[10,5,15],[5,3,12]]]},
+    {"name":"Test 8","input":[[[1,null,2],[3,null,4],[2,null,3],[4,null,5]]]},
+    {"name":"Test 9","input":[[[30,25,40],[20,10,30],[40,35],[10,5,15],[5,null,7],[15,12]]]},
+    {"name":"Test 10","input":[[[50000,2],[1,null,50000]]]},
+    {"name":"Test 11","input":[[[3,1,5],[7,6,8],[8,7]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe merges are not really a choice: a tree can only hang at a leaf carrying its root value, and a valid BST holds each value once, so every tree has exactly one place to go. The final root is the one root value that is **not** a leaf anywhere. So start from that tree, walk down it, and plug in each waiting tree when its matching leaf is reached. While walking, carry the open interval `(low, high)` the BST rule allows at that spot; one violation means `null`.\n\n## Approach\n\n1. Map every root value to its tree in `rootOf`, and collect every child value in `leafValues`.\n2. Let `top` be the first tree whose root value is not in `leafValues`. If there is none, return `null` (the merges would form a cycle). Remove `top` from `rootOf`.\n3. `grow(node, low, high)` walks the tree: a node outside `(low, high)` fails. If the node is a leaf and `rootOf` holds a tree with its value, copy that tree's children onto the leaf and delete the tree from `rootOf`. Then recurse left with `(low, node.val)` and right with `(node.val, high)`.\n4. Return `top` only if the walk succeeded and `rootOf` is empty (every tree was used); otherwise `null`.\n\n## Example 1, step by step\n\n`rootOf` holds `2`, `3` and `5`; `leafValues` is `{1, 2, 5, 4}`. Only `3` is not a leaf value, so `top` is `[3, 2, 5]`. The walk reaches leaf `2` with bounds `(-Infinity, 3)`, finds tree `2` and adopts its child `1`, which lies in `(-Infinity, 2)`. Leaf `5` lies in `(3, Infinity)` and adopts child `4`, which lies in `(3, 5)`. `rootOf` is now empty, so the answer is `[3, 2, 5, 1, null, 4]`.\n\n## Complexity\n\n- Time: O(n): each tree is mapped once and each node is visited once.\n- Space: O(n) for the map, the set and the recursion depth of the merged tree.\n\n## Pitfalls\n\n- Bounds must be strict: a repeated value (two leaves with the same value) breaks the BST, and strict bounds catch it.\n- Local checks are not enough: in Example 2, `6` ends up left of `5`.\n- A finished walk is not success: unreached trees (a second candidate root, or a cycle) stay in `rootOf`.\n- Only replace a node that is a real leaf; inner nodes keep their children.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rootOf` | root value to the tree still waiting to be merged |\n| `leafValues` | values of every child node in the input |\n| `top` | the tree that must become the final root |\n| `grow` | walks and grows the tree while checking the BST bounds |\n| `low`, `high` | the open interval a node's value must lie in |\n| `sub` | the waiting tree whose root matches the current leaf |",
+  "narration": {
+    "2": "Map each root value to its tree so a matching leaf can find the tree to plug in.",
+    "3": "Collect every child value; a root listed here must hang below some leaf.",
+    "4": "Scan every small tree once.",
+    "5": "Remember this tree under its root value.",
+    "7": "Its left child is a leaf value.",
+    "10": "Its right child is a leaf value too.",
+    "15": "A root that is no leaf anywhere can only be the final root.",
+    "16": "Take the first such tree as the top of the merged BST.",
+    "20": "Every root is also some leaf, so the merges would loop: no single tree can result.",
+    "23": "The top tree is used now, so it no longer waits in the map.",
+    "24": "Walk the growing tree, carrying the open interval (low, high) its values must lie in.",
+    "25": "An empty spot is always fine.",
+    "28": "A value outside its interval breaks the BST rule (this also catches repeated values).",
+    "31": "Look for a waiting tree whose root has this node's value.",
+    "32": "Only a real leaf can be replaced by that tree.",
+    "33": "Plug the tree in by adopting its left child...",
+    "34": "...and its right child.",
+    "35": "That tree is merged now, so remove it from the map.",
+    "37": "Check and grow the left side below this value and the right side above it.",
+    "39": "If any node broke the BST rule, the answer is null.",
+    "42": "Success only if every tree was merged in; otherwise some tree was never reached."
+  }
+}

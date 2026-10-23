@@ -1,0 +1,54 @@
+{
+  "number": 3262,
+  "title": "Find Overlapping Shifts",
+  "spec": "recalled",
+  "statement": "One table lists work shifts:\n\n- `EmployeeShifts(employee_id, start_time, end_time)`: one row per shift, with times of day as `'HH:MM:SS'`; `(employee_id, start_time)` is unique and every shift ends after it starts.\n\nTwo shifts of the **same employee** overlap when the later-starting one starts strictly before the earlier one ends. Shifts that only touch (one ends at `12:00:00` and the other starts at `12:00:00`) do not overlap, and shifts of different employees are never compared.\n\nFor every employee with at least one overlapping pair, report `employee_id` and `overlapping_shifts`: the number of unordered pairs of that employee's shifts that overlap. Employees without any overlap are left out. Order the rows by `employee_id` ascending.",
+  "constraints": [
+    "(employee_id, start_time) is unique in EmployeeShifts",
+    "start_time < end_time in every row",
+    "Times are within one day, written HH:MM:SS"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "EmployeeShifts": [["employee_id","INT"],["start_time","TIME"],["end_time","TIME"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ EmployeeShifts = [] }] = input;\n  const seen = new Set(), time = /^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$/;\n  for (const [id, start, end] of EmployeeShifts) {\n    if (id === null || start === null || end === null) return 'EmployeeShifts rows may not contain null.';\n    if (!time.test(start) || !time.test(end)) return `Employee ${id} has a time that is not HH:MM:SS.`;\n    if (start >= end) return `Employee ${id}'s shift at ${start} must end after it starts.`;\n    const key = `${id}|${start}`;\n    if (seen.has(key)) return `Employee ${id} has two shifts starting at ${start}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT s1.employee_id,\n  COUNT(*) AS overlapping_shifts\nFROM EmployeeShifts AS s1\nJOIN EmployeeShifts AS s2\n  ON s2.employee_id = s1.employee_id\n  AND s2.start_time > s1.start_time\n  AND s2.start_time < s1.end_time\nGROUP BY s1.employee_id\nORDER BY s1.employee_id;",
+  "brute": "SELECT a.employee_id, COUNT(*) DIV 2 AS overlapping_shifts\nFROM EmployeeShifts AS a, EmployeeShifts AS b\nWHERE a.employee_id = b.employee_id\n  AND a.start_time <> b.start_time\n  AND a.start_time < b.end_time\n  AND b.start_time < a.end_time\nGROUP BY a.employee_id\nORDER BY a.employee_id",
+  "generator": "function generate(rand, size) {\n  const pick = (n) => Math.floor(rand() * n);\n  const small = size === 'small';\n  const clock = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;\n  const count = small ? pick(9) : 2000;\n  const people = small ? 1 + pick(4) : 200;\n  // Small cases start on whole hours and last whole hours, so touching shifts are common.\n  const step = small ? 60 : 15, slots = small ? 9 : 81, first = small ? 8 * 60 : 0;\n  const used = new Set(), rows = [];\n  for (let tries = 0; rows.length < count && tries < count * 20; tries++) {\n    const id = small ? [1, 2, 3, 7][pick(people)] : 1 + pick(people);\n    const start = first + step * pick(slots);\n    const key = `${id}|${start}`;\n    if (used.has(key)) continue;\n    used.add(key);\n    const length = small ? 60 * (1 + pick(4)) : 30 * (1 + pick(12));\n    rows.push([id, clock(start), clock(Math.min(start + length, 23 * 60 + 59))]);\n  }\n  return [{ EmployeeShifts: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"EmployeeShifts":[[1,"08:00:00","12:00:00"],[1,"11:00:00","15:00:00"],[1,"14:00:00","18:00:00"],[2,"09:00:00","17:00:00"],[2,"16:00:00","20:00:00"],[3,"10:00:00","12:00:00"],[3,"13:00:00","15:00:00"],[3,"16:00:00","18:00:00"],[4,"08:00:00","10:00:00"],[4,"09:00:00","11:00:00"]]}],"expected":{"columns":["employee_id","overlapping_shifts"],"rows":[[1,2],[2,1],[4,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"EmployeeShifts":[]}]},
+    {"name":"Test 2","input":[{"EmployeeShifts":[[5,"09:00:00","17:00:00"]]}]},
+    {"name":"Test 3","input":[{"EmployeeShifts":[[1,"08:00:00","12:00:00"],[1,"12:00:00","16:00:00"],[1,"16:00:00","20:00:00"]]}]},
+    {"name":"Test 4","input":[{"EmployeeShifts":[[2,"08:00:00","18:00:00"],[2,"09:00:00","10:00:00"],[2,"11:00:00","12:00:00"]]}]},
+    {"name":"Test 5","input":[{"EmployeeShifts":[[3,"11:00:00","17:00:00"],[3,"08:00:00","20:00:00"],[3,"10:00:00","18:00:00"],[3,"09:00:00","19:00:00"]]}]},
+    {"name":"Test 6","input":[{"EmployeeShifts":[[1,"08:00:00","12:00:00"],[2,"09:00:00","13:00:00"],[3,"10:00:00","14:00:00"]]}]},
+    {"name":"Test 7","input":[{"EmployeeShifts":[[9,"13:00:00","15:00:00"],[4,"09:00:00","11:00:00"],[9,"14:00:00","16:00:00"],[4,"10:00:00","12:00:00"],[6,"08:00:00","09:00:00"],[4,"11:00:00","13:00:00"],[6,"09:00:00","10:00:00"]]}]},
+    {"name":"Test 8","input":[{"EmployeeShifts":[[1,"08:00:00","08:30:00"],[1,"08:29:59","09:00:00"],[2,"09:00:00","09:30:00"],[2,"09:30:00","10:00:00"],[2,"09:59:59","10:30:00"]]}]},
+    {"name":"Test 9","input":[{"EmployeeShifts":[[7,"06:00:00","22:00:00"],[7,"07:00:00","09:00:00"],[7,"08:00:00","10:00:00"],[7,"10:00:00","11:00:00"],[7,"20:00:00","23:00:00"],[8,"06:00:00","07:00:00"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOverlap is a relation between two rows of the same table, so the natural tool is a **self-join**: pair every shift with every other shift of the same employee and keep the pairs that overlap. Each surviving pair is one overlap, and counting pairs per employee is a plain `GROUP BY`.\n\nTo count every pair once, let `s1` be the shift that starts first. Then `s2` overlaps it exactly when `s2` starts after `s1` starts but before `s1` ends. Start times of one employee are unique, so every pair has a clear earlier shift.\n\n## Approach\n\n1. Take each shift as `s1`.\n2. Join `s2`: a shift of the same employee that starts later than `s1` and strictly before `s1` ends.\n3. `GROUP BY s1.employee_id` and `COUNT(*)` the pairs. The inner join already drops employees with no overlapping pair.\n4. Order by `employee_id`.\n\n## Example 1, step by step\n\nThe join keeps these pairs:\n\n| employee | s1 | s2 |\n| --- | --- | --- |\n| 1 | 08:00-12:00 | 11:00-15:00 |\n| 1 | 11:00-15:00 | 14:00-18:00 |\n| 2 | 09:00-17:00 | 16:00-20:00 |\n| 4 | 08:00-10:00 | 09:00-11:00 |\n\nEmployee 1's first and last shifts do not overlap (14:00 is after 12:00), and employee 3's shifts are all separate, so employee 3 has no row. Counting gives 1 → 2, 2 → 1 and 4 → 1.\n\n## Complexity\n\n- Time: O(sum of k^2) over employees with k shifts each, for the self-join; O(n^2) in the worst case for n shifts.\n- Space: O(p) for the p overlapping pairs before grouping.\n\n## Pitfalls\n\n- Using `<=` for the end test counts shifts that merely touch.\n- Dropping the `start_time > s1.start_time` condition counts each pair twice (and a shift with itself).\n- Counting distinct shifts involved in overlaps is a different number: a long shift covering two short ones is 2 pairs but 3 shifts.\n- Forgetting `s2.employee_id = s1.employee_id` compares shifts of different people.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `s1` | the earlier-starting shift of a pair |\n| `s2` | a later shift of the same employee that starts before `s1` ends |\n| `overlapping_shifts` | number of `(s1, s2)` pairs for the employee |",
+  "narration": {
+    "1": "Each output row is one employee.",
+    "2": "Count the overlapping pairs found for that employee.",
+    "3": "s1 is the earlier-starting shift of a pair.",
+    "4": "A self-join pairs each shift with other shifts.",
+    "5": "Only shifts of the same employee are compared.",
+    "6": "s2 must start later, so every pair is counted once and a shift is never paired with itself.",
+    "7": "They overlap when s2 starts strictly before s1 ends; touching shifts fail this test.",
+    "8": "Collapse the pairs to one row per employee; employees without pairs never reach this step.",
+    "9": "Report employees in ascending id order."
+  }
+}

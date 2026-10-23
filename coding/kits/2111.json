@@ -1,0 +1,62 @@
+{
+  "number": 2111,
+  "title": "Minimum Operations to Make the Array K-Increasing",
+  "spec": "leetcode",
+  "statement": "You get an array `arr` of `n` positive integers (indexed from 0) and a positive integer `k`. Call `arr` *K-increasing* when `arr[i - k] <= arr[i]` for every index `i` with `k <= i <= n - 1`.\n\nOne operation picks any index `i` and overwrites `arr[i]` with any positive integer you like. Return the smallest number of operations that makes `arr` K-increasing for the given `k`.",
+  "constraints": [
+    "1 <= arr.length <= 10^5",
+    "1 <= arr[i] <= arr.length",
+    "1 <= k <= arr.length"
+  ],
+  "signature": "int kIncreasing(int[] arr, int k)",
+  "entry": "kIncreasing",
+  "kind": "function",
+  "parameters": [
+    "arr",
+    "k"
+  ],
+  "validator": "function validate([arr, k]) {\n  const n = arr.length;\n  if (n < 1 || n > 100000) return 'arr needs 1 to 10^5 values.';\n  if (arr.some(v => !Number.isInteger(v) || v < 1 || v > n)) return 'Each value of arr is an integer from 1 to arr.length.';\n  if (!Number.isInteger(k) || k < 1 || k > n) return 'k is an integer from 1 to arr.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function kIncreasing(arr, k) {\n  let operations = 0;\n  for (let start = 0; start < k; start++) {\n    const tails = [];\n    let length = 0;\n    for (let i = start; i < arr.length; i += k) {\n      const value = arr[i];\n      let left = 0;\n      let right = tails.length;\n      while (left < right) {\n        const mid = (left + right) >> 1;\n        if (tails[mid] <= value) {\n          left = mid + 1;\n        } else {\n          right = mid;\n        }\n      }\n      tails[left] = value;\n      length++;\n    }\n    operations += length - tails.length;\n  }\n  return operations;\n}",
+  "brute": "function kIncreasing(arr, k) {\n  let total = 0;\n  for (let r = 0; r < k; r++) {\n    const chain = [];\n    for (let i = r; i < arr.length; i += k) chain.push(arr[i]);\n    const best = chain.map(() => 1);\n    let keep = 0;\n    for (let j = 0; j < chain.length; j++) {\n      for (let p = 0; p < j; p++) if (chain[p] <= chain[j]) best[j] = Math.max(best[j], best[p] + 1);\n      keep = Math.max(keep, best[j]);\n    }\n    total += chain.length - keep;\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 10);\n  const mode = Math.floor(rand() * 4);\n  const top = mode === 0 ? Math.min(n, 3) : n;\n  const arr = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  if (mode === 1) arr.sort((a, b) => b - a);\n  if (mode === 2) arr.sort((a, b) => a - b);\n  let k;\n  if (size === 'large') {\n    const choices = [1, 2, 3, 7, 50, n];\n    k = Math.min(n, choices[Math.floor(rand() * choices.length)]);\n  } else {\n    k = 1 + Math.floor(rand() * n);\n  }\n  return [arr, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[5,4,3,2,1],1],"expected":4},
+    {"name":"Example 2","input":[[4,1,5,2,6,2],2],"expected":0},
+    {"name":"Example 3","input":[[4,1,5,2,6,2],3],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[5,4,3,2,1],5]},
+    {"name":"Test 3","input":[[3,3,3,3,3,3],1]},
+    {"name":"Test 4","input":[[2,2,1,2,2],1]},
+    {"name":"Test 5","input":[[1,5,2,5,3,5,4,5],1]},
+    {"name":"Test 6","input":[[6,5,4,3,2,1],2]},
+    {"name":"Test 7","input":[[3,3,1,1,2,2],2]},
+    {"name":"Test 8","input":[[1,2,3,4,5,6,7,8,9,10],3]},
+    {"name":"Test 9","input":[[9,1,8,2,7,3,6,4,5,10,1,2],4]},
+    {"name":"Test 10","input":[[2,1,2,1,2,1,2,1],1]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rule `arr[i - k] <= arr[i]` only ever links indices that share the same remainder modulo `k`. So the array splits into `k` independent chains: indices `start, start + k, start + 2k, ...`. Each chain must end up non-decreasing, and the chains never interact.\n\nInside one chain, the values we leave alone must already be non-decreasing; everything else can be rewritten to fit around them (any positive integer is allowed). So the fewest changes for a chain is its length minus its **longest non-decreasing subsequence**. Trying every subset of kept values is exponential, and the O(m²) DP is too slow for 10^5 values, so we use the patience-sorting LIS with binary search.\n\n## Approach\n\n1. For each `start` from `0` to `k - 1`, walk the chain `i = start, start + k, ...`.\n2. Keep `tails`, where `tails[j]` is the smallest possible last value of a non-decreasing subsequence of length `j + 1`.\n3. For each `value`, binary-search the first position whose tail is **strictly greater** than `value` and put `value` there (this appends when no such tail exists).\n4. Count the chain's `length`; the chain needs `length - tails.length` changes. Add that to `operations`.\n\n## Example 1, step by step\n\n`arr = [5,4,3,2,1]`, `k = 1`, so there is one chain holding all five values. `5` makes `tails = [5]`; `4` replaces it (`[4]`), then `3`, `2` and `1` each replace position 0 too. The chain has `length = 5` and `tails.length = 1`, so `operations = 5 - 1 = 4`.\n\n## Complexity\n\n- Time: O(n log n): every index is visited once, with a binary search over `tails`.\n- Space: O(n / k) for the `tails` of the current chain.\n\n## Pitfalls\n\n- The order is non-decreasing, so equal values may stay: search for the first tail `> value`, not `>= value`, or `[2,2,2]` would wrongly need changes.\n- Forgetting to split by remainder and running one LIS over the whole array solves a different problem.\n- An O(m²) LIS per chain times out when `k = 1` and `n = 10^5`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `operations` | total changes needed over all chains |\n| `start` | first index of the current chain |\n| `tails` | smallest tail for each subsequence length in this chain |\n| `length` | number of values in this chain |\n| `value` | the chain value being placed |\n| `left`, `right`, `mid` | binary-search bounds |",
+  "narration": {
+    "2": "Count the changes needed across all chains.",
+    "3": "Each remainder start in 0..k-1 begins its own independent chain.",
+    "4": "tails[j] holds the smallest last value of a non-decreasing run of length j + 1 in this chain.",
+    "6": "Walk the chain by jumping k positions at a time.",
+    "10": "Binary-search tails for the first entry that is strictly greater than value.",
+    "12": "A tail equal to or below value can be extended, so search to the right of it.",
+    "15": "This tail is bigger than value, so the answer is here or further left.",
+    "18": "Put value at that position: it either extends the longest run or lowers a tail.",
+    "19": "Count one more value in this chain.",
+    "21": "Values outside the longest non-decreasing run must be changed, so add the difference.",
+    "23": "Return the total number of changes over all k chains."
+  }
+}
