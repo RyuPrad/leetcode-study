@@ -1,0 +1,67 @@
+{
+  "number": 2557,
+  "title": "Maximum Number of Integers to Choose From a Range II",
+  "spec": "recalled",
+  "statement": "You get an integer array `banned` and two integers `n` and `maxSum`. Pick a collection of integers that obeys all of these rules:\n\n- every picked integer lies between `1` and `n` inclusive;\n- no integer is picked more than once;\n- no picked integer occurs in `banned` (values in `banned` may repeat);\n- the picked integers add up to no more than `maxSum`.\n\nReturn the largest number of integers such a collection can contain (`0` if nothing can be picked).",
+  "constraints": [
+    "1 <= banned.length <= 10^5",
+    "1 <= banned[i] <= n <= 10^9",
+    "1 <= maxSum <= 10^15"
+  ],
+  "signature": "int maxCount(int[] banned, int n, long maxSum)",
+  "entry": "maxCount",
+  "kind": "function",
+  "parameters": [
+    "banned",
+    "n",
+    "maxSum"
+  ],
+  "validator": "function validate([banned, n, maxSum]) {\n  if (!Number.isInteger(n) || n < 1 || n > 1000000000) return 'n is between 1 and 10^9.';\n  if (!Array.isArray(banned) || banned.length < 1 || banned.length > 100000) return 'banned needs 1 to 10^5 values.';\n  if (banned.some(v => !Number.isInteger(v) || v < 1 || v > n)) return 'Each banned value is an integer from 1 to n.';\n  if (!Number.isInteger(maxSum) || maxSum < 1 || maxSum > 1000000000000000) return 'maxSum is between 1 and 10^15.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxCount(banned, n, maxSum) {\n  const blocked = [...new Set(banned)].sort((a, b) => a - b);\n  const prefix = [0];\n  for (const value of blocked) {\n    prefix.push(prefix[prefix.length - 1] + value);\n  }\n\n  const blockedUpTo = (limit) => {\n    let low = 0;\n    let high = blocked.length;\n    while (low < high) {\n      const middle = (low + high) >> 1;\n      if (blocked[middle] <= limit) {\n        low = middle + 1;\n      } else {\n        high = middle;\n      }\n    }\n    return low;\n  };\n  const costUpTo = (limit) => limit * (limit + 1) / 2 - prefix[blockedUpTo(limit)];\n\n  let left = 0;\n  let right = n;\n  while (left < right) {\n    const mid = left + Math.ceil((right - left) / 2);\n    if (costUpTo(mid) <= maxSum) {\n      left = mid;\n    } else {\n      right = mid - 1;\n    }\n  }\n  return left - blockedUpTo(left);\n}",
+  "brute": "function maxCount(banned, n, maxSum) {\n  // Take the allowed integers from smallest to largest until the next one no longer fits.\n  const skip = new Set(banned);\n  let total = 0, count = 0;\n  for (let value = 1; value <= n; value++) {\n    if (skip.has(value)) continue;\n    if (total + value > maxSum) break;\n    total += value;\n    count++;\n  }\n  return count;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const n = 1 + Math.floor(rand() * 1000000000);\n    const maxSum = 1 + Math.floor(rand() * 1000000000000000);\n    // Most banned values fall below the point where the budget runs out, so they matter.\n    const reach = Math.min(n, Math.ceil(Math.sqrt(2 * maxSum)) + 3000);\n    const banned = Array.from({ length: 2000 }, () => 1 + Math.floor(rand() * (rand() < 0.8 ? reach : n)));\n    return [banned, n, maxSum];\n  }\n  const n = 1 + Math.floor(rand() * 15);\n  const banned = Array.from({ length: 1 + Math.floor(rand() * 6) }, () => 1 + Math.floor(rand() * n));\n  const maxSum = 1 + Math.floor(rand() * (n * (n + 1) / 2 + 5));\n  return [banned, n, maxSum];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,4,6],6,4],"expected":1},
+    {"name":"Example 2","input":[[4,3,5,6],7,18],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1,1]},
+    {"name":"Test 2","input":[[1],2,1]},
+    {"name":"Test 3","input":[[2],5,100]},
+    {"name":"Test 4","input":[[5,5,5],5,10]},
+    {"name":"Test 5","input":[[1,2,3],10,3]},
+    {"name":"Test 6","input":[[2,3,7],10,22]},
+    {"name":"Test 7","input":[[1000000000,999999,3],1000000000,500000000000]},
+    {"name":"Test 8","input":[[1,2,3,4,5],1000000000,1]},
+    {"name":"Test 9","input":[[3,1,4,1,5,9,2,6],12,30]},
+    {"name":"Test 10","input":[[7,100,4471,4472],100000,10000000]},
+    {"name":"Test 11","input":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],20,1000000000000000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSmall numbers are cheap, so an optimal pick always uses the smallest allowed integers: swapping any picked number for a smaller unpicked allowed one keeps the count and lowers the sum. The answer is therefore \"all allowed integers up to some value `limit`\".\n\nWalking upward one integer at a time works, but `n` can be `10^9`. Instead, binary search on `limit`: the cost of taking every allowed integer in `[1, limit]` is `limit * (limit + 1) / 2` minus the banned values up to `limit`, and that cost never decreases as `limit` grows.\n\n## Approach\n\n1. Remove duplicates from `banned`, sort it into `blocked`, and build `prefix` sums so the banned total up to any position is one lookup.\n2. `blockedUpTo(limit)` binary-searches how many blocked values are `<= limit`.\n3. `costUpTo(limit)` is the sum `1 + ... + limit` minus those blocked values.\n4. Binary search the largest `limit` in `[0, n]` with `costUpTo(limit) <= maxSum`, keeping `left` as a value that fits.\n5. Return `left` minus the number of blocked values up to `left`.\n\n## Example 1, step by step\n\n`blocked = [1, 4, 6]`, `prefix = [0, 1, 5, 11]`, `maxSum = 4`. Search `[0, 6]`: `mid = 3` costs `6 - 1 = 5 > 4`, so `right = 2`; `mid = 1` costs `1 - 1 = 0`, so `left = 1`; `mid = 2` costs `3 - 1 = 2`, so `left = 2`. Up to 2 one value (`1`) is banned, so the answer is `2 - 1 = 1`.\n\n## Complexity\n\n- Time: O(b log b + log n · log b) for `b = banned.length`: sorting, then about 30 search steps, each with an inner binary search.\n- Space: O(b) for `blocked` and `prefix`.\n\n## Pitfalls\n\n- Duplicates in `banned` must be removed, or their values get subtracted twice.\n- The search must find the largest fitting value, so round `mid` up; rounding down loops forever when `right = left + 1`.\n- `limit * (limit + 1) / 2` reaches about `5 * 10^17`; use 64-bit integers in Java and C.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `blocked` | sorted distinct banned values |\n| `prefix` | `prefix[i]` is the sum of the first `i` blocked values |\n| `low`, `high`, `middle` | bounds of the inner search over `blocked` |\n| `left`, `right`, `mid` | bounds of the search for the largest affordable `limit` |",
+  "narration": {
+    "2": "Drop repeated banned values and sort the rest so they can be searched.",
+    "4": "Walk the blocked values in increasing order...",
+    "5": "...storing running totals so the sum of the first i blocked values is prefix[i].",
+    "8": "Helper: how many blocked values are at most limit.",
+    "11": "Standard upper-bound binary search over the sorted blocked values.",
+    "13": "This blocked value is within the limit, so the count is at least middle + 1.",
+    "19": "low is now the number of blocked values that are at most limit.",
+    "21": "Cost of taking every allowed integer up to limit: the full triangle sum minus the blocked ones.",
+    "23": "left always holds a limit we can afford; 0 costs nothing.",
+    "24": "right is the largest limit that might still be affordable.",
+    "25": "Binary search on the answer until the bounds meet.",
+    "26": "Round the midpoint up so that left = mid always makes progress.",
+    "27": "Can we afford every allowed integer up to mid?",
+    "28": "Yes: mid is affordable, so the answer is at least mid.",
+    "30": "No: anything from mid upward costs too much.",
+    "33": "Count the allowed integers up to the largest affordable limit."
+  }
+}

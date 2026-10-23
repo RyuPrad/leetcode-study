@@ -1,0 +1,63 @@
+{
+  "number": 2539,
+  "title": "Count the Number of Good Subsequences",
+  "spec": "recalled",
+  "statement": "A subsequence of the string `s` is what remains after deleting any number of its characters (possibly none) while keeping the others in their original order. A subsequence is **good** when it is not empty and every character occurring in it occurs the same number of times.\n\nReturn the number of good subsequences of `s`, modulo `10^9 + 7`. Subsequences are counted by the positions they keep: two different sets of positions count separately even when they spell the same string.",
+  "constraints": [
+    "1 <= s.length <= 10^4",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "int countGoodSubsequences(String s)",
+  "entry": "countGoodSubsequences",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 10000) return 's needs 1 to 10^4 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countGoodSubsequences(s) {\n  const MOD = 1000000007n;\n  const n = s.length;\n  const counts = new Array(26).fill(0);\n  for (const ch of s) {\n    counts[ch.charCodeAt(0) - 97]++;\n  }\n\n  const power = (base, exp) => {\n    let result = 1n;\n    while (exp > 0n) {\n      if (exp & 1n) result = (result * base) % MOD;\n      base = (base * base) % MOD;\n      exp >>= 1n;\n    }\n    return result;\n  };\n  const fact = new Array(n + 1).fill(1n);\n  for (let i = 1; i <= n; i++) {\n    fact[i] = (fact[i - 1] * BigInt(i)) % MOD;\n  }\n  const invFact = new Array(n + 1).fill(1n);\n  invFact[n] = power(fact[n], MOD - 2n);\n  for (let i = n; i > 0; i--) {\n    invFact[i - 1] = (invFact[i] * BigInt(i)) % MOD;\n  }\n  const choose = (total, pick) => (((fact[total] * invFact[pick]) % MOD) * invFact[total - pick]) % MOD;\n\n  const maxCount = Math.max(...counts);\n  let answer = 0n;\n  for (let freq = 1; freq <= maxCount; freq++) {\n    let ways = 1n;\n    for (const count of counts) {\n      if (count >= freq) {\n        ways = (ways * (choose(count, freq) + 1n)) % MOD;\n      }\n    }\n    answer = (answer + ways - 1n + MOD) % MOD;\n  }\n  return Number(answer);\n}",
+  "brute": "function countGoodSubsequences(s) {\n  // Try every non-empty set of positions and check the letter frequencies directly.\n  const n = s.length;\n  let total = 0;\n  for (let mask = 1; mask < (1 << n); mask++) {\n    const freq = {};\n    for (let i = 0; i < n; i++) if (mask & (1 << i)) freq[s[i]] = (freq[s[i]] || 0) + 1;\n    const values = Object.values(freq);\n    if (values.every(v => v === values[0])) total++;\n  }\n  return total % 1000000007;\n}",
+  "generator": "function generate(rand, size) {\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  if (size === 'large') {\n    const n = 10000;\n    // Few letters make long runs of one frequency; all 26 spread the counts out.\n    const shape = rand();\n    const width = shape < 0.2 ? 1 : shape < 0.5 ? 1 + Math.floor(rand() * 4) : 26;\n    return [Array.from({ length: n }, () => letters[Math.floor(rand() * width)]).join('')];\n  }\n  const n = 1 + Math.floor(rand() * 12);\n  const width = 1 + Math.floor(rand() * 4);\n  const offset = Math.floor(rand() * (26 - width + 1));\n  return [Array.from({ length: n }, () => letters[offset + Math.floor(rand() * width)]).join('')];\n}",
+  "examples": [
+    {"name":"Example 1","input":["aabb"],"expected":11},
+    {"name":"Example 2","input":["leet"],"expected":12},
+    {"name":"Example 3","input":["abcd"],"expected":15}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["aaaa"]},
+    {"name":"Test 3","input":["ab"]},
+    {"name":"Test 4","input":["zyxwvutsrqpon"]},
+    {"name":"Test 5","input":["aabbcc"]},
+    {"name":"Test 6","input":["aaabbc"]},
+    {"name":"Test 7","input":["abacabadabacaba"]},
+    {"name":"Test 8","input":["zzzzzzzzzzzzzz"]},
+    {"name":"Test 9","input":["leetcode"]},
+    {"name":"Test 10","input":["aabbbcccc"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking all `2^n` subsequences is hopeless for `n = 10^4`. Instead, fix the common frequency `freq` that every letter of a good subsequence shares. Each letter independently either stays out of the subsequence (1 way) or contributes exactly `freq` of its `count` copies (`C(count, freq)` ways). Multiplying these choices over all letters counts every selection with that frequency, including the one where every letter stays out, which is the empty subsequence and must be subtracted. Different values of `freq` give disjoint sets, so the totals add up.\n\n## Approach\n\n1. Count each letter of `s` in `counts`.\n2. Precompute factorials `fact` and inverse factorials `invFact` up to `n` (Fermat's little theorem gives the last inverse), so `choose(total, pick)` is two multiplications.\n3. For each `freq` from 1 to `maxCount`, multiply `choose(count, freq) + 1` over every letter whose `count` is at least `freq` into `ways`.\n4. Add `ways - 1` to `answer`, removing the empty choice, and return `answer`.\n\n## Example 1, step by step\n\n`s = \"aabb\"` gives `counts` of 2 for `a` and 2 for `b`, so `maxCount = 2`.\n\n- `freq = 1`: `ways = (C(2,1) + 1) · (C(2,1) + 1) = 3 · 3 = 9`; add `8` (`\"a\"` ×2, `\"b\"` ×2, `\"ab\"` ×4).\n- `freq = 2`: `ways = (1 + 1) · (1 + 1) = 4`; add `3` (`\"aa\"`, `\"bb\"`, `\"aabb\"`).\n\n`answer = 11`.\n\n## Complexity\n\n- Time: O(n + 26 · maxCount) after the O(log MOD) inverse: one pass to count, one per factorial table, and 26 letters per frequency.\n- Space: O(n) for the factorial tables.\n\n## Pitfalls\n\n- Skip letters with fewer than `freq` copies: `choose(count, freq)` would read a factorial at a negative index. Their factor is 1 anyway, since they can only stay out.\n- Subtract the empty subsequence once per `freq`, not once overall.\n- Products of two residues exceed 2^53, so use `BigInt` (or a safe multiply) and keep the running sum non-negative.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `counts` | occurrences of each of the 26 letters |\n| `fact`, `invFact` | factorials and their modular inverses |\n| `choose` | binomial coefficient modulo `MOD` |\n| `freq` | the shared frequency being counted |\n| `ways` | selections where each letter is absent or appears `freq` times |\n| `answer` | good subsequences counted so far |",
+  "narration": {
+    "4": "counts[c] will hold how many times letter c occurs in s.",
+    "5": "Count every character of s.",
+    "9": "Fast modular exponentiation, used once to invert n! with Fermat's little theorem.",
+    "20": "fact[i] is i! modulo MOD, built from the previous factorial.",
+    "23": "Invert n! once: a^(MOD - 2) is the inverse of a for the prime MOD.",
+    "24": "Walk down to fill the other inverse factorials, since 1/(i-1)! = i/i!.",
+    "27": "C(total, pick) = total! / (pick! (total - pick)!), using the precomputed inverses.",
+    "29": "No good subsequence can use a letter more often than the most frequent letter occurs.",
+    "31": "Try every common frequency freq a good subsequence could have.",
+    "32": "Start the product over letters for this frequency.",
+    "34": "A letter with fewer than freq copies can only be left out, which is a factor of 1.",
+    "35": "Otherwise it is either left out or exactly freq of its copies are chosen.",
+    "38": "Drop the selection where every letter was left out, the empty subsequence.",
+    "40": "Convert back to a regular number; it is below MOD."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 3808,
+  "title": "Find Emotionally Consistent Users",
+  "spec": "leetcode",
+  "statement": "One table logs reactions to content:\n\n- `reactions(user_id, content_id, reaction)`: one row per piece of content a user reacted to; `(user_id, content_id)` is unique, so a user reacts to each item at most once. `reaction` is a lowercase word such as `'like'`, `'love'`, `'wow'` or `'sad'`.\n\nA user is **emotionally consistent** when both of these hold:\n\n- they reacted to at least 5 content items;\n- one reaction type makes up at least 60% of all their reactions (compare the exact share).\n\nFor each such user report `user_id`, `dominant_reaction` (that most frequent reaction type) and `reaction_ratio` (its count divided by the user's total number of reactions, rounded to 2 decimals). Sort by `reaction_ratio` (the rounded value) descending, then by `user_id` ascending.",
+  "constraints": [
+    "(user_id, content_id) is unique in reactions",
+    "reaction is a non-empty lowercase word",
+    "A share of exactly 60% qualifies; above 50%, the dominant reaction of a qualifying user is unique"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "reactions": [["user_id","INT"],["content_id","INT"],["reaction","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ reactions = [] }] = input;\n  const seen = new Set();\n  for (const [user, content, reaction] of reactions) {\n    if (user === null || content === null || reaction === null) return 'No column may be null.';\n    if (seen.has(`${user}|${content}`)) return `User ${user} reacts to content ${content} twice.`;\n    seen.add(`${user}|${content}`);\n    if (!/^[a-z]+$/.test(reaction)) return `reaction ${reaction} must be a lowercase word.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH reaction_counts AS (\n  SELECT user_id, reaction, COUNT(*) AS reaction_count\n  FROM reactions\n  GROUP BY user_id, reaction\n),\nuser_totals AS (\n  SELECT user_id,\n         SUM(reaction_count) AS total_reactions,\n         MAX(reaction_count) AS top_count\n  FROM reaction_counts\n  GROUP BY user_id\n)\nSELECT u.user_id,\n       c.reaction AS dominant_reaction,\n       ROUND(u.top_count / u.total_reactions, 2) AS reaction_ratio\nFROM user_totals AS u\nJOIN reaction_counts AS c\n  ON c.user_id = u.user_id AND c.reaction_count = u.top_count\nWHERE u.total_reactions >= 5\n  AND u.top_count / u.total_reactions >= 0.6\nORDER BY reaction_ratio DESC, u.user_id;",
+  "brute": "SELECT r.user_id,\n       r.reaction AS dominant_reaction,\n       ROUND(COUNT(*) / (SELECT COUNT(*) FROM reactions AS t WHERE t.user_id = r.user_id), 2) AS reaction_ratio\nFROM reactions AS r\nGROUP BY r.user_id, r.reaction\nHAVING (SELECT COUNT(*) FROM reactions AS t WHERE t.user_id = r.user_id) >= 5\n   AND 5 * COUNT(*) >= 3 * (SELECT COUNT(*) FROM reactions AS t WHERE t.user_id = r.user_id)\nORDER BY reaction_ratio DESC, r.user_id ASC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const kinds = ['like', 'love', 'wow', 'sad', 'angry', 'haha'];\n  const reactions = [];\n  let budget = small ? pick(9) : 2000;\n  for (let user = 1; budget > 0; user++) {\n    // At most 40 reactions per user keeps the exact and the rounded share on the same side of 60%.\n    const count = Math.min(budget, small ? 3 + pick(6) : 1 + pick(40));\n    budget -= count;\n    const favourite = kinds[pick(small ? 3 : kinds.length)];\n    const loyalty = [0.3, 0.6, 0.8, 1][pick(4)];\n    const first = 100 * user + pick(50);\n    for (let i = 0; i < count; i++) {\n      const reaction = rand() < loyalty ? favourite : kinds[pick(small ? 3 : kinds.length)];\n      reactions.push([user, first + i, reaction]);\n    }\n  }\n  return [{ reactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"reactions":[[1,101,"like"],[1,102,"like"],[1,103,"like"],[1,104,"wow"],[1,105,"like"],[2,201,"like"],[2,202,"wow"],[2,203,"sad"],[2,204,"like"],[2,205,"wow"],[3,301,"love"],[3,302,"love"],[3,303,"love"],[3,304,"love"],[3,305,"love"]]}],"expected":{"columns":["user_id","dominant_reaction","reaction_ratio"],"rows":[[3,"love",1],[1,"like",0.8]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"reactions":[]}]},
+    {"name":"Test 2","input":[{"reactions":[[4,1,"wow"],[4,2,"sad"],[4,3,"wow"],[4,4,"like"],[4,5,"wow"],[5,1,"love"],[5,2,"love"],[5,3,"love"],[5,4,"love"]]}]},
+    {"name":"Test 3","input":[{"reactions":[[1,1,"like"],[1,2,"like"],[1,3,"like"],[1,4,"like"],[1,5,"sad"],[1,6,"wow"],[1,7,"love"],[2,1,"sad"],[2,2,"sad"],[2,3,"sad"],[2,4,"sad"],[2,5,"sad"],[2,6,"sad"],[2,7,"like"],[2,8,"like"],[2,9,"wow"],[2,10,"love"],[3,1,"like"],[3,2,"like"],[3,3,"wow"],[3,4,"wow"],[3,5,"sad"]]}]},
+    {"name":"Test 4","input":[{"reactions":[[9,1,"like"],[9,2,"like"],[9,3,"like"],[9,4,"like"],[9,5,"sad"],[2,1,"wow"],[2,2,"wow"],[2,3,"love"],[2,4,"wow"],[2,5,"wow"],[6,1,"sad"],[6,2,"sad"],[6,3,"sad"],[6,4,"sad"],[6,5,"sad"],[6,6,"sad"],[6,7,"sad"],[6,8,"sad"],[6,9,"like"],[6,10,"love"],[7,1,"love"],[7,2,"love"],[7,3,"love"],[7,4,"love"],[7,5,"love"]]}]},
+    {"name":"Test 5","input":[{"reactions":[[1,1,"wow"],[1,2,"love"],[1,3,"love"],[1,4,"love"],[1,5,"love"],[1,6,"sad"],[2,1,"like"],[2,2,"like"],[2,3,"like"],[2,4,"like"],[2,5,"like"],[2,6,"like"],[2,7,"like"],[2,8,"wow"],[2,9,"sad"],[3,1,"sad"],[3,2,"sad"],[3,3,"sad"],[3,4,"sad"],[3,5,"sad"],[3,6,"like"],[3,7,"love"]]}]},
+    {"name":"Test 6","input":[{"reactions":[[1,10,"haha"],[1,11,"haha"],[1,12,"haha"],[1,13,"haha"],[1,14,"haha"],[1,15,"haha"],[8,10,"sad"],[8,11,"sad"],[8,12,"sad"],[8,13,"sad"],[8,14,"sad"]]}]},
+    {"name":"Test 7","input":[{"reactions":[[1,1,"like"],[1,2,"like"],[1,3,"like"],[1,4,"love"],[1,5,"love"],[1,6,"love"],[2,1,"wow"],[2,2,"sad"],[2,3,"like"],[2,4,"love"],[2,5,"angry"]]}]},
+    {"name":"Test 8","input":[{"reactions":[[5,1,"like"],[5,2,"sad"],[5,3,"sad"],[5,4,"like"],[5,5,"sad"],[5,6,"sad"],[5,7,"like"],[5,8,"sad"],[3,1,"love"],[3,2,"wow"],[3,3,"love"],[3,4,"love"],[3,5,"wow"],[3,6,"love"],[3,7,"wow"],[3,8,"love"],[3,9,"love"],[3,10,"wow"]]}]},
+    {"name":"Test 9","input":[{"reactions":[[1,101,"like"],[1,102,"like"],[1,103,"like"],[1,104,"wow"],[1,105,"like"],[2,201,"like"],[2,202,"wow"],[2,203,"wow"],[2,204,"like"],[2,205,"wow"],[3,301,"love"],[3,302,"love"],[3,303,"love"],[3,304,"love"],[3,305,"love"],[4,401,"sad"],[4,402,"sad"],[4,403,"sad"],[4,404,"sad"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTo know a user's dominant reaction we need the count of **each** reaction type per user, and to turn it into a share we need the user's total. That is two levels of aggregation: first per `(user_id, reaction)`, then per `user_id`. A share of at least 60% is more than half, so a qualifying user has exactly one reaction type at the top, and joining the per-user maximum back to the per-type counts recovers its name.\n\n## Approach\n\n1. `reaction_counts`: group `reactions` by `user_id` and `reaction`, counting rows as `reaction_count`.\n2. `user_totals`: group those counts by `user_id`; `SUM` gives `total_reactions` and `MAX` gives `top_count`, the size of the largest reaction type.\n3. Join `user_totals` (`u`) to `reaction_counts` (`c`) on the user and `reaction_count = top_count`, which picks the dominant type.\n4. Keep users with `total_reactions >= 5` and `top_count / total_reactions >= 0.6`.\n5. Report the rounded share as `reaction_ratio` and sort by it descending, then `user_id` ascending.\n\n## Example 1, step by step\n\n- `reaction_counts`: (1, like, 4), (1, wow, 1), (2, like, 2), (2, wow, 2), (2, sad, 1), (3, love, 5).\n- `user_totals`: user 1 has 5 reactions with top 4; user 2 has 5 with top 2; user 3 has 5 with top 5.\n- Shares: user 1 gives 4 / 5 = 0.8 (kept), user 2 gives 2 / 5 = 0.4 (dropped), user 3 gives 5 / 5 = 1 (kept).\n- The join attaches like to user 1 and love to user 3. Sorted: (3, love, 1.00), then (1, like, 0.80).\n\n## Complexity\n\n- Time: O(N log N) for N reactions: two groupings, a join on the small per-user tables and a final sort.\n- Space: O(U · K) for U users with up to K reaction types each.\n\n## Pitfalls\n\n- Dividing two integers must give a fraction: in MySQL `/` does, but `DIV` would truncate every share to 0 or 1.\n- The thresholds are inclusive: exactly 5 reactions and exactly 60% both qualify.\n- Joining back on `reaction_count = top_count` is only safe because 60% forces a unique top type; for users below the threshold several types can tie, which is why the filter must stay in place.\n- Users with equal `reaction_ratio` come out in increasing `user_id`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `reaction_counts` | how many times each user used each reaction type |\n| `user_totals` | each user's total reactions and the count of their most used type |\n| `u` | a row of `user_totals` |\n| `c` | the `reaction_counts` row whose count equals the user's top count |\n| `reaction_ratio` | top count divided by total, rounded to 2 decimals |",
+  "narration": {
+    "1": "The reaction_counts stage counts how often each user used each reaction type.",
+    "4": "Grouping by user and reaction gives one row per (user, type) pair.",
+    "6": "The user_totals stage rolls those counts up to one row per user.",
+    "8": "Summing the per-type counts gives the user's total number of reactions.",
+    "9": "The largest per-type count is the size of the dominant reaction.",
+    "14": "The reaction type of the matched count row is the dominant reaction.",
+    "15": "The dominant reaction's share of all the user's reactions, rounded to 2 decimals.",
+    "17": "Join each user back to their per-type counts to find the type behind the top count.",
+    "18": "Only the type whose count equals the maximum matches; above 60% it is unique.",
+    "19": "Users need at least 5 reactions.",
+    "20": "The dominant type must make up at least 60% of them.",
+    "21": "Highest share first; equal shares fall back to the smaller user_id."
+  }
+}
