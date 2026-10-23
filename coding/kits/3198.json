@@ -1,0 +1,48 @@
+{
+  "number": 3198,
+  "title": "Find Cities in Each State",
+  "spec": "recalled",
+  "statement": "One table lists cities:\n\n- `cities(state, city)`: one row per city; the pair `(state, city)` is unique, so a state never lists the same city twice.\n\nFor every state, build one string holding all of its cities **sorted alphabetically** and joined by a comma and a space (`', '`), for example `'Austin, Dallas, Houston'`.\n\nReport the columns `state` and `cities`, one row per state, ordered by `state` ascending.",
+  "constraints": [
+    "(state, city) is unique in cities",
+    "state and city are non-empty text"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "cities": [["state","VARCHAR(100)"],["city","VARCHAR(100)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ cities = [] }] = input;\n  const seen = new Set();\n  for (const [state, city] of cities) {\n    if (typeof state !== 'string' || !state || typeof city !== 'string' || !city) return 'Every row needs a state and a city.';\n    const key = `${state.toLowerCase()}/${city.toLowerCase()}`;\n    if (seen.has(key)) return `${city}, ${state} appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT state,\n       GROUP_CONCAT(city ORDER BY city SEPARATOR ', ') AS cities\nFROM cities\nGROUP BY state\nORDER BY state;",
+  "brute": "WITH RECURSIVE numbered AS (\n  SELECT state, city,\n         ROW_NUMBER() OVER (PARTITION BY state ORDER BY city) AS position,\n         COUNT(*) OVER (PARTITION BY state) AS total\n  FROM cities\n),\nchain AS (\n  SELECT state, CAST(city AS CHAR(4000)) AS cities, position, total\n  FROM numbered\n  WHERE position = 1\n  UNION ALL\n  SELECT ch.state, CONCAT(ch.cities, ', ', n.city), n.position, ch.total\n  FROM chain AS ch\n  JOIN numbered AS n\n    ON n.state = ch.state\n   AND n.position = ch.position + 1\n)\nSELECT state, cities\nFROM chain\nWHERE position = total\nORDER BY state",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const states = ['California', 'Texas', 'New York', 'Florida', 'Ohio', 'Oregon', 'Nevada', 'Maine'];\n  const prefixes = ['San', 'Fort', 'New', 'Lake', 'Port', 'Mount', 'East', 'West', 'North', 'South', 'Glen', 'Rock'];\n  const roots = ['Diego', 'Worth', 'Haven', 'Springs', 'Falls', 'Ridge', 'Bay', 'Vale', 'Field', 'Grove', 'Point', 'View', 'Mills', 'Creek', 'Harbor', 'Hill'];\n  // Small cases reuse a short list, so names repeat across states and share prefixes.\n  const shortList = ['Austin', 'Dallas', 'Houston', 'Albany', 'Buffalo', 'Salem', 'Portland', 'Springfield', 'San Diego', 'San Jose'];\n  const rows = [], seen = new Set();\n  const stateCount = small ? 1 + Math.floor(rand() * 3) : 8;\n  const used = states.slice(0, stateCount);\n  const target = small ? Math.floor(rand() * 9) : 1500;\n  for (let tries = 0; rows.length < target && tries < target * 4; tries++) {\n    const state = pick(used);\n    const city = small ? pick(shortList) : `${pick(prefixes)} ${pick(roots)}${rand() < 0.5 ? '' : ` ${Math.floor(rand() * 9) + 1}`}`;\n    const key = `${state}/${city}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    rows.push([state, city]);\n  }\n  return [{ cities: rows }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"cities":[["California","Los Angeles"],["California","San Francisco"],["California","San Diego"],["Texas","Houston"],["Texas","Austin"],["Texas","Dallas"],["New York","New York City"],["New York","Buffalo"],["New York","Rochester"]]}],"expected":{"columns":["state","cities"],"rows":[["California","Los Angeles, San Diego, San Francisco"],["New York","Buffalo, New York City, Rochester"],["Texas","Austin, Dallas, Houston"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"cities":[]}]},
+    {"name":"Test 2","input":[{"cities":[["Ohio","Columbus"]]}]},
+    {"name":"Test 3","input":[{"cities":[["Texas","Houston"],["Texas","Austin"],["Texas","Dallas"],["Texas","El Paso"]]}]},
+    {"name":"Test 4","input":[{"cities":[["Oregon","Salem"],["Massachusetts","Salem"],["Illinois","Springfield"],["Oregon","Portland"],["Maine","Portland"]]}]},
+    {"name":"Test 5","input":[{"cities":[["Texas","Austin"],["Nevada","Reno"],["Alabama","Mobile"],["Wyoming","Casper"],["California","Fresno"]]}]},
+    {"name":"Test 6","input":[{"cities":[["California","San Jose"],["California","San Diego"],["California","Santa Ana"],["California","Sacramento"],["California","San Bernardino"]]}]},
+    {"name":"Test 7","input":[{"cities":[["New York","Rochester"],["New Jersey","Newark"],["New York","Albany"],["New Mexico","Santa Fe"],["New Jersey","Camden"],["New Mexico","Albuquerque"]]}]},
+    {"name":"Test 8","input":[{"cities":[["Florida","Tampa"],["Florida","Miami"],["Ohio","Toledo"],["Florida","Orlando"],["Ohio","Akron"],["Florida","Jacksonville"],["Ohio","Dayton"]]}]},
+    {"name":"Test 9","input":[{"cities":[["California","Los Angeles"],["California","San Francisco"],["California","San Diego"],["Texas","Houston"],["Texas","Austin"],["Texas","Dallas"],["New York","New York City"],["New York","Buffalo"],["New York","Rochester"],["Georgia","Atlanta"],["Washington","Spokane"],["Washington","Seattle"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach state becomes one output row, so group by `state`. Inside a group, `GROUP_CONCAT` glues the city names into one string; its own `ORDER BY` decides the order of the names inside the string, and `SEPARATOR` chooses what goes between them. The outer `ORDER BY` is a different thing: it orders the result rows.\n\n## Approach\n\n1. Read `cities` and `GROUP BY state`, giving one group per state.\n2. In each group, `GROUP_CONCAT(city ORDER BY city SEPARATOR ', ')` builds the alphabetical, comma-and-space separated list, named `cities`.\n3. `ORDER BY state` sorts the rows.\n\n## Example 1, step by step\n\n- California's group holds Los Angeles, San Francisco, San Diego. Sorted: Los Angeles, San Diego, San Francisco, giving `'Los Angeles, San Diego, San Francisco'`.\n- New York's group sorts to Buffalo, New York City, Rochester.\n- Texas's group sorts to Austin, Dallas, Houston.\n\nOrdered by state, the rows are California, New York, Texas.\n\n## Complexity\n\n- Time: O(n log n) for n rows, to sort the cities inside each group and the groups themselves.\n- Space: O(n) for the concatenated strings.\n\n## Pitfalls\n\n- Leaving out `ORDER BY city` inside `GROUP_CONCAT` gives the cities in whatever order the rows were read.\n- MySQL's default separator is `','` with no space; the expected strings use `', '`.\n- Sorting the result rows by `cities` instead of `state`, or not sorting them at all.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `GROUP BY state` | one group, and one output row, per state |\n| `GROUP_CONCAT(... ORDER BY city SEPARATOR ', ')` | the state's cities, alphabetical, joined by `', '` |\n| `cities` (output) | that joined string |",
+  "narration": {
+    "1": "Each output row starts with the state.",
+    "2": "GROUP_CONCAT sorts the cities of the group by name and joins them with a comma and a space.",
+    "3": "Read every city row.",
+    "4": "Grouping by state makes one row per state, and the aggregate runs once per group.",
+    "5": "The result rows are listed by state name."
+  }
+}

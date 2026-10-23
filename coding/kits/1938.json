@@ -1,0 +1,76 @@
+{
+  "number": 1938,
+  "title": "Maximum Genetic Difference Query",
+  "spec": "leetcode",
+  "statement": "A rooted tree has `n` nodes labelled `0` to `n - 1`, and each node's label doubles as its genetic value. `parents[i]` is the parent of node `i`; the root is the single node whose entry is `-1`.\n\nEach query `queries[i] = [node_i, val_i]` looks at every node `p` on the path that climbs from `node_i` up to the root (both `node_i` and the root count) and asks for the largest possible `val_i XOR p`. Return an array `ans` in which `ans[i]` answers query `i`.",
+  "constraints": [
+    "2 <= parents.length <= 10^5",
+    "Exactly one node, the root, has parents[root] == -1",
+    "0 <= parents[i] <= parents.length - 1 for every other node i",
+    "parents describes a single valid rooted tree",
+    "1 <= queries.length <= 3 * 10^4",
+    "0 <= node_i <= parents.length - 1",
+    "0 <= val_i <= 2 * 10^5"
+  ],
+  "signature": "int[] maxGeneticDifference(int[] parents, int[][] queries)",
+  "entry": "maxGeneticDifference",
+  "kind": "function",
+  "parameters": [
+    "parents",
+    "queries"
+  ],
+  "validator": "function validate([parents, queries]) {\n  const n = parents.length;\n  if (n < 2 || n > 100000) return 'parents needs 2 to 100000 entries.';\n  if (parents.filter(p => p === -1).length !== 1) return 'Exactly one node must be the root (parent -1).';\n  if (parents.some((p, i) => p !== -1 && (!Number.isInteger(p) || p < 0 || p >= n || p === i))) return 'Each parent must be another node from 0 to n - 1, or -1 for the root.';\n  // Every node must reach the root without running into a cycle.\n  const state = new Array(n).fill(0);\n  for (let start = 0; start < n; start++) {\n    const path = [];\n    let node = start;\n    while (node !== -1 && state[node] === 0) {\n      state[node] = 1;\n      path.push(node);\n      node = parents[node];\n    }\n    if (node !== -1 && state[node] === 1) return 'parents must form a tree: following parents from a node loops back on itself.';\n    for (const visited of path) state[visited] = 2;\n  }\n  if (queries.length < 1 || queries.length > 30000) return 'queries needs 1 to 30000 entries.';\n  for (const query of queries) {\n    if (!Array.isArray(query) || query.length !== 2) return 'Each query is a pair [node, val].';\n    const [node, val] = query;\n    if (!Number.isInteger(node) || node < 0 || node >= n) return 'Each queried node must be from 0 to n - 1.';\n    if (!Number.isInteger(val) || val < 0 || val > 200000) return 'Each val must be from 0 to 200000.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxGeneticDifference(parents, queries) {\n  const n = parents.length;\n  const HIGH_BIT = 17;\n  const children = parents.map(() => []);\n  let root = 0;\n  for (let node = 0; node < n; node++) {\n    if (parents[node] === -1) root = node;\n    else children[parents[node]].push(node);\n  }\n  const asked = parents.map(() => []);\n  queries.forEach(([node], index) => asked[node].push(index));\n  const trie = [[0, 0]];\n  const count = [0];\n  const update = (value, delta) => {\n    let at = 0;\n    for (let bit = HIGH_BIT; bit >= 0; bit--) {\n      const side = (value >> bit) & 1;\n      if (trie[at][side] === 0) {\n        trie[at][side] = trie.length;\n        trie.push([0, 0]);\n        count.push(0);\n      }\n      at = trie[at][side];\n      count[at] += delta;\n    }\n  };\n  const best = (value) => {\n    let at = 0;\n    let result = 0;\n    for (let bit = HIGH_BIT; bit >= 0; bit--) {\n      const want = ((value >> bit) & 1) ^ 1;\n      const next = trie[at][want];\n      if (next !== 0 && count[next] > 0) {\n        result |= 1 << bit;\n        at = next;\n      } else {\n        at = trie[at][want ^ 1];\n      }\n    }\n    return result;\n  };\n  const answer = new Array(queries.length).fill(0);\n  const stack = [[root, false]];\n  while (stack.length > 0) {\n    const [node, leaving] = stack.pop();\n    if (leaving) {\n      update(node, -1);\n      continue;\n    }\n    update(node, 1);\n    for (const index of asked[node]) {\n      answer[index] = best(queries[index][1]);\n    }\n    stack.push([node, true]);\n    for (const child of children[node]) {\n      stack.push([child, false]);\n    }\n  }\n  return answer;\n}",
+  "brute": "function maxGeneticDifference(parents, queries) {\n  // Climb from each queried node to the root and try every value on the way.\n  return queries.map(([node, val]) => {\n    let most = 0;\n    for (let p = node; p !== -1; p = parents[p]) most = Math.max(most, val ^ p);\n    return most;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 2000 : 2 + Math.floor(rand() * 7);\n  const q = large ? 2000 : 1 + Math.floor(rand() * 6);\n  const order = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [order[i], order[j]] = [order[j], order[i]];\n  }\n  // Shuffled labels; a \"chainy\" tree hangs each node near the previous one, so it gets deep.\n  const parents = new Array(n);\n  parents[order[0]] = -1;\n  const chainy = rand() < 0.4;\n  for (let i = 1; i < n; i++) {\n    const pick = chainy ? Math.max(0, i - 1 - Math.floor(rand() * 3)) : Math.floor(rand() * i);\n    parents[order[i]] = order[pick];\n  }\n  const maxVal = large || rand() < 0.3 ? 200000 : 31;\n  const queries = Array.from({ length: q }, () => [Math.floor(rand() * n), Math.floor(rand() * (maxVal + 1))]);\n  return [parents, queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[-1,0,1,1],[[0,2],[3,2],[2,5]]],"expected":[2,3,7]},
+    {"name":"Example 2","input":[[3,7,-1,2,0,7,0,2],[[4,6],[1,15],[0,5]]],"expected":[6,14,7]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[-1,0],[[1,0]]]},
+    {"name":"Test 2","input":[[-1,0],[[0,0]]]},
+    {"name":"Test 3","input":[[1,-1],[[0,1],[1,1],[0,200000]]]},
+    {"name":"Test 4","input":[[-1,0,1,2,3,4,5,6],[[7,200000],[0,200000],[3,7],[7,7],[5,2]]]},
+    {"name":"Test 5","input":[[2,2,-1,2,2,2],[[0,0],[1,0],[5,3],[2,6],[4,131071]]]},
+    {"name":"Test 6","input":[[-1,0,0,1,1,2,2],[[3,4],[3,4],[6,1],[4,5],[5,9],[0,31]]]},
+    {"name":"Test 7","input":[[5,0,1,2,3,-1,4,6,7,8],[[9,131072],[5,131072],[2,65535],[8,15]]]},
+    {"name":"Test 8","input":[[-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[[16,16],[15,16],[16,0],[8,23]]]},
+    {"name":"Test 9","input":[[4,4,0,0,-1,1,1,2,3,3,5],[[10,199999],[7,100000],[9,12],[4,4],[6,1]]]},
+    {"name":"Test 10","input":[[-1,0,0,0,0,0,0,0,0,0],[[9,6],[1,8],[5,10],[0,9]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe brute force climbs from each queried node to the root and tries every value on the way, which is O(depth) per query and too slow on a deep tree. Two ideas fix it. First, answer the queries **offline** during one depth-first walk: when the walk stands on a node, the nodes \"currently open\" are exactly that node's path to the root. Second, keep those open values in a binary **trie**, where the best XOR partner for `val` is found greedily from the highest bit down. A count on each trie node lets values be removed again when the walk leaves a subtree.\n\n## Approach\n\n1. Build `children` lists from `parents`, find `root`, and group query indices by node in `asked`.\n2. The trie stores 18-bit numbers (`val` < 2^18). `update(value, delta)` walks its bits from `HIGH_BIT` down, creating missing nodes and adding `delta` to `count` along the path.\n3. `best(value)` walks the trie preferring, at each bit, the child with the opposite bit (`want`) if any value still lives there (`count > 0`); taking it sets that bit in `result`.\n4. Run an iterative DFS with a `stack` of `[node, leaving]`. On entering a node, insert it, answer every query in `asked[node]`, push a \"leave\" marker and then the children. On a \"leave\" marker, remove the node.\n5. Return `answer`.\n\n## Example 1, step by step\n\n`parents = [-1, 0, 1, 1]`: node 0 is the root, node 1 its child, nodes 2 and 3 children of 1. Enter 0: the trie holds {0}, so query `[0, 2]` gets `2 XOR 0 = 2`. Enter 1: trie {0, 1}. Enter 3: trie {0, 1, 3}; query `[3, 2]` gives `2 XOR 1 = 3`. Leave 3, removing it. Enter 2: trie {0, 1, 2}; query `[2, 5]` gives `5 XOR 2 = 7`. The answer is `[2, 3, 7]`.\n\n## Complexity\n\n- Time: O((n + q) · 18): each node is inserted and removed once, each query walks 18 bits.\n- Space: O(n · 18) for the trie, plus O(n + q) for the lists and stack.\n\n## Pitfalls\n\n- Removing a value must only lower counts, never delete trie nodes; `best` must check `count > 0`, not merely that a child exists.\n- The root is not always node 0; find the `-1` entry.\n- Deep chains overflow a recursive DFS, so the walk uses an explicit stack with \"leave\" markers.\n- 17 bits are not enough: `val` can reach 200000 > 2^17.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `children`, `root` | the tree rebuilt from `parents` |\n| `asked[node]` | indices of the queries about `node` |\n| `trie`, `count` | trie child pointers `[zero, one]` and how many open values pass through each trie node |\n| `at`, `bit`, `side`, `want` | current trie node, bit position, a value's bit, the bit we hope to find |\n| `result` | XOR built so far for one query |\n| `stack`, `leaving` | DFS work list; `leaving` marks the exit from a node |\n| `answer` | the results, by query index |",
+  "narration": {
+    "3": "Values stay below 2^18, so bits 17 down to 0 are enough.",
+    "7": "The node with parent -1 is the root.",
+    "8": "Every other node is recorded as a child of its parent.",
+    "11": "Group query indices by node so each can be answered when the walk reaches that node.",
+    "14": "update inserts (delta 1) or removes (delta -1) a value along its 18-bit path.",
+    "17": "The bit of value at this position picks the branch.",
+    "18": "Create the branch the first time any value needs it.",
+    "24": "Count how many open values pass through this trie node.",
+    "27": "best finds the open value whose XOR with value is largest.",
+    "31": "To make this bit of the XOR a 1, we want the opposite bit.",
+    "33": "Is there still an open value down the opposite branch?",
+    "34": "Yes: this bit of the XOR is 1.",
+    "37": "No: the only option is the same bit, so this XOR bit stays 0.",
+    "43": "Walk the tree from the root with an explicit stack instead of recursion.",
+    "45": "Take the next piece of work: entering or leaving a node.",
+    "46": "On leaving, the node is no longer on the current path.",
+    "47": "Remove its value from the trie.",
+    "50": "On entering, the node joins the path to the root.",
+    "52": "Now the trie holds exactly this node's path, so its queries can be answered.",
+    "54": "Schedule the exit from this node after its whole subtree.",
+    "56": "Visit each child next.",
+    "59": "Every query has been answered during the walk."
+  }
+}

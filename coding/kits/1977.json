@@ -1,0 +1,67 @@
+{
+  "number": 1977,
+  "title": "Number of Ways to Separate Numbers",
+  "spec": "leetcode",
+  "statement": "The digit string `num` was produced by writing a list of positive integers one after another with no separators. The list was non-decreasing, and none of its integers was written with a leading zero (so no integer in the list starts with the digit `0`).\n\nCount how many different lists could have produced exactly `num`, and return that count modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= num.length <= 3500",
+    "num consists only of the digits '0' to '9'"
+  ],
+  "signature": "int numberOfCombinations(String num)",
+  "entry": "numberOfCombinations",
+  "kind": "function",
+  "parameters": [
+    "num"
+  ],
+  "validator": "function validate([num]) {\n  if (typeof num !== 'string' || num.length < 1 || num.length > 3500) return 'num needs 1 to 3500 digits.';\n  if (!/^[0-9]+$/.test(num)) return 'num may contain only the digits 0 to 9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numberOfCombinations(num) {\n  const MOD = 1000000007;\n  const n = num.length;\n  const lcp = Array.from({ length: n + 1 }, () => new Uint16Array(n + 1));\n  for (let a = n - 1; a >= 0; a--) {\n    for (let b = n - 1; b > a; b--) {\n      if (num[a] === num[b]) {\n        lcp[a][b] = lcp[a + 1][b + 1] + 1;\n      }\n    }\n  }\n\n  const sums = Array.from({ length: n + 1 }, () => new Int32Array(n + 1));\n  for (let end = 1; end <= n; end++) {\n    for (let len = 1; len <= end; len++) {\n      const start = end - len;\n      let ways = 0;\n      if (num[start] !== '0') {\n        if (start === 0) {\n          ways = 1;\n        } else {\n          ways = sums[start][Math.min(len - 1, start)];\n          const prev = start - len;\n          if (prev >= 0) {\n            const common = lcp[prev][start];\n            if (common >= len || num[prev + common] < num[start + common]) {\n              ways = (ways + sums[start][len] - sums[start][len - 1] + MOD) % MOD;\n            }\n          }\n        }\n      }\n      sums[end][len] = (sums[end][len - 1] + ways) % MOD;\n    }\n  }\n  return sums[n][n];\n}",
+  "brute": "function numberOfCombinations(num) {\n  const MOD = 1000000007;\n  const n = num.length;\n  // Without leading zeros, a longer number is bigger; equal lengths compare as strings.\n  const atMost = (x, y) => x.length !== y.length ? x.length < y.length : x <= y;\n  // count[i][j]: lists that spell num[0..j) and end with the number num[i..j).\n  const count = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));\n  for (let j = 1; j <= n; j++) {\n    for (let i = 0; i < j; i++) {\n      if (num[i] === '0') continue;\n      if (i === 0) { count[i][j] = 1; continue; }\n      const last = num.slice(i, j);\n      let total = 0;\n      for (let k = 0; k < i; k++) {\n        if (count[k][i] && atMost(num.slice(k, i), last)) total = (total + count[k][i]) % MOD;\n      }\n      count[i][j] = total;\n    }\n  }\n  let answer = 0;\n  for (let i = 0; i < n; i++) answer = (answer + count[i][n]) % MOD;\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (alphabet) => alphabet[Math.floor(rand() * alphabet.length)];\n  const shape = Math.floor(rand() * 4);\n  const alphabet = shape === 0 ? '0123456789' : shape === 1 ? '01' : shape === 2 ? '1' : '1112';\n  const n = size === 'large' ? 700 + Math.floor(rand() * 201) : 1 + Math.floor(rand() * 12);\n  let num = '';\n  for (let i = 0; i < n; i++) num += pick(alphabet);\n  if (rand() < 0.85 && num[0] === '0') num = '1' + num.slice(1);\n  return [num];\n}",
+  "examples": [
+    {"name":"Example 1","input":["327"],"expected":2},
+    {"name":"Example 2","input":["094"],"expected":0},
+    {"name":"Example 3","input":["0"],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["1"]},
+    {"name":"Test 2","input":["1000"]},
+    {"name":"Test 3","input":["1111"]},
+    {"name":"Test 4","input":["987654321"]},
+    {"name":"Test 5","input":["123456789"]},
+    {"name":"Test 6","input":["101010"]},
+    {"name":"Test 7","input":["9999999999"]},
+    {"name":"Test 8","input":["24896"]},
+    {"name":"Test 9","input":["1101101101"]},
+    {"name":"Test 10","input":["11111111111111111111111111111111111111111111111111"]},
+    {"name":"Test 11","input":["31415926535897932384626433832795"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every place to put commas is exponential. Instead, describe a partial split by where its last number ends and how many digits it has. The number before it must be no larger, which (with no leading zeros) means it is **shorter**, or it has the **same length** and is not bigger digit by digit. Shorter predecessors can be counted all at once with a prefix sum over lengths, and the same-length case needs only one comparison, made O(1) by a longest-common-prefix table.\n\n## Approach\n\n1. Build `lcp[a][b]`, the length of the longest common prefix of `num` starting at `a` and at `b`, from the back of the string.\n2. Let `sums[end][len]` count the splits of `num[0..end)` whose last number has at most `len` digits.\n3. For each `end` and `len`, the last number starts at `start = end - len`. If it begins with `'0'` it contributes nothing; if `start` is `0` it is the whole list, one way.\n4. Otherwise add every split of `num[0..start)` whose last number is shorter: `sums[start][min(len - 1, start)]`.\n5. If a same-length predecessor fits (starting at `prev = start - len`), compare it using `common = lcp[prev][start]`; when it is not bigger, add the splits ending there with exactly `len` digits.\n6. Accumulate into `sums[end][len]`; the answer is `sums[n][n]`.\n\n## Example 1, step by step\n\n`num = \"327\"`. Prefix `\"3\"` has one split, so `sums[1][1] = 1`. For `\"32\"`, the last number `\"2\"` would need a predecessor `\"3\"` of the same length, which is bigger, so only `\"32\"` itself counts. For `\"327\"`: last number `\"7\"` needs `\"2\"` before it, but `\"2\"` itself has no valid split; last number `\"27\"` takes the one split of `\"3\"` (a shorter number); `\"327\"` alone is one more. Total `2`.\n\n## Complexity\n\n- Time: O(n²): both tables are filled once, each cell in O(1).\n- Space: O(n²) for `lcp` and `sums`.\n\n## Pitfalls\n\n- A number starting with `'0'` is never valid, including a lone `\"0\"`.\n- Comparing two same-length numbers digit by digit makes the whole thing O(n³); use `lcp`.\n- `sums[start]` only covers lengths up to `start`; clamp with `Math.min`.\n- Subtracting prefix sums under a modulus can go negative; add `MOD` back.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `lcp[a][b]` | common prefix length of the suffixes at `a` and `b` |\n| `sums[end][len]` | splits of `num[0..end)` whose last number has at most `len` digits |\n| `start`, `end` | the last number is `num[start..end)` |\n| `prev` | where a same-length previous number would start |\n| `common` | how many leading digits that previous number shares with the last one |\n| `ways` | splits whose last number is exactly `num[start..end)` |",
+  "narration": {
+    "4": "lcp[a][b] will hold how many digits the suffixes starting at a and b share.",
+    "5": "Fill it from the back so lcp[a + 1][b + 1] is ready when it is needed.",
+    "7": "When the digits at a and b match...",
+    "8": "...the shared prefix is one longer than the one starting a step further right.",
+    "13": "sums[end][len] counts splits of num[0..end) whose last number has at most len digits.",
+    "14": "Consider every prefix length end...",
+    "15": "...and every length len of its last number.",
+    "16": "The last number is num[start..end).",
+    "18": "A number may not start with the digit 0.",
+    "19": "If it starts at the very beginning, the list is just this number: one way.",
+    "22": "Any split of num[0..start) ending in a shorter number works, since shorter means smaller.",
+    "23": "A previous number of the same length would start at prev.",
+    "25": "Look up how many leading digits it shares with the last number.",
+    "26": "It is not bigger if the two are equal or it has the smaller digit at the first difference.",
+    "27": "Then add the splits of num[0..start) whose last number has exactly len digits.",
+    "32": "Fold this length into the running prefix sum over lengths.",
+    "35": "Every split of the whole string, with a last number of any length."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "number": 3089,
+  "title": "Find Bursty Behavior",
+  "spec": "recalled",
+  "statement": "One table lists posts:\n\n- `Posts(post_id, user_id, post_date)`: one row per post; `post_id` is unique. A user may post several times on the same day.\n\nAnalyse only posts dated from `2024-02-01` through `2024-02-28` (February is treated as exactly 4 weeks, so posts on February 29 and outside February are ignored everywhere). For each user with at least one such post:\n\n- `avg_weekly_posts` is the user's number of those posts divided by 4 (exact, not rounded).\n- `max_7day_posts` is the largest number of those posts the user made within any 7 consecutive days (a day `d` through `d + 6`).\n\nA user is **bursty** when `max_7day_posts` is at least twice `avg_weekly_posts`. Return the columns `user_id`, `max_7day_posts` and `avg_weekly_posts` for every bursty user, ordered by `user_id` ascending.",
+  "constraints": [
+    "post_id is unique in Posts",
+    "post_date is a valid date",
+    "Only posts from 2024-02-01 to 2024-02-28 are analysed"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Posts": [["post_id","INT"],["user_id","INT"],["post_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Posts = [] }] = input;\n  const ids = new Set();\n  for (const [id, user, date] of Posts) {\n    if (id === null || user === null) return 'Every post needs a post_id and a user_id.';\n    if (ids.has(id)) return `post_id ${id} appears twice.`;\n    ids.add(id);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date ?? '') || Number.isNaN(Date.parse(date))) return `Post ${id} needs a date like 2024-02-01.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH february AS (\n  SELECT user_id,\n         DATEDIFF(post_date, '2024-02-01') AS day_no\n  FROM Posts\n  WHERE post_date BETWEEN '2024-02-01' AND '2024-02-28'\n),\nwindows AS (\n  SELECT user_id,\n         COUNT(*) OVER (\n           PARTITION BY user_id\n           ORDER BY day_no\n           RANGE BETWEEN CURRENT ROW AND 6 FOLLOWING\n         ) AS posts_in_7_days,\n         COUNT(*) OVER (PARTITION BY user_id) / 4 AS avg_weekly_posts\n  FROM february\n)\nSELECT user_id,\n       MAX(posts_in_7_days) AS max_7day_posts,\n       avg_weekly_posts\nFROM windows\nGROUP BY user_id, avg_weekly_posts\nHAVING MAX(posts_in_7_days) >= 2 * avg_weekly_posts\nORDER BY user_id;",
+  "brute": "WITH feb AS (\n  SELECT post_id, user_id, post_date\n  FROM Posts\n  WHERE post_date >= '2024-02-01' AND post_date < '2024-02-29'\n),\nspans AS (\n  SELECT s.user_id, s.post_id, COUNT(*) AS cnt\n  FROM feb AS s\n  JOIN feb AS e\n    ON e.user_id = s.user_id\n   AND e.post_date >= s.post_date\n   AND e.post_date <= DATE_ADD(s.post_date, INTERVAL 6 DAY)\n  GROUP BY s.user_id, s.post_id\n),\ntotals AS (\n  SELECT user_id, COUNT(*) AS total\n  FROM feb\n  GROUP BY user_id\n)\nSELECT sp.user_id, MAX(sp.cnt) AS max_7day_posts, t.total / 4 AS avg_weekly_posts\nFROM spans AS sp\nJOIN totals AS t ON t.user_id = sp.user_id\nGROUP BY sp.user_id, t.total\nHAVING 2 * MAX(sp.cnt) >= t.total\nORDER BY sp.user_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const stamp = offset => new Date(Date.UTC(2024, 1, 1) + offset * 86400000).toISOString().slice(0, 10);\n  const users = small ? 1 + Math.floor(rand() * 4) : 160;\n  const Posts = [];\n  let id = 0;\n  for (let u = 1; u <= users && (!small || Posts.length < 8); u++) {\n    const user = small ? u : u * 2 + 3;\n    const count = small ? Math.floor(rand() * 5) : 3 + Math.floor(rand() * 10);\n    // Bursty users post inside a short stretch; steady users spread posts over the month and a little beyond.\n    const bursty = rand() < 0.5;\n    const from = bursty ? Math.floor(rand() * 26) : -3, span = bursty ? 2 + Math.floor(rand() * 7) : 33;\n    for (let k = 0; k < count && (!small || Posts.length < 8); k++) Posts.push([0, user, stamp(from + Math.floor(rand() * span))]);\n  }\n  for (let i = Posts.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Posts[i], Posts[j]] = [Posts[j], Posts[i]];\n  }\n  for (const row of Posts) row[0] = ++id;\n  return [{ Posts }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Posts":[[1,1,"2024-02-27"],[2,5,"2024-02-06"],[3,3,"2024-02-25"],[4,3,"2024-02-14"],[5,3,"2024-02-06"],[6,2,"2024-02-25"]]}],"expected":{"columns":["user_id","max_7day_posts","avg_weekly_posts"],"rows":[[1,1,0.25],[2,1,0.25],[5,1,0.25]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Posts":[]}]},
+    {"name":"Test 2","input":[{"Posts":[[1,4,"2024-02-10"]]}]},
+    {"name":"Test 3","input":[{"Posts":[[1,1,"2024-02-29"],[2,2,"2024-01-31"],[3,3,"2024-03-01"],[4,4,"2023-02-10"]]}]},
+    {"name":"Test 4","input":[{"Posts":[[1,1,"2024-02-01"],[2,1,"2024-02-08"],[3,1,"2024-02-15"],[4,1,"2024-02-22"],[5,2,"2024-02-01"],[6,2,"2024-02-07"],[7,2,"2024-02-15"],[8,2,"2024-02-22"],[9,3,"2024-02-01"],[10,3,"2024-02-02"],[11,3,"2024-02-03"],[12,3,"2024-02-20"]]}]},
+    {"name":"Test 5","input":[{"Posts":[[1,6,"2024-02-10"],[2,6,"2024-02-10"],[3,6,"2024-02-10"],[4,6,"2024-02-25"],[5,7,"2024-02-10"],[6,7,"2024-02-18"],[7,7,"2024-02-26"]]}]},
+    {"name":"Test 6","input":[{"Posts":[[1,1,"2024-02-22"],[2,1,"2024-02-25"],[3,1,"2024-02-28"],[4,1,"2024-02-29"],[5,1,"2024-03-01"],[6,2,"2024-02-03"],[7,2,"2024-02-26"],[8,2,"2024-02-27"],[9,2,"2024-02-29"],[10,2,"2024-03-01"],[11,2,"2024-03-02"]]}]},
+    {"name":"Test 7","input":[{"Posts":[[1,9,"2024-02-05"],[2,3,"2024-02-12"],[3,7,"2024-02-19"],[4,3,"2024-02-13"],[5,9,"2024-02-06"]]}]},
+    {"name":"Test 8","input":[{"Posts":[[1,1,"2024-02-01"],[2,1,"2024-02-04"],[3,1,"2024-02-08"],[4,1,"2024-02-11"],[5,1,"2024-02-15"],[6,1,"2024-02-18"],[7,1,"2024-02-22"],[8,1,"2024-02-25"],[9,2,"2024-02-10"],[10,2,"2024-02-12"],[11,2,"2024-02-14"],[12,2,"2024-02-16"],[13,2,"2024-02-01"],[14,2,"2024-02-05"],[15,2,"2024-02-21"],[16,2,"2024-02-27"]]}]},
+    {"name":"Test 9","input":[{"Posts":[[1,8,"2024-01-28"],[2,8,"2024-01-29"],[3,8,"2024-01-30"],[4,8,"2024-01-31"],[5,8,"2024-02-01"],[6,8,"2024-02-15"],[7,8,"2024-02-26"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo numbers per user are compared. The weekly average is easy: count the user's posts from February 1 to 28 and divide by 4. The busiest 7-day stretch needs a sliding window, and the best window can always be taken to **start on a day the user posted** (sliding it forward to the first post inside it never loses a post). So for every post, count the user's posts from that day through 6 days later, and take the maximum. A window function with a `RANGE` frame does exactly that count once dates are turned into day numbers.\n\n## Approach\n\n1. `february`: keep posts dated `2024-02-01` through `2024-02-28` and turn each date into `day_no` = days since February 1.\n2. `windows`: for every post, `COUNT(*) OVER (PARTITION BY user_id ORDER BY day_no RANGE BETWEEN CURRENT ROW AND 6 FOLLOWING)` gives `posts_in_7_days`, the user's posts from that day through day + 6 (same-day posts included). `COUNT(*) OVER (PARTITION BY user_id) / 4` repeats the weekly average on every row.\n3. Group by user, take `MAX(posts_in_7_days)` as `max_7day_posts`, keep groups where it is at least `2 * avg_weekly_posts`, and order by `user_id`.\n\n## Example 1, step by step\n\n- All six posts are in the range. `day_no`: user 1 → 26; user 5 → 5; user 3 → 24, 13, 5; user 2 → 24.\n- User 3: the windows starting at days 5, 13 and 24 each hold one post (5 and 13 are 8 days apart), so `max_7day_posts` = 1 while `avg_weekly_posts` = 3 / 4 = 0.75; 1 < 1.5, not bursty.\n- Users 1, 2 and 5 each have one post: max 1, average 0.25, and 1 ≥ 0.5.\n- Result: `1, 1, 0.25`, `2, 1, 0.25`, `5, 1, 0.25`.\n\n## Complexity\n\n- Time: O(P log P) for P posts, to sort each user's posts for the windows.\n- Space: O(P) for the intermediate rows.\n\n## Pitfalls\n\n- A window of \"7 consecutive days\" is a day through 6 days later; using 7 days later wrongly merges posts a week apart (Test 4).\n- `ROWS` frames count rows, not days; a `RANGE` frame over day numbers keeps several posts on one day together (Test 5).\n- Posts outside February 1–28 must be dropped before both counts, including February 29 and posts in the days just before or after (Tests 3, 6 and 9).\n- Dividing by the number of days, or by 29 / 7 weeks for a leap-year February, changes `avg_weekly_posts`; the average is always posts / 4.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `february` | posts from February 1–28 with `day_no`, days since February 1 |\n| `windows` | each post with `posts_in_7_days` and the user's `avg_weekly_posts` |\n| `posts_in_7_days` | the user's posts from that post's day through 6 days later |\n| `max_7day_posts` | the busiest such window for the user |\n| `HAVING` | keeps users whose busiest week is at least twice their average week |",
+  "narration": {
+    "1": "First stage: the posts that count, with dates turned into day numbers.",
+    "3": "day_no counts days from February 1, so a 7-day window becomes a numeric range.",
+    "5": "Only February 1 through 28 is analysed.",
+    "7": "Second stage: give every post its 7-day count and the weekly average.",
+    "9": "Count posts over a window of the same user ...",
+    "12": "... from this post's day through 6 days later; RANGE keeps same-day posts together.",
+    "14": "The user's total February posts divided by 4 weeks.",
+    "17": "Report the user, the busiest window and the average.",
+    "18": "The busiest 7-day window for the user.",
+    "21": "One group per user; the average is the same on all of the user's rows.",
+    "22": "Keep only bursty users: the busiest week reaches twice the average week.",
+    "23": "Users come out in ascending id order."
+  }
+}

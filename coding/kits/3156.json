@@ -1,0 +1,61 @@
+{
+  "number": 3156,
+  "title": "Employee Task Duration and Concurrent Tasks",
+  "spec": "recalled",
+  "statement": "One table logs the tasks employees work on:\n\n- `Tasks(task_id, employee_id, start_time, end_time)`: one row per task; `(task_id, employee_id)` is unique. Times are datetimes and every task ends strictly after it starts. A task occupies the time from `start_time` up to, but not including, `end_time`, so a task that ends at the moment another begins does **not** overlap it.\n\nFor every employee with at least one task, report:\n\n- `employee_id`;\n- `total_task_hours`: the length of the time during which the employee was working on **at least one** task (overlapping stretches count only once), in hours, **rounded down** to a whole number;\n- `max_concurrent_tasks`: the largest number of that employee's tasks in progress at the same moment.\n\nOrder the rows by `employee_id` ascending.",
+  "constraints": [
+    "(task_id, employee_id) is unique in Tasks",
+    "start_time < end_time for every task",
+    "Times are datetimes like 2023-05-01 08:00:00",
+    "A task covers [start_time, end_time): touching tasks do not overlap"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tasks": [["task_id","INT"],["employee_id","INT"],["start_time","DATETIME"],["end_time","DATETIME"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Tasks = [] }] = input;\n  const keys = new Set(), stamp = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;\n  for (const [task, employee, start, end] of Tasks) {\n    if (task === null || employee === null) return 'Every task needs a task_id and an employee_id.';\n    const key = `${task}/${employee}`;\n    if (keys.has(key)) return `Task ${task} of employee ${employee} appears twice.`;\n    keys.add(key);\n    if (!stamp.test(start ?? '') || !stamp.test(end ?? '')) return `Task ${task} needs times like 2023-05-01 08:00:00.`;\n    if (!(start < end)) return `Task ${task} must end after it starts.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH events AS (\n  SELECT employee_id, task_id, start_time AS event_time, 1 AS delta\n  FROM Tasks\n  UNION ALL\n  SELECT employee_id, task_id, end_time, -1\n  FROM Tasks\n),\nsweep AS (\n  SELECT employee_id, event_time,\n         SUM(delta) OVER (PARTITION BY employee_id\n                          ORDER BY event_time, delta, task_id) AS running,\n         LEAD(event_time) OVER (PARTITION BY employee_id\n                                ORDER BY event_time, delta, task_id) AS next_time\n  FROM events\n)\nSELECT employee_id,\n       FLOOR(SUM(CASE WHEN running > 0\n                      THEN TIMESTAMPDIFF(SECOND, event_time, next_time)\n                      ELSE 0 END) / 3600) AS total_task_hours,\n       MAX(running) AS max_concurrent_tasks\nFROM sweep\nGROUP BY employee_id\nORDER BY employee_id;",
+  "brute": "WITH block_starts AS (\n  SELECT DISTINCT t.employee_id, t.start_time\n  FROM Tasks AS t\n  WHERE NOT EXISTS (\n    SELECT 1 FROM Tasks AS o\n    WHERE o.employee_id = t.employee_id AND o.start_time < t.start_time AND o.end_time >= t.start_time)\n),\nblock_ends AS (\n  SELECT DISTINCT t.employee_id, t.end_time\n  FROM Tasks AS t\n  WHERE NOT EXISTS (\n    SELECT 1 FROM Tasks AS o\n    WHERE o.employee_id = t.employee_id AND o.start_time <= t.end_time AND o.end_time > t.end_time)\n),\nblocks AS (\n  SELECT s.employee_id, s.start_time, MIN(e.end_time) AS end_time\n  FROM block_starts AS s\n  JOIN block_ends AS e\n    ON e.employee_id = s.employee_id AND e.end_time > s.start_time\n  GROUP BY s.employee_id, s.start_time\n),\nbusy AS (\n  SELECT employee_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) AS seconds\n  FROM blocks\n  GROUP BY employee_id\n),\npeaks AS (\n  SELECT t.employee_id,\n         (SELECT COUNT(*) FROM Tasks AS o\n          WHERE o.employee_id = t.employee_id AND o.start_time <= t.start_time AND o.end_time > t.start_time) AS running\n  FROM Tasks AS t\n)\nSELECT b.employee_id, FLOOR(b.seconds / 3600) AS total_task_hours, MAX(p.running) AS max_concurrent_tasks\nFROM busy AS b\nJOIN peaks AS p\n  ON p.employee_id = b.employee_id\nGROUP BY b.employee_id, b.seconds\nORDER BY b.employee_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const stamp = seconds => new Date(Date.UTC(2023, 4, 1) + seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');\n  const employees = small ? [1001, 1002, 1003] : Array.from({ length: 40 }, (_, i) => 2001 + i);\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  // Small cases draw starts and lengths from coarse grids, so equal starts, touching ends and overlaps are common.\n  const starts = small ? [8, 8.5, 9, 9.5, 10, 11, 13, 23].map(h => h * 3600) : null;\n  const lengths = [900, 1800, 2400, 3600, 5400, 7200, 9000, 3599, 14400];\n  const Tasks = [];\n  for (let i = 0; i < count; i++) {\n    const employee = pick(employees);\n    const start = small ? pick(starts) : Math.floor(rand() * 6 * 96) * 900;\n    const length = pick(lengths);\n    Tasks.push([i + 1, employee, stamp(start), stamp(start + length)]);\n  }\n  // Small cases sometimes reuse a task_id for different employees, which the key allows.\n  if (small && Tasks.length > 1 && rand() < 0.4 && Tasks[0][1] !== Tasks[1][1]) Tasks[1][0] = Tasks[0][0];\n  return [{ Tasks }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tasks":[[1,1001,"2023-05-01 08:00:00","2023-05-01 09:00:00"],[2,1001,"2023-05-01 08:30:00","2023-05-01 10:30:00"],[3,1001,"2023-05-01 11:00:00","2023-05-01 12:00:00"],[7,1001,"2023-05-01 13:00:00","2023-05-01 15:30:00"],[4,1002,"2023-05-01 09:00:00","2023-05-01 10:00:00"],[5,1002,"2023-05-01 09:30:00","2023-05-01 11:30:00"],[6,1003,"2023-05-01 14:00:00","2023-05-01 16:00:00"]]}],"expected":{"columns":["employee_id","total_task_hours","max_concurrent_tasks"],"rows":[[1001,6,2],[1002,2,2],[1003,2,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tasks":[]}]},
+    {"name":"Test 2","input":[{"Tasks":[[1,7,"2023-05-01 08:00:00","2023-05-01 09:59:00"]]}]},
+    {"name":"Test 3","input":[{"Tasks":[[1,5,"2023-05-01 08:00:00","2023-05-01 09:00:00"],[2,5,"2023-05-01 09:00:00","2023-05-01 10:00:00"]]}]},
+    {"name":"Test 4","input":[{"Tasks":[[1,3,"2023-05-01 08:00:00","2023-05-01 12:00:00"],[2,3,"2023-05-01 09:00:00","2023-05-01 10:00:00"],[3,3,"2023-05-01 09:30:00","2023-05-01 11:00:00"]]}]},
+    {"name":"Test 5","input":[{"Tasks":[[1,4,"2023-05-01 10:00:00","2023-05-01 10:30:00"],[2,4,"2023-05-01 10:00:00","2023-05-01 12:00:00"]]}]},
+    {"name":"Test 6","input":[{"Tasks":[[1,9,"2023-05-01 08:00:00","2023-05-01 08:40:00"],[2,9,"2023-05-01 10:00:00","2023-05-01 10:40:00"],[3,9,"2023-05-01 12:00:00","2023-05-01 12:40:00"]]}]},
+    {"name":"Test 7","input":[{"Tasks":[[1,2,"2023-05-01 08:00:00","2023-05-01 10:00:00"],[2,2,"2023-05-01 09:00:00","2023-05-01 11:00:00"]]}]},
+    {"name":"Test 8","input":[{"Tasks":[[1,8,"2023-05-01 23:00:00","2023-05-02 01:30:00"],[2,8,"2023-05-02 00:30:00","2023-05-02 01:00:00"]]}]},
+    {"name":"Test 9","input":[{"Tasks":[[1,1002,"2023-05-01 08:00:00","2023-05-01 11:00:00"],[1,1001,"2023-05-01 09:00:00","2023-05-01 10:00:00"],[2,1001,"2023-05-01 09:15:00","2023-05-01 09:45:00"],[2,1002,"2023-05-01 12:00:00","2023-05-01 13:00:00"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","input":[{"Tasks":[[1,6,"2023-05-01 08:00:00","2023-05-01 10:00:00"],[2,6,"2023-05-01 09:00:00","2023-05-01 11:00:00"],[3,6,"2023-05-01 10:00:00","2023-05-01 12:00:00"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","input":[{"Tasks":[[1,11,"2023-05-01 08:00:00","2023-05-01 08:59:59"],[2,12,"2023-05-01 08:00:00","2023-05-01 09:00:00"],[3,12,"2023-05-01 08:00:00","2023-05-01 08:30:00"],[4,12,"2023-05-01 08:10:00","2023-05-01 08:20:00"]]}]}
+  ],
+  "notes": "## Intuition\n\nPicture each employee's day as a timeline and walk along it. Every task start is an event that adds one task in progress, and every end is an event that removes one. A running sum of these `+1`/`-1` events tells how many tasks are in progress right after each event, which answers both questions at once:\n\n- its maximum is the peak number of concurrent tasks;\n- between one event and the next the count stays fixed, so the stretch counts as working time exactly when the count is above 0. Adding those stretches measures the union of the tasks, with overlaps counted once.\n\n## Approach\n\n1. `events` turns each task into two rows: `(start_time, +1)` and `(end_time, -1)`.\n2. `sweep` orders each employee's events by `event_time`, then `delta` (so an end at time t is processed before a start at t, matching the rule that touching tasks do not overlap), then `task_id` to make the order total. `SUM(delta) OVER` is `running`, the number of tasks in progress after the event; `LEAD` gives `next_time`, when the next event happens.\n3. Per employee, add `TIMESTAMPDIFF(SECOND, event_time, next_time)` over the events with `running > 0`, divide by 3600 and `FLOOR` it; `MAX(running)` is the concurrency.\n4. Order by `employee_id`.\n\n## Example 1, step by step\n\nFor employee 1001 the sweep is:\n\n- 08:00 start → running 1, next 08:30 (30 min busy)\n- 08:30 start → running 2, next 09:00 (30 min)\n- 09:00 end → running 1, next 10:30 (90 min)\n- 10:30 end → running 0 (idle until 11:00)\n- 11:00 start → 1 for 60 min, 12:00 end → 0\n- 13:00 start → 1 for 150 min, 15:30 end → 0\n\nBusy time is 30 + 30 + 90 + 60 + 150 = 360 minutes = 6 hours, and the peak is 2. Employee 1002 is busy 09:00–11:30 (150 minutes, so 2 hours) with a peak of 2; employee 1003 works 2 hours with a peak of 1.\n\n## Complexity\n\n- Time: O(n log n) for n tasks, to sort the 2n events in each partition.\n- Space: O(n) for the events.\n\n## Pitfalls\n\n- Summing each task's own duration counts overlaps twice: employee 1002 would get 3 hours instead of 2.\n- Round down **once**, after adding the seconds; flooring each stretch separately loses the partial hours.\n- If starts were processed before ends at the same time, back-to-back tasks would look concurrent and the peak would be too high.\n- `(task_id, employee_id)` is the key: the same `task_id` may belong to two employees, so never match tasks on `task_id` alone.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `events` | one row per task start (`delta = 1`) and per task end (`delta = -1`) |\n| `sweep` | each employee's events in time order with the running count |\n| `running` | tasks in progress right after this event |\n| `next_time` | the time of the employee's next event; `null` for the last one |\n| `total_task_hours` | busy seconds divided by 3600, rounded down |",
+  "narration": {
+    "1": "events lists every moment where the number of tasks in progress changes.",
+    "2": "A start opens a task, so it carries delta 1.",
+    "4": "UNION ALL keeps every end even when two tasks end at the same moment.",
+    "5": "An end closes a task, so it carries delta -1.",
+    "8": "sweep walks each employee's events in time order.",
+    "10": "The running sum of deltas is the number of tasks in progress after this event.",
+    "11": "Ends sort before starts at the same time, so back-to-back tasks never count as concurrent; task_id breaks the remaining ties.",
+    "12": "LEAD finds when the next event happens, which closes the stretch that starts here.",
+    "17": "A stretch counts as working time only while at least one task is in progress.",
+    "19": "Add the busy seconds, convert to hours and round down once at the end.",
+    "20": "The highest running count is the peak number of concurrent tasks.",
+    "22": "One row per employee.",
+    "23": "Employees appear in increasing id order."
+  }
+}

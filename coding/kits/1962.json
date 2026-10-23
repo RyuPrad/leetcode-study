@@ -1,0 +1,63 @@
+{
+  "number": 1962,
+  "title": "Remove Stones to Minimize the Total",
+  "spec": "leetcode",
+  "statement": "The integer array `piles` lists stone piles, with `piles[i]` stones in pile `i`, and `k` is a number of moves. A move picks one pile holding `x` stones and takes `floor(x / 2)` stones away from it (half of them, rounded down), so `x - floor(x / 2)` stones stay. You must make exactly `k` moves, and a pile may be picked on any number of them. Return the smallest number of stones, summed over all piles, that can remain once the `k` moves are done.",
+  "constraints": [
+    "1 <= piles.length <= 10^5",
+    "1 <= piles[i] <= 10^4",
+    "1 <= k <= 10^5"
+  ],
+  "signature": "int minStoneSum(int[] piles, int k)",
+  "entry": "minStoneSum",
+  "kind": "function",
+  "parameters": [
+    "piles",
+    "k"
+  ],
+  "validator": "function validate([piles, k]) {\n  if (!Array.isArray(piles) || piles.length < 1 || piles.length > 100000) return 'piles needs 1 to 10^5 values.';\n  if (!piles.every(v => Number.isInteger(v) && v >= 1 && v <= 10000)) return 'Each pile holds 1 to 10^4 stones.';\n  if (!Number.isInteger(k) || k < 1 || k > 100000) return 'k is between 1 and 10^5.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minStoneSum(piles, k) {\n  // A max-heap in an array: each parent is at least as large as its children.\n  const heap = [...piles];\n  const siftDown = start => {\n    let parent = start;\n    for (;;) {\n      let largest = parent;\n      const left = 2 * parent + 1;\n      const right = left + 1;\n      if (left < heap.length && heap[left] > heap[largest]) {\n        largest = left;\n      }\n      if (right < heap.length && heap[right] > heap[largest]) {\n        largest = right;\n      }\n      if (largest === parent) {\n        return;\n      }\n      [heap[parent], heap[largest]] = [heap[largest], heap[parent]];\n      parent = largest;\n    }\n  };\n  for (let i = (heap.length >> 1) - 1; i >= 0; i--) {\n    siftDown(i);\n  }\n\n  let total = piles.reduce((sum, pile) => sum + pile, 0);\n  for (let move = 0; move < k; move++) {\n    const removed = Math.floor(heap[0] / 2);\n    if (removed === 0) {\n      break;\n    }\n    heap[0] -= removed;\n    total -= removed;\n    siftDown(0);\n  }\n  return total;\n}",
+  "brute": "function minStoneSum(piles, k) {\n  // Try every sequence of moves, remembering results for states already seen.\n  const memo = new Map();\n  const best = (state, movesLeft) => {\n    if (movesLeft === 0 || state.every(v => v === 1)) return state.reduce((a, b) => a + b, 0);\n    const key = state.join(',') + '|' + movesLeft;\n    if (memo.has(key)) return memo.get(key);\n    let answer = Infinity;\n    for (let i = 0; i < state.length; i++) {\n      const next = state.slice();\n      next[i] = Math.ceil(next[i] / 2);\n      answer = Math.min(answer, best(next, movesLeft - 1));\n    }\n    memo.set(key, answer);\n    return answer;\n  };\n  return best(piles.slice(), k);\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const piles = Array.from({ length: 2000 }, () => int(1, 10000));\n    return [piles, int(1, 100000)];\n  }\n  const n = int(1, 5);\n  const top = rand() < 0.2 ? 10000 : int(1, 40);\n  const piles = Array.from({ length: n }, () => int(1, top));\n  return [piles, int(1, 7)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[5,4,9],2],"expected":12},
+    {"name":"Example 2","input":[[4,3,6,7],3],"expected":12}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[1,1,1],5]},
+    {"name":"Test 3","input":[[10000],100000]},
+    {"name":"Test 4","input":[[3],1]},
+    {"name":"Test 5","input":[[7,7,7],3]},
+    {"name":"Test 6","input":[[10000,10000],1]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6],4]},
+    {"name":"Test 8","input":[[9,1,1,1],2]},
+    {"name":"Test 9","input":[[10000,1,9999],6]},
+    {"name":"Test 10","input":[[2,2,2,2],8]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA move on a pile of `x` stones removes `floor(x / 2)`, and that amount only grows with `x`. So each move should hit the pile that is currently the largest: no other choice removes more now, and halving the largest pile never makes any later move worse. Trying every sequence of moves would be exponential; a max-heap finds the largest pile in O(log n) per move.\n\n## Approach\n\n1. Copy `piles` into `heap` and turn it into a max-heap by sifting down every parent, from the last one to the root.\n2. Start `total` as the sum of all piles.\n3. Repeat `k` times: the root `heap[0]` is the largest pile. Compute `removed = floor(heap[0] / 2)`.\n4. If `removed` is 0, every pile has one stone and no move can change anything, so stop early.\n5. Otherwise shrink the root by `removed`, subtract it from `total`, and sift the root down to restore the heap.\n6. Return `total`.\n\n## Example 1, step by step\n\n`piles = [5, 4, 9]`, `k = 2`, so `total = 18` and the heap's root is 9.\n- Move 1: `removed = 4`, the pile becomes 5, `total = 14`. The piles are now 5, 4, 5.\n- Move 2: the root is a 5, `removed = 2`, it becomes 3, `total = 12`.\n\nThe answer is `12`.\n\n## Complexity\n\n- Time: O(n + k log n): building the heap is linear and each move sifts down once.\n- Space: O(n) for the heap copy.\n\n## Pitfalls\n\n- The pile keeps `x - floor(x / 2)`, which is the ceiling of half (7 becomes 4, not 3).\n- Picking the largest pile once and halving it `k` times is wrong; after each move another pile may be the largest.\n- Sorting once and walking the array fails for the same reason; the order must be updated after every move.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `heap` | the piles arranged as a max-heap; `heap[0]` is the largest |\n| `siftDown` | moves a value down until it is no smaller than its children |\n| `parent`, `left`, `right`, `largest` | positions used while sifting |\n| `total` | stones left over all piles |\n| `move` | how many moves have been made |\n| `removed` | stones taken by the current move |",
+  "narration": {
+    "3": "Copy the piles so the input array is left untouched; this copy becomes the heap.",
+    "10": "If the left child exists and is bigger, it is the new candidate for the top of this subtree.",
+    "13": "Do the same check for the right child.",
+    "16": "The parent is already the largest of the three, so the heap property holds here.",
+    "19": "Swap the parent with its larger child and keep sifting from the child's position.",
+    "23": "Heapify: sift down every parent, from the last one back to the root.",
+    "27": "Count all stones before any move is made.",
+    "28": "Make up to k moves, one per iteration.",
+    "29": "The root is the biggest pile; a move on it removes half of it, rounded down.",
+    "30": "Nothing can be removed only when every pile has one stone, so the remaining moves change nothing.",
+    "33": "Shrink the biggest pile by the stones removed.",
+    "34": "Keep the running total in step with the heap.",
+    "35": "The root may no longer be the largest, so sift it down to restore the heap.",
+    "37": "After the k moves the running total is the smallest possible."
+  }
+}

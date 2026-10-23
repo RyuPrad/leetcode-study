@@ -1,0 +1,73 @@
+{
+  "number": 1896,
+  "title": "Minimum Cost to Change the Final Value of Expression",
+  "spec": "leetcode",
+  "statement": "`expression` is a valid boolean formula built from the digits `0` and `1`, the operators `&` (AND) and `|` (OR), and parentheses. A valid formula is a single digit, a valid formula wrapped in one pair of parentheses, or valid formulas joined by operators; parentheses are never empty.\n\nThere is no operator precedence: a parenthesised part is evaluated before it is used, and otherwise the operators are applied strictly from left to right, so `1|1&0` means `(1|1)&0`.\n\nOne operation changes a single character in place: a `0` becomes `1`, a `1` becomes `0`, an `&` becomes `|`, or an `|` becomes `&`. Parentheses cannot be changed. Return the smallest number of operations after which `expression` evaluates to the opposite of its current value.",
+  "constraints": [
+    "1 <= expression.length <= 10^5",
+    "expression contains only '0', '1', '&', '|', '(' and ')'",
+    "All parentheses are properly matched",
+    "expression never contains empty parentheses \"()\"",
+    "expression is a valid formula"
+  ],
+  "signature": "int minOperationsToFlip(String expression)",
+  "entry": "minOperationsToFlip",
+  "kind": "function",
+  "parameters": [
+    "expression"
+  ],
+  "validator": "function validate([expression]) {\n  if (typeof expression !== 'string' || expression.length < 1 || expression.length > 100000) return 'expression needs 1 to 100000 characters.';\n  if (/[^01&|()]/.test(expression)) return 'expression may only use 0, 1, &, | and parentheses.';\n  let depth = 0;\n  let wantTerm = true;\n  for (const ch of expression) {\n    if (wantTerm) {\n      if (ch === '(') depth++;\n      else if (ch === '0' || ch === '1') wantTerm = false;\n      else if (ch === ')') return 'Parentheses may not be empty, and an operator needs a value after it.';\n      else return 'Each operator needs a value on both sides.';\n    } else if (ch === '&' || ch === '|') wantTerm = true;\n    else if (ch === ')') {\n      if (depth === 0) return 'Parentheses must be matched.';\n      depth--;\n    } else return 'A value must be followed by an operator or a closing parenthesis.';\n  }\n  if (wantTerm) return 'expression cannot end with an operator or an open parenthesis.';\n  if (depth !== 0) return 'Parentheses must be matched.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minOperationsToFlip(expression) {\n  const stack = [];\n\n  for (const ch of expression) {\n    if (ch === '(' || ch === '&' || ch === '|') {\n      stack.push(ch);\n      continue;\n    }\n    let value;\n    let cost;\n    if (ch === ')') {\n      [value, cost] = stack.pop();\n      stack.pop();\n    } else {\n      value = Number(ch);\n      cost = 1;\n    }\n    const top = stack[stack.length - 1];\n    if (top === '&' || top === '|') {\n      const operator = stack.pop();\n      const [leftValue, leftCost] = stack.pop();\n      if (leftValue !== value) {\n        cost = 1;\n      } else if ((operator === '&' && value === 1) || (operator === '|' && value === 0)) {\n        cost = Math.min(leftCost, cost);\n      } else {\n        cost = Math.min(leftCost, cost) + 1;\n      }\n      value = operator === '&' ? leftValue & value : leftValue | value;\n    }\n    stack.push([value, cost]);\n  }\n  return stack[0][1];\n}",
+  "brute": "function minOperationsToFlip(expression) {\n  // Evaluate a formula without parentheses from left to right.\n  const flat = (text) => {\n    let value = Number(text[0]);\n    for (let i = 1; i < text.length; i += 2) value = text[i] === '&' ? value & Number(text[i + 1]) : value | Number(text[i + 1]);\n    return String(value);\n  };\n  // Collapse innermost parentheses until none are left.\n  const evaluate = (text) => {\n    while (text.includes('(')) text = text.replace(/\\(([01&|]*)\\)/g, (_, inside) => flat(inside));\n    return flat(text);\n  };\n  const flip = { '0': '1', '1': '0', '&': '|', '|': '&' };\n  const chars = expression.split('');\n  const spots = [];\n  for (let i = 0; i < chars.length; i++) if (chars[i] in flip) spots.push(i);\n  const original = evaluate(expression);\n  // Try every set of exactly `left` more changes among spots[start..].\n  const search = (start, left) => {\n    if (left === 0) return evaluate(chars.join('')) !== original;\n    for (let j = start; j < spots.length; j++) {\n      const i = spots[j];\n      chars[i] = flip[chars[i]];\n      const found = search(j + 1, left - 1);\n      chars[i] = flip[chars[i]];\n      if (found) return true;\n    }\n    return false;\n  };\n  // Changing every character gives the complement (De Morgan), so some size always works.\n  for (let size = 1; ; size++) if (search(0, size)) return size;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  if (large && rand() < 0.4) {\n    // A balanced tree of one operator over mostly equal digits makes the flip cost grow with its height.\n    const operator = rand() < 0.5 ? '&' : '|';\n    const usual = operator === '&' ? '0' : '1';\n    const tree = (height) => height === 0 ? (rand() < 0.97 ? usual : String(1 - Number(usual))) : '(' + tree(height - 1) + operator + tree(height - 1) + ')';\n    return [tree(10 + Math.floor(rand() * 2))];\n  }\n  for (;;) {\n    // Grammar: formula = term (op term)*, term = digit | ( formula ).\n    let budget = large ? 2000 + Math.floor(rand() * 1000) : 1 + Math.floor(rand() * 6);\n    const maxDepth = large ? 25 : 3;\n    const openChance = large ? 0.25 : 0.35;\n    const term = (depth) => {\n      if (depth < maxDepth && rand() < openChance) return '(' + formula(depth + 1) + ')';\n      budget -= 1;\n      return rand() < 0.5 ? '0' : '1';\n    };\n    const formula = (depth) => {\n      let text = term(depth);\n      const more = large && depth === 0 ? 1 : 0.55;\n      while (budget > 0 && rand() < more) text += (rand() < 0.5 ? '&' : '|') + term(depth);\n      return text;\n    };\n    const expression = formula(0);\n    if (expression.length <= 10000) return [expression];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["1&(0|1)"],"expected":1},
+    {"name":"Example 2","input":["(0&0)&(0&0&0)"],"expected":3},
+    {"name":"Example 3","input":["(0|(1|0&1))"],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["1"]},
+    {"name":"Test 2","input":["0"]},
+    {"name":"Test 3","input":["0&0"]},
+    {"name":"Test 4","input":["1|1|(0&0)&1"]},
+    {"name":"Test 5","input":["1|1|1|1|1|1"]},
+    {"name":"Test 6","input":["((0&0)&(0&0))&((0&0)&(0&0))"]},
+    {"name":"Test 7","input":["((1|1)|(1|1))|((1|1)|(1|1))&1"]},
+    {"name":"Test 8","input":["(((((((((((((((((((((((((((((((0&0)|(0&0)))))))))))))))))))))))))))))))"]},
+    {"name":"Test 9","input":["0&1|0&(1|1)&(0|0|0)|1&1"]},
+    {"name":"Test 10","input":["(1&(1&(1&(1&(1&1)))))|0"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":16,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach sub-formula has a current value, and only one other number matters about it: how many operations it takes to flip that value. Keeping its value costs nothing. Trying every set of changes works on tiny inputs but is exponential; instead, the flip cost of `left op right` can be computed from the two sides' values and flip costs alone, which is a DP over the formula's tree. Because evaluation is strictly left to right with parentheses, a stack builds that tree on the fly.\n\n## Approach\n\n1. Push `(`, `&` and `|` onto `stack`.\n2. A digit becomes the pair `[value, 1]`: one change flips it. A `)` pops the finished pair of its group and then the matching `(`.\n3. If the stack top is an operator, pop it and the left pair, and combine:\n   - the sides differ: changing the operator flips the result, so `cost = 1`;\n   - both `1` under `&`, or both `0` under `|`: flipping the cheaper side is enough, so `cost = min(leftCost, cost)`;\n   - both `0` under `&`, or both `1` under `|`: one flipped side is not enough; also change the operator, so `cost = min(leftCost, cost) + 1`.\n4. Push the combined pair. At the end the stack holds one pair; return its cost.\n\n## Example 1, step by step\n\nFor `\"1&(0|1)\"`: `1` pushes `[1, 1]`; `&` and `(` are pushed; `0` pushes `[0, 1]` (the top was `(`); `|` is pushed. Then `1` meets `|`: the sides `0` and `1` differ, so the pair is `[1, 1]`. The `)` pops it and the `(`, then meets `&` with left `[1, 1]`: both are `1` under `&`, so `cost = min(1, 1) = 1`. The answer is `1`.\n\n## Complexity\n\n- Time: O(n): every character is pushed and popped at most once.\n- Space: O(n) for the stack.\n\n## Pitfalls\n\n- `&` does not bind tighter than `|`; combine as soon as the right operand is complete.\n- Two equal sides under the \"wrong\" operator need the extra `+ 1`: `0&0` costs 2, not 1.\n- Unequal sides always cost exactly 1, however expensive each side is.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stack` | open parentheses, pending operators and `[value, cost]` pairs |\n| `value`, `cost` | the current operand's value and its flip cost |\n| `top` | the stack entry just below the current operand |\n| `operator` | the pending `&` or `|` being applied |\n| `leftValue`, `leftCost` | the left operand's value and flip cost |",
+  "narration": {
+    "2": "The stack holds open parentheses, pending operators and [value, cost] pairs for finished operands.",
+    "4": "Read the formula one character at a time.",
+    "5": "An opening parenthesis or an operator cannot be used yet...",
+    "6": "...so it waits on the stack.",
+    "11": "A closing parenthesis means its group is finished.",
+    "12": "The group's own [value, cost] pair is on top; take it as the current operand.",
+    "13": "Drop the matching opening parenthesis.",
+    "15": "A digit is an operand whose value is the digit itself...",
+    "16": "...and one change flips it.",
+    "18": "Look at what sits just below the current operand.",
+    "19": "If it is an operator, the left operand is waiting to be combined (left to right, no precedence).",
+    "20": "Take the operator off the stack.",
+    "21": "Take the left operand's value and flip cost.",
+    "22": "Different values on the two sides?",
+    "23": "Then changing the operator alone flips the result: cost 1.",
+    "24": "Both 1 under AND, or both 0 under OR: flipping one side is enough.",
+    "25": "So the cost is the cheaper side's flip cost.",
+    "27": "Both 0 under AND, or both 1 under OR: flip the cheaper side and also change the operator.",
+    "29": "Compute the combined value with the operator as written.",
+    "31": "Push the combined (or lone) operand back as a pair.",
+    "33": "One pair is left for the whole formula; its cost is the answer."
+  }
+}

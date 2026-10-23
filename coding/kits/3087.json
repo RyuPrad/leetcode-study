@@ -1,0 +1,54 @@
+{
+  "number": 3087,
+  "title": "Find Trending Hashtags",
+  "spec": "recalled",
+  "statement": "One table stores tweets:\n\n- `Tweets(user_id, tweet_id, tweet_date, tweet)`: one row per tweet; `tweet_id` is unique. Every `tweet` contains exactly one hashtag: a `#` followed by letters and digits, ending at a space or at the end of the text. Two different hashtags never differ only in letter case.\n\nLook only at tweets posted in **February 2024** (`2024-02-01` through `2024-02-29`). Count how many of those tweets use each hashtag, and report the **top 3** hashtags with the columns `hashtag` (including its `#`) and `hashtag_count`. Rank by `hashtag_count` descending; among equal counts, the hashtag that sorts later alphabetically comes first. Return the rows in that ranked order; if fewer than 3 hashtags were used, return them all.",
+  "constraints": [
+    "tweet_id is unique in Tweets",
+    "Each tweet contains exactly one #, starting its only hashtag",
+    "A hashtag is # followed by letters and digits, ending at a space or the end of the tweet",
+    "Hashtags that differ only in letter case do not occur"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tweets": [["user_id","INT"],["tweet_id","INT"],["tweet_date","DATE"],["tweet","VARCHAR(100)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Tweets = [] }] = input;\n  const ids = new Set(), spelling = new Map();\n  for (const [user, id, date, tweet] of Tweets) {\n    if (id === null) return 'Every tweet needs a tweet_id.';\n    if (ids.has(id)) return `tweet_id ${id} appears twice.`;\n    ids.add(id);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date ?? '')) return `Tweet ${id} needs a date like 2024-02-01.`;\n    if (typeof tweet !== 'string' || tweet.split('#').length !== 2) return `Tweet ${id} must contain exactly one #.`;\n    const match = /#([A-Za-z0-9]+)(?: |$)/.exec(tweet);\n    if (!match) return `The hashtag in tweet ${id} must be letters and digits ending at a space or the end.`;\n    const lower = match[0].trim().toLowerCase();\n    if (spelling.has(lower) && spelling.get(lower) !== match[0].trim()) return `Hashtags ${spelling.get(lower)} and ${match[0].trim()} differ only in case.`;\n    spelling.set(lower, match[0].trim());\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH tagged AS (\n  SELECT tweet_id,\n         CONCAT('#', SUBSTRING_INDEX(SUBSTRING_INDEX(tweet, '#', -1), ' ', 1)) AS hashtag\n  FROM Tweets\n  WHERE tweet_date BETWEEN '2024-02-01' AND '2024-02-29'\n)\nSELECT hashtag,\n       COUNT(*) AS hashtag_count\nFROM tagged\nGROUP BY hashtag\nORDER BY hashtag_count DESC, hashtag DESC\nLIMIT 3;",
+  "brute": "WITH counts AS (\n  SELECT REGEXP_SUBSTR(tweet, '#[A-Za-z0-9]+') AS hashtag, COUNT(*) AS hashtag_count\n  FROM Tweets\n  WHERE YEAR(tweet_date) = 2024 AND MONTH(tweet_date) = 2\n  GROUP BY REGEXP_SUBSTR(tweet, '#[A-Za-z0-9]+')\n)\nSELECT g.hashtag, g.hashtag_count\nFROM counts AS g\nWHERE (SELECT COUNT(*)\n       FROM counts AS h\n       WHERE h.hashtag_count > g.hashtag_count\n          OR (h.hashtag_count = g.hashtag_count AND h.hashtag > g.hashtag)) < 3\nORDER BY g.hashtag_count DESC, g.hashtag DESC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const tags = small\n    ? ['#HappyDay', '#TechLife', '#WorkLife', '#Nature', '#Travel', '#Music']\n    : Array.from({ length: 40 }, (_, i) => `#Topic${i}`);\n  const dates = small\n    ? ['2024-02-01', '2024-02-04', '2024-02-14', '2024-02-29', '2024-01-31', '2024-03-01', '2023-02-10']\n    : null;\n  const words = ['Great start', 'Another day', \"Today's mood\", 'Loving this', 'New ideas', 'Quiet morning'];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Tweets = [];\n  for (let i = 0; i < count; i++) {\n    // Squaring a uniform draw favours the first tags, so counts differ but ties still happen.\n    const tag = tags[Math.floor(rand() * rand() * tags.length)];\n    let date;\n    if (small) date = pick(dates);\n    else {\n      const month = rand() < 0.8 ? 2 : pick([1, 3]);\n      const day = 1 + Math.floor(rand() * (month === 2 ? 29 : 31));\n      date = `2024-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;\n    }\n    const where = Math.floor(rand() * 3);\n    const tweet = where === 0 ? `${tag} ${pick(words)}` : where === 1 ? `${pick(words)} ${tag} again` : `${pick(words)}. ${tag}`;\n    Tweets.push([100 + Math.floor(rand() * 20), i + 1, date, tweet]);\n  }\n  return [{ Tweets }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tweets":[[135,13,"2024-02-01","Enjoying a great start to the day. #HappyDay"],[136,14,"2024-02-03","Another #HappyDay with good "],[137,15,"2024-02-04","Productivity peaks! #WorkLife"],[138,16,"2024-02-04","Exploring new tech frontiers. #TechLife"],[139,17,"2024-02-05","Gratitude for today's moments. #HappyDay"],[140,18,"2024-02-07","Innovation drives us. #TechLife"],[141,19,"2024-02-09","Connecting with nature's serenity. #Nature"]]}],"expected":{"columns":["hashtag","hashtag_count"],"rows":[["#HappyDay",3],["#TechLife",2],["#WorkLife",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tweets":[]}]},
+    {"name":"Test 2","input":[{"Tweets":[[1,1,"2024-02-10","Hello world #Hello"]]}]},
+    {"name":"Test 3","input":[{"Tweets":[[1,1,"2024-01-31","Late night #Nature"],[2,2,"2024-03-01","Spring #Travel"],[3,3,"2023-02-14","Last year #Music"]]}]},
+    {"name":"Test 4","input":[{"Tweets":[[1,1,"2024-02-01","First day #Music"],[2,2,"2024-02-29","Leap day #Travel"],[3,3,"2024-02-29","Leap again #Travel"],[4,4,"2024-01-31","Too early #Nature"],[5,5,"2024-01-30","Way too early #Nature"],[6,6,"2024-03-01","Too late #Nature"],[7,7,"2024-02-15","Middle #Art"]]}]},
+    {"name":"Test 5","input":[{"Tweets":[[1,1,"2024-02-02","#Coding all day"],[1,2,"2024-02-03","More #Coding today"],[2,3,"2024-02-04","Done #Coding"],[2,4,"2024-02-04","Read #Books"],[3,5,"2024-02-05","More #Books"],[3,6,"2024-02-06","Run #Fitness"],[4,7,"2024-02-07","#Fitness again"],[4,8,"2024-02-08","#Fitness forever"],[5,9,"2024-02-09","Song #Music"]]}]},
+    {"name":"Test 6","input":[{"Tweets":[[1,1,"2024-02-02","Paint #Art"],[1,2,"2024-02-03","Sketch #Art"],[2,3,"2024-02-04","Draw #Art"],[2,4,"2024-02-05","Read #Books"],[3,5,"2024-02-06","Read #Books"],[3,6,"2024-02-07","Code #Coding"],[4,7,"2024-02-08","Play #Music"],[5,8,"2024-02-09","Calm #Zen"]]}]},
+    {"name":"Test 7","input":[{"Tweets":[[1,1,"2024-02-02","#Nature walk today"],[2,2,"2024-02-03","Morning #Nature run"],[3,3,"2024-02-04","Done. #Nature"],[4,4,"2024-02-05","City #Travel trip"],[5,5,"2024-02-06","#Travel"]]}]},
+    {"name":"Test 8","input":[{"Tweets":[[1,1,"2024-02-02","Hiking #Nature"],[2,2,"2024-02-20","Flying #Travel"],[3,3,"2024-02-21","Flying back #Travel"]]}]},
+    {"name":"Test 9","input":[{"Tweets":[[1,1,"2024-02-02","Streak #Day100 done"],[1,2,"2024-02-03","Streak #Day100 again"],[1,3,"2024-02-04","Streak #Day10 start"],[2,4,"2024-02-05","#Day10 is here"],[2,5,"2024-02-06","#Day10 again"],[3,6,"2024-02-07","New #Day1"]]}]},
+    {"name":"Test 10","input":[{"Tweets":[[1,1,"2024-02-02","a #Art"],[1,2,"2024-02-03","b #Art"],[2,3,"2024-02-04","c #Books"],[2,4,"2024-02-05","d #Books"],[3,5,"2024-02-06","e #Coding"],[3,6,"2024-02-07","f #Coding"],[4,7,"2024-02-08","g #Music"],[4,8,"2024-02-09","h #Music"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnce each tweet is reduced to its single hashtag, this is a plain \"count per group, keep the top three\" problem. The hashtag can sit anywhere in the text, so cut the tweet twice: everything **after** the `#`, then everything **before** the next space. Ranking is a sort by count, with the hashtag itself as a descending tie-break, followed by `LIMIT 3`.\n\n## Approach\n\n1. `tagged`: keep tweets dated `2024-02-01` through `2024-02-29` (2024 is a leap year). `SUBSTRING_INDEX(tweet, '#', -1)` returns the text after the `#`; `SUBSTRING_INDEX(..., ' ', 1)` keeps it up to the first space; `CONCAT('#', ...)` puts the `#` back.\n2. `GROUP BY hashtag` and `COUNT(*)` the tweets in each group as `hashtag_count`.\n3. `ORDER BY hashtag_count DESC, hashtag DESC` and `LIMIT 3`.\n\n## Example 1, step by step\n\n- All seven tweets are in February 2024. `tagged` gives 13 → `#HappyDay`, 14 → `#HappyDay` (the tag sits mid-sentence and is cut at the next space), 15 → `#WorkLife`, 16 → `#TechLife`, 17 → `#HappyDay`, 18 → `#TechLife`, 19 → `#Nature`.\n- Counts: `#HappyDay` 3, `#TechLife` 2, `#WorkLife` 1, `#Nature` 1.\n- Sorted: `#HappyDay`, `#TechLife`, then the tie at 1 goes to `#WorkLife` because W sorts after N. `LIMIT 3` drops `#Nature`.\n\n## Complexity\n\n- Time: O(T · L) to cut T tweets of length L, plus O(T log T) to group and sort.\n- Space: O(H) for H distinct hashtags.\n\n## Pitfalls\n\n- `SUBSTRING_INDEX(tweet, '#', -1)` alone keeps the words after a mid-sentence hashtag (Test 7).\n- Ending February on the 28th loses leap-day tweets (Test 4); comparing only the month mixes in other years (Test 3).\n- Breaking count ties alphabetically ascending picks the wrong third hashtag (Tests 6 and 10).\n- Forgetting the `#` in `hashtag` changes every output value.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `tagged` | February 2024 tweets, each with its `hashtag` |\n| `hashtag` | `#` plus the text between the `#` and the next space |\n| `hashtag_count` | how many February tweets carry that hashtag |\n| `LIMIT 3` | keeps the three best-ranked hashtags |",
+  "narration": {
+    "1": "First stage: reduce each tweet to its hashtag.",
+    "3": "Take the text after the #, cut it at the first space, and put the # back in front.",
+    "5": "Only tweets from February 2024 count, leap day included.",
+    "8": "Count the tweets that share each hashtag.",
+    "10": "One group per hashtag.",
+    "11": "Rank by count, breaking ties with the hashtag that sorts later alphabetically.",
+    "12": "Keep only the top three."
+  }
+}

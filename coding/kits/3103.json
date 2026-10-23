@@ -1,0 +1,59 @@
+{
+  "number": 3103,
+  "title": "Find Trending Hashtags II",
+  "spec": "recalled",
+  "statement": "One table stores tweets:\n\n- `Tweets(user_id, tweet_id, tweet_date, tweet)`: one row per tweet; `tweet_id` is unique. A `tweet` may contain **any number of hashtags** (zero, one or several). A hashtag is a `#` followed by letters and digits; it starts the text or follows a space, and it ends at a space or at the end of the text. A tweet never repeats a hashtag, and two different hashtags never differ only in letter case.\n\nLook only at tweets posted in **February 2024** (`2024-02-01` through `2024-02-29`). Count how many times each hashtag is used across those tweets, and report the **top 3** hashtags with the columns `hashtag` (including its `#`) and `count`. Rank by `count` descending; among equal counts, the hashtag that sorts later alphabetically comes first. Return the rows in that ranked order; if fewer than 3 hashtags were used, return them all.",
+  "constraints": [
+    "tweet_id is unique in Tweets",
+    "A hashtag is # followed by letters and digits, at the start of the tweet or after a space, ending at a space or the end",
+    "A tweet does not repeat a hashtag",
+    "Hashtags that differ only in letter case do not occur",
+    "tweet has at most 100 characters"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tweets": [["user_id","INT"],["tweet_id","INT"],["tweet_date","DATE"],["tweet","VARCHAR(100)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Tweets = [] }] = input;\n  const ids = new Set(), spelling = new Map();\n  for (const [user, id, date, tweet] of Tweets) {\n    if (id === null) return 'Every tweet needs a tweet_id.';\n    if (ids.has(id)) return `tweet_id ${id} appears twice.`;\n    ids.add(id);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date ?? '')) return `Tweet ${id} needs a date like 2024-02-01.`;\n    if (typeof tweet !== 'string') return `Tweet ${id} needs its text.`;\n    if (tweet.length > 100) return `Tweet ${id} is longer than 100 characters.`;\n    if (/[\\t\\r\\n]/.test(tweet)) return `Tweet ${id} may only separate words with spaces.`;\n    const own = new Set();\n    for (const word of tweet.split(' ')) {\n      if (!word.includes('#')) continue;\n      if (!/^#[A-Za-z0-9]+$/.test(word)) return `In tweet ${id}, \"${word}\" is not a hashtag of letters and digits standing alone.`;\n      const lower = word.toLowerCase();\n      if (own.has(lower)) return `Tweet ${id} repeats ${word}.`;\n      own.add(lower);\n      if (spelling.has(lower) && spelling.get(lower) !== word) return `Hashtags ${spelling.get(lower)} and ${word} differ only in case.`;\n      spelling.set(lower, word);\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE february AS (\n  SELECT tweet_id, tweet\n  FROM Tweets\n  WHERE tweet_date BETWEEN '2024-02-01' AND '2024-02-29'\n),\ntags AS (\n  SELECT tweet_id, SUBSTRING(tweet, LOCATE('#', tweet)) AS rest\n  FROM february\n  WHERE LOCATE('#', tweet) > 0\n  UNION ALL\n  SELECT tweet_id, SUBSTRING(rest, LOCATE('#', rest, 2))\n  FROM tags\n  WHERE LOCATE('#', rest, 2) > 0\n)\nSELECT SUBSTRING_INDEX(rest, ' ', 1) AS hashtag,\n       COUNT(*) AS count\nFROM tags\nGROUP BY hashtag\nORDER BY count DESC, hashtag DESC\nLIMIT 3;",
+  "brute": "WITH RECURSIVE nums AS (\n  SELECT 1 AS n\n  UNION ALL\n  SELECT n + 1 FROM nums WHERE n < 101\n),\nwords AS (\n  SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(t.tweet, ' ', nums.n), ' ', -1) AS word\n  FROM Tweets AS t\n  JOIN nums\n    ON nums.n <= LENGTH(t.tweet) - LENGTH(REPLACE(t.tweet, ' ', '')) + 1\n  WHERE YEAR(t.tweet_date) = 2024 AND MONTH(t.tweet_date) = 2\n),\ncounts AS (\n  SELECT word AS hashtag, COUNT(*) AS cnt\n  FROM words\n  WHERE LEFT(word, 1) = '#'\n  GROUP BY word\n)\nSELECT c.hashtag, c.cnt AS count\nFROM counts AS c\nWHERE (SELECT COUNT(*)\n       FROM counts AS d\n       WHERE d.cnt > c.cnt\n          OR (d.cnt = c.cnt AND d.hashtag > c.hashtag)) < 3\nORDER BY c.cnt DESC, c.hashtag DESC",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const tags = small\n    ? ['#HappyDay', '#TechLife', '#WorkLife', '#Nature', '#FeelGood', '#Travel']\n    : Array.from({ length: 40 }, (_, i) => `#Topic${i}`);\n  const dates = ['2024-02-01', '2024-02-05', '2024-02-14', '2024-02-29', '2024-01-31', '2024-03-01', '2023-02-10'];\n  const words = ['Enjoying', 'the', 'day.', 'Great', 'vibes!', 'New', 'post', 'today', 'with', 'friends'];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Tweets = [];\n  for (let i = 0; i < count; i++) {\n    const date = small ? pick(dates) : `2024-${pick(['01', '02', '02', '02', '03'])}-${String(1 + Math.floor(rand() * 29)).padStart(2, '0')}`;\n    const parts = Array.from({ length: 1 + Math.floor(rand() * 4) }, () => pick(words));\n    // Up to three distinct hashtags, each dropped at a random position among the words.\n    const pool = tags.slice();\n    const k = Math.floor(rand() * 4);\n    for (let j = 0; j < k; j++) {\n      const at = j + Math.floor(rand() * (pool.length - j));\n      [pool[j], pool[at]] = [pool[at], pool[j]];\n      parts.splice(Math.floor(rand() * (parts.length + 1)), 0, pool[j]);\n    }\n    Tweets.push([1 + Math.floor(rand() * (small ? 4 : 300)), 100 + i, date, parts.join(' ')]);\n  }\n  return [{ Tweets }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tweets":[[135,13,"2024-02-01","Enjoying a great start to the day. #HappyDay #MorningVibes"],[136,14,"2024-02-03","Another #HappyDay with good vibes! #FeelGood"],[137,15,"2024-02-04","Productivity peaks! #WorkLife #ProductiveDay"],[138,16,"2024-02-04","Exploring new tech frontiers. #TechLife #Innovation"],[139,17,"2024-02-05","Gratitude for today's moments. #HappyDay #Thankful"],[140,18,"2024-02-07","Innovation drives us. #TechLife #FutureTech"],[141,19,"2024-02-09","Connecting with nature's serenity. #Nature #Peaceful"]]}],"expected":{"columns":["hashtag","count"],"rows":[["#HappyDay",3],["#TechLife",2],["#WorkLife",1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tweets":[]}]},
+    {"name":"Test 2","input":[{"Tweets":[[1,1,"2024-01-31","Late night #NewYear #Party"],[2,2,"2024-03-01","Spring is here #Spring"],[3,3,"2023-02-15","Old memories #Throwback"]]}]},
+    {"name":"Test 3","input":[{"Tweets":[[1,1,"2024-02-10","No tags here"],[2,2,"2024-02-11","Just words!"],[3,3,"2024-02-12","Finally #Done"]]}]},
+    {"name":"Test 4","input":[{"Tweets":[[1,1,"2024-02-01","#Alpha starts the month"],[1,2,"2024-02-29","Leap day #Alpha #Leap"],[2,3,"2024-01-31","#Zeta #Gamma"],[2,4,"2024-03-01","#Zeta #Gamma"],[3,5,"2024-02-15","Midway #Gamma"]]}]},
+    {"name":"Test 5","input":[{"Tweets":[[10,1,"2024-02-03","Morning run #Fitness #Sunrise"],[11,2,"2024-02-04","Again #Coffee #Sunrise"],[12,3,"2024-02-05","Weekend #Music #Sunrise"],[13,4,"2024-02-06","Office #Coffee #WorkLife"]]}]},
+    {"name":"Test 6","input":[{"Tweets":[[1,1,"2024-02-02","#Coffee time on #Monday"],[2,2,"2024-02-03","#Coffee break"],[3,3,"2024-02-04","#Coffee and #Books tonight"]]}]},
+    {"name":"Test 7","input":[{"Tweets":[[5,1,"2024-02-20","All the tags #Apple #Mango #Kiwi #Banana #Cherry"]]}]},
+    {"name":"Test 8","input":[{"Tweets":[[1,1,"2024-02-01","#Blue #Red"],[2,2,"2024-02-02","#Blue #Green #Gold"],[3,3,"2024-02-03","Colors #Blue"],[4,4,"2024-02-04","#Red #Green"],[5,5,"2024-02-05","More #Gold"]]}]},
+    {"name":"Test 9","input":[{"Tweets":[[7,1,"2024-02-01","Day one #Daily"],[7,2,"2024-02-02","Day two #Daily"],[7,3,"2024-02-03","Day three #Daily"],[1,4,"2024-02-04","Hello #Shared"],[2,5,"2024-02-05","Hi #Shared"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","input":[{"Tweets":[[4,1,"2024-02-08","Ready for #Q1 goals"],[4,2,"2024-02-09","#Q1 planning with #Team2024"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach February tweet can carry several hashtags, so a tweet has to be broken into one row **per hashtag** before anything can be counted. Once every mention is its own row, the rest is a plain `GROUP BY` with a ranked `ORDER BY` and `LIMIT 3`. MySQL has no built-in \"split a string into rows\", so a **recursive CTE** peels the hashtags off one at a time.\n\n## Approach\n\n1. `february` keeps the tweets dated `2024-02-01` through `2024-02-29`.\n2. `tags`, anchor: for each tweet with a `#`, `rest` is the text from its first `#` onward.\n3. `tags`, recursive step: `LOCATE('#', rest, 2)` finds the next `#` after the one `rest` starts with; cutting there gives the next row. The recursion stops when no `#` is left.\n4. Every `tags` row starts with exactly one hashtag, so `SUBSTRING_INDEX(rest, ' ', 1)` (the text before the first space) is that hashtag.\n5. Group by hashtag, count, sort by `count DESC, hashtag DESC`, and keep 3 rows.\n\n## Example 1, step by step\n\n- All 7 tweets fall in February, and each has two hashtags, so `tags` has 14 rows. Tweet 14 gives `#HappyDay with good vibes! #FeelGood` and then `#FeelGood`.\n- Counting: `#HappyDay` 3 (tweets 13, 14, 17), `#TechLife` 2 (16, 18), and nine hashtags with 1.\n- Among the count-1 hashtags, descending order puts `#WorkLife` first (W is the latest letter), ahead of `#Thankful` and `#ProductiveDay`.\n- Result: `#HappyDay` 3, `#TechLife` 2, `#WorkLife` 1.\n\n## Complexity\n\n- Time: O(T + M log M) for T tweets and M hashtag mentions (the recursion emits one row per mention, then the grouping sorts them).\n- Space: O(M) for the `tags` rows.\n\n## Pitfalls\n\n- Taking only the first (or only the last) hashtag of each tweet, as in the one-hashtag version of this problem, undercounts every other hashtag.\n- Ties need the second sort key: without `hashtag DESC`, which hashtags make the top 3 is arbitrary.\n- February 2024 has 29 days; a filter like `< '2024-02-29'` drops the leap day.\n- Counting distinct users instead of rows reports how many people used a tag, not how often it was used.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `february` | tweets posted in February 2024 |\n| `tags` | one row per hashtag mention: `rest` starts at that hashtag |\n| `rest` | the tweet's text from the current `#` to the end |\n| `hashtag` | `rest` up to its first space |\n| `count` | how many mentions the hashtag has |",
+  "narration": {
+    "1": "The first CTE keeps only February tweets; RECURSIVE lets the later CTE refer to itself.",
+    "4": "BETWEEN includes both ends, so tweets from February 1 and the leap day February 29 count.",
+    "6": "tags will hold one row per hashtag mention.",
+    "7": "Anchor: cut each tweet at its first #, so rest starts with its first hashtag.",
+    "9": "Tweets without any # produce no rows.",
+    "11": "Recursive step: jump to the next # after the one rest starts with.",
+    "13": "The recursion stops once rest has no further hashtag.",
+    "15": "Each row starts with one hashtag; the text before the first space is that hashtag.",
+    "18": "Count the mentions of each hashtag.",
+    "19": "Most mentions first; equal counts put the alphabetically later hashtag first.",
+    "20": "Keep the top three."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "number": 1931,
+  "title": "Painting a Grid With Three Different Colors",
+  "spec": "leetcode",
+  "statement": "A grid has `m` rows and `n` columns, and every one of its cells has to be given one of three colors (red, green or blue). Cells that share a side must end up with different colors. Count how many different colorings of the whole grid obey this rule, where two colorings differ if at least one cell gets a different color. The count can be huge, so return it modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= m <= 5",
+    "1 <= n <= 1000"
+  ],
+  "signature": "int colorTheGrid(int m, int n)",
+  "entry": "colorTheGrid",
+  "kind": "function",
+  "parameters": [
+    "m",
+    "n"
+  ],
+  "validator": "function validate([m, n]) {\n  if (!Number.isInteger(m) || m < 1 || m > 5) return 'm must be a whole number from 1 to 5.';\n  if (!Number.isInteger(n) || n < 1 || n > 1000) return 'n must be a whole number from 1 to 1000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function colorTheGrid(m, n) {\n  const MOD = 1e9 + 7;\n  const columns = [];\n  for (let mask = 0; mask < 3 ** m; mask++) {\n    const colors = [];\n    let rest = mask;\n    for (let row = 0; row < m; row++) {\n      colors.push(rest % 3);\n      rest = Math.floor(rest / 3);\n    }\n    if (colors.every((color, row) => row === 0 || color !== colors[row - 1])) {\n      columns.push(colors);\n    }\n  }\n  const count = columns.length;\n  const fits = columns.map(() => []);\n  for (let i = 0; i < count; i++) {\n    for (let j = 0; j < count; j++) {\n      if (columns[i].every((color, row) => color !== columns[j][row])) {\n        fits[i].push(j);\n      }\n    }\n  }\n  let dp = new Array(count).fill(1);\n  for (let col = 1; col < n; col++) {\n    const next = new Array(count).fill(0);\n    for (let prev = 0; prev < count; prev++) {\n      for (const cur of fits[prev]) {\n        next[cur] = (next[cur] + dp[prev]) % MOD;\n      }\n    }\n    dp = next;\n  }\n  return dp.reduce((total, ways) => (total + ways) % MOD, 0);\n}",
+  "brute": "function colorTheGrid(m, n) {\n  // Fill the grid one cell at a time, column by column, remembering only the last m colors placed.\n  const MOD = 1000000007;\n  let states = new Map([['', 1]]);\n  for (let cell = 0; cell < m * n; cell++) {\n    const row = cell % m;\n    const nextStates = new Map();\n    for (const [key, ways] of states) {\n      const recent = key === '' ? [] : key.split(',').map(Number);\n      for (let color = 0; color < 3; color++) {\n        if (row > 0 && recent[recent.length - 1] === color) continue;\n        if (cell >= m && recent[recent.length - m] === color) continue;\n        const kept = [...recent, color].slice(-m).join(',');\n        nextStates.set(kept, ((nextStates.get(kept) || 0) + ways) % MOD);\n      }\n    }\n    states = nextStates;\n  }\n  let total = 0;\n  for (const ways of states.values()) total = (total + ways) % MOD;\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const m = 3 + Math.floor(rand() * 3);\n    const n = 800 + Math.floor(rand() * 201);\n    return [m, n];\n  }\n  const m = 1 + Math.floor(rand() * 5);\n  const n = 1 + Math.floor(rand() * 9);\n  return [m, n];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,1],"expected":3},
+    {"name":"Example 2","input":[1,2],"expected":6},
+    {"name":"Example 3","input":[5,5],"expected":580986}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,1]},
+    {"name":"Test 2","input":[1,3]},
+    {"name":"Test 3","input":[3,1]},
+    {"name":"Test 4","input":[2,2]},
+    {"name":"Test 5","input":[3,3]},
+    {"name":"Test 6","input":[5,1]},
+    {"name":"Test 7","input":[1,1000]},
+    {"name":"Test 8","input":[2,37]},
+    {"name":"Test 9","input":[4,10]},
+    {"name":"Test 10","input":[5,20]},
+    {"name":"Test 11","input":[3,100]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","input":[5,1000]}
+  ],
+  "notes": "## Intuition\n\nTrying all `3^(m·n)` colorings is hopeless, but `m` is at most 5, so a single column has very few legal colorings (at most 48). A column only interacts with the column right before it, so the whole grid is a walk of `n` steps through those column patterns, where a step is allowed when the two columns differ in every row. Counting walks is a small dynamic program.\n\n## Approach\n\n1. Read every number `mask` below `3^m` as `m` base-3 digits, one color per row, and keep it in `columns` if no two vertically neighboring digits are equal.\n2. For every pair of kept columns `i`, `j`, record `j` in `fits[i]` when no row has the same color in both, so `j` may stand to the right of `i`.\n3. Let `dp[k]` be the number of ways to paint the columns so far with column pattern `k` last. For the first column every pattern gives exactly 1 way.\n4. For each further column, push `dp[prev]` into `next[cur]` for every `cur` in `fits[prev]`, taking the modulus as you add.\n5. The answer is the sum of `dp` modulo `10^9 + 7`.\n\n## Example 1, step by step\n\nWith `m = 1` the masks are `0`, `1` and `2`, giving the one-cell columns `[0]`, `[1]` and `[2]`; all are legal, so `count = 3`. Each fits the two others. `dp` starts as `[1, 1, 1]`, and since `n = 1` no more columns are added, so the answer is `1 + 1 + 1 = 3`.\n\n## Complexity\n\n- Time: O(3^m · m + P · m + n · P), where P ≤ 48² is the number of column pairs; with `m` fixed at 5 at most this is linear in `n`.\n- Space: O(P) for `fits` plus O(48) for `dp`.\n\n## Pitfalls\n\n- Columns must be checked twice: inside a column (vertical neighbours) when building `columns`, and between columns (horizontal neighbours) when building `fits`.\n- Reduce modulo `10^9 + 7` on every addition; the sums otherwise grow past safe integers within a few dozen columns.\n- When `n = 1` the loop never runs, and the answer is just the number of legal columns.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `columns` | every legal coloring of one column, as an array of colors 0–2 |\n| `mask`, `rest` | the base-3 number being decoded and what is left of it |\n| `fits[i]` | patterns that may stand right after pattern `i` |\n| `dp[k]` | ways to paint the columns so far ending with pattern `k` |\n| `next` | the same counts after adding one more column |\n| `col` | index of the column being added |",
+  "narration": {
+    "2": "All counts are reported modulo 10^9 + 7.",
+    "4": "Every number below 3^m encodes one possible coloring of a single column.",
+    "7": "Peel off one base-3 digit per row: that digit is the row's color.",
+    "11": "Keep the column only if no two vertically adjacent cells share a color.",
+    "12": "This column pattern is legal on its own.",
+    "15": "count is how many legal column patterns there are (at most 48).",
+    "19": "Two patterns can sit side by side only if every row has different colors in them.",
+    "20": "Remember that pattern j may follow pattern i.",
+    "24": "For the first column, each legal pattern is exactly one way to paint it.",
+    "25": "Add the remaining columns one at a time.",
+    "26": "next will hold the counts once this column is placed.",
+    "28": "Every pattern compatible with prev can be placed next.",
+    "29": "All ways ending in prev extend to ways ending in cur.",
+    "32": "The new column becomes the last one.",
+    "34": "Sum the ways over every possible last column pattern."
+  }
+}

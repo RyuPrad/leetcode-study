@@ -1,0 +1,48 @@
+{
+  "number": 3220,
+  "title": "Odd and Even Transactions",
+  "spec": "leetcode",
+  "statement": "One table lists payments:\n\n- `transactions(transaction_id, amount, transaction_date)`: one row per payment; `transaction_id` is unique, `amount` is a positive whole number and `transaction_date` is a date.\n\nA transaction is **odd** or **even** according to its `amount` (not its id). For every date that has at least one transaction, report:\n\n- `transaction_date`;\n- `odd_sum`: the total of that day's odd amounts, or `0` if the day has none;\n- `even_sum`: the total of that day's even amounts, or `0` if the day has none.\n\nOrder the rows by `transaction_date` ascending.",
+  "constraints": [
+    "transaction_id is unique in transactions",
+    "amount is a positive integer",
+    "transaction_date is a date (YYYY-MM-DD)"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "transactions": [["transaction_id","INT"],["amount","INT"],["transaction_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ transactions = [] }] = input;\n  const ids = new Set();\n  for (const [id, amount, day] of transactions) {\n    if (id === null || amount === null || day === null) return 'No value in transactions may be null.';\n    if (ids.has(id)) return `transaction_id ${id} appears twice.`;\n    ids.add(id);\n    if (amount <= 0) return `amount ${amount} must be positive.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)) return `transaction_date ${day} must look like 2024-07-01.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT transaction_date,\n       SUM(CASE WHEN amount % 2 = 1 THEN amount ELSE 0 END) AS odd_sum,\n       SUM(CASE WHEN amount % 2 = 0 THEN amount ELSE 0 END) AS even_sum\nFROM transactions\nGROUP BY transaction_date\nORDER BY transaction_date;",
+  "brute": "SELECT d.transaction_date AS transaction_date,\n       IFNULL((SELECT SUM(o.amount) FROM transactions AS o\n               WHERE o.transaction_date = d.transaction_date AND MOD(o.amount, 2) <> 0), 0) AS odd_sum,\n       IFNULL((SELECT SUM(e.amount) FROM transactions AS e\n               WHERE e.transaction_date = d.transaction_date AND MOD(e.amount, 2) = 0), 0) AS even_sum\nFROM (SELECT DISTINCT transaction_date FROM transactions) AS d\nORDER BY d.transaction_date",
+  "generator": "function generate(rand, size) {\n  const pad = n => String(n).padStart(2, '0');\n  const small = size === 'small';\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const days = small ? ['2024-07-01', '2024-07-02', '2024-07-03', '2024-06-30'] : Array.from({ length: 400 }, (_, i) => { const d = new Date(Date.UTC(2023, 0, 1 + i)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; });\n  const amounts = [1, 2, 50, 75, 120, 150, 200, 300, 999];\n  const transactions = [];\n  for (let i = 0; i < count; i++) {\n    const amount = small ? amounts[Math.floor(rand() * amounts.length)] : 1 + Math.floor(rand() * 100000);\n    transactions.push([small ? i + 1 : 5 + i * 2, amount, days[Math.floor(rand() * days.length)]]);\n  }\n  for (let i = transactions.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [transactions[i], transactions[j]] = [transactions[j], transactions[i]]; }\n  return [{ transactions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"transactions":[[1,150,"2024-07-01"],[2,200,"2024-07-01"],[3,75,"2024-07-01"],[4,300,"2024-07-02"],[5,50,"2024-07-02"],[6,120,"2024-07-03"]]}],"expected":{"columns":["transaction_date","odd_sum","even_sum"],"rows":[["2024-07-01",75,350],["2024-07-02",0,350],["2024-07-03",0,120]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"transactions":[]}]},
+    {"name":"Test 2","input":[{"transactions":[[1,7,"2024-01-05"]]}]},
+    {"name":"Test 3","input":[{"transactions":[[1,10,"2024-01-05"]]}]},
+    {"name":"Test 4","input":[{"transactions":[[1,3,"2024-03-02"],[2,5,"2024-03-02"],[3,8,"2024-03-01"],[4,6,"2024-03-01"]]}]},
+    {"name":"Test 5","input":[{"transactions":[[1,2,"2024-05-10"],[3,4,"2024-05-10"],[2,1,"2024-05-10"],[4,3,"2024-05-10"]]}]},
+    {"name":"Test 6","input":[{"transactions":[[9,100,"2024-12-31"],[8,1,"2023-12-31"],[7,99,"2024-01-01"],[6,2,"2024-01-01"]]}]},
+    {"name":"Test 7","input":[{"transactions":[[1,11,"2024-07-01"],[2,11,"2024-07-01"],[3,11,"2024-07-01"]]}]},
+    {"name":"Test 8","input":[{"transactions":[[1,999999,"2024-02-29"],[2,1000000,"2024-02-29"],[3,1,"2024-03-01"],[4,1000000,"2024-03-01"],[5,2,"2024-02-28"]]}]},
+    {"name":"Test 9","input":[{"transactions":[[1,150,"2024-07-03"],[2,200,"2024-07-01"],[3,75,"2024-07-02"],[4,300,"2024-07-01"],[5,51,"2024-07-03"],[6,120,"2024-07-02"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach day needs two totals from the same set of rows, split by the parity of `amount`. Grouping by date gives one row per day, and a **conditional sum** inside each group adds an amount only when it has the wanted parity, contributing `0` otherwise. Because the `ELSE 0` branch always contributes something, a day with no odd (or no even) amounts sums to `0` rather than `null`.\n\n## Approach\n\n1. Read `transactions` and `GROUP BY transaction_date`, so every day becomes one output row.\n2. `odd_sum`: `SUM(CASE WHEN amount % 2 = 1 THEN amount ELSE 0 END)` keeps only odd amounts.\n3. `even_sum`: the same with `amount % 2 = 0`.\n4. `ORDER BY transaction_date` lists the days from earliest to latest.\n\n## Example 1, step by step\n\n- 2024-07-01 holds 150, 200 and 75. Only 75 is odd, so `odd_sum` = 75; 150 + 200 gives `even_sum` = 350.\n- 2024-07-02 holds 300 and 50, both even: `odd_sum` = 0 (every row took the `ELSE 0` branch), `even_sum` = 350.\n- 2024-07-03 holds only 120: `odd_sum` = 0, `even_sum` = 120.\n\nNote that the ids 1 and 3 are odd but play no part: parity is taken from the amount.\n\n## Complexity\n\n- Time: O(n log n) for n transactions, for grouping and sorting by date (O(n) with hashing).\n- Space: O(d) for the d distinct dates.\n\n## Pitfalls\n\n- `SUM(CASE WHEN ... THEN amount END)` without `ELSE 0` returns `null` for a day with no matching amounts; the task wants `0`.\n- Testing `transaction_id % 2` instead of `amount % 2` gives plausible-looking but wrong totals.\n- Forgetting `ORDER BY transaction_date`: grouping does not promise any row order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `transaction_date` | the day, one output row per distinct value |\n| `odd_sum` | sum of the day's amounts with `amount % 2 = 1`, else 0 |\n| `even_sum` | sum of the day's amounts with `amount % 2 = 0`, else 0 |",
+  "narration": {
+    "2": "A conditional sum adds an amount only when it is odd; every other row adds 0, so a day without odd amounts still gets 0.",
+    "3": "The same pattern with the even test produces the even total from the same group.",
+    "5": "Grouping by date turns each day into one output row.",
+    "6": "Days are listed from earliest to latest, as required."
+  }
+}

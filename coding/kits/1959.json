@@ -1,0 +1,61 @@
+{
+  "number": 1959,
+  "title": "Minimum Total Space Wasted With K Resizing Operations",
+  "spec": "leetcode",
+  "statement": "A dynamic array must hold `nums[t]` elements at each moment `t` (0-indexed, for every `t` from `0` to `nums.length - 1`). You choose the array's capacity at every moment; the capacity at moment `t` must be at least `nums[t]`, and the waste at that moment is the capacity minus `nums[t]`.\n\nThe starting capacity is free to pick and costs nothing, but after that the capacity may change (to any value) at most `k` times in total. Return the smallest possible sum of the waste over all moments.",
+  "constraints": [
+    "1 <= nums.length <= 200",
+    "1 <= nums[i] <= 10^6",
+    "0 <= k <= nums.length - 1"
+  ],
+  "signature": "int minSpaceWastedKResizing(int[] nums, int k)",
+  "entry": "minSpaceWastedKResizing",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 200) return 'nums needs 1 to 200 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1000000)) return 'Each value is an integer from 1 to 10^6.';\n  if (!Number.isInteger(k) || k < 0 || k > nums.length - 1) return 'k is between 0 and nums.length - 1.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minSpaceWastedKResizing(nums, k) {\n  const n = nums.length;\n  const dp = Array.from({ length: n + 1 }, () => new Array(k + 2).fill(Infinity));\n  dp[0][0] = 0;\n\n  for (let end = 1; end <= n; end++) {\n    let high = 0;\n    let sum = 0;\n    for (let start = end; start >= 1; start--) {\n      high = Math.max(high, nums[start - 1]);\n      sum += nums[start - 1];\n      const waste = high * (end - start + 1) - sum;\n      for (let segments = 1; segments <= k + 1; segments++) {\n        const candidate = dp[start - 1][segments - 1] + waste;\n        if (candidate < dp[end][segments]) {\n          dp[end][segments] = candidate;\n        }\n      }\n    }\n  }\n  return Math.min(...dp[n]);\n}",
+  "brute": "function minSpaceWastedKResizing(nums, k) {\n  const n = nums.length;\n  let best = Infinity;\n  // Bit i of mask set means the capacity changes right before moment i + 1.\n  for (let mask = 0; mask < (1 << (n - 1)); mask++) {\n    let cuts = 0;\n    for (let b = 0; b < n - 1; b++) if (mask & (1 << b)) cuts++;\n    if (cuts > k) continue;\n    let total = 0;\n    let from = 0;\n    for (let t = 0; t < n; t++) {\n      if (t === n - 1 || (mask & (1 << t))) {\n        const part = nums.slice(from, t + 1);\n        const cap = Math.max(...part);\n        for (const v of part) total += cap - v;\n        from = t + 1;\n      }\n    }\n    best = Math.min(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 200 : 1 + Math.floor(rand() * 9);\n  const top = size === 'large' ? 1000000 : (rand() < 0.5 ? 5 : 40);\n  const nums = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  if (size === 'large' && rand() < 0.5) nums.sort((a, b) => a - b);\n  const k = size === 'large' ? Math.floor(rand() * (rand() < 0.5 ? 10 : n)) : Math.floor(rand() * n);\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[10,20],0],"expected":10},
+    {"name":"Example 2","input":[[10,20,30],1],"expected":10},
+    {"name":"Example 3","input":[[10,20,15,30,20],2],"expected":15}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7],0]},
+    {"name":"Test 2","input":[[5,5,5,5],0]},
+    {"name":"Test 3","input":[[1,2,3,4,5,6],0]},
+    {"name":"Test 4","input":[[9,1,8,2,7,3],5]},
+    {"name":"Test 5","input":[[1000000,1,1000000,1,1000000],1]},
+    {"name":"Test 6","input":[[6,5,4,3,2,1],2]},
+    {"name":"Test 7","input":[[3,10,3,10,3,10,3],2]},
+    {"name":"Test 8","input":[[1,1,1,1000000,1,1,1],1]},
+    {"name":"Test 9","input":[[4,8,2,9,1,7,3,6,5],3]},
+    {"name":"Test 10","input":[[2,9,4,9,5,1,8,8,3,6],4]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach resize starts a new block of consecutive moments, so the timeline is cut into at most `k + 1` contiguous blocks. Inside one block the best capacity is the block's largest value, and its waste is `max * length - sum`. Trying every way to cut is exponential; instead, remember the cheapest way to cover each prefix with a given number of blocks.\n\n## Approach\n\n1. Let `dp[i][s]` be the least waste for the first `i` moments split into exactly `s` blocks. Start with `dp[0][0] = 0` and everything else `Infinity`.\n2. For each prefix length `end`, walk the last block's first moment `start` from `end` down to `1`, growing `high` (the block maximum) and `sum` as it widens.\n3. The block's `waste` is `high * (end - start + 1) - sum`.\n4. For every block count `segments` up to `k + 1`, try `dp[start - 1][segments - 1] + waste` and keep the smaller value in `dp[end][segments]`.\n5. Return the minimum of `dp[n]` over all block counts.\n\n## Example 1, step by step\n\n`nums = [10, 20]`, `k = 0`, so only one block is allowed. For `end = 1` the block `[10]` wastes 0, giving `dp[1][1] = 0`. For `end = 2`, the block `[20]` alone would need `dp[1][0]`, which is `Infinity`; the block `[10, 20]` has `high = 20`, `sum = 30`, waste `40 - 30 = 10`, so `dp[2][1] = 10`. The answer is `10`.\n\n## Complexity\n\n- Time: O(n² · k): every (`start`, `end`) pair is tried for each block count.\n- Space: O(n · k) for the table.\n\n## Pitfalls\n\n- `k` counts resizes, so there can be `k + 1` blocks, not `k`.\n- Recomputing a block's maximum and sum from scratch costs an extra factor of n; extend them as `start` moves left instead.\n- Unreachable states must stay `Infinity` (for example `dp[1][0]`), or a block count of zero would look free.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp[i][s]` | least waste for the first `i` moments using exactly `s` blocks |\n| `end` | length of the prefix being solved |\n| `start` | 1-based first moment of the last block |\n| `high`, `sum` | maximum and sum of the last block |\n| `waste` | waste of the last block at capacity `high` |\n| `segments` | number of blocks including the last one |",
+  "narration": {
+    "3": "dp[i][s] will hold the least waste for the first i moments using exactly s blocks; Infinity marks impossible states.",
+    "4": "Covering nothing with zero blocks wastes nothing.",
+    "6": "Solve each prefix length end in turn.",
+    "9": "Let the last block start at moment start, widening it one moment to the left each step.",
+    "10": "Keep the block's maximum up to date; it is the cheapest capacity for the whole block.",
+    "12": "With capacity high, the block wastes high times its length minus its sum.",
+    "13": "Try every number of blocks, up to k + 1.",
+    "14": "Cover the part before the block with one fewer block, then add this block's waste.",
+    "15": "Is that cheaper than the best way found so far?",
+    "16": "Yes: keep it.",
+    "21": "Any block count up to k + 1 is allowed, so take the smallest total for the whole array."
+  }
+}

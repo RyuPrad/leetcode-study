@@ -1,0 +1,78 @@
+{
+  "number": 1948,
+  "title": "Delete Duplicate Folders in System",
+  "spec": "leetcode",
+  "statement": "`paths` describes a tree of folders: each `paths[i]` lists the folder names on the way from the top of the file system down to one folder, so `[\"one\", \"two\", \"three\"]` stands for `/one/two/three`. Every folder is listed exactly once, and the parent of every folder below the top level is listed too.\n\nCall two different folders **identical** when both have at least one subfolder and their contents match all the way down: they have the same set of subfolder names, and the subfolders with the same name have matching contents in turn (two empty subfolders with the same name match). The two folders' own names, depths and positions do not matter.\n\n- Every folder that is identical to at least one other folder is marked, together with everything inside it.\n- All marked folders are then deleted in one pass. Folders that only become identical after this deletion are kept.\n\nReturn the paths of the folders that remain, in any order.",
+  "constraints": [
+    "1 <= paths.length <= 2 * 10^4",
+    "1 <= paths[i].length <= 500",
+    "1 <= paths[i][j].length <= 10",
+    "1 <= sum(paths[i][j].length) <= 2 * 10^5",
+    "paths[i][j] contains only lowercase English letters",
+    "No two paths name the same folder",
+    "The parent of every folder below the top level is also in paths"
+  ],
+  "signature": "List<List<String>> deleteDuplicateFolder(List<List<String>> paths)",
+  "entry": "deleteDuplicateFolder",
+  "kind": "function",
+  "parameters": [
+    "paths"
+  ],
+  "compare": "unordered",
+  "validator": "function validate([paths]) {\n  if (!Array.isArray(paths) || paths.length < 1 || paths.length > 20000) return 'paths needs 1 to 20000 folders.';\n  const seen = new Set();\n  let letters = 0;\n  for (const path of paths) {\n    if (!Array.isArray(path) || path.length < 1 || path.length > 500) return 'Each path has 1 to 500 names.';\n    for (const name of path) {\n      if (typeof name !== 'string' || !/^[a-z]{1,10}$/.test(name)) return 'Each name is 1 to 10 lowercase letters.';\n      letters += name.length;\n    }\n    const key = path.join('/');\n    if (seen.has(key)) return 'No folder may be listed twice.';\n    seen.add(key);\n  }\n  if (letters > 200000) return 'The names may hold at most 200000 letters in total.';\n  for (const path of paths) {\n    if (path.length > 1 && !seen.has(path.slice(0, -1).join('/'))) return 'Every folder needs its parent folder listed.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function deleteDuplicateFolder(paths) {\n  const root = { children: new Map(), key: '' };\n  for (const path of paths) {\n    let node = root;\n    for (const name of path) {\n      if (!node.children.has(name)) {\n        node.children.set(name, { children: new Map(), key: '' });\n      }\n      node = node.children.get(name);\n    }\n  }\n\n  const counts = new Map();\n  const serialize = (node) => {\n    if (node.children.size === 0) return '';\n    const parts = [];\n    for (const [name, child] of node.children) {\n      parts.push(name + '(' + serialize(child) + ')');\n    }\n    parts.sort();\n    node.key = parts.join('');\n    counts.set(node.key, (counts.get(node.key) || 0) + 1);\n    return node.key;\n  };\n  serialize(root);\n\n  const result = [];\n  const current = [];\n  const collect = (node) => {\n    for (const [name, child] of node.children) {\n      if (child.key !== '' && counts.get(child.key) > 1) continue;\n      current.push(name);\n      result.push([...current]);\n      collect(child);\n      current.pop();\n    }\n  };\n  collect(root);\n  return result;\n}",
+  "brute": "function deleteDuplicateFolder(paths) {\n  // Build the tree, then compare every pair of non-empty folders directly, with no hashing.\n  const top = Object.create(null);\n  const folders = [];\n  for (const p of paths) {\n    let at = top;\n    for (const nm of p) {\n      if (!(nm in at)) at[nm] = Object.create(null);\n      at = at[nm];\n    }\n    folders.push({ p, at });\n  }\n  const same = (x, y) => {\n    const kx = Object.keys(x).sort(), ky = Object.keys(y).sort();\n    if (kx.join('/') !== ky.join('/')) return false;\n    return kx.every(k => same(x[k], y[k]));\n  };\n  const marked = new Set();\n  for (const f of folders) {\n    if (Object.keys(f.at).length === 0) continue;\n    if (folders.some(g => g !== f && Object.keys(g.at).length > 0 && same(f.at, g.at))) marked.add(f.p.join('/'));\n  }\n  return paths.filter(p => p.every((_, i) => !marked.has(p.slice(0, i + 1).join('/'))));\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const target = large ? 1500 + Math.floor(rand() * 500) : (rand() < 0.15 ? 1 : 3 + Math.floor(rand() * 9));\n  const maxDepth = large ? 9 : 4;\n  const pool = large ? ['a', 'b', 'c', 'd', 'e', 'f', 'xy', 'docs', 'src', 'tmp'] : (rand() < 0.5 ? ['a', 'b'] : ['a', 'b', 'c']);\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const root = { children: new Map(), depth: 0 };\n  const nodes = [root];\n  let count = 0;\n  const add = (parent, name) => {\n    const child = { children: new Map(), depth: parent.depth + 1 };\n    parent.children.set(name, child);\n    nodes.push(child);\n    count++;\n    return child;\n  };\n  const snapshot = node => [...node.children].map(([name, child]) => [name, snapshot(child)]);\n  const height = plain => plain.reduce((h, [, sub]) => Math.max(h, 1 + height(sub)), 0);\n  const sizeOf = plain => plain.reduce((s, [, sub]) => s + 1 + sizeOf(sub), 0);\n  const plant = (parent, plain) => { for (const [name, sub] of plain) plant(add(parent, name), sub); };\n  let guard = 0;\n  while (count < target && guard++ < 100000) {\n    const parent = pick(nodes);\n    const free = pool.filter(name => !parent.children.has(name));\n    if (!free.length || parent.depth >= maxDepth) continue;\n    // Often copy an existing folder's contents somewhere else, so identical folders are common.\n    if (rand() < (large ? 0.35 : 0.7)) {\n      const source = pick(nodes);\n      const plain = snapshot(source);\n      if (plain.length && parent.depth + 1 + height(plain) <= maxDepth && count + 1 + sizeOf(plain) <= target + (large ? 0 : 4)) {\n        plant(add(parent, pick(free)), plain);\n        continue;\n      }\n    }\n    add(parent, pick(free));\n  }\n  const paths = [];\n  const walk = (node, trail) => {\n    for (const [name, child] of node.children) {\n      paths.push([...trail, name]);\n      walk(child, [...trail, name]);\n    }\n  };\n  walk(root, []);\n  for (let i = paths.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [paths[i], paths[j]] = [paths[j], paths[i]];\n  }\n  return [paths];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[["a"],["c"],["d"],["a","b"],["c","b"],["d","a"]]],"expected":[["d"],["d","a"]]},
+    {"name":"Example 2","input":[[["a"],["c"],["a","b"],["c","b"],["a","b","x"],["a","b","x","y"],["w"],["w","y"]]],"expected":[["c"],["c","b"],["a"],["a","b"]]},
+    {"name":"Example 3","input":[[["a","b"],["c","d"],["c"],["a"]]],"expected":[["c"],["c","d"],["a"],["a","b"]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[["a"]]]},
+    {"name":"Test 2","input":[[["a"],["b"],["c"]]]},
+    {"name":"Test 3","input":[[["a"],["b"],["a","x"],["b","x"]]]},
+    {"name":"Test 4","input":[[["a"],["b"],["a","x"],["b","y"]]]},
+    {"name":"Test 5","input":[[["a"],["a","b"],["a","b","c"],["a","c"]]]},
+    {"name":"Test 6","input":[[["a"],["a","x"],["a","x","y"],["a","z"],["b"],["b","x"],["b","x","y"],["b","z"],["b","w"]]]},
+    {"name":"Test 7","input":[[["p"],["p","q"],["p","q","r"],["s"],["s","q"],["s","q","r"],["t"],["t","q"],["t","q","r"]]]},
+    {"name":"Test 8","input":[[["m"],["m","a"],["m","a","k"],["m","b"],["m","b","k"],["n"],["n","k"]]]},
+    {"name":"Test 9","input":[[["a"],["a","b"],["a","b","c"],["a","b","c","d"],["e"],["e","f"]]]},
+    {"name":"Test 10","input":[[["x"],["x","y"],["x","y","x"],["x","y","x","y"],["z"],["z","x"],["z","x","y"]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe paths describe a tree, so first rebuild it as a trie: one node per folder, children keyed by name. Two folders are identical exactly when the shapes below them are equal, names included. Comparing every pair of folders subtree by subtree works but is far too slow on big trees. Instead, give each folder a **canonical string** for its contents, built bottom-up: each child contributes `name(childString)`, and the pieces are sorted so the order the paths arrived in does not matter. Equal contents give equal strings, so one hash map of string counts finds every duplicate.\n\n## Approach\n\n1. Insert every path into a trie rooted at `root`; each node has `children` (a `Map`) and a `key`.\n2. `serialize` each node after its children: a leaf returns `''`; otherwise collect `name(childKey)` for each child, sort, join, store it in `node.key` and add one to `counts` for that key.\n3. Walk the trie again with `collect`. Skip a child whose key is non-empty and appears more than once: it is deleted along with its whole subtree. Otherwise record its path from `current` and descend.\n4. Return `result`.\n\n## Example 1, step by step\n\nFolders `/a/b`, `/c/b` and `/d/a` are leaves, so their keys are `''`. Then `/a` gets key `b()`, `/c` gets `b()` and `/d` gets `a()`, so `counts` maps `b()` to 2 and `a()` to 1. In `collect`, `/a` and `/c` are skipped (their key appears twice), and `/d` survives along with `/d/a`, giving `[[\"d\"], [\"d\",\"a\"]]`.\n\n## Complexity\n\n- Time: O(S log S), where S is the number of characters in `paths`. Each name is copied into the key of every ancestor, and there are exactly as many ancestor–descendant pairs as names in all the paths, so all keys together are O(S) long; sorting the pieces adds the log factor.\n- Space: O(S) for the trie and its keys.\n\n## Pitfalls\n\n- Leaves are never identical to each other (they have no subfolders), so an empty key must never count as a duplicate.\n- Sort the children's pieces; insertion order differs between equal folders.\n- Wrap each child's string in brackets; plain concatenation would let different trees produce the same string.\n- Delete once: decide from the original tree, not after removing folders.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `root` | trie node above the top-level folders |\n| `node.children` | map from a subfolder's name to its node |\n| `node.key` | canonical string of the folder's contents (`''` for a leaf) |\n| `counts` | how many folders have each key |\n| `parts` | the `name(childKey)` pieces of one folder |\n| `current` | path of names to the folder being visited |\n| `result` | paths of the folders that remain |",
+  "narration": {
+    "2": "An empty root node sits above all top-level folders.",
+    "3": "Insert each path into the trie, one name at a time.",
+    "5": "Follow the path's names downward from the root.",
+    "6": "Create the folder's node the first time it is seen.",
+    "9": "Step into that folder.",
+    "13": "counts will record how many folders share each contents string.",
+    "14": "serialize builds a canonical string for a folder's contents, bottom-up.",
+    "15": "A leaf has no contents; it can never be identical to anything.",
+    "17": "Look at each subfolder of this folder.",
+    "18": "Describe the child by its name and, in brackets, its own contents string (computed first).",
+    "20": "Sort the pieces so the order the paths arrived in does not matter.",
+    "21": "The folder's key is the joined, sorted pieces.",
+    "22": "Count this key; a count above one means duplicates.",
+    "25": "Compute the keys for the whole tree.",
+    "29": "collect walks the tree again and keeps the folders that survive.",
+    "30": "Visit each subfolder of this folder.",
+    "31": "A non-empty key shared with another folder: skip this folder and everything inside it.",
+    "32": "Otherwise extend the current path with this name...",
+    "33": "...record the surviving folder's path...",
+    "34": "...and look inside it.",
+    "35": "Step back out before trying the next sibling.",
+    "38": "Start collecting from the top level.",
+    "39": "Return every folder that was not deleted."
+  }
+}

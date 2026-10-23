@@ -1,0 +1,73 @@
+{
+  "number": 1801,
+  "title": "Number of Orders in the Backlog",
+  "spec": "leetcode",
+  "statement": "Each entry `orders[i] = [price, amount, orderType]` stands for `amount` identical orders at `price`; `orderType` is `0` for buy orders and `1` for sell orders. The batches arrive in the given order, and every order of one batch arrives before any order of the next.\n\nA backlog of unexecuted orders starts empty. Orders are handled one at a time:\n\n- An arriving **buy** order checks the cheapest sell order in the backlog. If that sell price is at most the buy price, the two orders trade and the sell order leaves the backlog; otherwise the buy order joins the backlog.\n- An arriving **sell** order checks the highest-priced buy order in the backlog. If that buy price is at least the sell price, the two orders trade and the buy order leaves the backlog; otherwise the sell order joins the backlog.\n\nOnce every order has been handled, return how many orders (buy and sell together) remain in the backlog, modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= orders.length <= 10^5",
+    "orders[i].length == 3",
+    "1 <= price, amount <= 10^9",
+    "orderType is 0 (buy) or 1 (sell)"
+  ],
+  "signature": "int getNumberOfBacklogOrders(int[][] orders)",
+  "entry": "getNumberOfBacklogOrders",
+  "kind": "function",
+  "parameters": [
+    "orders"
+  ],
+  "validator": "function validate([orders]) {\n  if (!Array.isArray(orders) || orders.length < 1 || orders.length > 100000) return 'orders needs 1 to 10^5 batches.';\n  for (const order of orders) {\n    if (!Array.isArray(order) || order.length !== 3) return 'Each batch is [price, amount, orderType].';\n    const [price, amount, type] = order;\n    if (!Number.isInteger(price) || price < 1 || price > 1e9) return 'Each price is an integer from 1 to 10^9.';\n    if (!Number.isInteger(amount) || amount < 1 || amount > 1e9) return 'Each amount is an integer from 1 to 10^9.';\n    if (type !== 0 && type !== 1) return 'orderType is 0 (buy) or 1 (sell).';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function getNumberOfBacklogOrders(orders) {\n  const buys = [];\n  const sells = [];\n  const buyFirst = (a, b) => a[0] > b[0];\n  const sellFirst = (a, b) => a[0] < b[0];\n  const push = (heap, batch, before) => {\n    heap.push(batch);\n    let i = heap.length - 1;\n    while (i > 0 && before(heap[i], heap[(i - 1) >> 1])) {\n      const parent = (i - 1) >> 1;\n      [heap[i], heap[parent]] = [heap[parent], heap[i]];\n      i = parent;\n    }\n  };\n  const pop = (heap, before) => {\n    const last = heap.pop();\n    if (heap.length === 0) return;\n    heap[0] = last;\n    let i = 0;\n    while (true) {\n      let top = i;\n      for (const child of [2 * i + 1, 2 * i + 2]) {\n        if (child < heap.length && before(heap[child], heap[top])) top = child;\n      }\n      if (top === i) return;\n      [heap[i], heap[top]] = [heap[top], heap[i]];\n      i = top;\n    }\n  };\n\n  for (const [price, amount, type] of orders) {\n    let remaining = amount;\n    if (type === 0) {\n      while (remaining > 0 && sells.length > 0 && sells[0][0] <= price) {\n        const traded = Math.min(remaining, sells[0][1]);\n        remaining -= traded;\n        sells[0][1] -= traded;\n        if (sells[0][1] === 0) pop(sells, sellFirst);\n      }\n      if (remaining > 0) push(buys, [price, remaining], buyFirst);\n    } else {\n      while (remaining > 0 && buys.length > 0 && buys[0][0] >= price) {\n        const traded = Math.min(remaining, buys[0][1]);\n        remaining -= traded;\n        buys[0][1] -= traded;\n        if (buys[0][1] === 0) pop(buys, buyFirst);\n      }\n      if (remaining > 0) push(sells, [price, remaining], sellFirst);\n    }\n  }\n\n  let total = 0;\n  for (const [, count] of [...buys, ...sells]) total += count;\n  return total % 1000000007;\n}",
+  "brute": "function getNumberOfBacklogOrders(orders) {\n  // Keep the backlog as plain lists of single prices with counts and scan for the best one each time.\n  const book = { 0: new Map(), 1: new Map() };\n  for (const [price, amount, type] of orders) {\n    let left = amount;\n    const other = book[1 - type];\n    while (left > 0) {\n      const prices = [...other.keys()];\n      if (prices.length === 0) break;\n      const best = type === 0 ? Math.min(...prices) : Math.max(...prices);\n      if (type === 0 ? best > price : best < price) break;\n      const take = Math.min(left, other.get(best));\n      left -= take;\n      if (other.get(best) === take) other.delete(best); else other.set(best, other.get(best) - take);\n    }\n    if (left > 0) book[type].set(price, (book[type].get(price) || 0) + left);\n  }\n  let sum = 0n;\n  for (const side of [book[0], book[1]]) for (const count of side.values()) sum += BigInt(count);\n  return Number(sum % 1000000007n);\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const n = 2000;\n    const spread = rand() < 0.5 ? 1000 : 1000000000;\n    const orders = [];\n    for (let i = 0; i < n; i++) orders.push([int(1, spread), rand() < 0.3 ? int(1, 1000000000) : int(1, 1000), int(0, 1)]);\n    return [orders];\n  }\n  const n = int(1, 8);\n  const top = int(1, 8);\n  const orders = [];\n  for (let i = 0; i < n; i++) {\n    const amount = rand() < 0.15 ? int(999999990, 1000000000) : int(1, 6);\n    orders.push([int(1, top), amount, int(0, 1)]);\n  }\n  return [orders];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[10,5,0],[15,2,1],[25,1,1],[30,4,0]]],"expected":6},
+    {"name":"Example 2","input":[[[7,1000000000,1],[15,3,0],[5,999999995,0],[5,1,1]]],"expected":999999984}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[5,3,0]]]},
+    {"name":"Test 2","input":[[[5,3,0],[5,3,1]]]},
+    {"name":"Test 3","input":[[[5,3,0],[6,3,1]]]},
+    {"name":"Test 4","input":[[[1,2,0],[10,3,0],[5,4,1]]]},
+    {"name":"Test 5","input":[[[10,1,1],[9,1,1],[8,1,1],[7,1,1],[20,10,0]]]},
+    {"name":"Test 6","input":[[[1,1000000000,0],[2,1000000000,0],[3,1000000000,1]]]},
+    {"name":"Test 7","input":[[[4,2,1],[4,2,1],[9,3,0],[3,5,0],[3,2,1],[1,7,1]]]},
+    {"name":"Test 8","input":[[[100,6,0],[50,2,0],[75,3,0],[60,10,1],[40,1,1]]]},
+    {"name":"Test 9","input":[[[1000000000,1000000000,1],[1000000000,1000000000,0],[1,1,1],[1,1,0]]]},
+    {"name":"Test 10","input":[[[3,1,0],[3,1,1],[3,1,0],[3,1,1],[3,1,0]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nReplaying the market one order at a time is hopeless when a single batch can hold 10^9 orders. But orders inside a batch are identical, so the backlog can store **batches** `[price, count]` and trade a whole chunk at once. An arriving buy only ever looks at the cheapest sell, and an arriving sell only at the dearest buy, so each side of the backlog is a priority queue: a max-heap of buys and a min-heap of sells. A brute force would scan the whole backlog for the best price on every trade, which is quadratic.\n\n## Approach\n\n1. Keep `buys` as a max-heap and `sells` as a min-heap of `[price, count]` pairs (`push` and `pop` maintain the heap order given by `buyFirst` or `sellFirst`).\n2. For each batch, set `remaining` to its amount.\n3. For a buy batch, while `remaining > 0` and the cheapest sell costs at most `price`, trade `traded = min(remaining, top count)` orders, subtract it from both sides, and pop the sell batch once it is empty.\n4. If anything is left, push `[price, remaining]` into `buys`. Sell batches mirror this against the dearest buy.\n5. Add up all counts left in both heaps and return the sum modulo `10^9 + 7`.\n\n## Example 1, step by step\n\n- `[10,5,0]`: no sells, so `buys = [[10,5]]`.\n- `[15,2,1]`: best buy 10 < 15, so `sells = [[15,2]]`.\n- `[25,1,1]`: still no match, `sells` gains `[25,1]`.\n- `[30,4,0]`: sell 15 ≤ 30 trades 2 (`remaining = 2`), then sell 25 trades 1 (`remaining = 1`); `sells` is empty, so `[30,1]` joins `buys`.\n\nThe backlog holds 5 + 1 = **6** orders.\n\n## Complexity\n\n- Time: O(n log n): every batch is pushed at most once and popped at most once, and a batch that is only partly used ends its loop.\n- Space: O(n) for the two heaps.\n\n## Pitfalls\n\n- Trade in chunks with `Math.min`; looping per single order times out on amounts near 10^9.\n- The final count can reach about 10^14: a JavaScript number or a 64-bit `long` holds it, but a 32-bit `int` overflows, so in Java or C add up in 64 bits (or reduce modulo as you go).\n- The match test is inclusive on both sides: `sell <= buy` trades.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `buys`, `sells` | heaps of backlog batches `[price, count]` |\n| `buyFirst`, `sellFirst` | heap orderings: higher price first, lower price first |\n| `remaining` | orders of the current batch not yet traded |\n| `traded` | orders matched in one step |\n| `total` | orders left in the backlog |",
+  "narration": {
+    "2": "The buy side of the backlog: a max-heap of [price, count] batches.",
+    "3": "The sell side of the backlog: a min-heap of [price, count] batches.",
+    "4": "Buys are ordered so the highest price sits on top.",
+    "5": "Sells are ordered so the lowest price sits on top.",
+    "6": "push adds a batch at the bottom of a heap and sifts it up.",
+    "9": "Swap upward while the new batch should come before its parent.",
+    "15": "pop removes the top batch and restores the heap order.",
+    "18": "Move the last batch to the root, then sift it down.",
+    "23": "Pick whichever child should come first, if it beats the current node.",
+    "25": "The node is already in place, so the heap is valid again.",
+    "31": "Handle the batches in arrival order.",
+    "32": "remaining counts the orders of this batch that have not traded yet.",
+    "33": "A buy batch trades against the cheapest sells.",
+    "34": "Keep trading while orders remain and the cheapest sell costs no more than this buy price.",
+    "35": "Trade as many orders as both batches allow in one chunk.",
+    "36": "Those orders of the incoming batch are done.",
+    "37": "The same number leaves the top sell batch.",
+    "38": "A sell batch that is used up leaves the heap.",
+    "40": "Unmatched buy orders join the backlog as one batch.",
+    "42": "A sell batch trades against the dearest buys, as long as they pay at least this price.",
+    "48": "Unmatched sell orders join the backlog as one batch.",
+    "53": "Add up every order still waiting on either side.",
+    "54": "Return the backlog size modulo 10^9 + 7."
+  }
+}

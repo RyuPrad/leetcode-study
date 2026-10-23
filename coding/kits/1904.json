@@ -1,0 +1,57 @@
+{
+  "number": 1904,
+  "title": "The Number of Full Rounds You Have Played",
+  "spec": "leetcode",
+  "statement": "An online chess tournament runs on a 24-hour clock and starts a new 15-minute round at every quarter hour: `00:00`, `00:15`, `00:30`, and so on up to `23:45`, every day.\n\nYou log in at `loginTime` and log out at `logoutTime`, both strings in the form `\"hh:mm\"`. When `logoutTime` is earlier than `loginTime`, your session runs through midnight and ends at `logoutTime` on the following day. The two times are never equal.\n\nReturn how many rounds you played in full: rounds that began at or after your login and finished at or before your logout.",
+  "constraints": [
+    "loginTime and logoutTime have the format hh:mm",
+    "00 <= hh <= 23",
+    "00 <= mm <= 59",
+    "loginTime and logoutTime are different"
+  ],
+  "signature": "int numberOfRounds(String loginTime, String logoutTime)",
+  "entry": "numberOfRounds",
+  "kind": "function",
+  "parameters": [
+    "loginTime",
+    "logoutTime"
+  ],
+  "validator": "function validate([loginTime, logoutTime]) {\n  for (const t of [loginTime, logoutTime]) {\n    if (typeof t !== 'string' || !/^\\d\\d:\\d\\d$/.test(t)) return 'Times must look like \"hh:mm\".';\n    if (Number(t.slice(0, 2)) > 23) return 'Hours go from 00 to 23.';\n    if (Number(t.slice(3)) > 59) return 'Minutes go from 00 to 59.';\n  }\n  if (loginTime === logoutTime) return 'loginTime and logoutTime must differ.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numberOfRounds(loginTime, logoutTime) {\n  const start = Number(loginTime.slice(0, 2)) * 60 + Number(loginTime.slice(3));\n  let end = Number(logoutTime.slice(0, 2)) * 60 + Number(logoutTime.slice(3));\n  if (end < start) {\n    end += 24 * 60;\n  }\n  const firstRound = Math.ceil(start / 15);\n  const lastRound = Math.floor(end / 15);\n  return Math.max(0, lastRound - firstRound);\n}",
+  "brute": "function numberOfRounds(loginTime, logoutTime) {\n  const [h1, m1] = loginTime.split(':').map(Number);\n  const [h2, m2] = logoutTime.split(':').map(Number);\n  const login = h1 * 60 + m1;\n  const logout = h2 * 60 + m2 + (h2 * 60 + m2 < login ? 1440 : 0);\n  // Walk over every round of today and tomorrow and test whether it fits inside the session.\n  let count = 0;\n  for (let begin = 0; begin < 2 * 1440; begin += 15) {\n    if (begin >= login && begin + 15 <= logout) count++;\n  }\n  return count;\n}",
+  "generator": "function generate(rand, size) {\n  const pad = (v) => String(v).padStart(2, '0');\n  // Times land on a quarter hour or right next to one often, as those are the interesting edges.\n  const minute = () => {\n    const pick = rand();\n    if (pick < 0.25) return 15 * Math.floor(rand() * 4);\n    if (pick < 0.5) return Math.min(59, 15 * Math.floor(rand() * 4) + (rand() < 0.5 ? 1 : 14));\n    return Math.floor(rand() * 60);\n  };\n  const time = () => pad(Math.floor(rand() * 24)) + ':' + pad(minute());\n  const loginTime = time();\n  let logoutTime = time();\n  // A short session within the same hour shows the case where no round fits.\n  if (size === 'small' && rand() < 0.2) logoutTime = loginTime.slice(0, 3) + pad(Math.floor(rand() * 60));\n  while (logoutTime === loginTime) logoutTime = time();\n  return [loginTime, logoutTime];\n}",
+  "examples": [
+    {"name":"Example 1","input":["09:31","10:14"],"expected":1},
+    {"name":"Example 2","input":["21:30","03:00"],"expected":22}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["00:00","23:59"]},
+    {"name":"Test 2","input":["23:59","00:00"]},
+    {"name":"Test 3","input":["00:47","00:57"]},
+    {"name":"Test 4","input":["12:00","12:15"]},
+    {"name":"Test 5","input":["12:00","12:14"]},
+    {"name":"Test 6","input":["23:45","00:00"]},
+    {"name":"Test 7","input":["00:01","00:00"]},
+    {"name":"Test 8","input":["18:51","04:54"]},
+    {"name":"Test 9","input":["10:15","10:45"]},
+    {"name":"Test 10","input":["20:00","06:00"]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nRounds are fixed 15-minute slots, so counting them is arithmetic on minutes. Turn both times into minutes after midnight. A round fits only if it starts at or after the login, so the first usable slot boundary is the login rounded **up** to a multiple of 15; it must end by the logout, so the last usable boundary is the logout rounded **down**. The rounds in between are the answer. A brute force could test each of the 192 slots in two days one by one; the rounding does it in O(1).\n\n## Approach\n\n1. Convert `loginTime` to `start` and `logoutTime` to `end`, in minutes since midnight.\n2. If `end < start`, the session crosses midnight: add 24 * 60 to `end`.\n3. `firstRound = ceil(start / 15)` is the index of the first slot that begins after login.\n4. `lastRound = floor(end / 15)` is the index of the boundary at or before logout.\n5. Return `lastRound - firstRound`, but never less than 0.\n\n## Example 1, step by step\n\n`\"09:31\"` gives `start = 571` and `\"10:14\"` gives `end = 614`, no midnight wrap. `firstRound = ceil(571 / 15) = 39` (09:45) and `lastRound = floor(614 / 15) = 40` (10:00). One round, 09:45 to 10:00, fits: the answer is `40 - 39 = 1`.\n\n## Complexity\n\n- Time: O(1): a fixed amount of parsing and arithmetic.\n- Space: O(1).\n\n## Pitfalls\n\n- A short session inside one slot, such as `\"00:47\"` to `\"00:57\"`, gives `lastRound - firstRound = -1`; clamp it to 0.\n- Round the login up and the logout down; rounding both the same way overcounts.\n- Only wrap when logout is strictly earlier; the times are never equal.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `start` | login time in minutes after midnight |\n| `end` | logout time in minutes, plus a day if it wrapped |\n| `firstRound` | index of the first quarter hour at or after `start` |\n| `lastRound` | index of the last quarter hour at or before `end` |",
+  "narration": {
+    "2": "Turn the login time into minutes after midnight.",
+    "3": "Do the same for the logout time.",
+    "4": "A logout earlier than the login means the session crossed midnight...",
+    "5": "...so the logout happens a full day (1440 minutes) later.",
+    "7": "The first round you can play fully starts at the login rounded up to a quarter hour.",
+    "8": "The last full round must end by the logout rounded down to a quarter hour.",
+    "9": "Count the slots between them; a session inside a single slot would give -1, so clamp at 0."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "number": 3140,
+  "title": "Consecutive Available Seats II",
+  "spec": "recalled",
+  "statement": "One table describes the seats of a cinema row:\n\n- `Cinema(seat_id, free)`: one row per seat. `seat_id` is an auto-increment key, so the seats are numbered `1` to `n` with no gaps, and seats whose numbers differ by 1 sit next to each other. `free` is `1` when the seat is available and `0` when it is taken.\n\nA **block** is a maximal run of free seats with consecutive numbers; a free seat whose neighbours are both taken (or missing) is a block of length 1. Find the longest blocks and report each with the columns `first_seat_id` (its lowest seat), `last_seat_id` (its highest seat) and `consecutive_seats_len` (how many seats it has). When several blocks share the greatest length, report all of them. If no seat is free, return no rows. Order the rows by `first_seat_id` ascending.",
+  "constraints": [
+    "seat_id is unique in Cinema and runs from 1 to n without gaps",
+    "free is 1 (available) or 0 (taken)",
+    "Seats whose seat_id values differ by 1 are adjacent"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Cinema": [["seat_id","INT"],["free","BOOLEAN"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Cinema = [] }] = input;\n  const seen = new Set();\n  for (const [id, free] of Cinema) {\n    if (!Number.isInteger(id) || id < 1) return 'Every seat_id must be a positive integer.';\n    if (seen.has(id)) return `seat_id ${id} appears twice.`;\n    seen.add(id);\n    if (![0, 1, true, false].includes(free)) return `Seat ${id} needs free = 0 or 1.`;\n  }\n  for (let id = 1; id <= Cinema.length; id++) if (!seen.has(id)) return `Seats must be numbered 1 to ${Cinema.length}; seat ${id} is missing.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH free_seats AS (\n  SELECT seat_id,\n         seat_id - ROW_NUMBER() OVER (ORDER BY seat_id) AS block_key\n  FROM Cinema\n  WHERE free = 1\n),\nblocks AS (\n  SELECT MIN(seat_id) AS first_seat_id,\n         MAX(seat_id) AS last_seat_id,\n         COUNT(*) AS consecutive_seats_len\n  FROM free_seats\n  GROUP BY block_key\n),\nranked AS (\n  SELECT first_seat_id, last_seat_id, consecutive_seats_len,\n         RANK() OVER (ORDER BY consecutive_seats_len DESC) AS len_rank\n  FROM blocks\n)\nSELECT first_seat_id, last_seat_id, consecutive_seats_len\nFROM ranked\nWHERE len_rank = 1\nORDER BY first_seat_id;",
+  "brute": "WITH starts AS (\n  SELECT c.seat_id\n  FROM Cinema AS c\n  LEFT JOIN Cinema AS prev\n    ON prev.seat_id = c.seat_id - 1 AND prev.free = 1\n  WHERE c.free = 1 AND prev.seat_id IS NULL\n),\nends AS (\n  SELECT c.seat_id\n  FROM Cinema AS c\n  LEFT JOIN Cinema AS nxt\n    ON nxt.seat_id = c.seat_id + 1 AND nxt.free = 1\n  WHERE c.free = 1 AND nxt.seat_id IS NULL\n),\nspans AS (\n  SELECT s.seat_id AS first_seat_id, MIN(e.seat_id) AS last_seat_id\n  FROM starts AS s\n  JOIN ends AS e\n    ON e.seat_id >= s.seat_id\n  GROUP BY s.seat_id\n)\nSELECT first_seat_id, last_seat_id, last_seat_id - first_seat_id + 1 AS consecutive_seats_len\nFROM spans\nWHERE last_seat_id - first_seat_id = (SELECT MAX(last_seat_id - first_seat_id) FROM spans)\nORDER BY first_seat_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const n = small ? Math.floor(rand() * 9) : 2000;\n  const share = small ? 0.3 + rand() * 0.5 : 0.8;\n  const Cinema = [];\n  for (let id = 1; id <= n; id++) Cinema.push([id, rand() < share ? 1 : 0]);\n  // Shuffle the row order so solutions cannot rely on rows arriving sorted.\n  for (let i = Cinema.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Cinema[i], Cinema[j]] = [Cinema[j], Cinema[i]];\n  }\n  return [{ Cinema }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Cinema":[[1,1],[2,0],[3,1],[4,1],[5,1]]}],"expected":{"columns":["first_seat_id","last_seat_id","consecutive_seats_len"],"rows":[[3,5,3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Cinema":[]}]},
+    {"name":"Test 2","input":[{"Cinema":[[1,0],[2,0],[3,0]]}]},
+    {"name":"Test 3","input":[{"Cinema":[[1,1],[2,1],[3,1],[4,1],[5,1]]}]},
+    {"name":"Test 4","input":[{"Cinema":[[1,1],[2,1],[3,0],[4,1],[5,1],[6,0],[7,1]]}]},
+    {"name":"Test 5","input":[{"Cinema":[[1,1]]}]},
+    {"name":"Test 6","input":[{"Cinema":[[1,1],[2,0],[3,1],[4,0],[5,1]]}]},
+    {"name":"Test 7","input":[{"Cinema":[[1,0],[2,1],[3,0],[4,1],[5,1],[6,1]]}]},
+    {"name":"Test 8","input":[{"Cinema":[[5,0],[1,1],[3,1],[2,1],[4,0],[6,1]]}]},
+    {"name":"Test 9","input":[{"Cinema":[[9,1],[8,1],[7,0],[6,1],[5,1],[4,0],[3,0],[2,1],[1,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","input":[{"Cinema":[[1,1],[2,0],[3,1],[4,1],[5,1],[6,1],[7,0],[8,1],[9,1],[10,1]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a **gaps-and-islands** problem: the free seats form islands of consecutive numbers, and we need the biggest islands. Number the free seats in order with `ROW_NUMBER()`. Inside one island both `seat_id` and the row number go up by 1 each step, so `seat_id - ROW_NUMBER()` stays constant; every taken seat in between makes `seat_id` jump further than the row number, so the difference changes. That difference is a ready-made island label.\n\n## Approach\n\n1. `free_seats` keeps the free seats and labels each with `block_key = seat_id - ROW_NUMBER() OVER (ORDER BY seat_id)`.\n2. `blocks` groups by `block_key`: `MIN` and `MAX` give the ends of each island and `COUNT(*)` its length.\n3. `ranked` ranks the islands by length, longest first, with `RANK()` so equal lengths share rank 1.\n4. Keep rank 1 and order by `first_seat_id`.\n\n## Example 1, step by step\n\n- Free seats are 1, 3, 4, 5 with row numbers 1, 2, 3, 4, so `block_key` is 0, 1, 1, 1.\n- `blocks`: key 0 gives (1, 1, 1); key 1 gives (3, 5, 3).\n- `ranked`: the length-3 island gets rank 1, the length-1 island rank 2.\n- Result: `first_seat_id = 3`, `last_seat_id = 5`, `consecutive_seats_len = 3`.\n\n## Complexity\n\n- Time: O(n log n) for n seats, to sort the free seats for the row numbers and again to rank the islands.\n- Space: O(n) for the labelled free seats.\n\n## Pitfalls\n\n- `ORDER BY ... LIMIT 1` keeps only one of several equally long islands; ties must all be reported.\n- Self-joining a seat with its neighbour finds pairs, not islands, and misses an island of a single free seat.\n- Computing `ROW_NUMBER()` over **all** seats instead of the free ones makes the difference constant across taken seats too, merging separate islands.\n- `ROW_NUMBER()` needs `ORDER BY seat_id`; the table's rows are not stored in seat order.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `free_seats` | the free seats, each with its island label |\n| `block_key` | `seat_id` minus the seat's position among free seats; equal within one island |\n| `blocks` | one row per island: its first seat, last seat and length |\n| `ranked` | the islands with `len_rank`, 1 for the longest |\n| `len_rank` | rank by length, longest first; ties share a rank |",
+  "narration": {
+    "1": "The first stage keeps the free seats and gives each an island label.",
+    "3": "Within a run of consecutive free seats, seat_id and its row number both rise by 1, so their difference is the same for the whole run.",
+    "5": "Taken seats are dropped before numbering, so each taken seat makes the label jump.",
+    "7": "The second stage turns each label into one block.",
+    "8": "The lowest and highest seat of a block are its first and last seat.",
+    "10": "Each free seat in the block adds 1 to its length.",
+    "12": "One group per island label.",
+    "16": "RANK gives every block of the greatest length rank 1, so ties survive.",
+    "21": "Keep only the longest blocks.",
+    "22": "Report them from the front of the row to the back."
+  }
+}
