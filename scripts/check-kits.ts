@@ -95,9 +95,10 @@ async function check(number: number): Promise<string[]> {
   } else errors.push('A kit needs a generator.');
   if (!record.brute) errors.push('A kit needs an independent brute force.');
   // Varied answers catch solutions that return a constant. A problem whose answer takes only two values (yes/no,
-  // 0 or 1) on every case and generated input needs only those two.
+  // 0 or 1) on every case and generated input needs only those two, and one with a single answer for every valid
+  // input (2396) only that one; a constant wrong answer is still rejected below.
   const answers = new Set(outputs.map(o => JSON.stringify(o)));
-  const variety = new Set([...answers, ...fuzzed]).size <= 2 ? 2 : 3;
+  const variety = Math.min(3, new Set([...answers, ...fuzzed]).size);
   if (answers.size < Math.min(variety, outputs.length)) errors.push(`The cases produce fewer than ${variety} distinct answers; vary the tests.`);
   // A plainly wrong solution must not be accepted.
   const wrong = problem.kind === 'design' ? `class ${problem.entry} { constructor() {} ${Object.keys(problem.methods ?? {}).filter(m => m !== 'constructor').map(m => `${m}() { return -12345; }`).join(' ')} }` : `function ${problem.entry}() { return -12345; }`;
