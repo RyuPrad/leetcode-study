@@ -1,0 +1,59 @@
+{
+  "number": 2753,
+  "title": "Count Houses in a Circular Street II",
+  "spec": "recalled",
+  "statement": "This is an interactive problem. Houses stand in a circle along a street, and each house's door is either open or closed at the start, with **at least one door open**. You are standing in front of one of the houses. Count how many houses the street has, given only an upper bound `k` on that number, and return the count.\n\nYou cannot see the street directly. Your function `houseCount(street, k)` receives a `street` object with only these methods, all acting on the house you currently face:\n\n- `street.closeDoor()` closes its door;\n- `street.isDoorOpen()` returns `true` when its door is open, `false` otherwise;\n- `street.moveRight()` steps to the next house on the right.\n\nThere is no way to open a door or to move left. Because the street is circular, moving right from the last house brings you back to the first one.\n\nEach case is written as `[street, k]`, where `street` lists the doors (`1` open, `0` closed) starting with the house you face and continuing to the right. The judge builds the `street` object from that list; your function never sees the list itself.",
+  "constraints": [
+    "n == the number of houses (street.length)",
+    "1 <= n <= k <= 10^5",
+    "street[i] is 0 (closed) or 1 (open)",
+    "At least one door is open at the start"
+  ],
+  "signature": "int houseCount(int[] street, int k)",
+  "entry": "houseCount",
+  "kind": "function",
+  "parameters": [
+    "street",
+    "k"
+  ],
+  "validator": "function validate([street, k]) {\n  if (!Array.isArray(street) || street.length < 1 || street.length > 100000) return 'street needs 1 to 100000 houses.';\n  if (street.some(door => door !== 0 && door !== 1)) return 'Each door is 0 (closed) or 1 (open).';\n  if (!street.includes(1)) return 'At least one door must be open.';\n  if (!Number.isInteger(k) || k > 100000) return 'k is a whole number up to 100000.';\n  if (k < street.length) return 'k must be at least the number of houses.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [doors, k] = input;\n  const open = doors.map(door => door === 1);\n  const n = open.length;\n  let position = 0;\n  // The door list stays inside this closure; the solution can only use the three methods.\n  const street = Object.freeze({\n    closeDoor() {\n      open[position] = false;\n    },\n    isDoorOpen() {\n      return open[position];\n    },\n    moveRight() {\n      position = (position + 1) % n;\n    },\n  });\n  return solve(street, k);\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function houseCount(street, k) {\n  while (!street.isDoorOpen()) {\n    street.moveRight();\n  }\n  let count = 0;\n  for (let step = 1; step <= k; step++) {\n    street.moveRight();\n    if (street.isDoorOpen()) {\n      street.closeDoor();\n      count = step;\n    }\n  }\n  return count;\n}",
+  "brute": "function houseCount(street, k) {\n  // Stand at an open door, then walk 2k steps, writing down each door before closing it.\n  while (!street.isDoorOpen()) street.moveRight();\n  const seen = [1];\n  for (let step = 1; step <= 2 * k; step++) {\n    street.moveRight();\n    seen.push(street.isDoorOpen() ? 1 : 0);\n    street.closeDoor();\n  }\n  // Try every possible length: replay the same walk on a street of that length and keep the one that fits.\n  for (let length = 1; length <= k; length++) {\n    const doors = seen.slice(0, length);\n    let fits = true;\n    for (let step = 1; step <= 2 * k && fits; step++) {\n      const at = step % length;\n      if (doors[at] !== seen[step]) fits = false;\n      doors[at] = 0;\n    }\n    if (fits) return length;\n  }\n  return -1;\n}",
+  "generator": "function generate(rand, size) {\n  const k = size === 'large' ? 50000 + Math.floor(rand() * 50001) : 1 + Math.floor(rand() * 10);\n  const cap = size === 'large' ? 2000 : k;\n  // Sometimes the street is as long as allowed, sometimes much shorter.\n  const n = rand() < 0.3 ? cap : 1 + Math.floor(rand() * cap);\n  const bias = rand();\n  const street = Array.from({ length: n }, () => (rand() < bias ? 1 : 0));\n  // The problem guarantees at least one open door.\n  if (!street.includes(1)) street[Math.floor(rand() * n)] = 1;\n  return [street, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,1,1,1],10],"expected":4},
+    {"name":"Example 2","input":[[1,0,1,1,0],5],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[1],1000]},
+    {"name":"Test 3","input":[[1,1],2]},
+    {"name":"Test 4","input":[[0,0,1],3]},
+    {"name":"Test 5","input":[[1,1,1,1,1,1],7]},
+    {"name":"Test 6","input":[[0,1,0,1,0,1,0,1],8]},
+    {"name":"Test 7","input":[[0,0,0,0,0,0,0,0,0,0,0,1],20]},
+    {"name":"Test 8","input":[[1,0,0,1,0,1,1,0,1],12]},
+    {"name":"Test 9","input":[[1,1,0,1,1,0,1,1,0,1,1,0,1,1,0],15]},
+    {"name":"Test 10","input":[[0,1,1,0,0],1000]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithout a way to open doors, you cannot plant a fresh marker; you can only take marks away. So pick an existing open door as the marker and never touch it until you come back to it. Every other open door you pass gets closed. After one full lap the marker is the only open door left, and once it is closed too, the street is dark. The last open door you met is therefore the marker itself, reached after exactly `n` steps. Since `n <= k`, walking `k` steps is enough to get there.\n\n## Approach\n\n1. Move right until you face an open door. That house is the marker.\n2. Set `count = 0` and take `k` steps to the right, numbering them `step = 1, 2, ...`.\n3. After each move, if the door is open, close it and set `count = step`.\n4. Return `count`: the step at which the last open door was seen.\n\nSteps `1` to `n - 1` close the other open doors, step `n` meets the untouched marker, and every later step sees only closed doors, so `count` ends at `n`.\n\n## Example 1, step by step\n\n`street = [1,1,1,1]`, `k = 10`. The first door is open, so house 0 is the marker. Step 1 reaches house 1, open: close it, `count = 1`. Steps 2 and 3 do the same for houses 2 and 3 (`count = 3`). Step 4 is back at house 0, still open: close it, `count = 4`. Steps 5 to 10 meet only closed doors, so the answer is `4`.\n\n## Complexity\n\n- Time: O(n + k) method calls: fewer than `n` moves to find an open door, then exactly `k` steps.\n- Space: O(1).\n\n## Pitfalls\n\n- Stopping at the first open door after the start is wrong when other doors are open: Example 1 would give `1`.\n- Closing the marker before leaving it loses the only thing that tells you a lap is complete.\n- You cannot see when you are back at the start, so keep walking all `k` steps; the extra steps never change `count`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `step` | how many houses you have moved past the marker |\n| `count` | the step at which the latest open door was found and closed |",
+  "narration": {
+    "2": "Walk until you face an open door; the problem promises at least one exists.",
+    "3": "This door is closed, so keep moving right.",
+    "5": "No open door has been seen after the marker yet.",
+    "6": "Take k steps; since the street has at most k houses, this goes at least once around.",
+    "7": "Move to the next house on the right.",
+    "8": "An open door is either one we have not met yet or the marker itself.",
+    "9": "Close it so the next lap cannot see it again.",
+    "10": "Remember how far from the marker this open door was.",
+    "13": "The last open door seen was the marker, reached after exactly n steps."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "number": 2659,
+  "title": "Make Array Empty",
+  "spec": "leetcode",
+  "statement": "The array `nums` holds distinct integers. Repeat the following single operation until nothing is left:\n\n- if the element at the front is the minimum of the values still in the array, delete it;\n- otherwise, take the front element off and append it to the back.\n\nReturn how many operations are performed in total before `nums` becomes empty.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "-10^9 <= nums[i] <= 10^9",
+    "All values in nums are distinct"
+  ],
+  "signature": "long countOperationsToEmptyArray(int[] nums)",
+  "entry": "countOperationsToEmptyArray",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 100000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < -1e9 || v > 1e9)) return 'Each value is an integer from -10^9 to 10^9.';\n  if (new Set(nums).size !== nums.length) return 'All values in nums must be distinct.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countOperationsToEmptyArray(nums) {\n  const n = nums.length;\n  const order = Array.from({ length: n }, (_, i) => i);\n  order.sort((a, b) => nums[a] - nums[b]);\n  const tree = new Array(n + 1).fill(0);\n\n  const update = (index, delta) => {\n    for (let j = index + 1; j <= n; j += j & -j) {\n      tree[j] += delta;\n    }\n  };\n  const countUpTo = (index) => {\n    let total = 0;\n    for (let j = index + 1; j > 0; j -= j & -j) {\n      total += tree[j];\n    }\n    return total;\n  };\n\n  for (let i = 0; i < n; i++) {\n    update(i, 1);\n  }\n  let operations = 0;\n  let prev = -1;\n  for (const index of order) {\n    if (index > prev) {\n      operations += countUpTo(index) - countUpTo(prev);\n    } else {\n      operations += countUpTo(n - 1) - countUpTo(prev) + countUpTo(index);\n    }\n    update(index, -1);\n    prev = index;\n  }\n  return operations;\n}",
+  "brute": "function countOperationsToEmptyArray(nums) {\n  const queue = nums.slice();\n  let steps = 0;\n  while (queue.length > 0) {\n    steps++;\n    const front = queue.shift();\n    if (queue.some(v => v < front)) queue.push(front);\n  }\n  return steps;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'small' ? int(1, 10) : 2000;\n  const limit = size === 'small' && rand() < 0.7 ? 20 : 1000000000;\n  const seen = new Set();\n  const nums = [];\n  while (nums.length < n) {\n    const v = int(-limit, limit);\n    if (seen.has(v)) continue;\n    seen.add(v);\n    nums.push(v);\n  }\n  const shape = rand();\n  if (shape < 0.15) {\n    nums.sort((a, b) => b - a);\n  } else if (shape < 0.25) {\n    nums.sort((a, b) => a - b);\n  } else if (shape < 0.4) {\n    nums.sort((a, b) => a - b);\n    const cut = int(0, n - 1);\n    return [nums.slice(cut).concat(nums.slice(0, cut))];\n  }\n  return [nums];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,4,-1]],"expected":5},
+    {"name":"Example 2","input":[[1,2,4,3]],"expected":5},
+    {"name":"Example 3","input":[[1,2,3]],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5]]},
+    {"name":"Test 2","input":[[1,2,3,4,5,6]]},
+    {"name":"Test 3","input":[[6,5,4,3,2,1]]},
+    {"name":"Test 4","input":[[-1000000000,1000000000]]},
+    {"name":"Test 5","input":[[1000000000,-1000000000]]},
+    {"name":"Test 6","input":[[2,1,4,3,6,5]]},
+    {"name":"Test 7","input":[[3,1,2]]},
+    {"name":"Test 8","input":[[-5,10,-20,7,0,15,-3]]},
+    {"name":"Test 9","input":[[4,5,6,1,2,3]]},
+    {"name":"Test 10","input":[[10,-10,20,-20,30,-30,40,-40]]},
+    {"name":"Test 11","input":[[0,7,-7,3,-3,9,-9,1]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSimulating the queue is correct but can take about n²/2 operations. Notice instead that elements are deleted in increasing order of value, and the front of the queue only ever moves forward through the original positions, wrapping around at the end. So the work to delete the next smallest value is the number of **still-present** elements the front passes on its way to it, including that element itself. A binary indexed tree (Fenwick tree) over positions answers \"how many are still present in this range\" in O(log n).\n\n## Approach\n\n1. Sort the positions `0..n-1` by their values into `order`: this is the deletion order.\n2. Build `tree` with a 1 at every position (all present). `countUpTo(index)` returns how many present positions are in `[0, index]`.\n3. Keep `prev`, the position deleted last (start at `-1`, just before the array).\n4. For each `index` in `order`: if it lies after `prev`, add the present count in `(prev, index]`; otherwise the front wraps, so add the present count in `(prev, n - 1]` plus that in `[0, index]`.\n5. Mark `index` as gone with `update(index, -1)` and set `prev = index`.\n\n## Example 1, step by step\n\n`nums = [3, 4, -1]`, so `order = [2, 0, 1]`.\n\n- Delete position 2 (value -1): positions 0, 1, 2 are passed, `operations = 3`.\n- Delete position 0 (value 3): it is before `prev = 2`, so wrap. Nothing is present after 2, and `[0, 0]` has 1: `operations = 4`.\n- Delete position 1 (value 4): `(0, 1]` has 1 present: `operations = 5`.\n\n## Complexity\n\n- Time: O(n log n) for the sort and the Fenwick tree updates and queries.\n- Space: O(n) for `order` and `tree`.\n\n## Pitfalls\n\n- The answer can reach n(n+1)/2, about 5·10^9, so Java and C need a 64-bit result.\n- Sorting by `nums[a] - nums[b]` overflows 32-bit ints in Java or C; compare the values instead of subtracting.\n- Count only elements that are still present; positions deleted earlier cost nothing to pass.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `order` | positions sorted by value (deletion order) |\n| `tree` | Fenwick tree marking which positions remain |\n| `update`, `countUpTo` | change one position; count present positions in `[0, index]` |\n| `prev` | position deleted most recently |\n| `index` | position deleted now |\n| `operations` | total operations so far |",
+  "narration": {
+    "3": "List every position of the array.",
+    "4": "Order positions by value: the smallest value is always deleted first.",
+    "5": "The Fenwick tree, indexed from 1, counts positions still present.",
+    "7": "update adds delta at one position and every tree node covering it.",
+    "12": "countUpTo sums the present positions from 0 to index.",
+    "20": "At the start every position is present.",
+    "23": "Total operations performed so far.",
+    "24": "The previous deletion; -1 means the front starts at position 0.",
+    "25": "Delete positions in increasing order of their values.",
+    "26": "The target lies ahead of the last deletion without wrapping.",
+    "27": "Every present element in (prev, index] costs one operation.",
+    "29": "The front wraps: pass what remains after prev, then what is in [0, index].",
+    "31": "This position is now gone and costs nothing to pass later.",
+    "32": "The front continues from here.",
+    "34": "All elements are deleted; return the total."
+  }
+}

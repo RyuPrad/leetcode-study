@@ -1,0 +1,59 @@
+{
+  "number": 2764,
+  "title": "Is Array a Preorder of Some ‌Binary Tree",
+  "spec": "recalled",
+  "statement": "Each entry of `nodes` is a pair `[id, parentId]`: the id of one node of a binary tree and the id of its parent, where `parentId` is `-1` for the root. Together the entries describe a whole binary tree, but they only say who the parent is, so you are free to decide which child of a node is its left child and which is its right child.\n\nReturn `true` if the entries, read in the given order, can be the **preorder traversal** of such a tree (each node is visited first, then its entire left subtree, then its entire right subtree) for some choice of left and right children. Otherwise return `false`.\n\nThe input is guaranteed to form a valid binary tree: the ids are distinct, exactly one entry has `parentId = -1`, every other `parentId` is the id of some entry, and no node has more than two children.",
+  "constraints": [
+    "1 <= nodes.length <= 10^5",
+    "nodes[i].length == 2",
+    "0 <= nodes[i][0] <= 10^5",
+    "-1 <= nodes[i][1] <= 10^5",
+    "The entries of nodes form one binary tree."
+  ],
+  "signature": "boolean isPreorder(List<List<Integer>> nodes)",
+  "entry": "isPreorder",
+  "kind": "function",
+  "parameters": [
+    "nodes"
+  ],
+  "validator": "function validate([nodes]) {\n  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 100000) return 'nodes needs 1 to 100000 entries.';\n  const ids = new Set();\n  for (const entry of nodes) {\n    if (!Array.isArray(entry) || entry.length !== 2 || !entry.every(Number.isInteger)) return 'Each entry is a pair [id, parentId] of integers.';\n    if (entry[0] < 0 || entry[0] > 100000) return 'Each id is between 0 and 100000.';\n    if (entry[1] < -1 || entry[1] > 100000) return 'Each parentId is between -1 and 100000.';\n    if (ids.has(entry[0])) return 'The ids must be distinct.';\n    ids.add(entry[0]);\n  }\n  const children = new Map();\n  let root = null;\n  for (const [id, parentId] of nodes) {\n    if (parentId === -1) {\n      if (root !== null) return 'Exactly one entry is the root (parentId -1).';\n      root = id;\n      continue;\n    }\n    if (!ids.has(parentId)) return 'Every parentId must be the id of some entry.';\n    if (!children.has(parentId)) children.set(parentId, []);\n    children.get(parentId).push(id);\n    if (children.get(parentId).length > 2) return 'A node has at most two children.';\n  }\n  if (root === null) return 'Exactly one entry is the root (parentId -1).';\n  let reached = 0;\n  const queue = [root];\n  while (queue.length) {\n    const id = queue.pop();\n    reached++;\n    for (const kid of children.get(id) || []) queue.push(kid);\n  }\n  if (reached !== nodes.length) return 'Every node must hang below the root (no cycles).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function isPreorder(nodes) {\n  const stack = [];\n\n  for (const [id, parentId] of nodes) {\n    while (stack.length > 0 && stack[stack.length - 1] !== parentId) {\n      stack.pop();\n    }\n    if (stack.length === 0 && parentId !== -1) {\n      return false;\n    }\n    stack.push(id);\n  }\n  return true;\n}",
+  "brute": "function isPreorder(nodes) {\n  // Try every left/right order of every node's children and compare the resulting preorder.\n  const children = new Map();\n  let root = -1;\n  for (const [id, parentId] of nodes) {\n    if (parentId === -1) root = id;\n    else {\n      if (!children.has(parentId)) children.set(parentId, []);\n      children.get(parentId).push(id);\n    }\n  }\n  const pairs = [...children.keys()].filter(id => children.get(id).length === 2);\n  const given = nodes.map(entry => entry[0]).join(',');\n  for (let mask = 0; mask < (1 << pairs.length); mask++) {\n    const swapped = new Set(pairs.filter((_, bit) => (mask >> bit) & 1));\n    const order = [];\n    const visit = id => {\n      order.push(id);\n      const kids = [...(children.get(id) || [])];\n      if (swapped.has(id)) kids.reverse();\n      for (const kid of kids) visit(kid);\n    };\n    visit(root);\n    if (order.join(',') === given) return true;\n  }\n  return false;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 8);\n  const idLimit = size === 'large' ? 100001 : 12;\n  // Distinct ids for the n nodes.\n  const used = new Set();\n  const ids = [];\n  while (ids.length < n) {\n    const id = Math.floor(rand() * Math.max(idLimit, n));\n    if (!used.has(id)) { used.add(id); ids.push(id); }\n  }\n  // A random binary tree: node i hangs below an earlier node that still has room.\n  const deep = rand() < 0.5;\n  const kids = Array.from({ length: n }, () => []);\n  const parent = new Array(n).fill(-1);\n  for (let i = 1; i < n; i++) {\n    for (;;) {\n      const p = deep ? Math.max(0, i - 1 - Math.floor(rand() * 3)) : Math.floor(rand() * i);\n      if (kids[p].length < 2) { kids[p].push(i); parent[i] = p; break; }\n    }\n  }\n  // Its preorder with a random choice of left and right children.\n  const order = [];\n  const stack = [0];\n  while (stack.length) {\n    const v = stack.pop();\n    order.push(v);\n    const k = rand() < 0.5 ? [...kids[v]] : [...kids[v]].reverse();\n    for (let j = k.length - 1; j >= 0; j--) stack.push(k[j]);\n  }\n  // About half the inputs are disturbed a little, which usually (not always) breaks the preorder.\n  if (n > 1 && rand() < 0.5) {\n    const a = Math.floor(rand() * n);\n    const b = Math.floor(rand() * n);\n    if (rand() < 0.5) [order[a], order[b]] = [order[b], order[a]];\n    else order.splice(b, 0, order.splice(a, 1)[0]);\n  }\n  return [order.map(v => [ids[v], parent[v] === -1 ? -1 : ids[parent[v]]])];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,-1],[1,0],[2,0],[3,2],[4,2]]],"expected":true},
+    {"name":"Example 2","input":[[[0,-1],[1,0],[2,0],[3,1],[4,1]]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,-1]]]},
+    {"name":"Test 2","input":[[[1,0],[0,-1]]]},
+    {"name":"Test 3","input":[[[5,-1],[3,5],[9,3],[1,9]]]},
+    {"name":"Test 4","input":[[[0,-1],[2,0],[1,0]]]},
+    {"name":"Test 5","input":[[[0,-1],[1,0],[2,1],[3,0]]]},
+    {"name":"Test 6","input":[[[0,-1],[1,0],[2,0],[3,1]]]},
+    {"name":"Test 7","input":[[[7,-1],[4,7],[2,4],[9,4],[3,7],[8,3]]]},
+    {"name":"Test 8","input":[[[7,-1],[4,7],[2,4],[3,7],[9,4],[8,3]]]},
+    {"name":"Test 9","input":[[[100000,-1],[0,100000],[99999,0]]]},
+    {"name":"Test 10","input":[[[6,-1],[2,6],[4,2],[8,6],[1,4],[3,8]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nDuring a preorder walk, the nodes that are \"open\" (visited, but whose subtrees are not finished) always form the path from the root down to the node just visited. The next node in the order must be a child of one of those open nodes: everything below that parent on the path is finished for good. A node whose parent has already been closed can never appear again, so the order is impossible.\n\nThe brute force tries every left/right arrangement of the children and compares preorders, which is exponential in the number of two-child nodes.\n\n## Approach\n\n1. Keep `stack`, the ids on the current root-to-node path.\n2. For each entry `[id, parentId]`, pop the stack until its top is `parentId`; the popped nodes' subtrees are complete.\n3. If the stack is now empty, the parent is not open. That is fine only for the root (`parentId = -1`), which must therefore come first; any other node means the answer is `false`.\n4. Push `id`: it is now the deepest open node.\n5. If every entry fits, return `true`.\n\nBecause each node has at most two children, any order of a node's children is achievable by choosing which is left, so no further check is needed.\n\n## Example 1, step by step\n\n`[0,-1]`: stack empty and the parent is `-1`, push → `[0]`. `[1,0]`: top is 0, push → `[0,1]`. `[2,0]`: pop 1, top is 0, push → `[0,2]`. `[3,2]`: push → `[0,2,3]`. `[4,2]`: pop 3, push → `[0,2,4]`. All entries fit, so the answer is `true`.\n\nIn Example 2, `[3,1]` arrives when the stack is `[0,2]`: popping finds no 1, the stack empties, and the answer is `false`.\n\n## Complexity\n\n- Time: O(n): each id is pushed once and popped at most once.\n- Space: O(n) for the stack in the worst case (a chain).\n\n## Pitfalls\n\n- The first entry must be the root; a parent that is not on the stack must return `false`, not be skipped.\n- Do not compare against a fixed left/right order: the input does not say which child is left.\n- Popping is permanent: once a node leaves the stack, a later child of it proves the order wrong.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stack` | ids of the open nodes, from the root down to the latest node |\n| `id` | the current entry's node |\n| `parentId` | the current entry's parent, or `-1` for the root |",
+  "narration": {
+    "2": "The stack holds the open nodes: the path from the root to the node visited last.",
+    "4": "Read the entries in the given order, as a preorder walk would visit them.",
+    "5": "While the deepest open node is not this node's parent, that node's subtree must be finished...",
+    "6": "...so close it by popping it off the path.",
+    "8": "No open node is the parent: only the root, which has no parent, may start from an empty path.",
+    "9": "Some other node has a parent that is not open, so this cannot be a preorder.",
+    "11": "The current node becomes the deepest open node on the path.",
+    "13": "Every entry had an open parent, so some choice of left and right children produces this order."
+  }
+}

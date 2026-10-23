@@ -1,0 +1,68 @@
+{
+  "number": 2835,
+  "title": "Minimum Operations to Form Subsequence With Target Sum",
+  "spec": "leetcode",
+  "statement": "Every element of `nums` is a power of two (1, 2, 4, ...). You may repeat the following operation as often as you like: pick an element greater than 1, delete it, and append two copies of half its value to the end of `nums`.\n\nReturn the fewest operations after which some subsequence of `nums` (elements kept in order, any of them dropped) adds up to exactly `target`. If no number of operations makes that possible, return `-1`.",
+  "constraints": [
+    "1 <= nums.length <= 1000",
+    "1 <= nums[i] <= 2^30",
+    "Each nums[i] is a power of two",
+    "1 <= target < 2^31"
+  ],
+  "signature": "int minOperations(List<Integer> nums, int target)",
+  "entry": "minOperations",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "target"
+  ],
+  "validator": "function validate([nums, target]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 1000) return 'nums needs 1 to 1000 values.';\n  for (const v of nums) {\n    if (!Number.isInteger(v) || v < 1 || v > 2 ** 30 || (v & (v - 1)) !== 0) return 'Each value must be a power of two from 1 to 2^30.';\n  }\n  if (!Number.isInteger(target) || target < 1 || target >= 2 ** 31) return 'target is from 1 to 2^31 - 1.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minOperations(nums, target) {\n  const count = new Array(32).fill(0);\n  let total = 0;\n  for (const num of nums) {\n    count[31 - Math.clz32(num)]++;\n    total += num;\n  }\n  if (total < target) {\n    return -1;\n  }\n\n  let operations = 0;\n  for (let bit = 0; bit < 31; bit++) {\n    if ((target >> bit) & 1) {\n      if (count[bit] > 0) {\n        count[bit]--;\n      } else {\n        let higher = bit + 1;\n        while (count[higher] === 0) {\n          higher++;\n        }\n        operations += higher - bit;\n        count[higher]--;\n        for (let b = bit; b < higher; b++) {\n          count[b]++;\n        }\n      }\n    }\n    count[bit + 1] += Math.floor(count[bit] / 2);\n  }\n  return operations;\n}",
+  "brute": "function minOperations(nums, target) {\n  // Largest-first greedy on the actual pieces: drop, use or split the biggest one.\n  const pieces = [...nums].sort((a, b) => a - b);\n  let rest = pieces.reduce((s, v) => s + v, 0);\n  if (rest < target) return -1;\n  let ops = 0;\n  let need = target;\n  while (need > 0) {\n    const a = pieces.pop();\n    rest -= a;\n    if (rest >= need) continue;\n    if (a <= need) { need -= a; continue; }\n    pieces.push(a / 2, a / 2);\n    rest += a;\n    ops++;\n  }\n  return ops;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 600 + Math.floor(rand() * 401) : 1 + Math.floor(rand() * 6);\n  // Leaving out the small powers forces splits, so the answers are not all 0.\n  const minExp = Math.floor(rand() * (large ? 26 : 4));\n  const maxExp = minExp + Math.floor(rand() * ((large ? 31 : 6) - minExp));\n  const nums = Array.from({ length: n }, () => 2 ** (minExp + Math.floor(rand() * (maxExp - minExp + 1))));\n  const total = nums.reduce((s, v) => s + v, 0);\n  const limit = Math.min(2 ** 31 - 1, Math.floor(total * 1.15) + 2);\n  const target = 1 + Math.floor(rand() * limit);\n  return [nums, target];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,8],7],"expected":1},
+    {"name":"Example 2","input":[[1,32,1,2],12],"expected":2},
+    {"name":"Example 3","input":[[1,32,1],35],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[1073741824],1]},
+    {"name":"Test 3","input":[[1073741824,1073741824],2147483647]},
+    {"name":"Test 4","input":[[1,1,1,1],4]},
+    {"name":"Test 5","input":[[2,2,2],7]},
+    {"name":"Test 6","input":[[16],5]},
+    {"name":"Test 7","input":[[8,1,1],6]},
+    {"name":"Test 8","input":[[1,1,2,4,8,16,32],63]},
+    {"name":"Test 9","input":[[32,2,2,1],13]},
+    {"name":"Test 10","input":[[4,4,4,64],76]},
+    {"name":"Test 11","input":[[1,1,1,1,1,1,1,1,1,1],11]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOrder does not matter: any multiset of elements can be read as a subsequence, so only how many pieces of each power we hold matters. Look at `target` in binary and satisfy its bits from the lowest up. Two leftover pieces of value `2^b` can stand in for one `2^(b+1)` without any operation, because we can simply put both in the subsequence. A missing bit has to be cut from the smallest larger piece, and halving `2^h` down to `2^b` costs `h - b` operations while leaving one spare piece at every level in between.\n\nIf the whole array sums to less than `target`, nothing can help; otherwise this greedy always finds a larger piece when it needs one.\n\n## Approach\n\n1. Count the pieces per exponent in `count` and add up `total`. If `total < target`, return `-1`.\n2. For each `bit` from 0 to 30, if `target` has that bit set:\n   - use a piece from `count[bit]` when there is one;\n   - otherwise find the smallest `higher` exponent with a piece, add `higher - bit` to `operations`, remove that piece, and add one spare piece at every level from `bit` to `higher - 1` (the second `2^bit` is the one we use).\n3. Pair up what is left at this level and carry `count[bit] / 2` (rounded down) into `count[bit + 1]`.\n4. Return `operations`.\n\n## Example 1, step by step\n\n`nums = [1, 2, 8]`, `target = 7` (binary 111). `count` has one piece at exponents 0, 1 and 3; `total = 11`. Bit 0: use the 1. Bit 1: use the 2. Bit 2: no 4 is available, so `higher = 3`: split the 8 once (`operations = 1`) and use one of the two 4s. No higher bits are set, so the answer is `1`.\n\n## Complexity\n\n- Time: O(n + 31²): one pass to count, then at most 31 levels with a short search and refill each.\n- Space: O(1): 32 counters.\n\n## Pitfalls\n\n- Forgetting to carry leftovers upward: `[1, 1, 1, 1]` with `target = 4` needs no operation.\n- Splitting the largest piece instead of the smallest larger one wastes operations.\n- Check `total < target` first; without it the search for `higher` can run off the end.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | `count[b]` is how many pieces worth `2^b` are available |\n| `total` | sum of all of `nums` |\n| `operations` | splits performed so far |\n| `bit` | the bit of `target` being satisfied |\n| `higher` | exponent of the smallest piece big enough to split |\n| `b` | level receiving a spare piece after a split |",
+  "narration": {
+    "2": "count[b] will hold how many pieces worth 2^b we have.",
+    "5": "31 - clz32 gives the exponent of a power of two; tally the piece at that level.",
+    "6": "Keep the overall sum to detect impossible targets.",
+    "8": "Splitting never changes the sum, so a total below target can never work.",
+    "13": "Satisfy target's bits from the least significant upward.",
+    "14": "Only bits that are set in target need a piece.",
+    "15": "A piece of exactly this size is available...",
+    "16": "...so use it for this bit.",
+    "18": "Otherwise look for the smallest larger piece, starting one level up.",
+    "19": "Skip levels that have no pieces.",
+    "22": "Halving 2^higher down to 2^bit takes higher - bit operations.",
+    "23": "The split piece is gone.",
+    "25": "Each split level leaves one spare half behind; the extra 2^bit is the one we just used.",
+    "29": "Two leftover pieces at this level act like one piece at the next level, so carry the pairs up.",
+    "31": "All set bits of target are covered with the fewest splits."
+  }
+}
