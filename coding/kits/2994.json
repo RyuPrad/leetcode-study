@@ -1,0 +1,55 @@
+{
+  "number": 2994,
+  "title": "Friday Purchases II",
+  "spec": "recalled",
+  "statement": "One table records purchases made in November 2023:\n\n- `Purchases(user_id, purchase_date, amount_spend)`: one row per purchase; the triple `(user_id, purchase_date, amount_spend)` is unique. Every `purchase_date` lies between `2023-11-01` and `2023-11-30`, and `amount_spend` is a positive whole number.\n\nNovember 1, 2023 is a Wednesday, so the month has four Fridays, one in each of weeks 1 to 4 (week `k` covers days `7k-6` to `7k`). Report **every** Friday of November 2023, even one with no purchases, with the columns `week_of_month` (1 to 4), `purchase_date` (that Friday's date) and `total_amount`, the sum of `amount_spend` over all purchases made on that Friday by any user, or `0` when there were none. The result always has four rows, ordered by `week_of_month` ascending.",
+  "constraints": [
+    "(user_id, purchase_date, amount_spend) is unique in Purchases",
+    "purchase_date is between 2023-11-01 and 2023-11-30",
+    "amount_spend > 0"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Purchases": [["user_id","INT"],["purchase_date","DATE"],["amount_spend","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Purchases = [] }] = input;\n  const seen = new Set();\n  for (const [user, date, amount] of Purchases) {\n    if (user === null || date === null || amount === null) return 'Every purchase needs a user_id, a purchase_date and an amount_spend.';\n    if (!/^2023-11-(0[1-9]|[12]\\d|30)$/.test(date)) return `purchase_date ${date} is not in November 2023.`;\n    if (amount <= 0) return 'amount_spend must be positive.';\n    const key = `${user}|${date}|${amount}`;\n    if (seen.has(key)) return `(${user}, ${date}, ${amount}) appears twice.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE november AS (\n  SELECT CAST('2023-11-01' AS DATE) AS calendar_date\n  UNION ALL\n  SELECT DATE_ADD(calendar_date, INTERVAL 1 DAY)\n  FROM november\n  WHERE calendar_date < '2023-11-30'\n),\nfridays AS (\n  SELECT calendar_date AS friday\n  FROM november\n  WHERE DAYNAME(calendar_date) = 'Friday'\n),\ndaily AS (\n  SELECT purchase_date, SUM(amount_spend) AS day_total\n  FROM Purchases\n  GROUP BY purchase_date\n)\nSELECT\n  CEIL(DAY(f.friday) / 7) AS week_of_month,\n  f.friday AS purchase_date,\n  IFNULL(d.day_total, 0) AS total_amount\nFROM fridays AS f\nLEFT JOIN daily AS d\n  ON d.purchase_date = f.friday\nORDER BY week_of_month;",
+  "brute": "SELECT\n  w.week_of_month,\n  w.purchase_date,\n  (SELECT COALESCE(SUM(p.amount_spend), 0) FROM Purchases AS p WHERE p.purchase_date = w.purchase_date) AS total_amount\nFROM (\n  SELECT 1 AS week_of_month, '2023-11-03' AS purchase_date\n  UNION ALL SELECT 2, '2023-11-10'\n  UNION ALL SELECT 3, '2023-11-17'\n  UNION ALL SELECT 4, '2023-11-24'\n) AS w\nORDER BY w.week_of_month",
+  "generator": "function generate(rand, size) {\n  const fridays = [3, 10, 17, 24], near = [2, 3, 4, 9, 10, 11, 16, 17, 18, 23, 24, 25, 30, 1];\n  const count = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const users = size === 'small' ? 5 : 400;\n  const seen = new Set(), Purchases = [];\n  for (let i = 0; i < count; i++) {\n    // Small sets favour Fridays and the days around them, so some Fridays stay empty; large sets use any November day.\n    const r = rand();\n    const day = size === 'small' ? (r < 0.4 ? fridays[Math.floor(rand() * 4)] : near[Math.floor(rand() * near.length)]) : 1 + Math.floor(r * 30);\n    const user = 1 + Math.floor(rand() * users);\n    const amount = size === 'small' ? 100 * (1 + Math.floor(rand() * 20)) : 1 + Math.floor(rand() * 12000);\n    const date = `2023-11-${String(day).padStart(2, '0')}`, key = `${user}|${date}|${amount}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Purchases.push([user, date, amount]);\n  }\n  return [{ Purchases }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Purchases":[[11,"2023-11-07",1126],[15,"2023-11-30",7473],[17,"2023-11-14",2414],[12,"2023-11-24",9692],[8,"2023-11-03",5117],[1,"2023-11-16",5241],[10,"2023-11-12",8266],[13,"2023-11-24",12000]]}],"expected":{"columns":["week_of_month","purchase_date","total_amount"],"rows":[[1,"2023-11-03",5117],[2,"2023-11-10",0],[3,"2023-11-17",0],[4,"2023-11-24",21692]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Purchases":[]}]},
+    {"name":"Test 2","input":[{"Purchases":[[1,"2023-11-02",500],[2,"2023-11-04",700],[3,"2023-11-11",900]]}]},
+    {"name":"Test 3","input":[{"Purchases":[[4,"2023-11-17",250]]}]},
+    {"name":"Test 4","input":[{"Purchases":[[1,"2023-11-24",40],[2,"2023-11-17",30],[3,"2023-11-10",20],[4,"2023-11-03",10],[5,"2023-11-24",4]]}]},
+    {"name":"Test 5","input":[{"Purchases":[[7,"2023-11-10",300],[7,"2023-11-10",200],[8,"2023-11-10",300]]}]},
+    {"name":"Test 6","input":[{"Purchases":[[1,"2023-11-01",100],[2,"2023-11-23",200],[3,"2023-11-24",300],[4,"2023-11-25",400],[5,"2023-11-30",500]]}]},
+    {"name":"Test 7","input":[{"Purchases":[[1,"2023-11-03",1000],[1,"2023-11-07",2000],[2,"2023-11-14",3000],[2,"2023-11-24",4000],[3,"2023-11-24",1000],[3,"2023-11-09",5000]]}]},
+    {"name":"Test 8","input":[{"Purchases":[[9,"2023-11-16",800],[9,"2023-11-18",800],[9,"2023-11-17",800],[6,"2023-11-17",800],[5,"2023-11-10",1]]}]},
+    {"name":"Test 9","input":[{"Purchases":[[1,"2023-11-03",12000],[2,"2023-11-03",11999],[3,"2023-11-03",1],[1,"2023-11-10",12000]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nUnlike Friday Purchases I, a Friday with no purchases must still produce a row with 0. Rows that are not in the data cannot come out of grouping `Purchases`, so the Fridays have to be generated first and the purchase totals attached to them. That is the classic \"calendar table plus left join\" pattern: a recursive CTE lists the days of November, a filter keeps the Fridays, and a `LEFT JOIN` to the daily totals keeps every Friday, turning a missing total into 0 with `IFNULL`.\n\n## Approach\n\n1. Recursive CTE `november`: start at `2023-11-01` and add one day at a time up to `2023-11-30`.\n2. CTE `fridays`: keep the dates whose `DAYNAME` is `'Friday'` (the 3rd, 10th, 17th and 24th).\n3. CTE `daily`: `SUM(amount_spend)` grouped by `purchase_date`, one total per day across all users.\n4. `fridays LEFT JOIN daily` on the date; `IFNULL(d.day_total, 0)` fills Fridays without purchases.\n5. `week_of_month = CEIL(DAY(friday) / 7)`; order by it.\n\n## Example 1, step by step\n\n- `fridays`: `2023-11-03`, `2023-11-10`, `2023-11-17`, `2023-11-24`.\n- `daily` includes `2023-11-03` → 5117 and `2023-11-24` → 9692 + 12000 = 21692; no purchase falls on the 10th or the 17th.\n- The left join gives totals 5117, null, null, 21692; `IFNULL` turns the nulls into 0.\n- Weeks: `CEIL(3/7) = 1`, `CEIL(10/7) = 2`, `CEIL(17/7) = 3`, `CEIL(24/7) = 4`.\n\n## Complexity\n\n- Time: O(P) for P purchases to build the daily totals; the calendar has 30 rows and the join at most 4.\n- Space: O(D) for the D distinct purchase dates (at most 30).\n\n## Pitfalls\n\n- An inner join, or filtering `Purchases` for Fridays and grouping, drops the empty Fridays (Example 1 needs weeks 2 and 3 with 0).\n- `SUM` over no matching rows is `null`, not 0; without `IFNULL` the empty weeks show `null`.\n- Joining `Purchases` directly and filtering `p.purchase_date` in `WHERE` undoes the left join.\n- `DAYOFWEEK` numbers Friday 6 and `WEEKDAY` numbers it 4; mixing them picks Thursdays or Saturdays (Tests 6 and 8).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `november` | every date from `2023-11-01` to `2023-11-30` |\n| `fridays` (`f`) | the four Friday dates, column `friday` |\n| `daily` (`d`) | each purchase date with `day_total`, the sum over all users |\n| `week_of_month` | `CEIL(DAY(friday) / 7)` |\n| `total_amount` | `day_total`, or 0 when no purchase was made that Friday |",
+  "narration": {
+    "1": "The recursive CTE november builds a calendar, starting from the first day of the month.",
+    "4": "Each step adds one day to the previous date.",
+    "6": "Recursion stops once the calendar reaches November 30.",
+    "8": "The CTE fridays keeps only the calendar dates that fall on a Friday.",
+    "11": "DAYNAME names the weekday of each date; four dates survive.",
+    "13": "The CTE daily adds up all purchases per date, across all users.",
+    "19": "The day of the month divided by 7 and rounded up is the week of the month.",
+    "21": "A Friday with no purchases has no daily row, so its total is null and becomes 0.",
+    "22": "Start from the Fridays so that every Friday produces a row.",
+    "23": "A left join attaches the day total when one exists and keeps the Friday otherwise.",
+    "25": "List the four weeks in ascending order."
+  }
+}

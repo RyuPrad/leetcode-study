@@ -1,0 +1,53 @@
+{
+  "number": 2978,
+  "title": "Symmetric Coordinates",
+  "spec": "recalled",
+  "statement": "One table lists points:\n\n- `Coordinates(X, Y)`: one row per point, both integers and never null. The table has no key, so the same point may appear more than once.\n\nTwo **different rows** `(X1, Y1)` and `(X2, Y2)` are symmetric when `X1 = Y2` and `Y1 = X2`. A row is never symmetric with itself, so a point on the diagonal such as `(4, 4)` counts only when it appears at least twice.\n\nReport each distinct point `(X, Y)` that belongs to some symmetric pair and has `X <= Y`, once, with the columns `X` and `Y`. Order the rows by `X` ascending, then `Y` ascending.",
+  "constraints": [
+    "X and Y are integers and never null",
+    "Coordinates has no key; rows may repeat",
+    "A row is never paired with itself"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Coordinates": [["X","INT"],["Y","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Coordinates = [] }] = input;\n  for (const [x, y] of Coordinates) if (x === null || y === null) return 'X and Y cannot be null.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH numbered AS (\n  SELECT X, Y, ROW_NUMBER() OVER () AS row_id\n  FROM Coordinates\n)\nSELECT DISTINCT p.X, p.Y\nFROM numbered AS p\nJOIN numbered AS mirror\n  ON mirror.X = p.Y\n  AND mirror.Y = p.X\n  AND mirror.row_id <> p.row_id\nWHERE p.X <= p.Y\nORDER BY p.X, p.Y;",
+  "brute": "SELECT c.X, c.Y\nFROM Coordinates AS c\nWHERE c.X < c.Y\n  AND EXISTS (SELECT 1 FROM Coordinates AS d WHERE d.X = c.Y AND d.Y = c.X)\nUNION\nSELECT X, Y\nFROM Coordinates\nWHERE X = Y\nGROUP BY X, Y\nHAVING COUNT(*) > 1\nORDER BY X, Y",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? Math.floor(rand() * 9) : 1500 + Math.floor(rand() * 500);\n  const low = size === 'small' ? 1 : -40, span = size === 'small' ? 4 : 120;\n  const value = () => low + Math.floor(rand() * span);\n  const Coordinates = [];\n  for (let i = 0; i < count; i++) {\n    const roll = rand();\n    if (roll < 0.25 && Coordinates.length) {\n      // Mirror an earlier row, which may also repeat a diagonal point.\n      const [x, y] = Coordinates[Math.floor(rand() * Coordinates.length)];\n      Coordinates.push([y, x]);\n    } else if (roll < 0.35) {\n      const v = value();\n      Coordinates.push([v, v]);\n    } else {\n      Coordinates.push([value(), value()]);\n    }\n  }\n  return [{ Coordinates }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Coordinates":[[20,20],[20,20],[20,21],[23,22],[22,23],[21,20]]}],"expected":{"columns":["X","Y"],"rows":[[20,20],[20,21],[22,23]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Coordinates":[]}]},
+    {"name":"Test 2","input":[{"Coordinates":[[5,5]]}]},
+    {"name":"Test 3","input":[{"Coordinates":[[5,5],[5,5],[6,6]]}]},
+    {"name":"Test 4","input":[{"Coordinates":[[1,2],[2,3],[3,4],[4,4]]}]},
+    {"name":"Test 5","input":[{"Coordinates":[[3,1],[1,3],[1,3],[3,1]]}]},
+    {"name":"Test 6","input":[{"Coordinates":[[9,2],[2,9]]}]},
+    {"name":"Test 7","input":[{"Coordinates":[[-1,2],[2,-1],[0,0],[0,0],[0,0]]}]},
+    {"name":"Test 8","input":[{"Coordinates":[[7,8],[8,7],[1,9],[9,1],[1,4],[4,1],[2,2],[2,2],[3,5]]}]},
+    {"name":"Test 9","input":[{"Coordinates":[[1,2],[1,2],[3,3],[2,1],[4,6],[6,5]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nSymmetry is a relationship between two rows of the same table, which is what a **self-join** expresses: join `Coordinates` to itself where one row's `X` equals the other's `Y` and vice versa. The only subtlety is the diagonal: `(20, 20)` matches itself under that condition, so the join must also insist that the two rows are different rows. The table has no key, so the query first gives each row a number to tell copies apart.\n\n## Approach\n\n1. CTE `numbered`: every row of `Coordinates` with a distinct `row_id` from `ROW_NUMBER() OVER ()`.\n2. Join `numbered` as `p` to itself as `mirror`, where `mirror` swaps `p`'s coordinates and is a different row.\n3. Keep only points with `p.X <= p.Y`, so each symmetric pair is reported from one side.\n4. `DISTINCT` collapses repeated points and repeated matches; order by `X`, then `Y`.\n\n## Example 1, step by step\n\n- `numbered`: 1 (20, 20), 2 (20, 20), 3 (20, 21), 4 (23, 22), 5 (22, 23), 6 (21, 20).\n- Join matches: 1 with 2 and 2 with 1 (each other's copy, never themselves), 3 with 6, 6 with 3, 4 with 5, 5 with 4.\n- `X <= Y` keeps `p` = 1, 2, 3 and 5; rows 4 (23, 22) and 6 (21, 20) are the larger-first sides.\n- `DISTINCT` merges rows 1 and 2, giving (20, 20), (20, 21), (22, 23).\n\n## Complexity\n\n- Time: O(n) to number the rows; the self-join is about O(n) with a hash on the point (O(n log n) with a sort), growing toward O(n²) when many rows share one point.\n- Space: O(n) for `numbered` and the join output (more when a point repeats many times).\n\n## Pitfalls\n\n- Joining without `mirror.row_id <> p.row_id` pairs a diagonal point with itself, so a single `(5, 5)` would be reported.\n- `X < Y` instead of `X <= Y` loses the diagonal points entirely.\n- Without `DISTINCT` a point that repeats, or has several mirrors, is reported several times.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `numbered` | every point with a unique `row_id` |\n| `p` | the point that may be reported |\n| `mirror` | another row whose coordinates are `p`'s swapped |\n| `row_id` | tells repeated copies of one point apart |",
+  "narration": {
+    "1": "The numbered stage gives every row an identity, because identical points must still count as different rows.",
+    "2": "ROW_NUMBER over the whole table hands out distinct ids in any order; only their distinctness matters.",
+    "5": "Each reported point appears once, however many mirrors it has.",
+    "7": "Self-join: mirror is a second copy of the same numbered rows.",
+    "8": "The mirror swaps the coordinates: its X equals p's Y and its Y equals p's X.",
+    "10": "A row may not be its own mirror, which matters only for diagonal points like (20, 20).",
+    "11": "Report each pair from the side whose X is not larger than its Y.",
+    "12": "The answer is ordered by X, then Y."
+  }
+}

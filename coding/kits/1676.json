@@ -1,0 +1,64 @@
+{
+  "number": 1676,
+  "title": "Lowest Common Ancestor of a Binary Tree IV",
+  "spec": "recalled",
+  "statement": "You are given `root`, the root of a binary tree in which no two nodes share a value, and an array `nodes` of distinct nodes that all belong to that tree. Return the lowest common ancestor of every node in `nodes`: the node farthest from the root whose subtree contains all of them. A node counts as part of its own subtree, so if `nodes` holds a single node, that node is the answer, and if one of the nodes lies above all the others, it is the answer.\n\nEach case is written as `[root, nodes]`: the tree as a level-order array with `null` for missing children, followed by the values of the chosen nodes. Your function is called with the root and an array of the node objects themselves (not their values), must not change the tree, and must return a node of the tree; the result is shown as that node's `val`.",
+  "constraints": [
+    "The tree has between 1 and 10^4 nodes",
+    "-10^9 <= Node.val <= 10^9",
+    "All Node.val are unique",
+    "1 <= nodes.length",
+    "The entries of nodes are distinct",
+    "Every entry of nodes is a node of the tree"
+  ],
+  "signature": "TreeNode lowestCommonAncestor(TreeNode root, int[] nodes)",
+  "entry": "lowestCommonAncestor",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "nodes"
+  ],
+  "validator": "function validate([root, nodes]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs a root.';\n  // Every value must sit in a child slot of an earlier node.\n  let slots = 1;\n  for (let i = 0; i < root.length; i++) {\n    if (i >= slots) return 'The level-order array has values with no parent.';\n    if (root[i] !== null) slots += 2;\n  }\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10^4 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -1000000000 || v > 1000000000)) return 'Node values are whole numbers between -10^9 and 10^9.';\n  const present = new Set(values);\n  if (present.size !== values.length) return 'Node values must be unique.';\n  if (!Array.isArray(nodes) || nodes.length === 0) return 'nodes needs at least one node.';\n  if (new Set(nodes).size !== nodes.length) return 'The entries of nodes must be distinct.';\n  if (nodes.some(v => !present.has(v))) return 'Every entry of nodes must be a value in the tree.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, chosen] = input;\n  const root = kit.toTree(values);\n  // Collect the nodes with an explicit stack so that deep trees need no recursion here.\n  const nodes = [];\n  const stack = [root];\n  while (stack.length) {\n    const node = stack.pop();\n    nodes.push(node);\n    if (node.right) stack.push(node.right);\n    if (node.left) stack.push(node.left);\n  }\n  const byValue = new Map(nodes.map(node => [node.val, node]));\n  const links = nodes.map(node => [node.val, node.left, node.right]);\n  const result = solve(root, chosen.map(v => byValue.get(v)));\n  const intact = nodes.every((node, i) => node.val === links[i][0] && node.left === links[i][1] && node.right === links[i][2]);\n  if (!intact) throw new Error('The tree must not be modified.');\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null) return null;\n  if (!new Set(nodes).has(result)) throw new Error('Return a node of the tree.');\n  return result.val;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function lowestCommonAncestor(root, nodes) {\n  const targets = new Set(nodes);\n\n  function dfs(node) {\n    if (node === null || targets.has(node)) {\n      return node;\n    }\n    const left = dfs(node.left);\n    const right = dfs(node.right);\n    if (left !== null && right !== null) {\n      return node;\n    }\n    return left !== null ? left : right;\n  }\n\n  return dfs(root);\n}",
+  "brute": "function lowestCommonAncestor(root, nodes) {\n  // Record every node's parent and depth with a breadth-first walk.\n  const parent = new Map([[root, null]]);\n  const depth = new Map([[root, 0]]);\n  const queue = [root];\n  for (let i = 0; i < queue.length; i++) {\n    for (const child of [queue[i].left, queue[i].right]) {\n      if (child) { parent.set(child, queue[i]); depth.set(child, depth.get(queue[i]) + 1); queue.push(child); }\n    }\n  }\n  // Combine the nodes one at a time: lift the deeper of two nodes, then lift both until they meet.\n  let answer = nodes[0];\n  for (const node of nodes.slice(1)) {\n    let x = answer, y = node;\n    while (depth.get(x) > depth.get(y)) x = parent.get(x);\n    while (depth.get(y) > depth.get(x)) y = parent.get(y);\n    while (x !== y) { x = parent.get(x); y = parent.get(y); }\n    answer = x;\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 900 + pick(90) : 1 + pick(10);\n  const deep = rand() < 0.35;\n  const span = size === 'large' || rand() < 0.3 ? 1000000000 : 25;\n  const used = new Set();\n  const fresh = () => { for (;;) { const v = pick(2 * span + 1) - span; if (!used.has(v)) { used.add(v); return v; } } };\n  const nodes = [{ val: fresh(), left: null, right: null }];\n  while (nodes.length < n) {\n    // Deep trees grow from the newest nodes; bushy trees attach a child anywhere.\n    const parent = deep ? nodes[Math.max(0, nodes.length - 1 - pick(2))] : nodes[pick(nodes.length)];\n    const side = rand() < 0.5 ? 'left' : 'right';\n    if (parent[side]) continue;\n    parent[side] = { val: fresh(), left: null, right: null };\n    nodes.push(parent[side]);\n  }\n  const root = [];\n  const queue = [nodes[0]];\n  for (let k = 0; k < queue.length; k++) {\n    root.push(queue[k] ? queue[k].val : null);\n    if (queue[k]) queue.push(queue[k].left, queue[k].right);\n  }\n  while (root[root.length - 1] === null) root.pop();\n  // Choose how many nodes to ask about, then take that many distinct ones at random.\n  const mode = rand();\n  const count = size === 'small' ? 1 + pick(Math.min(n, 4)) : mode < 0.25 ? 1 : mode < 0.5 ? 2 : mode < 0.75 ? 3 + pick(20) : 1 + pick(n);\n  const order = nodes.map((_, i) => i);\n  for (let i = 0; i < count; i++) {\n    const j = i + pick(n - i);\n    [order[i], order[j]] = [order[j], order[i]];\n  }\n  return [root, order.slice(0, count).map(i => nodes[i].val)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,1,6,2,0,8,null,null,7,4],[4,7]],"expected":2},
+    {"name":"Example 2","input":[[3,5,1,6,2,0,8,null,null,7,4],[1]],"expected":1},
+    {"name":"Example 3","input":[[3,5,1,6,2,0,8,null,null,7,4],[7,6,2,4]],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],[1]]},
+    {"name":"Test 2","input":[[1,2],[2]]},
+    {"name":"Test 3","input":[[1,2,3],[3,2]]},
+    {"name":"Test 4","input":[[3,5,1,6,2,0,8,null,null,7,4],[0,1,2,3,4,5,6,7,8]]},
+    {"name":"Test 5","input":[[3,5,1,6,2,0,8,null,null,7,4],[6,7,4]]},
+    {"name":"Test 6","input":[[3,5,1,6,2,0,8,null,null,7,4],[0,8]]},
+    {"name":"Test 7","input":[[3,5,1,6,2,0,8,null,null,7,4],[4,5]]},
+    {"name":"Test 8","input":[[1,null,2,null,3,null,4,null,5],[5,3,4]]},
+    {"name":"Test 9","input":[[-1000000000,1000000000,0,-5,7],[-5,7,1000000000]]},
+    {"name":"Test 10","input":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[8,9,10,11]]},
+    {"name":"Test 11","input":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[15,8]]},
+    {"name":"Test 12","input":[[10,9,null,8,null,7,null,6],[6]]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA slow but simple plan: record every node's parent and depth, then merge the targets one pair at a time by lifting the deeper node until the two meet. One DFS can do it all at once, just like the two-node version of this problem. Put the target nodes in a set. Each subtree reports `null` if it holds no target, or otherwise a single node: a target it found, or the ancestor of everything it found. The first node whose left and right subtrees both report something must be the answer, and the search can stop at a target, because any other targets underneath it are already covered by it.\n\n## Approach\n\n1. Put all of `nodes` into the set `targets` for O(1) membership checks.\n2. `dfs(node)`: if `node` is `null` or is in `targets`, return `node`.\n3. Otherwise search both children, storing the reports in `left` and `right`.\n4. If both reports are nodes, targets sit on both sides, so `node` is their lowest common ancestor: return it.\n5. Otherwise pass up whichever report is not `null` (or `null`).\n6. The answer is `dfs(root)`.\n\n## Example 1, step by step\n\nThe targets are the nodes 4 and 7, both children of node 2.\n\n- From 3 the search goes left to 5, then to 6, whose children are both empty: 6 reports `null`.\n- At 2 the left child 7 is a target, so `left = 7`; the right child 4 is a target, so `right = 4`. Both are set, so 2 reports itself.\n- 5 gets `null` from 6 and node 2 from 2, so it passes 2 up. The right side of 3 (1, 0, 8) reports `null`.\n- The root passes 2 up: the answer is `2`.\n\n## Complexity\n\n- Time: O(n + k): building the set takes O(k) for k targets, and each tree node is visited at most once.\n- Space: O(k + h): the set, plus the recursion stack whose depth is the tree's height h.\n\n## Pitfalls\n\n- Compare node objects (the set holds nodes, not values), and return the node itself.\n- With one target, the answer is that target; the early return handles it with no special case.\n- Stopping at a target is safe only because every target is guaranteed to be in the tree.\n- Counting how many targets each subtree holds also works, but the counts must be compared with the full total; reporting nodes avoids that.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `targets` | set of the nodes whose common ancestor is wanted |\n| `node` | the node whose subtree the current call searches |\n| `left` | what the left subtree reported: a target, an ancestor of targets, or `null` |\n| `right` | the same report from the right subtree |",
+  "narration": {
+    "2": "Put the target nodes in a set so each check is a constant-time lookup.",
+    "4": "dfs reports a target or the ancestor of the targets in this subtree, or null when it holds none.",
+    "5": "An empty spot holds no targets, and reaching a target means this subtree has found one.",
+    "6": "Report the current node (or null) to the caller.",
+    "8": "Search the left subtree for targets.",
+    "9": "Search the right subtree for targets.",
+    "10": "Did both sides find something? Then the targets are split around this node.",
+    "11": "This node is the lowest one above all of them, so report it.",
+    "13": "Otherwise pass up whatever one side found, or null if neither found anything.",
+    "16": "Start the search at the root; its report is the answer."
+  }
+}

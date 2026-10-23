@@ -1,0 +1,58 @@
+{
+  "number": 2991,
+  "title": "Top Three Wineries",
+  "spec": "recalled",
+  "statement": "A wine guide stores its ratings:\n\n- `Wineries(id, country, points, winery)`: one row per rated wine; `id` is unique. `winery` names the producer, `country` is where it is, and `points` is the score that wine received. A winery usually has several rows.\n\nWithin a country, a winery's **total** is the sum of `points` over its rows in that country. Rank each country's wineries by total, highest first; wineries with equal totals are ranked by `winery` name ascending.\n\nReport one row per country with the columns `country`, `top_winery`, `second_winery` and `third_winery`, holding the wineries ranked 1, 2 and 3. Each is written as the winery name, a space and its total in parentheses, for example `HarmonyHill (100)`. A country with only one winery shows the text `No second winery` as `second_winery`; a country with fewer than three shows `No third winery` as `third_winery`. Order the rows by `country` ascending.",
+  "constraints": [
+    "id is unique in Wineries",
+    "country, points and winery are never null",
+    "points is a non-negative integer",
+    "the same winery name may appear in several countries; its totals are counted per country"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Wineries": [["id","INT"],["country","VARCHAR(60)"],["points","INT"],["winery","VARCHAR(60)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Wineries = [] }] = input;\n  const ids = new Set();\n  for (const [id, country, points, winery] of Wineries) {\n    if (id === null) return 'Every row needs an id.';\n    if (ids.has(id)) return `id ${id} appears twice.`;\n    ids.add(id);\n    if (country === null || winery === null) return `Row ${id} needs a country and a winery.`;\n    if (!Number.isInteger(points) || points < 0) return `Row ${id} needs non-negative integer points.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH totals AS (\n  SELECT country, winery, SUM(points) AS total_points\n  FROM Wineries\n  GROUP BY country, winery\n),\nranked AS (\n  SELECT\n    country,\n    CONCAT(winery, ' (', total_points, ')') AS label,\n    ROW_NUMBER() OVER (\n      PARTITION BY country\n      ORDER BY total_points DESC, winery ASC\n    ) AS position\n  FROM totals\n)\nSELECT\n  country,\n  MAX(CASE WHEN position = 1 THEN label END) AS top_winery,\n  IFNULL(MAX(CASE WHEN position = 2 THEN label END), 'No second winery') AS second_winery,\n  IFNULL(MAX(CASE WHEN position = 3 THEN label END), 'No third winery') AS third_winery\nFROM ranked\nGROUP BY country\nORDER BY country;",
+  "brute": "WITH totals AS (\n  SELECT country, winery, SUM(points) AS total_points\n  FROM Wineries\n  GROUP BY country, winery\n),\npositioned AS (\n  SELECT t.country, t.winery, t.total_points,\n    1 + (SELECT COUNT(*) FROM totals AS o\n         WHERE o.country = t.country\n           AND (o.total_points > t.total_points OR (o.total_points = t.total_points AND o.winery < t.winery))) AS position\n  FROM totals AS t\n)\nSELECT c.country,\n  (SELECT CONCAT(p.winery, ' (', p.total_points, ')') FROM positioned AS p WHERE p.country = c.country AND p.position = 1) AS top_winery,\n  COALESCE((SELECT CONCAT(p.winery, ' (', p.total_points, ')') FROM positioned AS p WHERE p.country = c.country AND p.position = 2), 'No second winery') AS second_winery,\n  COALESCE((SELECT CONCAT(p.winery, ' (', p.total_points, ')') FROM positioned AS p WHERE p.country = c.country AND p.position = 3), 'No third winery') AS third_winery\nFROM (SELECT DISTINCT country FROM Wineries) AS c\nORDER BY c.country",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const countries = small ? ['Australia', 'Hungary', 'India', 'USA'] : Array.from({ length: 30 }, (_, i) => `Country${String(i).padStart(2, '0')}`);\n  const wineries = small ? ['GrapesGalore', 'HarmonyHill', 'MoonlitCellars', 'PacificCrest', 'RoyalVines'] : Array.from({ length: 60 }, (_, i) => `Winery${String(i).padStart(2, '0')}`);\n  // Small cases reuse a few point values so winery totals tie and the name order decides.\n  const points = [0, 10, 20, 30, 50];\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Wineries = [];\n  for (let i = 0; i < count; i++) Wineries.push([small ? 100 + i * 37 : i + 1, pick(countries), small ? pick(points) : Math.floor(rand() * 101), pick(wineries)]);\n  return [{ Wineries }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Wineries":[[103,"Australia",84,"WhisperingPines"],[737,"Australia",85,"GrapesGalore"],[848,"Australia",100,"HarmonyHill"],[222,"Hungary",60,"MoonlitCellars"],[116,"USA",47,"RoyalVines"],[124,"USA",45,"Eagle'sNest"],[648,"India",69,"SunsetVines"],[894,"USA",39,"RoyalVines"],[677,"USA",9,"PacificCrest"]]}],"expected":{"columns":["country","top_winery","second_winery","third_winery"],"rows":[["Australia","HarmonyHill (100)","GrapesGalore (85)","WhisperingPines (84)"],["Hungary","MoonlitCellars (60)","No second winery","No third winery"],["India","SunsetVines (69)","No second winery","No third winery"],["USA","RoyalVines (86)","Eagle'sNest (45)","PacificCrest (9)"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Wineries":[]}]},
+    {"name":"Test 2","input":[{"Wineries":[[1,"Chile",70,"AndesPeak"]]}]},
+    {"name":"Test 3","input":[{"Wineries":[[1,"Chile",70,"AndesPeak"],[2,"Chile",90,"ValleyRidge"]]}]},
+    {"name":"Test 4","input":[{"Wineries":[[1,"France",80,"Margaux"],[2,"France",80,"Bordelais"],[3,"France",80,"Chablis"],[4,"France",80,"Alsace"]]}]},
+    {"name":"Test 5","input":[{"Wineries":[[1,"Italy",50,"Tuscana"],[2,"Italy",50,"Tuscana"],[3,"Italy",90,"Piemonte"],[4,"Italy",40,"Veneto"],[5,"Italy",40,"Veneto"],[6,"Italy",15,"Veneto"]]}]},
+    {"name":"Test 6","input":[{"Wineries":[[1,"Spain",60,"Rioja"],[2,"Portugal",30,"Rioja"],[3,"Portugal",45,"Douro"],[4,"Spain",10,"Jerez"],[5,"Portugal",30,"Rioja"]]}]},
+    {"name":"Test 7","input":[{"Wineries":[[1,"USA",20,"Napa"],[2,"Germany",88,"Mosel"],[3,"Argentina",75,"Mendoza"],[4,"USA",95,"Sonoma"],[5,"Germany",88,"Baden"]]}]},
+    {"name":"Test 8","input":[{"Wineries":[[1,"Greece",0,"Santorini"],[2,"Greece",0,"Nemea"],[3,"Greece",0,"Crete"]]}]},
+    {"name":"Test 9","input":[{"Wineries":[[1,"Chile",60,"Maipo"],[2,"Chile",55,"Colchagua"],[3,"Chile",40,"Casablanca"],[4,"Chile",40,"Bio"],[5,"Chile",39,"Aconcagua"],[6,"Chile",1,"Bio"]]}]},
+    {"name":"Test 10","input":[{"Wineries":[[7,"Australia",84,"WhisperingPines"],[8,"Australia",85,"GrapesGalore"],[9,"Australia",100,"HarmonyHill"],[10,"Australia",16,"WhisperingPines"],[11,"Australia",15,"GrapesGalore"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThree things happen in order. First the rows collapse to one total per (country, winery). Then, inside each country, the totals are put in a strict order, with the name breaking ties, and numbered 1, 2, 3, ... with `ROW_NUMBER()`. Finally the first three positions are turned from rows into columns: grouping by country and taking `MAX(CASE WHEN position = k THEN label END)` picks out position k, or `null` when the country has no such position, which `IFNULL` replaces with the fallback text.\n\n## Approach\n\n1. CTE `totals`: `SUM(points)` grouped by `country, winery`.\n2. CTE `ranked`: build `label = CONCAT(winery, ' (', total_points, ')')` and number the wineries of each country with `ROW_NUMBER() OVER (PARTITION BY country ORDER BY total_points DESC, winery ASC)` as `position`.\n3. Group `ranked` by `country`; conditional `MAX` pulls positions 1, 2 and 3 into `top_winery`, `second_winery` and `third_winery`, with `IFNULL` supplying `No second winery` and `No third winery`.\n4. Sort by `country`.\n\n## Example 1, step by step\n\n- `totals`: Australia has HarmonyHill 100, GrapesGalore 85, WhisperingPines 84; Hungary has MoonlitCellars 60; India has SunsetVines 69; USA has RoyalVines 47 + 39 = 86, Eagle'sNest 45, PacificCrest 9.\n- `ranked` numbers them in that order inside each country, so USA's position 1 is `RoyalVines (86)`.\n- Hungary and India only have position 1, so their other two columns get the fallback texts.\n\n## Complexity\n\n- Time: O(n) to total n rows, then O(w log w) to sort the w (country, winery) totals within their countries; the pivot is one more pass.\n- Space: O(w) for the totals and their positions.\n\n## Pitfalls\n\n- Ranking single rows instead of summed totals: RoyalVines' best wine (47) is not its total (86).\n- `RANK()` or `DENSE_RANK()` give tied wineries the same number, so a position can hold two wineries or be skipped; the name tie-break plus `ROW_NUMBER()` keeps one winery per position.\n- Grouping totals by `winery` alone merges producers with the same name in different countries (Test 6).\n- Forgetting the fallback texts leaves `null` where `No second winery` or `No third winery` is expected.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `totals` | one row per (country, winery) with its summed points |\n| `total_points` | that winery's total within the country |\n| `ranked` | each total with its display `label` and `position` in the country |\n| `label` | `winery (total_points)`, the text shown in the output |\n| `position` | 1 for the best winery of the country, 2 for the next, and so on |",
+  "narration": {
+    "1": "The CTE totals adds up the points of each winery within its country.",
+    "4": "Grouping by both country and winery keeps same-named wineries in different countries apart.",
+    "6": "The CTE ranked gives every winery its display text and its place in the country.",
+    "9": "Build the output text: the winery name followed by its total in parentheses.",
+    "10": "ROW_NUMBER numbers the wineries of each country with no repeated positions.",
+    "12": "Higher totals come first; equal totals fall back to the winery name in ascending order.",
+    "18": "Position 1 is the top winery; every country has one.",
+    "19": "Position 2 becomes the second column, or No second winery when the country has only one winery.",
+    "20": "Position 3 becomes the third column, or No third winery when the country has fewer than three.",
+    "22": "One output row per country.",
+    "23": "Countries are listed alphabetically."
+  }
+}

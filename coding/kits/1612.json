@@ -1,0 +1,61 @@
+{
+  "number": 1612,
+  "title": "Check If Two Expression Trees are Equivalent",
+  "spec": "recalled",
+  "statement": "In an expression tree every node has either no children or exactly two. A leaf stands for a variable and holds one lowercase letter; a node with two children holds `\"+\"` and stands for the sum of its left and right subtrees. You get the roots `root1` and `root2` of two such trees. Return `true` when the two expressions are equivalent, meaning they produce the same value no matter which numbers are substituted for the variables, and `false` otherwise.\n\nEach node is a `Node` with a string `val` (`\"+\"` or a single letter) and the links `left` and `right` (`null` at a leaf). A case writes each tree as a level-order array with `null` for missing children. Both trees are valid expression trees and have the same number of nodes. LeetCode's follow-up asks what you would change if a node could also hold `\"-\"` (subtraction).",
+  "constraints": [
+    "Both trees have the same number of nodes",
+    "The number of nodes is odd and between 1 and 4999",
+    "Node.val is '+' or a lowercase English letter",
+    "Every '+' node has exactly two children and every letter node is a leaf"
+  ],
+  "signature": "boolean checkEquivalence(Node root1, Node root2)",
+  "entry": "checkEquivalence",
+  "kind": "function",
+  "parameters": [
+    "root1",
+    "root2"
+  ],
+  "validator": "function validate([root1, root2]) {\n  // Walk a level-order array the way it is read: every node takes the next two slots as its children.\n  const count = (values, name) => {\n    if (!Array.isArray(values) || values.length === 0 || values[0] === null) return `${name} needs at least one node.`;\n    const queue = [0];\n    let next = 1;\n    for (let head = 0; head < queue.length; head++) {\n      const value = values[queue[head]];\n      if (value !== '+' && !(typeof value === 'string' && /^[a-z]$/.test(value))) return `Every node of ${name} is \"+\" or one lowercase letter.`;\n      let children = 0;\n      for (let side = 0; side < 2; side++) {\n        if (next < values.length && values[next] !== null) {\n          queue.push(next);\n          children++;\n        }\n        next++;\n      }\n      if (value === '+' && children !== 2) return `Every \"+\" in ${name} needs two children.`;\n      if (value !== '+' && children !== 0) return `Letters in ${name} must be leaves.`;\n    }\n    if (values.slice(next).some(value => value !== null)) return `${name} has values that are not attached to the tree.`;\n    if (queue.length > 4999) return `${name} has at most 4999 nodes.`;\n    return queue.length;\n  };\n  const first = count(root1, 'root1');\n  if (typeof first === 'string') return first;\n  const second = count(root2, 'root2');\n  if (typeof second === 'string') return second;\n  if (first !== second) return 'Both trees must have the same number of nodes.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  // Rebuild a tree from its level-order array: each node takes the next two entries as its children.\n  const build = values => {\n    const root = new kit.Node(values[0]);\n    const queue = [root];\n    let next = 1;\n    for (let head = 0; head < queue.length && next < values.length; head++) {\n      for (const side of ['left', 'right']) {\n        if (next < values.length && values[next] !== null) {\n          queue[head][side] = new kit.Node(values[next]);\n          queue.push(queue[head][side]);\n        }\n        next++;\n      }\n    }\n    return root;\n  };\n  const [root1, root2] = input;\n  const result = solve(build(root1), build(root2));\n  if (typeof result !== 'boolean') throw new Error('Return true or false.');\n  return result;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function checkEquivalence(root1, root2) {\n  const counts = new Array(26).fill(0);\n  const tally = (node, delta) => {\n    if (node.val === '+') {\n      tally(node.left, delta);\n      tally(node.right, delta);\n    } else {\n      counts[node.val.charCodeAt(0) - 97] += delta;\n    }\n  };\n  tally(root1, 1);\n  tally(root2, -1);\n  return counts.every(count => count === 0);\n}",
+  "brute": "function checkEquivalence(root1, root2) {\n  // List each tree's leaves with an explicit stack, sort them, and compare the two lists.\n  const leaves = root => {\n    const found = [];\n    const stack = [root];\n    while (stack.length) {\n      const node = stack.pop();\n      if (node.left || node.right) stack.push(node.left, node.right);\n      else found.push(node.val);\n    }\n    return found.sort().join('');\n  };\n  return leaves(root1) === leaves(root2);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const leafCount = size === 'large' ? 400 + pick(100) : 1 + pick(6);\n  const alphabet = size === 'large' ? 26 : 1 + pick(4);\n  const letter = () => String.fromCharCode(97 + pick(alphabet));\n  // Join random pairs of subtrees under '+', or grow one long chain, until a single tree is left.\n  const build = letters => {\n    const pool = letters.map(val => ({ val, left: null, right: null }));\n    if (rand() < 0.3) {\n      let tree = pool[0];\n      for (let i = 1; i < pool.length; i++) tree = rand() < 0.5 ? { val: '+', left: tree, right: pool[i] } : { val: '+', left: pool[i], right: tree };\n      return tree;\n    }\n    while (pool.length > 1) {\n      const a = pool.splice(pick(pool.length), 1)[0];\n      const b = pool.splice(pick(pool.length), 1)[0];\n      pool.push({ val: '+', left: a, right: b });\n    }\n    return pool[0];\n  };\n  const serialize = root => {\n    const out = [];\n    const queue = [root];\n    for (let q = 0; q < queue.length; q++) {\n      const node = queue[q];\n      if (node === null) { out.push(null); continue; }\n      out.push(node.val);\n      queue.push(node.left, node.right);\n    }\n    while (out[out.length - 1] === null) out.pop();\n    return out;\n  };\n  const first = Array.from({ length: leafCount }, letter);\n  let second = first.slice();\n  const mode = rand();\n  if (mode < 0.35) {\n    // One leaf gets a different letter, so the counts no longer match.\n    const i = pick(leafCount);\n    second[i] = String.fromCharCode(97 + (second[i].charCodeAt(0) - 97 + 1 + pick(alphabet > 1 ? alphabet - 1 : 25)) % 26);\n  } else if (mode < 0.5) {\n    second = Array.from({ length: leafCount }, letter);\n  }\n  for (let i = second.length - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [second[i], second[j]] = [second[j], second[i]];\n  }\n  return [serialize(build(first)), serialize(build(second))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["x"],["x"]],"expected":true},
+    {"name":"Example 2","input":[["+","a","+",null,null,"b","c"],["+","+","a","b","c"]],"expected":true},
+    {"name":"Example 3","input":[["+","a","+",null,null,"b","c"],["+","+","a","b","d"]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["a"],["b"]]},
+    {"name":"Test 2","input":[["z"],["z"]]},
+    {"name":"Test 3","input":[["+","a","b"],["+","b","a"]]},
+    {"name":"Test 4","input":[["+","a","a"],["+","a","b"]]},
+    {"name":"Test 5","input":[["+","+","b","a","a"],["+","a","+",null,null,"b","b"]]},
+    {"name":"Test 6","input":[["+","+","+","a","b","c","d"],["+","d","+",null,null,"c","+",null,null,"b","a"]]},
+    {"name":"Test 7","input":[["+","+","+","z","z","z","z"],["+","z","+",null,null,"z","+",null,null,"z","z"]]},
+    {"name":"Test 8","input":[["+","+","c","a","b"],["+","+","c","a","x"]]},
+    {"name":"Test 9","input":[["+","+","+","a","b","a","b"],["+","+","+","a","a","a","b"]]},
+    {"name":"Test 10","input":[["+","a","+",null,null,"b","+",null,null,"c","+",null,null,"d","+",null,null,"e","+",null,null,"f","g"],["+","+","g","+","f",null,null,"+","e",null,null,"+","d",null,null,"+","c",null,null,"a","b"]]},
+    {"name":"Test 11","input":[["+","+","+","+","+","+","+","y","x","w","v","u","t","s","r"],["+","+","+","+","+","+","+","r","s","t","u","v","w","x","q"]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith `+` as the only operator, the brackets and the order of the operands never matter: addition is commutative and associative, so every expression tree is just the sum of its leaves. A variable that appears three times contributes three times its value. Two trees are therefore equivalent exactly when each letter appears the same number of times in both. Comparing the shapes of the trees is not needed and would be wrong. A simple check lists both trees' leaves, sorts the lists and compares them; counting letters does the same in linear time.\n\n## Approach\n\n1. Make `counts`, one slot per letter.\n2. `tally(node, delta)` walks a tree depth first: a `+` node recurses into `left` and `right`, and a leaf adds `delta` to its letter's slot.\n3. Run `tally(root1, 1)` and then `tally(root2, -1)`, so letters of the second tree cancel those of the first.\n4. The trees are equivalent when every slot of `counts` is back to `0`.\n\n## Example 1, step by step\n\nBoth trees are the single leaf `x`. `tally(root1, 1)` reaches that leaf and sets the `x` slot to `1`. `tally(root2, -1)` brings it back to `0`. All 26 slots are zero, so the answer is `true`. In Example 2 both trees hold `a`, `b` and `c` once each, so the slots also cancel; in Example 3 the `c` slot ends at `1` and the `d` slot at `-1`, so the answer is `false`.\n\n## Complexity\n\n- Time: O(n): each node of both trees is visited once.\n- Space: O(h) for the recursion, where h is the height of the deeper tree (up to about n / 2 for a chain), plus 26 counters.\n\n## Pitfalls\n\n- Comparing the trees node by node fails Example 2: `a + (b + c)` and `(a + b) + c` have different shapes but the same value.\n- Compare how many times each letter occurs, not just which letters occur: `a + a + b` differs from `a + b + b`.\n- Follow-up with `-`: pass a sign down the walk and flip it when entering the right child of a `-` node, then add that sign instead of `delta` alone.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `counts` | for each letter, its occurrences in `root1` minus those in `root2` |\n| `tally` | the depth-first walk that updates `counts` |\n| `node` | the node being visited |\n| `delta` | `1` for the first tree, `-1` for the second |",
+  "narration": {
+    "2": "One counter per lowercase letter; it will hold the first tree's count minus the second's.",
+    "3": "tally walks one tree depth first and adds delta for every leaf it finds.",
+    "4": "A '+' node only joins two subtrees, so the walk just goes into both.",
+    "5": "Visit the left operand...",
+    "6": "...and then the right operand.",
+    "8": "A leaf is a variable: adjust the counter of its letter by delta.",
+    "11": "Count the letters of the first tree upward.",
+    "12": "Count the letters of the second tree downward so matching letters cancel.",
+    "13": "The sums are equal for every assignment exactly when every counter is back to zero."
+  }
+}

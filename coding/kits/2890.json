@@ -1,0 +1,50 @@
+{
+  "number": 2890,
+  "title": "Reshape Data: Melt",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `report`; here the DataFrame is a table and you answer with one MySQL query.\n\n- `report(product, quarter_1, quarter_2, quarter_3, quarter_4)`: one row per product in **wide** form. `product` is the product's name and is never null; each `quarter_k` column holds that product's sales in quarter k. A sales figure may be null when it is missing.\n\nTurn the table into **long** form: every row of `report` becomes four rows, one per quarter, with the columns `product`, `quarter` and `sales`. `quarter` is the name of the source column as text (`'quarter_1'`, `'quarter_2'`, `'quarter_3'` or `'quarter_4'`) and `sales` is the value that column held, kept even when it is null. The result therefore has exactly four times as many rows as `report`. Rows may come in any order.",
+  "constraints": [
+    "product is never null",
+    "Sales figures are integers and may be null",
+    "Each input row yields exactly four output rows, one per quarter column"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "report": [["product","VARCHAR"],["quarter_1","INT"],["quarter_2","INT"],["quarter_3","INT"],["quarter_4","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ report = [] }] = input;\n  for (const [product] of report) if (product === null) return 'Every report row needs a product.';\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT product, 'quarter_1' AS quarter, quarter_1 AS sales\nFROM report\nUNION ALL\nSELECT product, 'quarter_2', quarter_2\nFROM report\nUNION ALL\nSELECT product, 'quarter_3', quarter_3\nFROM report\nUNION ALL\nSELECT product, 'quarter_4', quarter_4\nFROM report;",
+  "brute": "WITH quarters (quarter) AS (\n  SELECT 'quarter_1' UNION ALL SELECT 'quarter_2' UNION ALL SELECT 'quarter_3' UNION ALL SELECT 'quarter_4'\n)\nSELECT\n  r.product,\n  q.quarter,\n  CASE q.quarter\n    WHEN 'quarter_1' THEN r.quarter_1\n    WHEN 'quarter_2' THEN r.quarter_2\n    WHEN 'quarter_3' THEN r.quarter_3\n    ELSE r.quarter_4\n  END AS sales\nFROM report AS r\nCROSS JOIN quarters AS q",
+  "generator": "function generate(rand, size) {\n  const names = ['Umbrella', 'SleepingBag', 'Tent', 'Lantern', 'Compass', 'Kayak'];\n  const count = size === 'small' ? Math.floor(rand() * 7) : 1500 + Math.floor(rand() * 500);\n  const figure = () => (rand() < 0.1 ? null : Math.floor(rand() * (size === 'small' ? 1000 : 100000)));\n  const report = [];\n  for (let i = 0; i < count; i++) {\n    const product = size === 'small' ? names[Math.floor(rand() * names.length)] : `${names[i % names.length]}${i}`;\n    report.push([product, figure(), figure(), figure(), figure()]);\n  }\n  return [{ report }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"report":[["Umbrella",417,224,379,611],["SleepingBag",800,936,93,875]]}],"expected":{"columns":["product","quarter","sales"],"rows":[["Umbrella","quarter_1",417],["SleepingBag","quarter_1",800],["Umbrella","quarter_2",224],["SleepingBag","quarter_2",936],["Umbrella","quarter_3",379],["SleepingBag","quarter_3",93],["Umbrella","quarter_4",611],["SleepingBag","quarter_4",875]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"report":[]}]},
+    {"name":"Test 2","input":[{"report":[["Tent",10,20,30,40]]}]},
+    {"name":"Test 3","input":[{"report":[["Lantern",5,5,5,5],["Compass",5,5,5,5]]}]},
+    {"name":"Test 4","input":[{"report":[["Kayak",null,12,null,0]]}]},
+    {"name":"Test 5","input":[{"report":[["Tent",null,null,null,null],["Umbrella",1,2,3,4]]}]},
+    {"name":"Test 6","input":[{"report":[["Umbrella",417,224,379,611],["Umbrella",417,224,379,611]]}]},
+    {"name":"Test 7","input":[{"report":[["Compass",0,0,0,0]]}]},
+    {"name":"Test 8","input":[{"report":[["Kayak",7,7,1,7],["Lantern",99,0,99,0],["SleepingBag",800,936,93,875]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIn pandas this is `report.melt(id_vars=['product'], var_name='quarter', value_name='sales')`: the identifier column stays, and every other column is turned into a (column name, value) pair on its own row. SQL has no melt, but the four quarter columns are fixed and known, so each one can be read by its own `SELECT` that pairs the product with a constant naming the column. `UNION ALL` stacks the four blocks.\n\n## Approach\n\n1. The first `SELECT` takes every product with the literal `'quarter_1'` as `quarter` and the `quarter_1` value as `sales`; its aliases name the result's columns.\n2. `UNION ALL` appends the same shape for `quarter_2`, then `quarter_3`, then `quarter_4`. Later blocks need no aliases, because a union takes its column names from the first query.\n\n## Example 1, step by step\n\n- Block 1: (Umbrella, quarter_1, 417), (SleepingBag, quarter_1, 800).\n- Block 2: (Umbrella, quarter_2, 224), (SleepingBag, quarter_2, 936).\n- Block 3: (Umbrella, quarter_3, 379), (SleepingBag, quarter_3, 93).\n- Block 4: (Umbrella, quarter_4, 611), (SleepingBag, quarter_4, 875).\n\nStacked, these are the eight expected rows.\n\n## Complexity\n\n- Time: O(n) for n rows in `report`; the table is scanned four times.\n- Space: O(n) for the 4n output rows.\n\n## Pitfalls\n\n- Plain `UNION` removes duplicates: two report rows for the same product with the same figure in some quarter would collapse into one output row.\n- Do not filter out null sales; melt keeps a row for a missing figure.\n- The `quarter` value is the column's name as a string literal (`'quarter_1'`), not the column itself; writing `quarter_1 AS quarter` would put the number there.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `'quarter_k'` | constant text naming the column a block reads |\n| `quarter` | output column holding that constant |\n| `sales` | output column holding the product's figure for that quarter |\n| `UNION ALL` | stacks the four blocks and keeps every row |",
+  "narration": {
+    "1": "The first block pairs each product with the constant quarter_1 and its quarter_1 figure; these aliases name the output columns.",
+    "2": "Every row of report contributes to every block.",
+    "3": "UNION ALL appends the next block without removing duplicate rows.",
+    "4": "The second block reads quarter_2 the same way; its column names come from the first block.",
+    "7": "The third block reads quarter_3.",
+    "10": "The last block reads quarter_4, completing four rows per product."
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "number": 3054,
+  "title": "Binary Tree Nodes",
+  "spec": "recalled",
+  "statement": "A binary tree is stored one node per row:\n\n- `Tree(N, P)`: `N` is a node's value, unique in the table, and `P` is the value of its parent. The root's `P` is `null`.\n\nClassify every node:\n\n- `Root`: the node has no parent.\n- `Inner`: the node has a parent and at least one child (some row has it as `P`).\n- `Leaf`: the node has a parent and no children.\n\nReport one row per node with the columns `N` and `Type` (one of the three words above), sorted by `N` in ascending order. A tree with a single node has just its root, reported as `Root`.",
+  "constraints": [
+    "N is unique and never null",
+    "Exactly one row has P = null when the table is not empty",
+    "Every non-null P is the N of another row, and the rows form one binary tree (each node has at most two children)"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Tree": [["N","INT"],["P","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Tree = [] }] = input;\n  const parent = new Map(), children = new Map();\n  let roots = 0;\n  for (const [n, p] of Tree) {\n    if (n === null) return 'Every row needs a node value N.';\n    if (parent.has(n)) return `Node ${n} appears twice.`;\n    parent.set(n, p);\n    if (p === null) roots++;\n  }\n  if (Tree.length && roots !== 1) return 'The tree needs exactly one root (P = null).';\n  for (const [n, p] of Tree) {\n    if (p === null) continue;\n    if (!parent.has(p)) return `Parent ${p} of node ${n} is not in the table.`;\n    children.set(p, (children.get(p) ?? 0) + 1);\n    if (children.get(p) > 2) return `Node ${p} has more than two children.`;\n  }\n  // Walking up from every node must reach the root without revisiting a node.\n  const reaches = new Map();\n  for (const [n] of Tree) {\n    const path = [];\n    let cur = n;\n    while (cur !== null && !reaches.has(cur)) {\n      if (path.includes(cur)) return `Node ${cur} is its own ancestor.`;\n      path.push(cur);\n      cur = parent.get(cur);\n    }\n    for (const v of path) reaches.set(v, true);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  N,\n  CASE\n    WHEN P IS NULL THEN 'Root'\n    WHEN N IN (SELECT P FROM Tree) THEN 'Inner'\n    ELSE 'Leaf'\n  END AS Type\nFROM Tree\nORDER BY N;",
+  "brute": "SELECT t.N,\n  IF(t.P IS NULL, 'Root', IF(COUNT(c.N) > 0, 'Inner', 'Leaf')) AS Type\nFROM Tree AS t\nLEFT JOIN Tree AS c\n  ON c.P = t.N\nGROUP BY t.N, t.P\nORDER BY t.N",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const count = size === 'small' ? pick(9) : 1500 + pick(500);\n  // Distinct node values, drawn from a small range for small trees so they look like Example 1.\n  const range = size === 'small' ? 20 : 100000;\n  const values = new Set();\n  while (values.size < count) values.add(1 + pick(range));\n  const nodes = [...values];\n  const Tree = [], open = [];\n  nodes.forEach((n, i) => {\n    if (i === 0) { Tree.push([n, null]); open.push([n, 2]); return; }\n    // Attach to a random node that still has a free child slot; long chains and full nodes both happen.\n    const k = pick(open.length);\n    const slot = open[k];\n    Tree.push([n, slot[0]]);\n    if (--slot[1] === 0) { open[k] = open[open.length - 1]; open.pop(); }\n    open.push([n, 2]);\n  });\n  for (let i = Tree.length - 1; i > 0; i--) { const j = pick(i + 1); [Tree[i], Tree[j]] = [Tree[j], Tree[i]]; }\n  return [{ Tree }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Tree":[[1,2],[3,2],[6,8],[9,8],[2,5],[8,5],[5,null]]}],"expected":{"columns":["N","Type"],"rows":[[1,"Leaf"],[2,"Inner"],[3,"Leaf"],[5,"Root"],[6,"Leaf"],[8,"Inner"],[9,"Leaf"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Tree":[]}]},
+    {"name":"Test 2","input":[{"Tree":[[7,null]]}]},
+    {"name":"Test 3","input":[{"Tree":[[4,9],[9,null]]}]},
+    {"name":"Test 4","input":[{"Tree":[[1,null],[2,1],[3,2],[4,3],[5,4]]}]},
+    {"name":"Test 5","input":[{"Tree":[[20,10],[30,10],[10,null]]}]},
+    {"name":"Test 6","input":[{"Tree":[[15,3],[3,8],[12,8],[8,null],[1,3],[14,12]]}]},
+    {"name":"Test 7","input":[{"Tree":[[2,null],[1,2],[3,1],[4,3],[6,4],[5,6],[7,6]]}]},
+    {"name":"Test 8","input":[{"Tree":[[100,50],[50,25],[25,null],[10,25],[5,10],[7,10],[60,50],[1,5]]}]},
+    {"name":"Test 9","input":[{"Tree":[[0,null],[-1,0],[1,0],[-2,-1],[-3,-1],[2,1],[3,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach node's type depends on two facts: whether it has a parent (its own `P`) and whether it has a child (whether its `N` shows up in **someone else's** `P`). The first fact sits on the node's own row; the second needs a look at the whole `P` column, which a subquery provides. A `CASE` checks the facts in priority order, so the root is labelled before the child test is even asked.\n\n## Approach\n\n1. Read every row of `Tree`.\n2. `WHEN P IS NULL THEN 'Root'`: the node without a parent is the root, whether or not it has children.\n3. `WHEN N IN (SELECT P FROM Tree) THEN 'Inner'`: a node that is somebody's parent has a child.\n4. `ELSE 'Leaf'`: everything else has a parent but no child.\n5. Name the column `Type` and `ORDER BY N`.\n\n## Example 1, step by step\n\nThe `P` column holds {2, 2, 8, 8, 5, 5, null}, so the parents are 2, 5 and 8.\n\n- 5: `P` is null, so `Root`.\n- 2 and 8: have parent 5 and appear among the parents, so `Inner`.\n- 1, 3, 6, 9: have a parent but never appear in `P`, so `Leaf`.\n\nSorted by `N`: 1 Leaf, 2 Inner, 3 Leaf, 5 Root, 6 Leaf, 8 Inner, 9 Leaf.\n\n## Complexity\n\n- Time: O(n) with a hashed or indexed lookup for `IN` over n rows (O(n²) if the database rescans `P` per row), plus O(n log n) to sort.\n- Space: O(n) for the set of parent values and the result.\n\n## Pitfalls\n\n- Checking the child test first labels a root with children as `Inner`; the `Root` branch must come first.\n- `N NOT IN (SELECT P FROM Tree)` to find leaves is never true, because the root's `P` is null and `x NOT IN (..., NULL)` is unknown; the `ELSE` branch avoids that trap.\n- An inner self-join on `c.P = t.N` loses every leaf (no child row) and repeats nodes with two children.\n- Forgetting `ORDER BY N`: the rows arrive in table order, as in Example 1, not sorted.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `P IS NULL` | the node has no parent: `Root` |\n| `SELECT P FROM Tree` | every value that is some node's parent |\n| `N IN (...)` | the node has at least one child: `Inner` |\n| `Type` | the label chosen by the `CASE` |",
+  "narration": {
+    "2": "Every node is reported with its own value.",
+    "4": "A node without a parent is the root; this check comes first so a root with children is not called Inner.",
+    "5": "If the value appears in the P column, some node hangs below it, so it is an inner node.",
+    "6": "Everything else has a parent and no child: a leaf.",
+    "7": "The CASE result is the Type column.",
+    "9": "Sort the nodes by value as required."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "number": 3056,
+  "title": "Snaps Analysis",
+  "spec": "recalled",
+  "statement": "A messaging app logs how users spend time on snaps:\n\n- `Activities(activity_id, user_id, activity_type, time_spent)`: one row per activity; `activity_id` is unique, `activity_type` is `'send'` or `'open'`, and `time_spent` is the (positive) time the activity took.\n- `Age(user_id, age_bucket)`: one row per user; `user_id` is unique and `age_bucket` is `'21-25'`, `'26-30'` or `'31-35'`. Every user in `Activities` has a row here.\n\nFor each age bucket, add up the time its users spent on all activities, and find what share of that total went to sending and what share went to opening.\n\nReport the columns `age_bucket`, `send_perc` and `open_perc`: the two shares as percentages (0 to 100) rounded to 2 decimal places. A bucket with no activity at all is not reported; a bucket whose users only sent (or only opened) gets `0` for the other share, not `null`. Rows may come in any order.",
+  "constraints": [
+    "activity_id is unique in Activities",
+    "user_id is unique in Age",
+    "activity_type is 'send' or 'open'",
+    "age_bucket is '21-25', '26-30' or '31-35'",
+    "time_spent is positive and never null",
+    "Every Activities.user_id appears in Age"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Activities": [["activity_id","INT"],["user_id","INT"],["activity_type","ENUM('send', 'open')"],["time_spent","DECIMAL(5, 2)"]],
+    "Age": [["user_id","INT"],["age_bucket","ENUM('21-25', '26-30', '31-35')"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Activities = [], Age = [] }] = input;\n  const users = new Set(), activities = new Set();\n  for (const [user, bucket] of Age) {\n    if (user === null) return 'Every Age row needs a user_id.';\n    if (users.has(user)) return `user_id ${user} appears twice in Age.`;\n    users.add(user);\n    if (!['21-25', '26-30', '31-35'].includes(bucket)) return `age_bucket must be 21-25, 26-30 or 31-35, not ${bucket}.`;\n  }\n  for (const [id, user, type, spent] of Activities) {\n    if (id === null) return 'Every activity needs an activity_id.';\n    if (activities.has(id)) return `activity_id ${id} appears twice.`;\n    activities.add(id);\n    if (!users.has(user)) return `User ${user} of activity ${id} is missing from Age.`;\n    if (type !== 'send' && type !== 'open') return `activity_type must be send or open, not ${type}.`;\n    if (spent === null || spent <= 0 || spent > 999.99) return `Activity ${id} needs a time_spent between 0.01 and 999.99.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  g.age_bucket,\n  ROUND(100 * SUM(IF(a.activity_type = 'send', a.time_spent, 0)) / SUM(a.time_spent), 2) AS send_perc,\n  ROUND(100 * SUM(IF(a.activity_type = 'open', a.time_spent, 0)) / SUM(a.time_spent), 2) AS open_perc\nFROM Activities AS a\nJOIN Age AS g\n  ON g.user_id = a.user_id\nGROUP BY g.age_bucket;",
+  "brute": "WITH per_type AS (\n  SELECT g.age_bucket, a.activity_type, SUM(a.time_spent) AS spent\n  FROM Activities AS a, Age AS g\n  WHERE a.user_id = g.user_id\n  GROUP BY g.age_bucket, a.activity_type\n)\nSELECT b.age_bucket,\n  ROUND(100 * IFNULL((SELECT s.spent FROM per_type AS s WHERE s.age_bucket = b.age_bucket AND s.activity_type = 'send'), 0)\n    / (SELECT SUM(t.spent) FROM per_type AS t WHERE t.age_bucket = b.age_bucket), 2) AS send_perc,\n  ROUND(100 * IFNULL((SELECT o.spent FROM per_type AS o WHERE o.age_bucket = b.age_bucket AND o.activity_type = 'open'), 0)\n    / (SELECT SUM(t.spent) FROM per_type AS t WHERE t.age_bucket = b.age_bucket), 2) AS open_perc\nFROM (SELECT DISTINCT age_bucket FROM per_type) AS b",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const buckets = ['21-25', '26-30', '31-35'];\n  const times = [0.5, 1.25, 2, 3, 3.5, 4.5, 5.25, 5.67, 6.24, 8.24];\n  const userCount = size === 'small' ? pick(6) : 1000;\n  const activityCount = size === 'small' ? (userCount ? pick(9) : 0) : 2000;\n  const Age = [];\n  for (let i = 0; i < userCount; i++) Age.push([size === 'small' ? 100 + i * 111 : 1 + i * 3, buckets[pick(buckets.length)]]);\n  const Activities = [], ids = new Set();\n  for (let i = 0; i < activityCount; i++) {\n    let id;\n    do id = 1000 + pick(size === 'small' ? 9000 : 90000); while (ids.has(id));\n    ids.add(id);\n    const spent = size === 'small' ? times[pick(times.length)] : (1 + pick(9999)) / 100;\n    Activities.push([id, Age[pick(Age.length)][0], rand() < 0.5 ? 'send' : 'open', spent]);\n  }\n  return [{ Activities, Age }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Activities":[[7274,123,"open",4.5],[2425,123,"send",3.5],[1413,456,"send",5.67],[2536,456,"open",3],[8564,456,"send",8.24],[5235,789,"send",6.24],[4251,123,"open",1.25],[1435,789,"open",5.25]],"Age":[[123,"31-35"],[789,"21-25"],[456,"26-30"]]}],"expected":{"columns":["age_bucket","send_perc","open_perc"],"rows":[["31-35",37.84,62.16],["26-30",82.26,17.74],["21-25",54.31,45.69]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Activities":[],"Age":[[1,"21-25"],[2,"31-35"]]}]},
+    {"name":"Test 2","input":[{"Activities":[[10,1,"send",2.5]],"Age":[[1,"26-30"]]}]},
+    {"name":"Test 3","input":[{"Activities":[[10,1,"open",1.2],[11,1,"open",3.3]],"Age":[[1,"31-35"],[2,"21-25"]]}]},
+    {"name":"Test 4","input":[{"Activities":[[20,5,"send",1],[21,6,"open",2],[22,7,"send",3]],"Age":[[5,"21-25"],[6,"21-25"],[7,"21-25"]]}]},
+    {"name":"Test 5","input":[{"Activities":[[30,8,"send",1],[31,8,"open",1],[32,9,"send",1],[33,9,"open",2]],"Age":[[8,"26-30"],[9,"31-35"],[4,"26-30"]]}]},
+    {"name":"Test 6","input":[{"Activities":[[40,3,"send",0.01],[41,3,"open",999.99]],"Age":[[3,"21-25"]]}]},
+    {"name":"Test 7","input":[{"Activities":[[50,11,"send",4],[51,12,"open",5.5],[52,13,"send",7.25],[53,11,"open",0.75],[54,14,"send",2],[55,12,"send",1.1]],"Age":[[11,"21-25"],[12,"26-30"],[13,"31-35"],[14,"26-30"]]}]},
+    {"name":"Test 8","input":[{"Activities":[[60,21,"open",3],[61,22,"open",3],[62,23,"send",6]],"Age":[[21,"31-35"],[22,"21-25"],[23,"31-35"],[24,"26-30"]]}]},
+    {"name":"Test 9","input":[{"Activities":[[70,31,"send",1],[71,31,"send",1],[72,31,"open",1],[73,32,"send",2],[74,32,"open",4],[75,32,"open",4]],"Age":[[31,"21-25"],[32,"26-30"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe shares are per **age bucket**, but activities only know the user. Joining `Activities` to `Age` stamps each activity with its user's bucket; after that, one `GROUP BY age_bucket` collects all of a bucket's activities. Inside a group, a conditional sum adds only the send time (or only the open time), and dividing it by the plain sum of all time gives the share.\n\n## Approach\n\n1. Join `Activities` (`a`) to `Age` (`g`) on `user_id`, so every activity carries an `age_bucket`.\n2. `GROUP BY g.age_bucket`: one group per bucket that has at least one activity.\n3. `SUM(IF(a.activity_type = 'send', a.time_spent, 0))` is the send time; the `0` keeps a bucket without sends at 0 instead of `null`.\n4. Multiply by 100, divide by `SUM(a.time_spent)` and `ROUND(..., 2)` for `send_perc`; the same with `'open'` gives `open_perc`.\n\n## Example 1, step by step\n\nAfter the join and grouping:\n\n- 31-35 (user 123): send 3.5, open 4.5 + 1.25 = 5.75, total 9.25. 100 × 3.5 / 9.25 = 37.84 and 100 × 5.75 / 9.25 = 62.16.\n- 26-30 (user 456): send 5.67 + 8.24 = 13.91, open 3, total 16.91, giving 82.26 and 17.74.\n- 21-25 (user 789): send 6.24, open 5.25, total 11.49, giving 54.31 and 45.69.\n\n## Complexity\n\n- Time: O(A + U) to join A activities with U users by hash or index, plus O(A) to group them.\n- Space: O(U) for the lookup on `user_id` and one accumulator per bucket.\n\n## Pitfalls\n\n- `SUM(CASE WHEN ... THEN time_spent END)` without an `ELSE 0` is `null` for a bucket that never sends, so `send_perc` becomes `null` instead of 0.\n- Starting from `Age` with a `LEFT JOIN` reports buckets whose users have no activity, with `null` shares; such buckets are not part of the answer.\n- Grouping by `user_id` instead of `age_bucket` gives one row per user; two users in the same bucket must be pooled.\n- Averaging per-user percentages is not the same as dividing the bucket's total send time by its total time.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a` | `Activities`, one row per send or open |\n| `g` | `Age`, supplying each activity's `age_bucket` |\n| `SUM(IF(..., a.time_spent, 0))` | the bucket's time on one activity type |\n| `SUM(a.time_spent)` | the bucket's total time |\n| `send_perc`, `open_perc` | the two shares in percent, rounded to 2 decimals |",
+  "narration": {
+    "2": "Each output row is one age bucket.",
+    "3": "Send time over total time, times 100, rounded to two decimals; the IF adds 0 for open rows so the sum is never null.",
+    "4": "The same calculation with open time gives the open share.",
+    "5": "Every activity is a row to be attributed to a bucket.",
+    "6": "The inner join looks up each activity's user in Age to learn the age bucket.",
+    "8": "Group by bucket so all users of the same age range are pooled before dividing."
+  }
+}

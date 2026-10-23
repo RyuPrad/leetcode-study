@@ -1,0 +1,49 @@
+{
+  "number": 2985,
+  "title": "Calculate Compressed Mean",
+  "spec": "recalled",
+  "statement": "One table stores orders in compressed form:\n\n- `Orders(order_id, item_count, order_occurrences)`: `order_id` is the primary key. A row says that `order_occurrences` orders each contained exactly `item_count` items. Both counts are positive integers.\n\nCompute the average number of items per order over **all** the orders the table describes (every row stands for `order_occurrences` separate orders, not one), rounded to 2 decimal places. Return a single row with the single column `average_items_per_order`. If `Orders` is empty, that row holds `null`.",
+  "constraints": [
+    "order_id is the primary key of Orders",
+    "item_count >= 1",
+    "order_occurrences >= 1"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Orders": [["order_id","INT"],["item_count","INT"],["order_occurrences","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Orders = [] }] = input;\n  const ids = new Set();\n  for (const [id, items, occurrences] of Orders) {\n    if (id === null || items === null || occurrences === null) return 'Orders cannot contain null values.';\n    if (ids.has(id)) return `order_id ${id} appears twice.`;\n    if (items < 1) return 'item_count must be at least 1.';\n    if (occurrences < 1) return 'order_occurrences must be at least 1.';\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH totals AS (\n  SELECT\n    SUM(item_count * order_occurrences) AS total_items,\n    SUM(order_occurrences) AS total_orders\n  FROM Orders\n)\nSELECT ROUND(total_items / total_orders, 2) AS average_items_per_order\nFROM totals;",
+  "brute": "WITH RECURSIVE expanded (item_count, remaining) AS (\n  SELECT item_count, order_occurrences\n  FROM Orders\n  UNION ALL\n  SELECT item_count, remaining - 1\n  FROM expanded\n  WHERE remaining > 1\n)\nSELECT ROUND(AVG(item_count), 2) AS average_items_per_order\nFROM expanded",
+  "generator": "function generate(rand, size) {\n  const count = size === 'small' ? Math.floor(rand() * 7) : 1500 + Math.floor(rand() * 500);\n  const maxItems = size === 'small' ? 5 : 20, maxOccurrences = size === 'small' ? 12 : 10;\n  const Orders = [];\n  let id = 1 + Math.floor(rand() * 20);\n  for (let i = 0; i < count; i++) {\n    Orders.push([id, 1 + Math.floor(rand() * maxItems), 1 + Math.floor(rand() * maxOccurrences)]);\n    id += 1 + Math.floor(rand() * 3);\n  }\n  return [{ Orders }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Orders":[[10,1,500],[11,2,1000],[12,3,800],[13,4,1000]]}],"expected":{"columns":["average_items_per_order"],"rows":[[2.7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Orders":[]}]},
+    {"name":"Test 2","input":[{"Orders":[[1,7,3]]}]},
+    {"name":"Test 3","input":[{"Orders":[[1,1,1],[2,2,1],[3,4,1]]}]},
+    {"name":"Test 4","input":[{"Orders":[[1,1,7],[2,2,1]]}]},
+    {"name":"Test 5","input":[{"Orders":[[1,100,3],[2,1,997]]}]},
+    {"name":"Test 6","input":[{"Orders":[[4,5,10],[5,5,20],[6,5,1]]}]},
+    {"name":"Test 7","input":[{"Orders":[[1,10,1],[2,1,999]]}]},
+    {"name":"Test 8","input":[{"Orders":[[1,3,2],[2,4,1]]}]},
+    {"name":"Test 9","input":[{"Orders":[[3,2,50],[1,6,50],[2,1,100],[9,9,1]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach row is a shortcut for `order_occurrences` identical orders. Expanded, the table would list every order separately and the answer would be a plain average. Rather than expand it, weight each row: it contributes `item_count * order_occurrences` items and `order_occurrences` orders. The mean is total items over total orders, a **weighted average**.\n\n## Approach\n\n1. CTE `totals`: one row with `total_items = SUM(item_count * order_occurrences)` and `total_orders = SUM(order_occurrences)`.\n2. Divide them and `ROUND(..., 2)` as `average_items_per_order`. MySQL's `/` is exact division, so nothing is truncated before rounding.\n\n## Example 1, step by step\n\n- Row by row, items are 1 × 500 = 500, 2 × 1000 = 2000, 3 × 800 = 2400 and 4 × 1000 = 4000.\n- `totals`: `total_items = 8900`, `total_orders = 500 + 1000 + 800 + 1000 = 3300`.\n- 8900 / 3300 = 2.6969..., which rounds to 2.70.\n\n## Complexity\n\n- Time: O(n) for n rows: one pass computes both sums.\n- Space: O(1); `totals` is a single row.\n\n## Pitfalls\n\n- `AVG(item_count)` treats every row as one order; Example 1 would give 2.50 instead of 2.70.\n- Dividing by `COUNT(*)` (the number of rows) instead of `SUM(order_occurrences)` mixes orders with rows.\n- Round only the final quotient; rounding the sums or each row's share first can shift the second decimal.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `totals` | the single row of sums over the whole table |\n| `total_items` | every item in every order, `item_count` weighted by `order_occurrences` |\n| `total_orders` | the number of orders the table describes |\n| `average_items_per_order` | `total_items / total_orders`, rounded to 2 decimals |",
+  "narration": {
+    "1": "The totals stage collapses the whole table into one row of sums.",
+    "3": "Each row contributes item_count items for each of its order_occurrences orders.",
+    "4": "The number of orders is the sum of the occurrence counts, not the number of rows.",
+    "7": "The weighted mean is total items over total orders, rounded to 2 decimals at the very end."
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "number": 2823,
+  "title": "Deep Object Filter",
+  "spec": "recalled",
+  "statement": "Write `deepFilter(obj, fn)`. The argument `obj` is an object or an array produced by `JSON.parse`, possibly nested, and `fn` is a predicate that returns `true` or `false`. Return a filtered copy of `obj`:\n\n- A **leaf** is any value that is not an array or an object: a number, a string, a boolean or `null`. Call `fn` on the leaves only, never on an array or object. A leaf stays when `fn` returns `true` and is removed when it returns `false`.\n- An array or object that has nothing left in it once its contents are filtered is removed as well, at every level. So a container survives exactly when at least one leaf somewhere inside it stays. A container that was already empty in `obj` is removed too.\n- A removed entry of an object loses its key. In an array, the remaining elements close up and keep their order.\n- If nothing at all is left, return `undefined` rather than an empty array or object.\n\nThe keys of a returned object may come in any order.\n\nYour function receives a real function as `fn`. In a case, `fn` is written as one of these descriptions, each called as `fn(x)` on a leaf `x`:\n\n- `{ \"greaterThan\": v }` returns `x > v`, and `{ \"lessThan\": v }` returns `x < v`, with JavaScript's comparison rules (`\"4\" > 0` and `null > -1` are `true`).\n- `{ \"typeIs\": name }` returns `typeof x === name`, where `name` is `\"number\"`, `\"string\"`, `\"boolean\"` or `\"object\"` (among leaves, only `null` has type `\"object\"`).\n- `{ \"equals\": v }` returns `x === v`.\n- `\"truthy\"` returns `Boolean(x)`, and `\"isArray\"` returns `Array.isArray(x)`.\n\nEach case gives `obj` and `fn`; the answer is what your function returns, shown as `null` when it is `undefined`.",
+  "constraints": [
+    "obj is a JSON object or a JSON array",
+    "2 <= JSON.stringify(obj).length <= 10^5",
+    "obj is nested at most 10 levels deep",
+    "No key is \"__proto__\"",
+    "fn is { \"greaterThan\": v }, { \"lessThan\": v }, { \"typeIs\": name }, { \"equals\": v }, \"truthy\" or \"isArray\", and always returns a boolean"
+  ],
+  "signature": "Object deepFilter(Object obj, Object fn)",
+  "entry": "deepFilter",
+  "kind": "function",
+  "parameters": [
+    "obj",
+    "fn"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  // Deep equality in which the order of object keys does not matter (array order does).\n  const same = (x, y) => {\n    if (Array.isArray(y)) return Array.isArray(x) && x.length === y.length && y.every((value, i) => same(x[i], value));\n    if (y !== null && typeof y === 'object') {\n      if (x === null || typeof x !== 'object' || Array.isArray(x)) return false;\n      const keys = Object.keys(y);\n      return Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key) && same(x[key], y[key]));\n    }\n    return x === y;\n  };\n  return same(actual, expected);\n}",
+  "validator": "function validate(input) {\n  const [obj, spec] = input;\n  if (obj === null || typeof obj !== 'object') return 'obj must be a JSON object or array.';\n  if (JSON.stringify(obj).length > 100000) return 'Keep obj under 100,000 characters of JSON.';\n  const stack = [[obj, 1]];\n  while (stack.length) {\n    const [item, depth] = stack.pop();\n    if (item === null || typeof item !== 'object') continue;\n    if (depth > 10) return 'Keep obj at most 10 levels deep.';\n    if (!Array.isArray(item) && Object.hasOwn(item, '__proto__')) return 'Keys named \"__proto__\" are not allowed.';\n    for (const key of Object.keys(item)) stack.push([item[key], depth + 1]);\n  }\n  const message = 'fn must be { \"greaterThan\": v }, { \"lessThan\": v }, { \"typeIs\": name }, { \"equals\": v }, \"truthy\" or \"isArray\".';\n  if (spec === 'truthy' || spec === 'isArray') return null;\n  if (spec === null || typeof spec !== 'object' || Array.isArray(spec) || Object.keys(spec).length !== 1) return message;\n  const [name] = Object.keys(spec), value = spec[name];\n  if (name === 'greaterThan' || name === 'lessThan') return Number.isFinite(value) ? null : `${name} needs a number.`;\n  if (name === 'typeIs') return ['number', 'string', 'boolean', 'object'].includes(value) ? null : 'typeIs must be \"number\", \"string\", \"boolean\" or \"object\".';\n  if (name === 'equals') return value === null || ['number', 'string', 'boolean'].includes(typeof value) ? null : 'equals needs a number, a string, a boolean or null.';\n  return message;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [obj, spec] = input;\n  const rule = spec === 'truthy' ? (x) => Boolean(x)\n    : spec === 'isArray' ? (x) => Array.isArray(x)\n    : 'greaterThan' in spec ? (x) => x > spec.greaterThan\n    : 'lessThan' in spec ? (x) => x < spec.lessThan\n    : 'typeIs' in spec ? (x) => typeof x === spec.typeIs\n    : (x) => x === spec.equals;\n  const fn = (x) => {\n    const keep = rule(x);\n    kit.trace(`fn(${JSON.stringify(x)}) returns ${keep}`);\n    return keep;\n  };\n  const result = solve(JSON.parse(JSON.stringify(obj)), fn);\n  if (result === undefined) {\n    kit.trace('deepFilter returns undefined: nothing is left');\n    return null;\n  }\n  if (result === null || typeof result !== 'object') throw new Error('deepFilter must return an object, an array or undefined.');\n  // Serialize as LeetCode does, so an array element left as undefined shows up as null.\n  const answer = JSON.parse(JSON.stringify(result));\n  kit.trace(`deepFilter returns ${JSON.stringify(answer).slice(0, 80)}`);\n  return answer;\n}",
+  "starters": {
+    "javascript": "/**\n * @param {Object|Array} obj a parsed JSON object or array\n * @param {(x: any) => boolean} fn decides which leaf values stay\n * @return {Object|Array|undefined} the filtered copy, or undefined when nothing is left\n */\nfunction deepFilter(obj, fn) {\n  // Write your code here.\n}\n",
+    "typescript": "type Leaf = null | boolean | number | string;\ntype Json = Leaf | Json[] | { [key: string]: Json };\ntype Container = Json[] | { [key: string]: Json };\n\nfunction deepFilter(obj: Container, fn: (x: Leaf) => boolean): Container | undefined {\n  // Write your code here.\n  return undefined;\n}\n"
+  },
+  "api": "deepFilter(obj: Container, fn: (x: Leaf) => boolean): Container | undefined, where Container is a JSON array or object and Leaf is a JSON number, string, boolean or null",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function deepFilter(obj, fn) {\n  if (obj === null || typeof obj !== 'object') {\n    return fn(obj) ? obj : undefined;\n  }\n  if (Array.isArray(obj)) {\n    const filteredArr = [];\n    for (const item of obj) {\n      const child = deepFilter(item, fn);\n      if (child !== undefined) {\n        filteredArr.push(child);\n      }\n    }\n    return filteredArr.length > 0 ? filteredArr : undefined;\n  }\n  const filteredObj = {};\n  for (const key of Object.keys(obj)) {\n    const child = deepFilter(obj[key], fn);\n    if (child !== undefined) {\n      filteredObj[key] = child;\n    }\n  }\n  return Object.keys(filteredObj).length > 0 ? filteredObj : undefined;\n}",
+  "brute": "function deepFilter(obj, fn) {\n  const isContainer = (value) => value !== null && typeof value === 'object';\n  // A value is worth keeping when it is a passing leaf or holds one somewhere inside.\n  const alive = (value) => (isContainer(value) ? Object.values(value).some(alive) : fn(value) === true);\n  const copy = (value) => {\n    if (!isContainer(value)) return value;\n    if (Array.isArray(value)) return value.filter(alive).map(copy);\n    return Object.fromEntries(Object.entries(value).filter(([, inner]) => alive(inner)).map(([key, inner]) => [key, copy(inner)]));\n  };\n  return alive(obj) ? copy(obj) : undefined;\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = (list) => list[Math.floor(rand() * list.length)];\n  const int = (limit) => Math.floor(rand() * (2 * limit + 1)) - limit;\n  const leaf = () => {\n    const r = rand();\n    if (r < 0.55) return int(small ? 6 : 1000);\n    if (r < 0.75) return pick(['a', 'abc', '', '0', '2', '-3', '10', 'x y']);\n    if (r < 0.9) return rand() < 0.5;\n    return null;\n  };\n  const maxDepth = small ? 4 : 10;\n  let left = small ? 1 + Math.floor(rand() * 12) : 2000;\n  const container = (depth, length) => {\n    const items = [];\n    for (let i = 0; i < length && left > 0; i++) {\n      left--;\n      const nested = depth < maxDepth && rand() < (small ? 0.3 : 0.4);\n      items.push(nested ? container(depth + 1, Math.floor(rand() * (small ? 4 : 6))) : leaf());\n    }\n    if (rand() < 0.5) return items;\n    return Object.fromEntries(items.map((item, i) => [pick(['a', 'b', 'c', 'id', 'x', 'k']) + i, item]));\n  };\n  const obj = container(1, small ? Math.floor(rand() * 6) : 2000);\n  const kind = pick(['greaterThan', 'greaterThan', 'lessThan', 'typeIs', 'typeIs', 'equals', 'truthy', 'isArray']);\n  if (kind === 'truthy' || kind === 'isArray') return [obj, kind];\n  if (kind === 'typeIs') return [obj, { typeIs: pick(['number', 'string', 'boolean', 'object']) }];\n  if (kind === 'equals') return [obj, { equals: leaf() }];\n  return [obj, { [kind]: int(small ? 6 : 1000) }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[-5,-4,-3,-2,-1,0,1],{"greaterThan":0}],"expected":[1]},
+    {"name":"Example 2","input":[{"a":1,"b":"2","c":3,"d":"4","e":5,"f":6,"g":{"a":1}},{"typeIs":"string"}],"expected":{"b":"2","d":"4"}},
+    {"name":"Example 3","input":[[-1,[-1,-1,5,-1,10],-1,[-1],[-5]],{"greaterThan":0}],"expected":[[5,10]]},
+    {"name":"Example 4","input":[[[[[5]]]],"isArray"],"expected":null}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],{"greaterThan":0}]},
+    {"name":"Test 2","input":[{},"truthy"]},
+    {"name":"Test 3","input":[[1,2,3],{"greaterThan":0}]},
+    {"name":"Test 4","input":[{"a":{"b":{"c":0}},"d":1},"truthy"]},
+    {"name":"Test 5","input":[[null,0,false,"","x",[null]],{"equals":null}]},
+    {"name":"Test 6","input":[{"x":[[],{}],"y":[[[]]],"z":3},{"lessThan":5}]},
+    {"name":"Test 7","input":[[{"a":"1","b":1},{"c":true},["2",[3,"4"]]],{"typeIs":"string"}]},
+    {"name":"Test 8","input":[{"n":null,"t":true,"f":false},{"typeIs":"object"}]},
+    {"name":"Test 9","input":[[[[[5]]],[[[-5]]]],{"lessThan":0}]},
+    {"name":"Test 10","input":[{"0":"b","1":"a","k":["c","d"]},{"equals":"d"}]},
+    {"name":"Test 11","input":[[0.5,-0.5,"10","abc",0,false],{"greaterThan":0}]},
+    {"name":"Test 12","input":[[0,false,"",[0,[false]],{"z":0}],{"equals":0}]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThink of `obj` as a tree: arrays and objects are inner nodes, everything else is a leaf. Only leaves are judged by `fn`, and a container lives or dies by its contents: it stays exactly when something inside it stays. That is a post-order recursion: filter the children first, then decide about the parent from what came back. Returning `undefined` for \"nothing left\" lets every level use the same signal, including the top, where it is also the required answer. (The brute force asks, for every value, whether any passing leaf lies under it, and copies only those values; it repeats work but is easy to trust.)\n\n## Approach\n\n1. If `obj` is a leaf (not an object, or `null`), return it when `fn(obj)` is true and `undefined` otherwise.\n2. For an array, filter each `item` recursively and push every `child` that is not `undefined` onto `filteredArr`, which keeps the order and leaves no holes.\n3. For an object, filter each `obj[key]` recursively and copy every surviving `child` into `filteredObj` under the same `key`.\n4. Return the new container if it holds anything, else `undefined`.\n\n## Example 1, step by step\n\n`obj = [-5, -4, -3, -2, -1, 0, 1]` and `fn(x)` is `x > 0`.\n\n- `obj` is an array, so each element is filtered in turn.\n- `deepFilter(-5)` through `deepFilter(0)` are leaves; `fn` returns `false` for each, so they come back `undefined` and are skipped.\n- `deepFilter(1)`: `fn(1)` is `true`, so `1` comes back and `filteredArr = [1]`.\n- `filteredArr` is not empty, so the answer is `[1]`.\n\nIn Example 3, `[-1]` and `[-5]` come back `undefined` and vanish, leaving `[[5, 10]]`.\n\n## Complexity\n\n- Time: O(N), where N is the number of values in `obj`: each is visited once and `fn` runs once per leaf.\n- Space: O(N) for the copy, plus O(D) recursion depth for nesting depth D.\n\n## Pitfalls\n\n- Returning `[]` or `{}` for an emptied container: the parent keeps it, and Example 3 would give `[[5, 10], [], []]`.\n- Testing `if (child)` instead of `child !== undefined` drops kept falsy leaves such as `0`, `false`, `\"\"` and `null`.\n- `typeof null` is `\"object\"`: treat `null` as a leaf and ask `fn` about it.\n- Calling `fn` on containers: with `{ \"typeIs\": \"string\" }`, `{ g: { a: \"x\" } }` must keep `g`, even though `g` itself is not a string.\n\n## Variables\n\n| Name | Meaning |\n| --- | --- |\n| `obj` | the value being filtered at this level of the recursion |\n| `fn` | the predicate that decides which leaves stay |\n| `filteredArr` | the surviving elements of an array, in order |\n| `filteredObj` | the surviving entries of an object |\n| `item`, `key` | the element or key being visited |\n| `child` | the filtered form of that element or value, or `undefined` if nothing survived |",
+  "narration": {
+    "1": "deepFilter handles one value and calls itself for everything inside a container.",
+    "2": "Numbers, strings, booleans and null are leaves; typeof null is \"object\", so null is checked first.",
+    "3": "A leaf stays exactly when fn approves it; undefined tells the caller to drop it.",
+    "5": "Arrays must close up around removed elements, so they are rebuilt with push.",
+    "7": "Visit every element in order.",
+    "8": "Filter the element first; containers inside it are handled by the same recursion.",
+    "9": "Only undefined means \"nothing left\"; falsy leaves such as 0 or false are still kept.",
+    "13": "An array with no survivors disappears from its parent, so report undefined.",
+    "16": "For an object, visit every key and its value.",
+    "19": "A surviving value is copied under its original key.",
+    "22": "Return the object only if some key survived; otherwise it is removed too."
+  }
+}

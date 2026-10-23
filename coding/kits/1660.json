@@ -1,0 +1,67 @@
+{
+  "number": 1660,
+  "title": "Correct a Binary Tree",
+  "spec": "recalled",
+  "statement": "A binary tree with all node values different has exactly one broken node. That node's `right` link, which should be empty, was rewired to point at another node of the tree that sits on the **same depth** and somewhere **to its right**. Delete the broken node together with everything hanging below it through its `left` child, but keep the node its bad `right` link points at: that node stays under its real parent. Return the root of the repaired tree.\n\nEach case is written as `[root, fromNode, toNode]`: the tree before the defect as a level-order array with `null` for missing children, the value of the broken node, and the value of the node its `right` link is rewired to. The judge builds the tree, sets the broken node's `right` to the `toNode` node, and then calls `correctBinaryTree(root)` with the root only; `fromNode` and `toNode` are not passed to it. Return the root; it is shown as a level-order array.",
+  "constraints": [
+    "The tree has between 3 and 10^4 nodes",
+    "-10^9 <= Node.val <= 10^9",
+    "All Node.val are unique",
+    "fromNode != toNode",
+    "fromNode and toNode are nodes of the tree on the same depth",
+    "toNode is to the right of fromNode",
+    "fromNode has no right child in the level-order array"
+  ],
+  "signature": "TreeNode correctBinaryTree(TreeNode root, int fromNode, int toNode)",
+  "entry": "correctBinaryTree",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "fromNode",
+    "toNode"
+  ],
+  "validator": "function validate([root, fromNode, toNode]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs a root.';\n  const values = root.filter(v => v !== null);\n  if (values.length < 3 || values.length > 10000) return 'The tree has 3 to 10^4 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -1000000000 || v > 1000000000)) return 'Node values are whole numbers between -10^9 and 10^9.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  // Walk the level-order array, noting each node's depth, its left-to-right position and whether it has a right child.\n  const info = new Map([[root[0], { depth: 0, order: 0, right: false }]]);\n  const queue = [root[0]];\n  let next = 1;\n  for (let head = 0; head < queue.length; head++) {\n    for (const side of ['left', 'right']) {\n      if (next < root.length && root[next] !== null) {\n        info.set(root[next], { depth: info.get(queue[head]).depth + 1, order: next, right: false });\n        if (side === 'right') info.get(queue[head]).right = true;\n        queue.push(root[next]);\n      }\n      next++;\n    }\n  }\n  if (root.slice(next).some(v => v !== null)) return 'Every node must have a parent earlier in the level-order array.';\n  if (fromNode === toNode) return 'fromNode and toNode must be different.';\n  const from = info.get(fromNode);\n  const to = info.get(toNode);\n  if (!from || !to) return 'fromNode and toNode must be values in the tree.';\n  if (from.depth !== to.depth) return 'fromNode and toNode must be on the same depth.';\n  if (to.order < from.order) return 'toNode must be to the right of fromNode.';\n  if (from.right) return 'fromNode must have no right child in the given tree.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, fromNode, toNode] = input;\n  const root = kit.toTree(values);\n  // Plant the defect: the broken node's right link jumps sideways to toNode.\n  kit.findNode(root, fromNode).right = kit.findNode(root, toNode);\n  const result = solve(root);\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  return kit.fromTree(result);\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function correctBinaryTree(root) {\n  const parent = new Map([[root, null]]);\n  const queue = [root];\n  for (let head = 0; head < queue.length; head++) {\n    const node = queue[head];\n    if (node.right && parent.has(node.right)) {\n      const above = parent.get(node);\n      if (above.left === node) {\n        above.left = null;\n      } else {\n        above.right = null;\n      }\n      return root;\n    }\n    if (node.left) {\n      parent.set(node.left, node);\n      queue.push(node.left);\n    }\n    if (node.right) {\n      parent.set(node.right, node);\n      queue.push(node.right);\n    }\n  }\n  return root;\n}",
+  "brute": "function correctBinaryTree(root) {\n  // A right-first depth-first walk reaches every node of a level before the nodes to its left,\n  // so the broken node is the first one whose right child was already visited.\n  const seen = new Set();\n  const walk = (node, above) => {\n    if (!node) return false;\n    if (node.right && seen.has(node.right)) {\n      if (above.left === node) above.left = null;\n      else above.right = null;\n      return true;\n    }\n    seen.add(node);\n    return walk(node.right, node) || walk(node.left, node);\n  };\n  walk(root, null);\n  return root;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  for (;;) {\n    // At most 999 nodes keeps the level-order array under 2,000 entries.\n    const n = size === 'large' ? 900 + pick(100) : 3 + pick(10);\n    const deep = rand() < 0.3;\n    const span = size === 'large' || rand() < 0.4 ? 1000000000 : 30;\n    const used = new Set();\n    const fresh = () => {\n      for (;;) {\n        const v = pick(2 * span + 1) - span;\n        if (!used.has(v)) { used.add(v); return v; }\n      }\n    };\n    const nodes = [{ val: fresh(), left: null, right: null }];\n    while (nodes.length < n) {\n      // Deep trees keep growing from the newest nodes; bushy trees attach a child anywhere.\n      const parent = deep ? nodes[Math.max(0, nodes.length - 1 - pick(3))] : nodes[pick(nodes.length)];\n      const side = rand() < 0.5 ? 'left' : 'right';\n      if (parent[side]) continue;\n      parent[side] = { val: fresh(), left: null, right: null };\n      nodes.push(parent[side]);\n    }\n    const root = [];\n    const rows = [];\n    const queue = [[nodes[0], 0]];\n    for (let q = 0; q < queue.length; q++) {\n      const [node, depth] = queue[q];\n      root.push(node ? node.val : null);\n      if (!node) continue;\n      (rows[depth] ??= []).push(node);\n      queue.push([node.left, depth + 1], [node.right, depth + 1]);\n    }\n    while (root[root.length - 1] === null) root.pop();\n    // The broken node has no right child and at least one node to its right on its level.\n    const choices = [];\n    rows.forEach(row => row.forEach((node, i) => { if (!node.right && i + 1 < row.length) choices.push([row, i]); }));\n    if (choices.length === 0) continue;\n    const [row, i] = choices[pick(choices.length)];\n    const j = rand() < 0.4 ? i + 1 : i + 1 + pick(row.length - i - 1);\n    return [root, row[i].val, row[j].val];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3],2,3],"expected":[1,null,3]},
+    {"name":"Example 2","input":[[8,3,1,7,null,9,4,2,null,null,null,5,6],7,4],"expected":[8,3,1,null,null,9,4,null,null,5,6]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2,3,4,null,null,5],4,5]},
+    {"name":"Test 2","input":[[1,2,3,null,4,5],4,5]},
+    {"name":"Test 3","input":[[1,2,3,4,null,null,null,5,null,6],2,3]},
+    {"name":"Test 4","input":[[1,2,3,null,null,4,5],2,3]},
+    {"name":"Test 5","input":[[-1000000000,1000000000,0,7,null,-5,3],7,3]},
+    {"name":"Test 6","input":[[1,2,3,4,5,6,7,8,null,10,11,12,13,14,15],8,15]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,null,null,8],5,6]},
+    {"name":"Test 8","input":[[1,2,3,4,null,null,5,6,null,null,7,8,null,null,9],8,9]},
+    {"name":"Test 9","input":[[10,20,30,40,50,60,null,null,null,70,null,80,90],70,80]},
+    {"name":"Test 10","input":[[5,4,6,3,null,null,7,2,null,null,8],3,7]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe bad link points sideways: from a node on some level to a node on the **same** level. In a correct tree, a node's right child always lives one level lower and can only be reached through that node. So if we explore the tree level by level and remember every node we have already discovered, the broken node is the first one whose `right` child is already known: its target was discovered earlier, through its real parent on the level above. Remembering each discovered node's parent in a hash map lets us cut the broken node off in O(1).\n\n## Approach\n\n1. Put `root` in a map `parent` (with parent `null`) and in a `queue`.\n2. Take nodes from the queue in breadth-first order, by index `head`.\n3. If the `node`'s right child is already a key of `parent`, this node is the broken one: look up `above`, its parent, and clear whichever of `above.left` / `above.right` points at it. That drops the node and its whole left subtree. Return `root`.\n4. Otherwise record each existing child in `parent` (child to `node`) and push it to the queue, left child first.\n\n## Example 1, step by step\n\nThe tree is `1` with children `2` and `3`, and node `2`'s right link was rewired to `3`.\n\n- `head = 0`, `node = 1`: its right child `3` is not in `parent` yet, so `2` and `3` are recorded with parent `1` and queued.\n- `head = 1`, `node = 2`: its right child is `3`, which **is** in `parent`. So `2` is broken; `above = 1` and `1.left === 2`, so `1.left` becomes `null`.\n\nThe repaired tree is `[1, null, 3]`.\n\n## Complexity\n\n- Time: O(n): each node is queued and examined at most once.\n- Space: O(n) for the queue and the `parent` map.\n\n## Pitfalls\n\n- Clearing only the broken node's `right` link is not enough: the node itself and its left subtree must disappear too.\n- A left-first depth-first search can walk into `toNode` through the bad link before its real parent, and then blame the wrong node; breadth-first order discovers `toNode` from the level above first.\n- Never follow the bad link as a normal child: that would queue `toNode` twice and report a corrupted tree.\n- You need the broken node's parent to detach it, and must check which side it hangs on.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `parent` | map from every discovered node to its parent (the root maps to `null`) |\n| `queue` | nodes in breadth-first order |\n| `head` | index of the next node to examine in `queue` |\n| `node` | the node being examined |\n| `above` | the broken node's parent, whose link to it is cut |",
+  "narration": {
+    "2": "Map every discovered node to its parent; the root has none.",
+    "3": "The queue lists nodes in breadth-first order, starting with the root.",
+    "4": "Examine the queued nodes one by one, level by level.",
+    "5": "Take the next node in level order.",
+    "6": "A right child that is already known was discovered from the level above, so this link jumps sideways: this node is the broken one.",
+    "7": "Look up the broken node's parent so it can be detached.",
+    "8": "Does the broken node hang on its parent's left side?",
+    "9": "Yes: cutting the left link drops the node and its whole subtree.",
+    "11": "No: it hangs on the right side, so cut that link instead.",
+    "13": "The tree is repaired; return its root.",
+    "15": "A real left child is new: record its parent and queue it.",
+    "19": "A right child that was not already known is a real child too: record it and queue it.",
+    "24": "Not reached when the tree has the defect, but keeps the function total."
+  }
+}

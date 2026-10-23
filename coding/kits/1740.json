@@ -1,0 +1,68 @@
+{
+  "number": 1740,
+  "title": "Find Distance in a Binary Tree",
+  "spec": "recalled",
+  "statement": "You are given the `root` of a binary tree in which every node value is different, and two integers `p` and `q`, each of which is the value of some node in the tree.\n\nReturn how many edges lie on the path that connects the node valued `p` to the node valued `q`. When `p` and `q` are the same value, the answer is `0`.",
+  "constraints": [
+    "The tree has between 1 and 10^4 nodes",
+    "0 <= Node.val <= 10^9",
+    "All node values are distinct",
+    "p and q are both values of nodes in the tree"
+  ],
+  "signature": "int findDistance(TreeNode root, int p, int q)",
+  "entry": "findDistance",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "p",
+    "q"
+  ],
+  "validator": "function validate([root, p, q]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs at least one node.';\n  // Each real node owns the next two entries as its children; extra entries do not belong to the tree.\n  let slots = 1;\n  for (let i = 0; i < root.length; i++) {\n    if (i >= slots) return 'The tree has entries that no node can hold.';\n    if (root[i] !== null) slots += 2;\n  }\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10^4 nodes.';\n  const seen = new Set();\n  for (const v of values) {\n    if (!Number.isInteger(v) || v < 0 || v > 1e9) return 'Each node value is between 0 and 10^9.';\n    if (seen.has(v)) return 'Node values must be distinct.';\n    seen.add(v);\n  }\n  if (!seen.has(p)) return 'p must be the value of a node in the tree.';\n  if (!seen.has(q)) return 'q must be the value of a node in the tree.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findDistance(root, p, q) {\n  function lowestAncestor(node) {\n    if (node === null || node.val === p || node.val === q) {\n      return node;\n    }\n    const left = lowestAncestor(node.left);\n    const right = lowestAncestor(node.right);\n    if (left !== null && right !== null) {\n      return node;\n    }\n    return left !== null ? left : right;\n  }\n\n  function depth(node, target) {\n    if (node === null) {\n      return -1;\n    }\n    if (node.val === target) {\n      return 0;\n    }\n    const below = Math.max(depth(node.left, target), depth(node.right, target));\n    return below === -1 ? -1 : below + 1;\n  }\n\n  const ancestor = lowestAncestor(root);\n  return depth(ancestor, p) + depth(ancestor, q);\n}",
+  "brute": "function findDistance(root, p, q) {\n  // Turn the tree into an undirected graph, then walk outwards from p one layer at a time.\n  const neighbours = new Map();\n  const link = (a, b) => {\n    if (!neighbours.has(a)) neighbours.set(a, []);\n    neighbours.get(a).push(b);\n  };\n  const stack = [root];\n  neighbours.set(root.val, []);\n  while (stack.length) {\n    const node = stack.pop();\n    for (const child of [node.left, node.right]) {\n      if (!child) continue;\n      link(node.val, child.val);\n      link(child.val, node.val);\n      stack.push(child);\n    }\n  }\n  let layer = [p];\n  const seen = new Set([p]);\n  for (let steps = 0; layer.length; steps++) {\n    if (layer.includes(q)) return steps;\n    const next = [];\n    for (const v of layer) for (const w of neighbours.get(v)) if (!seen.has(w)) { seen.add(w); next.push(w); }\n    layer = next;\n  }\n  return -1;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 900 + Math.floor(rand() * 100) : 1 + Math.floor(rand() * 10);\n  // Some trees start with a long downward chain, which makes deep paths.\n  const chain = rand() < 0.3 ? 1 + Math.floor(rand() * n) : 1;\n  const nodes = [{ left: null, right: null }];\n  for (let i = 1; i < chain; i++) {\n    nodes[i - 1][rand() < 0.5 ? 'left' : 'right'] = i;\n    nodes.push({ left: null, right: null });\n  }\n  const slots = [[chain - 1, 'left'], [chain - 1, 'right']];\n  for (let i = chain; i < n; i++) {\n    const k = Math.floor(rand() * slots.length);\n    const [parent, side] = slots[k];\n    slots[k] = slots[slots.length - 1];\n    slots.pop();\n    nodes[parent][side] = i;\n    nodes.push({ left: null, right: null });\n    slots.push([i, 'left'], [i, 'right']);\n  }\n  // Distinct values: small trees draw from 0..30 (sometimes with the extremes), large ones from 0..10^9.\n  const used = new Set();\n  const values = [];\n  if (!large && rand() < 0.3) { values.push(0); used.add(0); }\n  if (!large && rand() < 0.3 && values.length < n) { values.push(1e9); used.add(1e9); }\n  while (values.length < n) {\n    const v = large ? Math.floor(rand() * 1e9) + 1 : Math.floor(rand() * 31);\n    if (!used.has(v)) { used.add(v); values.push(v); }\n  }\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [values[i], values[j]] = [values[j], values[i]];\n  }\n  // Level-order serialisation with null for missing children, trailing nulls removed.\n  const out = [];\n  const queue = [0];\n  for (let at = 0; at < queue.length; at++) {\n    if (queue[at] === null) { out.push(null); continue; }\n    out.push(values[queue[at]]);\n    queue.push(nodes[queue[at]].left, nodes[queue[at]].right);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  const p = values[Math.floor(rand() * n)];\n  const q = rand() < 0.1 ? p : values[Math.floor(rand() * n)];\n  return [out, p, q];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,1,6,2,0,8,null,null,7,4],5,0],"expected":3},
+    {"name":"Example 2","input":[[3,5,1,6,2,0,8,null,null,7,4],5,7],"expected":2},
+    {"name":"Example 3","input":[[3,5,1,6,2,0,8,null,null,7,4],5,5],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1,1]},
+    {"name":"Test 2","input":[[1,2],1,2]},
+    {"name":"Test 3","input":[[1,null,2],2,1]},
+    {"name":"Test 4","input":[[1,null,2,null,3,null,4,null,5],1,5]},
+    {"name":"Test 5","input":[[1,2,3,4,5,6,7],4,7]},
+    {"name":"Test 6","input":[[1,2,3,4,5,6,7],4,5]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7],2,4]},
+    {"name":"Test 8","input":[[0,1000000000,5],1000000000,5]},
+    {"name":"Test 9","input":[[10,20,null,null,30,40,null,null,50],50,10]},
+    {"name":"Test 10","input":[[3,5,1,6,2,0,8,null,null,7,4],7,8]},
+    {"name":"Test 11","input":[[3,5,1,6,2,0,8,null,null,7,4],6,4]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAny path between two tree nodes climbs up from the first node to some meeting point and then walks down to the second. That meeting point is their **lowest common ancestor** (LCA): the deepest node that has both of them in its subtree. So the distance is just (depth of `p` below the LCA) + (depth of `q` below the LCA). A brute force would turn the tree into a graph and run a BFS from `p`; the DFS below needs no extra structure.\n\n## Approach\n\n1. `lowestAncestor(node)` returns `node` itself if it is empty or holds `p` or `q`. Otherwise it searches both subtrees.\n2. If both subtrees report a hit, `p` and `q` are split across `node`, so `node` is the LCA. Otherwise pass up whichever side found something.\n3. `depth(node, target)` returns how many edges below `node` the value `target` sits, or `-1` if it is not in that subtree.\n4. Call `lowestAncestor(root)` to get `ancestor`, and return `depth(ancestor, p) + depth(ancestor, q)`.\n\n## Example 1, step by step\n\nTree `[3,5,1,6,2,0,8,null,null,7,4]`, `p = 5`, `q = 0`. At node 3, the left call stops at once on node 5 (it holds `p`). The right call goes to node 1, whose left child 0 holds `q` and whose right child 8 finds nothing, so node 1 passes node 0 up. Node 3 now has a hit on both sides, so `ancestor` is 3. Then `depth(3, 5) = 1` and `depth(3, 0) = 2`, giving `3`.\n\n## Complexity\n\n- Time: O(n): the LCA search and the two depth searches each visit every node at most once.\n- Space: O(h) for the recursion, where h is the tree height (up to n for a chain).\n\n## Pitfalls\n\n- When one value is an ancestor of the other, the search stops at the upper one; that is correct, because the other node is guaranteed to be below it.\n- `p === q` must give `0`: the LCA is the node itself and both depths are `0`.\n- Use `-1` (not `0`) for \"not found\" in `depth`, or a missing branch looks like a hit at the root.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `lowestAncestor` | returns the LCA of `p` and `q` within a subtree, the one of them it found, or `null` |\n| `left`, `right` | what the search returned from each child |\n| `depth` | edges from a node down to `target`, or `-1` |\n| `below` | the larger of the two child depths (only one can be found) |\n| `ancestor` | the lowest common ancestor of the two nodes |",
+  "narration": {
+    "2": "lowestAncestor searches one subtree for p and q.",
+    "3": "An empty subtree, or a node holding p or q, answers for itself.",
+    "6": "Search the left subtree...",
+    "7": "...and the right subtree.",
+    "8": "p and q were found on different sides of this node...",
+    "9": "...so this node is where their paths meet.",
+    "11": "Otherwise pass up whatever one side found (or null if neither did).",
+    "14": "depth measures how far below node the value target sits.",
+    "15": "An empty subtree does not contain target.",
+    "18": "Found target right here: zero edges down.",
+    "21": "Values are distinct, so at most one child can contain target; take that result.",
+    "22": "Not found below means -1; found means one more edge for this level.",
+    "25": "Find the node where the path from p to q turns around.",
+    "26": "The path climbs from p up to the ancestor and walks down to q."
+  }
+}

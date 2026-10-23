@@ -1,0 +1,65 @@
+{
+  "number": 1648,
+  "title": "Sell Diminishing-Valued Colored Balls",
+  "spec": "leetcode",
+  "statement": "`inventory[i]` is how many balls of color `i` you own, and a buyer wants exactly `orders` balls, of any colors, in any order you choose. Selling one ball earns as much as the number of balls of its color you hold at that moment, counting that ball; afterwards that color has one ball fewer. For instance, with 6 red balls the first red sale earns 6, the next earns 5, and so on.\n\nReturn the largest total you can earn from selling `orders` balls, modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= inventory.length <= 10^5",
+    "1 <= inventory[i] <= 10^9",
+    "1 <= orders <= min(sum(inventory), 10^9)"
+  ],
+  "signature": "int maxProfit(int[] inventory, int orders)",
+  "entry": "maxProfit",
+  "kind": "function",
+  "parameters": [
+    "inventory",
+    "orders"
+  ],
+  "validator": "function validate([inventory, orders]) {\n  if (!Array.isArray(inventory) || inventory.length < 1 || inventory.length > 100000) return 'inventory needs 1 to 100000 colors.';\n  if (inventory.some(v => !Number.isInteger(v) || v < 1 || v > 1000000000)) return 'Each count is an integer from 1 to 10^9.';\n  const sum = inventory.reduce((a, b) => a + b, 0);\n  if (!Number.isInteger(orders) || orders < 1 || orders > Math.min(sum, 1000000000)) return 'orders is from 1 to min(sum(inventory), 10^9).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxProfit(inventory, orders) {\n  const MOD = 1000000007n;\n  const soldAbove = (k) => {\n    let count = 0;\n    for (const balls of inventory) {\n      if (balls > k) {\n        count += balls - k;\n      }\n    }\n    return count;\n  };\n\n  let low = 0;\n  let high = Math.max(...inventory);\n  while (low < high) {\n    const mid = Math.floor((low + high) / 2);\n    if (soldAbove(mid) <= orders) {\n      high = mid;\n    } else {\n      low = mid + 1;\n    }\n  }\n  const threshold = low;\n\n  let total = 0n;\n  let remaining = orders;\n  for (const balls of inventory) {\n    if (balls > threshold) {\n      const top = BigInt(balls);\n      const bottom = BigInt(threshold);\n      total += (top + bottom + 1n) * (top - bottom) / 2n;\n      remaining -= balls - threshold;\n    }\n  }\n  total += BigInt(remaining) * BigInt(threshold);\n  return Number(total % MOD);\n}",
+  "brute": "function maxProfit(inventory, orders) {\n  // A different method: sort the counts and lower the tallest colors together, one level band at a time.\n  const counts = [...inventory].sort((a, b) => b - a).concat([0]);\n  let left = BigInt(orders);\n  let total = 0n;\n  for (let i = 0; i + 1 < counts.length && left > 0n; i++) {\n    const width = BigInt(i + 1);\n    const high = BigInt(counts[i]);\n    const low = BigInt(counts[i + 1]);\n    if (high === low) continue;\n    if (width * (high - low) <= left) {\n      total += width * ((high + low + 1n) * (high - low) / 2n);\n      left -= width * (high - low);\n    } else {\n      const levels = left / width;\n      const extra = left % width;\n      total += width * ((2n * high - levels + 1n) * levels / 2n) + extra * (high - levels);\n      left = 0n;\n    }\n  }\n  return Number(total % 1000000007n);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  if (size === 'large') {\n    const n = 1000 + pick(1001);\n    const shape = rand();\n    const top = shape < 0.3 ? 1000000000 : 1 + pick(1000000000);\n    const inventory = Array.from({ length: n }, () => (shape < 0.15 ? top : 1 + pick(top)));\n    const sum = inventory.reduce((a, b) => a + b, 0);\n    const cap = Math.min(sum, 1000000000);\n    const orders = rand() < 0.2 ? cap : 1 + pick(cap);\n    return [inventory, orders];\n  }\n  const n = 1 + pick(5);\n  const top = rand() < 0.15 ? 1000000000 : 1 + pick(12);\n  const inventory = Array.from({ length: n }, () => (rand() < 0.3 ? top : 1 + pick(top)));\n  const sum = inventory.reduce((a, b) => a + b, 0);\n  const orders = 1 + pick(Math.min(sum, 60));\n  return [inventory, orders];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,5],4],"expected":14},
+    {"name":"Example 2","input":[[3,5],6],"expected":19}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[1000000000],1000000000]},
+    {"name":"Test 3","input":[[2,8,4,10,6],20]},
+    {"name":"Test 4","input":[[1000000000],1]},
+    {"name":"Test 5","input":[[5,5,5],7]},
+    {"name":"Test 6","input":[[3,5],8]},
+    {"name":"Test 7","input":[[497978859,167261111,483575207,591815159],836556809]},
+    {"name":"Test 8","input":[[1,1,1,1],3]},
+    {"name":"Test 9","input":[[7,1,1],3]},
+    {"name":"Test 10","input":[[10,10,9],5]},
+    {"name":"Test 11","input":[[1000000000,1000000000,1000000000],1000000000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach sale should take the most valuable ball available, which is always one from the color with the most balls left. Simulating that sale by sale is too slow with up to 10^9 orders. Picture it instead as a water level falling across all colors at once: there is a value `threshold` such that every ball worth more than `threshold` gets sold, and the few orders left over are filled with balls worth exactly `threshold`. The number of balls worth more than `k` shrinks as `k` grows, so binary search finds that level, and each color's sales above it form an arithmetic series.\n\n## Approach\n\n1. `soldAbove(k)` counts the balls worth more than `k`: `balls - k` for every color with `balls > k`.\n2. Binary search `low..high` (from 0 to the largest count) for the smallest `k` with `soldAbove(k) <= orders`; that is `threshold`.\n3. For each color above `threshold`, add `(threshold + 1) + ... + balls` with the series formula, in `BigInt` so nothing overflows, and subtract those sales from `remaining`.\n4. Fill the `remaining` orders with balls worth `threshold` each, then return the total modulo `10^9 + 7`.\n\n## Example 1, step by step\n\n`inventory = [2, 5]`, `orders = 4`. The search starts at `low = 0`, `high = 5`.\n\n- `mid = 2`: only color 2 has more than 2 balls, so `soldAbove(2) = 3 <= 4` and `high = 2`.\n- `mid = 1`: `soldAbove(1) = 1 + 4 = 5 > 4`, so `low = 2`. Now `threshold = 2`.\n\nColor 2 sells `5 + 4 + 3 = 12` and `remaining` drops to `1`; color 1 has only 2 balls, not more than the threshold. The last order sells one ball at `2`, giving `14`.\n\n## Complexity\n\n- Time: O(n log M), where M is the largest count: each of the about 30 search steps scans the inventory.\n- Space: O(1) besides the input.\n\n## Pitfalls\n\n- The totals reach about 10^18, past exact JavaScript numbers; use `BigInt` (or careful modular arithmetic) for the sums.\n- The leftover orders are sold at `threshold`, not `threshold + 1`; there are always enough such balls.\n- Take the modulus only at the end (or consistently); the count in `soldAbove` itself stays below 2^53.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `soldAbove(k)` | number of balls worth more than `k` |\n| `low`, `high`, `mid` | binary search bounds and probe for the level |\n| `threshold` | the lowest value still sold; everything above it is sold |\n| `total` | money earned so far, as a `BigInt` |\n| `remaining` | orders still to fill after selling everything above `threshold` |\n| `top`, `bottom` | a color's count and the threshold, as `BigInt` for the series |",
+  "narration": {
+    "3": "Helper: how many balls are worth more than k, i.e. would be sold if the level stopped at k?",
+    "6": "Only colors with more than k balls sell any ball above k.",
+    "7": "They sell exactly the balls - k balls that sit above level k.",
+    "13": "The level lies between 0 and the largest count.",
+    "15": "Binary search for the smallest level whose higher balls do not exceed orders.",
+    "17": "Selling everything above mid fits within orders, so the level is mid or lower.",
+    "18": "Keep mid as a candidate and search lower.",
+    "20": "Too many balls above mid, so the level must be higher.",
+    "23": "threshold is the lowest value that still gets sold.",
+    "27": "Sell every ball worth more than threshold, color by color.",
+    "31": "Add the series (threshold + 1) + ... + balls, in BigInt so it stays exact.",
+    "32": "Those sales use up part of the orders.",
+    "35": "The orders still open are filled with balls worth exactly threshold.",
+    "36": "Reduce the exact total modulo 10^9 + 7 and return it."
+  }
+}

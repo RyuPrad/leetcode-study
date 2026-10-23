@@ -1,0 +1,50 @@
+{
+  "number": 2888,
+  "title": "Reshape Data: Concatenate",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on two DataFrames named `df1` and `df2`; here each DataFrame is a table and you answer with one MySQL query.\n\n- `df1(student_id, name, age)`: one row per student record; no value is null.\n- `df2(student_id, name, age)`: the same three columns in the same order; no value is null.\n\nNeither table promises unique rows, and the same row may appear in both.\n\nStack the two tables vertically into one table with the columns `student_id`, `name` and `age`: every row of `df1` and every row of `df2` appears in the result, with its values unchanged. Rows that repeat, within a table or across the two, are all kept, so the result has exactly as many rows as the two tables together. Rows may come in any order.",
+  "constraints": [
+    "df1 and df2 have the same columns: student_id, name, age",
+    "No value is null",
+    "Rows may repeat within a table and across the tables; every copy is kept"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "df1": [["student_id","INT"],["name","VARCHAR"],["age","INT"]],
+    "df2": [["student_id","INT"],["name","VARCHAR"],["age","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ df1 = [], df2 = [] }] = input;\n  for (const [label, rows] of [['df1', df1], ['df2', df2]]) {\n    for (const row of rows) if (row.some(value => value === null)) return `${label} cannot contain null values.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT student_id, name, age\nFROM df1\nUNION ALL\nSELECT student_id, name, age\nFROM df2;",
+  "brute": "WITH RECURSIVE tags (k) AS (\n  SELECT 1\n  UNION ALL\n  SELECT k + 1 FROM tags WHERE k < 2\n)\nSELECT\n  CASE WHEN t.k = 1 THEN a.student_id ELSE b.student_id END AS student_id,\n  CASE WHEN t.k = 1 THEN a.name ELSE b.name END AS name,\n  CASE WHEN t.k = 1 THEN a.age ELSE b.age END AS age\nFROM tags AS t\nLEFT JOIN df1 AS a ON t.k = 1\nLEFT JOIN df2 AS b ON t.k = 2\nWHERE (t.k = 1 AND a.student_id IS NOT NULL) OR (t.k = 2 AND b.student_id IS NOT NULL)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Mason', 'Ava', 'Taylor', 'Georgia', 'Leo', 'Alex'];\n  const table = () => {\n    const count = size === 'small' ? Math.floor(rand() * 9) : 1500 + Math.floor(rand() * 500);\n    const rows = [];\n    for (let i = 0; i < count; i++) {\n      const id = size === 'small' ? 1 + Math.floor(rand() * 6) : 1 + Math.floor(rand() * 3000);\n      rows.push([id, pick(names), 5 + Math.floor(rand() * (size === 'small' ? 4 : 14))]);\n    }\n    return rows;\n  };\n  return [{ df1: table(), df2: table() }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"df1":[[1,"Mason",8],[2,"Ava",6],[3,"Taylor",15],[4,"Georgia",17]],"df2":[[5,"Leo",7],[6,"Alex",7]]}],"expected":{"columns":["student_id","name","age"],"rows":[[1,"Mason",8],[2,"Ava",6],[3,"Taylor",15],[4,"Georgia",17],[5,"Leo",7],[6,"Alex",7]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"df1":[],"df2":[]}]},
+    {"name":"Test 2","input":[{"df1":[[1,"Mason",8],[2,"Ava",6]],"df2":[]}]},
+    {"name":"Test 3","input":[{"df1":[],"df2":[[5,"Leo",7]]}]},
+    {"name":"Test 4","input":[{"df1":[[1,"Mason",8]],"df2":[[1,"Mason",8]]}]},
+    {"name":"Test 5","input":[{"df1":[[2,"Ava",6],[2,"Ava",6]],"df2":[[3,"Taylor",15]]}]},
+    {"name":"Test 6","input":[{"df1":[[4,"Georgia",17]],"df2":[[4,"Georgia",18],[4,"Alex",17]]}]},
+    {"name":"Test 7","input":[{"df1":[[6,"Alex",7],[5,"Leo",7]],"df2":[[5,"Leo",7],[6,"Alex",7],[5,"Leo",7]]}]},
+    {"name":"Test 8","input":[{"df1":[[10,"Taylor",15]],"df2":[[11,"Mason",9],[12,"Ava",10],[13,"Georgia",11],[14,"Leo",12]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\npandas stacks two frames with `pd.concat([df1, df2])`: the rows of the second frame are appended below the first, column by column. SQL's set operators do the same for two queries with matching columns. `UNION ALL` appends the rows of the second `SELECT` to those of the first and keeps every copy, which is exactly what concatenation means.\n\n## Approach\n\n1. Select `student_id`, `name` and `age` from `df1`; the first query's column names become the result's names.\n2. `UNION ALL` with the same three columns, in the same order, selected from `df2`.\n\n## Example 1, step by step\n\n- The first `SELECT` yields Mason (1, 8), Ava (2, 6), Taylor (3, 15) and Georgia (4, 17).\n- The second yields Leo (5, 7) and Alex (6, 7).\n- `UNION ALL` places them in one table of six rows, the expected output.\n\n## Complexity\n\n- Time: O(m + n) for m rows in `df1` and n in `df2`; each row is copied once.\n- Space: O(m + n) for the output.\n\n## Pitfalls\n\n- Plain `UNION` removes duplicate rows; a student present in both tables, or twice in one, would lose copies.\n- `UNION` matches columns by position, not by name, so both sides must list `student_id`, `name`, `age` in the same order.\n- A `JOIN` puts the tables side by side instead of one above the other.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `df1` | the upper block of rows, also naming the output columns |\n| `df2` | the lower block of rows, appended below |\n| `UNION ALL` | stacks both blocks and keeps every duplicate |",
+  "narration": {
+    "1": "List the three columns of df1; their names become the names of the result.",
+    "2": "The first block of rows is all of df1.",
+    "3": "UNION ALL appends the next query's rows and keeps every copy, unlike UNION.",
+    "4": "The second query lists the same columns in the same order.",
+    "5": "The second block of rows is all of df2."
+  }
+}

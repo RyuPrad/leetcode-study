@@ -1,0 +1,68 @@
+{
+  "number": 1644,
+  "title": "Lowest Common Ancestor of a Binary Tree II",
+  "spec": "recalled",
+  "statement": "You are given `root`, the root of a binary tree in which no two nodes share a value, and two different nodes `p` and `q`. Unlike the classic version of this problem, `p`, `q` or both may be **missing** from the tree.\n\n- If both `p` and `q` belong to the tree, return their lowest common ancestor: the node farthest from the root whose subtree contains both of them. A node counts as part of its own subtree, so when one of the two lies below the other, the upper one is the answer.\n- If at least one of them is not in the tree, return `null`.\n\nEach case is written as `[root, p, q]`: the tree as a level-order array with `null` for missing children, followed by the values of `p` and `q`. Your function is called with the root and two node objects (not their values): a node of the tree when that value occurs in it, otherwise a separate node with that value that is not linked into the tree. It must not change the tree and must return a node of the tree or `null`; a node result is shown as its `val`.",
+  "constraints": [
+    "The tree has between 1 and 10^4 nodes",
+    "-10^9 <= Node.val <= 10^9",
+    "All Node.val are unique",
+    "-10^9 <= p, q <= 10^9",
+    "p != q"
+  ],
+  "signature": "TreeNode lowestCommonAncestor(TreeNode root, int p, int q)",
+  "entry": "lowestCommonAncestor",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "p",
+    "q"
+  ],
+  "validator": "function validate([root, p, q]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs a root.';\n  const values = root.filter(v => v !== null);\n  if (values.length > 10000) return 'The tree has at most 10^4 nodes.';\n  const inRange = v => Number.isInteger(v) && v >= -1000000000 && v <= 1000000000;\n  if (!values.every(inRange)) return 'Node values are integers between -10^9 and 10^9.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  if (!inRange(p) || !inRange(q)) return 'p and q are integers between -10^9 and 10^9.';\n  if (p === q) return 'p and q must be different.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [values, p, q] = input;\n  const root = kit.toTree(values);\n  // Collect the nodes with an explicit stack so that deep trees need no recursion here.\n  const nodes = [];\n  const stack = [root];\n  while (stack.length) {\n    const node = stack.pop();\n    nodes.push(node);\n    if (node.right) stack.push(node.right);\n    if (node.left) stack.push(node.left);\n  }\n  const links = nodes.map(node => [node.val, node.left, node.right]);\n  // A value that is not in the tree becomes a detached node, as LeetCode passes it.\n  const byValue = new Map(nodes.map(node => [node.val, node]));\n  const pNode = byValue.get(p) ?? new kit.TreeNode(p, null, null);\n  const qNode = byValue.get(q) ?? new kit.TreeNode(q, null, null);\n  const result = solve(root, pNode, qNode);\n  const intact = nodes.every((node, i) => node.val === links[i][0] && node.left === links[i][1] && node.right === links[i][2]);\n  if (!intact) throw new Error('The tree must not be modified.');\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null) return null;\n  if (!new Set(nodes).has(result)) throw new Error('Return a node of the tree, or null.');\n  return result.val;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function lowestCommonAncestor(root, p, q) {\n  let found = 0;\n\n  function dfs(node) {\n    if (node === null) {\n      return null;\n    }\n    const left = dfs(node.left);\n    const right = dfs(node.right);\n    if (node === p || node === q) {\n      found++;\n      return node;\n    }\n    if (left !== null && right !== null) {\n      return node;\n    }\n    return left !== null ? left : right;\n  }\n\n  const answer = dfs(root);\n  return found === 2 ? answer : null;\n}",
+  "brute": "function lowestCommonAncestor(root, p, q) {\n  // Record every node's parent with a breadth-first walk.\n  const parent = new Map([[root, null]]);\n  const queue = [root];\n  for (let i = 0; i < queue.length; i++) {\n    for (const child of [queue[i].left, queue[i].right]) {\n      if (child) { parent.set(child, queue[i]); queue.push(child); }\n    }\n  }\n  if (!parent.has(p) || !parent.has(q)) return null;\n  // Mark all ancestors of p (itself included), then climb from q to the first marked node.\n  const above = new Set();\n  for (let node = p; node; node = parent.get(node)) above.add(node);\n  let node = q;\n  while (!above.has(node)) node = parent.get(node);\n  return node;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 900 + pick(90) : 1 + pick(11);\n  const deep = rand() < 0.35;\n  const span = size === 'large' || rand() < 0.3 ? 1000000000 : 25;\n  const used = new Set();\n  const fresh = () => { for (;;) { const v = pick(2 * span + 1) - span; if (!used.has(v)) { used.add(v); return v; } } };\n  const nodes = [{ val: fresh(), left: null, right: null }];\n  while (nodes.length < n) {\n    // Deep trees grow from the newest nodes; bushy trees attach a child anywhere.\n    const parent = deep ? nodes[Math.max(0, nodes.length - 1 - pick(2))] : nodes[pick(nodes.length)];\n    const side = rand() < 0.5 ? 'left' : 'right';\n    if (parent[side]) continue;\n    parent[side] = { val: fresh(), left: null, right: null };\n    nodes.push(parent[side]);\n  }\n  const root = [];\n  const queue = [nodes[0]];\n  for (let k = 0; k < queue.length; k++) {\n    root.push(queue[k] ? queue[k].val : null);\n    if (queue[k]) queue.push(queue[k].left, queue[k].right);\n  }\n  while (root[root.length - 1] === null) root.pop();\n  // Both present about half of the time; otherwise one or both values are absent from the tree.\n  const mode = rand();\n  const present = mode < 0.5 || n === 1 && mode < 0.6 ? 2 : mode < 0.85 ? 1 : 0;\n  let p, q;\n  if (present === 2 && n >= 2) {\n    const a = pick(n);\n    let b = pick(n - 1);\n    if (b >= a) b++;\n    p = nodes[a].val;\n    q = nodes[b].val;\n  } else if (present >= 1) {\n    p = nodes[pick(n)].val;\n    q = fresh();\n  } else {\n    p = fresh();\n    q = fresh();\n  }\n  return rand() < 0.5 ? [root, p, q] : [root, q, p];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,1,6,2,0,8,null,null,7,4],5,1],"expected":3},
+    {"name":"Example 2","input":[[3,5,1,6,2,0,8,null,null,7,4],5,4],"expected":5},
+    {"name":"Example 3","input":[[3,5,1,6,2,0,8,null,null,7,4],5,10],"expected":null}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1,2]},
+    {"name":"Test 2","input":[[1,2],1,2]},
+    {"name":"Test 3","input":[[1,2],3,4]},
+    {"name":"Test 4","input":[[1,2,3],2,3]},
+    {"name":"Test 5","input":[[3,5,1,6,2,0,8,null,null,7,4],7,4]},
+    {"name":"Test 6","input":[[3,5,1,6,2,0,8,null,null,7,4],6,4]},
+    {"name":"Test 7","input":[[3,5,1,6,2,0,8,null,null,7,4],4,9]},
+    {"name":"Test 8","input":[[3,5,1,6,2,0,8,null,null,7,4],8,3]},
+    {"name":"Test 9","input":[[1,null,2,null,3,null,4,null,5],5,3]},
+    {"name":"Test 10","input":[[1,null,2,null,3,null,4,null,5],1,6]},
+    {"name":"Test 11","input":[[-1000000000,1000000000,0,-5,7],-5,7]},
+    {"name":"Test 12","input":[[10,9,null,8,null,7,null,6],6,11]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIn the classic problem both nodes are guaranteed to exist, so the search may stop as soon as it meets `p` or `q`. Here that shortcut is wrong: stopping at `p` never checks whether `q` really sits below it. The fix is to search the **whole** tree, count how many of the two targets were actually seen, and trust the usual answer only when that count is 2. (A slower plan records every parent, checks both nodes are present, then climbs from one to the other's ancestors.)\n\n## Approach\n\n1. Keep a counter `found` of target nodes met during the search.\n2. `dfs(node)` returns `null` for an empty subtree.\n3. It always searches both children first, storing their reports in `left` and `right`, so no node is skipped.\n4. If `node` is `p` or `q`, increase `found` and report `node`.\n5. Otherwise, if both children reported a node, `node` is where `p` and `q` split: report it. If not, pass up whichever report is non-null.\n6. Run `dfs(root)` into `answer`; return it when `found === 2`, else `null`.\n\n## Example 1, step by step\n\nRoot 3, `p = 5`, `q = 1`. The left call explores 6, 2, 7 and 4 (all report `null`), then 5 is `p`: `found = 1`, and it reports 5. The right call explores 0 and 8, then 1 is `q`: `found = 2`, and it reports 1. At 3, `left = 5` and `right = 1` are both set, so `answer = 3`, and since `found === 2` the result is `3`.\n\nIn Example 3, `q = 10` is never met, so `found` stays 1 and the result is `null` even though `dfs` returned 5.\n\n## Complexity\n\n- Time: O(n): every node is visited exactly once.\n- Space: O(h) for the recursion, where h is the tree's height.\n\n## Pitfalls\n\n- Do not return early at `p` or `q`: in `[1,null,2,null,3,null,4,null,5]` with `p = 1` and `q = 6`, the early-stop version wrongly returns 1.\n- Check the children **before** deciding on the current node, otherwise targets below `p` or `q` are never counted.\n- A missing node is passed as a detached node, so it is never `===` to a tree node; comparing by identity is safe.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `found` | how many of `p` and `q` the search has met |\n| `dfs` | reports `p`, `q`, their ancestor, or `null` for a subtree |\n| `left`, `right` | the reports of the two child subtrees |\n| `answer` | what `dfs` reported for the whole tree |",
+  "narration": {
+    "2": "Count how many of the two target nodes the search actually meets.",
+    "4": "dfs reports what a subtree contains: p, q, their ancestor, or null.",
+    "5": "An empty subtree contains nothing...",
+    "6": "...so it reports null.",
+    "8": "Search the whole left subtree first; nothing is skipped.",
+    "9": "Then search the whole right subtree.",
+    "10": "Is this node one of the targets?",
+    "11": "Count it, proving it really is in the tree.",
+    "12": "Report this node; if the other target is below it, this node is their ancestor.",
+    "14": "Both sides found something, so p and q split here.",
+    "15": "This node is their lowest common ancestor.",
+    "17": "Otherwise pass up whatever one side found, or null.",
+    "20": "Search the entire tree from the root.",
+    "21": "Only trust the answer if both targets were found; otherwise return null."
+  }
+}

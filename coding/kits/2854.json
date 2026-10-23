@@ -1,0 +1,54 @@
+{
+  "number": 2854,
+  "title": "Rolling Average Steps",
+  "spec": "recalled",
+  "statement": "One table logs how many steps each user walked on a day:\n\n- `Steps(user_id, steps_count, steps_date)`: one row per user and day; `(user_id, steps_date)` is unique. A user may skip days, so their dates can have gaps.\n\nFor each user and each of their dates, the **3-day rolling average** is the average of `steps_count` over that date and the two calendar days right before it. It exists only when the user has a row on all three of those days; a date with a missing day among the three gets no row at all.\n\nOutput `user_id`, `steps_date` and `rolling_average` (rounded to 2 decimal places) for every date where the rolling average exists, ordered by `user_id` and then `steps_date`, both ascending.",
+  "constraints": [
+    "(user_id, steps_date) is unique in Steps",
+    "steps_count is a non-negative integer and never null",
+    "steps_date is a valid date"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Steps": [["user_id","INT"],["steps_count","INT"],["steps_date","DATE"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Steps = [] }] = input;\n  const seen = new Set();\n  for (const [user, count, date] of Steps) {\n    if (user === null || count === null || date === null) return 'user_id, steps_count and steps_date cannot be null.';\n    if (count < 0) return 'steps_count cannot be negative.';\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) return `${date} is not a valid date.`;\n    const key = `${user}|${date}`;\n    if (seen.has(key)) return `User ${user} has two rows on ${date}.`;\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH windowed AS (\n  SELECT\n    user_id,\n    steps_date,\n    AVG(steps_count) OVER (\n      PARTITION BY user_id ORDER BY steps_date\n      ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n    ) AS window_average,\n    LAG(steps_date, 2) OVER (PARTITION BY user_id ORDER BY steps_date) AS two_rows_back\n  FROM Steps\n)\nSELECT user_id, steps_date, ROUND(window_average, 2) AS rolling_average\nFROM windowed\nWHERE DATEDIFF(steps_date, two_rows_back) = 2\nORDER BY user_id, steps_date;",
+  "brute": "SELECT\n  today.user_id,\n  today.steps_date,\n  ROUND((before2.steps_count + before1.steps_count + today.steps_count) / 3, 2) AS rolling_average\nFROM Steps AS today\nJOIN Steps AS before1\n  ON before1.user_id = today.user_id AND before1.steps_date = DATE_SUB(today.steps_date, INTERVAL 1 DAY)\nJOIN Steps AS before2\n  ON before2.user_id = today.user_id AND before2.steps_date = DATE_SUB(today.steps_date, INTERVAL 2 DAY)\nORDER BY today.user_id, today.steps_date",
+  "generator": "function generate(rand, size) {\n  const day = (base, offset) => new Date(Date.parse(`${base}T00:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);\n  const Steps = [];\n  if (size === 'small') {\n    // A few users, each with a random subset of an 8-day span that may cross a month, year or leap-day boundary.\n    const base = ['2021-09-01', '2021-08-28', '2020-02-26', '2021-12-29', '2021-02-25'][Math.floor(rand() * 5)];\n    const users = 1 + Math.floor(rand() * 3);\n    for (let user = 1; user <= users; user++) {\n      for (let offset = 0; offset < 8; offset++) {\n        if (Steps.length < 8 && rand() < 0.6) Steps.push([user, Math.floor(rand() * 1000), day(base, offset)]);\n      }\n    }\n    // Shuffle so rows are not listed in date order.\n    for (let i = Steps.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [Steps[i], Steps[j]] = [Steps[j], Steps[i]]; }\n  } else {\n    for (let user = 1; Steps.length < 2000; user++) {\n      for (let offset = 0; offset < 130 && Steps.length < 2000; offset++) {\n        if (rand() < 0.75) Steps.push([user, Math.floor(rand() * 20000), day('2021-11-15', offset)]);\n      }\n    }\n  }\n  return [{ Steps }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Steps":[[1,687,"2021-09-02"],[1,395,"2021-09-04"],[1,499,"2021-09-05"],[1,712,"2021-09-06"],[1,576,"2021-09-07"],[2,153,"2021-09-06"],[2,171,"2021-09-07"],[2,530,"2021-09-08"],[3,945,"2021-09-04"],[3,120,"2021-09-07"],[3,557,"2021-09-08"],[3,840,"2021-09-09"],[3,627,"2021-09-10"],[5,382,"2021-09-05"],[6,480,"2021-09-01"],[6,191,"2021-09-02"],[6,303,"2021-09-05"]]}],"expected":{"columns":["user_id","steps_date","rolling_average"],"rows":[[1,"2021-09-06",535.33],[1,"2021-09-07",595.67],[2,"2021-09-08",284.67],[3,"2021-09-09",505.67],[3,"2021-09-10",674.67]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Steps":[]}]},
+    {"name":"Test 2","input":[{"Steps":[[1,500,"2021-09-01"]]}]},
+    {"name":"Test 3","input":[{"Steps":[[1,100,"2021-09-01"],[1,200,"2021-09-02"]]}]},
+    {"name":"Test 4","input":[{"Steps":[[4,10,"2021-09-03"],[4,20,"2021-09-01"],[4,31,"2021-09-02"]]}]},
+    {"name":"Test 5","input":[{"Steps":[[1,100,"2021-09-01"],[1,200,"2021-09-02"],[1,300,"2021-09-04"],[1,400,"2021-09-05"],[1,500,"2021-09-06"]]}]},
+    {"name":"Test 6","input":[{"Steps":[[2,1,"2021-08-30"],[2,1,"2021-08-31"],[2,2,"2021-09-01"],[2,2,"2021-09-02"]]}]},
+    {"name":"Test 7","input":[{"Steps":[[1,300,"2020-02-28"],[1,301,"2020-02-29"],[1,302,"2020-03-01"],[2,10,"2021-02-27"],[2,20,"2021-02-28"],[2,40,"2021-03-01"]]}]},
+    {"name":"Test 8","input":[{"Steps":[[1,100,"2021-09-01"],[2,900,"2021-09-02"],[1,300,"2021-09-03"],[2,800,"2021-09-03"],[1,200,"2021-09-02"],[2,700,"2021-09-04"]]}]},
+    {"name":"Test 9","input":[{"Steps":[[3,0,"2021-12-30"],[3,0,"2021-12-31"],[3,0,"2022-01-01"],[3,7,"2022-01-02"]]}]},
+    {"name":"Test 10","input":[{"Steps":[[7,5,"2021-09-01"],[7,6,"2021-09-02"],[7,7,"2021-09-03"],[7,8,"2021-09-04"],[7,9,"2021-09-05"],[7,10,"2021-09-06"],[7,11,"2021-09-07"]]}]},
+    {"name":"Test 11","input":[{"Steps":[[1,50,"2021-09-01"],[1,60,"2021-09-03"],[1,70,"2021-09-05"],[2,1,"2021-09-01"],[3,1,"2021-09-02"],[4,1,"2021-09-03"]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA frame of \"this row and the two before it\" is exactly what a window function gives, once rows are split per user and sorted by date. The catch is that the two previous **rows** are not always the two previous **days**: a user who skipped a day still has rows before the gap. The three rows are three consecutive days exactly when the row two places back is dated two days earlier, because dates are unique per user.\n\n## Approach\n\n1. In the CTE `windowed`, partition `Steps` by `user_id` and order by `steps_date`.\n2. `AVG(steps_count)` over `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` averages the current row with up to two earlier rows (`window_average`).\n3. `LAG(steps_date, 2)` fetches the date two rows back (`two_rows_back`), or `null` for a user's first two rows.\n4. Keep only rows where `DATEDIFF(steps_date, two_rows_back) = 2`; a gap makes the difference larger, and `null` fails the test.\n5. Round the average to 2 places as `rolling_average` and sort by `user_id`, `steps_date`.\n\n## Example 1, step by step\n\n- User 1's rows are 09-02, 09-04, 09-05, 09-06, 09-07. On 09-05 the row two back is 09-02, three days earlier, so it is dropped. On 09-06 it is 09-04: kept with (395 + 499 + 712) / 3 = 535.33. On 09-07 it is 09-05: (499 + 712 + 576) / 3 = 595.67.\n- User 2 on 09-08: (153 + 171 + 530) / 3 = 284.67.\n- User 3: 09-08 looks back to 09-04 (dropped); 09-09 gives (120 + 557 + 840) / 3 = 505.67 and 09-10 gives (557 + 840 + 627) / 3 = 674.67.\n- User 5 has one row; user 6 has 09-01, 09-02, 09-05, so 09-05 looks back to 09-01 and is dropped.\n\n## Complexity\n\n- Time: O(S log S) to sort the S rows by user and date; the windows then take O(S).\n- Space: O(S) for the sorted partitions and the CTE.\n\n## Pitfalls\n\n- Using only `ROWS BETWEEN 2 PRECEDING` averages across gaps and also reports a user's first two days with a 1- or 2-day average.\n- Forgetting `PARTITION BY user_id` mixes one user's steps into another's window.\n- Comparing dates as numbers or strings instead of with `DATEDIFF` breaks at month and year ends (08-31 to 09-01).\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `windowed` | every row with its 3-row average and the date two rows back |\n| `window_average` | average of the current row and up to two earlier rows of the same user |\n| `two_rows_back` | the user's date two rows earlier, `null` for the first two rows |\n| `rolling_average` | `window_average` rounded to 2 places, kept only for 3 consecutive days |",
+  "narration": {
+    "1": "The CTE windowed computes, for every row, a 3-row average and the date two rows back.",
+    "5": "Average the steps over a frame of the current row and the two before it.",
+    "6": "Each user gets their own window, sorted by date.",
+    "7": "The frame is exactly the current row and up to two earlier rows.",
+    "9": "LAG fetches the date two rows earlier; it is null for a user's first two days.",
+    "12": "Round the window average to 2 decimal places for output.",
+    "14": "Keep a row only when the row two back is exactly two days earlier, which means the three days are consecutive.",
+    "15": "Sort by user and then by date as required."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "number": 2989,
+  "title": "Class Performance",
+  "spec": "recalled",
+  "statement": "A teacher records each student's marks on three assignments:\n\n- `Scores(student_id, student_name, assignment1, assignment2, assignment3)`: one row per student; `student_id` is unique. Each assignment column holds that student's score on it, an integer from 0 to 100.\n\nA student's **total score** is `assignment1 + assignment2 + assignment3`. Report how far apart the best and the worst student are: the highest total score among all students minus the lowest total score.\n\nReturn a single row with a single column `difference_in_score`. When `Scores` is empty there are no totals, and the one row holds `null`.",
+  "constraints": [
+    "student_id is unique in Scores",
+    "assignment1, assignment2 and assignment3 are integers from 0 to 100, never null",
+    "student_name may repeat across students"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Scores": [["student_id","INT"],["student_name","VARCHAR(40)"],["assignment1","INT"],["assignment2","INT"],["assignment3","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ Scores = [] }] = input;\n  const ids = new Set();\n  for (const [id, name, ...marks] of Scores) {\n    if (id === null) return 'Every student needs a student_id.';\n    if (ids.has(id)) return `student_id ${id} appears twice.`;\n    ids.add(id);\n    if (name === null) return `Student ${id} needs a name.`;\n    if (marks.some(m => !Number.isInteger(m) || m < 0 || m > 100)) return `Student ${id} has a score outside 0 to 100.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH totals AS (\n  SELECT\n    student_id,\n    assignment1 + assignment2 + assignment3 AS total_score\n  FROM Scores\n)\nSELECT MAX(total_score) - MIN(total_score) AS difference_in_score\nFROM totals;",
+  "brute": "SELECT\n  (SELECT assignment1 + assignment2 + assignment3 AS best FROM Scores ORDER BY best DESC LIMIT 1)\n  - (SELECT assignment1 + assignment2 + assignment3 AS worst FROM Scores ORDER BY worst ASC LIMIT 1)\n  AS difference_in_score",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const names = ['Owen', 'Claire', 'Julian', 'Peyton', 'David', 'Camila', 'Mia', 'Noah'];\n  // Small cases use a few marks so totals tie and the extremes come from different assignments.\n  const marks = [0, 37, 50, 64, 100];\n  const mark = () => small ? marks[Math.floor(rand() * marks.length)] : Math.floor(rand() * 101);\n  const count = small ? Math.floor(rand() * 9) : 2000;\n  const Scores = [];\n  for (let i = 0; i < count; i++) Scores.push([small ? 300 + i * 11 : i + 1, names[Math.floor(rand() * names.length)], mark(), mark(), mark()]);\n  return [{ Scores }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Scores":[[309,"Owen",88,47,87],[321,"Claire",98,95,37],[338,"Julian",100,64,43],[423,"Peyton",60,44,47],[896,"David",32,37,50],[235,"Camila",31,53,69]]}],"expected":{"columns":["difference_in_score"],"rows":[[111]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Scores":[]}]},
+    {"name":"Test 2","input":[{"Scores":[[1,"Mia",70,80,90]]}]},
+    {"name":"Test 3","input":[{"Scores":[[1,"Ann",100,0,0],[2,"Ben",0,100,0],[3,"Cal",0,0,100]]}]},
+    {"name":"Test 4","input":[{"Scores":[[1,"Ann",100,100,100],[2,"Ben",0,0,0]]}]},
+    {"name":"Test 5","input":[{"Scores":[[4,"Noah",90,10,50],[7,"Noah",20,95,30],[9,"Eli",60,60,60]]}]},
+    {"name":"Test 6","input":[{"Scores":[[10,"Ava",50,50,50],[11,"Max",70,40,40],[12,"Liv",30,30,30],[13,"Sam",10,40,40]]}]},
+    {"name":"Test 7","input":[{"Scores":[[5,"Zoe",99,98,97],[6,"Ian",100,1,2],[8,"Uma",3,100,4]]}]},
+    {"name":"Test 8","input":[{"Scores":[[21,"Kai",0,0,1],[22,"Lea",0,1,0],[23,"Ray",1,0,0],[24,"Tom",0,0,0]]}]},
+    {"name":"Test 9","input":[{"Scores":[[1,"Ann",40,41,42],[2,"Ben",42,41,40],[3,"Cal",41,41,41]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEach student contributes one number, the sum of the three assignment columns, and the answer is the spread of those numbers: `MAX - MIN`. The sum is a per-row expression, so no grouping by student is needed; the whole table forms one group and both aggregates come out of the same pass.\n\n## Approach\n\n1. CTE `totals`: compute `total_score = assignment1 + assignment2 + assignment3` for every row.\n2. Over all rows of `totals`, return `MAX(total_score) - MIN(total_score)` as `difference_in_score`. An aggregate without `GROUP BY` always yields exactly one row, which is `null` on an empty table.\n\n## Example 1, step by step\n\n- `totals`: Owen 222, Claire 230, Julian 207, Peyton 151, David 119, Camila 153.\n- `MAX(total_score)` is Claire's 230 and `MIN(total_score)` is David's 119.\n- `difference_in_score` = 230 - 119 = 111.\n\n## Complexity\n\n- Time: O(n) for n students; one scan computes every total and both aggregates.\n- Space: O(1) beyond the scan; the CTE can be streamed.\n\n## Pitfalls\n\n- `MAX(assignment1) + MAX(assignment2) + MAX(assignment3)` mixes the best marks of different students; in Test 3 every student totals 100, so the answer is 0, not 300.\n- Taking the spread of a single assignment column answers a different question.\n- Grouping by `student_id` before the outer `MAX`/`MIN` is harmless but unnecessary; grouping by `student_name` would merge two students who share a name.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `totals` | one row per student with that student's total |\n| `total_score` | `assignment1 + assignment2 + assignment3` |\n| `difference_in_score` | highest total minus lowest total |",
+  "narration": {
+    "1": "The CTE totals turns each student into a single number.",
+    "4": "Add the three assignment scores on the same row to get the student's total.",
+    "7": "Over all totals, subtract the lowest from the highest; with no GROUP BY this yields exactly one row.",
+    "8": "Read from the totals stage rather than the raw scores."
+  }
+}

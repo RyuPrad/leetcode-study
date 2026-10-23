@@ -1,0 +1,77 @@
+{
+  "number": 1728,
+  "title": "Cat and Mouse II",
+  "spec": "leetcode",
+  "statement": "A cat and a mouse play on the board `grid`, an array of equal-length strings. Each cell is a wall `'#'`, open floor `'.'`, the food `'F'`, the cat's starting cell `'C'` or the mouse's starting cell `'M'`. Each of `'C'`, `'M'` and `'F'` appears exactly once, and those three cells are walkable like floor.\n\nThe mouse moves first, then the two alternate. On its turn a player either stays where it is or picks one of the four directions (up, down, left, right) and slides in a straight line by any number of cells from 1 up to its limit: `mouseJump` for the mouse, `catJump` for the cat. A move may not leave the board and may not enter or cross a wall. The mouse is allowed to pass over the cat's cell.\n\nThe game stops at the first of these events:\n\n- the cat and the mouse are on the same cell: the cat wins;\n- the cat gets to the food before the mouse does: the cat wins;\n- the mouse gets to the food before the cat does: the mouse wins;\n- the mouse has not reached the food within 1000 turns: the cat wins.\n\nAssuming both play optimally, return `true` if the mouse wins and `false` otherwise.",
+  "constraints": [
+    "rows == grid.length",
+    "cols == grid[i].length",
+    "1 <= rows, cols <= 8",
+    "grid[i][j] is one of 'C', 'M', 'F', '.' and '#'",
+    "'C', 'M' and 'F' each appear exactly once in grid",
+    "1 <= catJump, mouseJump <= 8"
+  ],
+  "signature": "boolean canMouseWin(String[] grid, int catJump, int mouseJump)",
+  "entry": "canMouseWin",
+  "kind": "function",
+  "parameters": [
+    "grid",
+    "catJump",
+    "mouseJump"
+  ],
+  "validator": "function validate([grid, catJump, mouseJump]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 8) return 'grid needs 1 to 8 rows.';\n  const cols = grid[0].length;\n  if (cols < 1 || cols > 8) return 'Each row needs 1 to 8 cells.';\n  if (grid.some(row => typeof row !== 'string' || row.length !== cols)) return 'All rows must have the same length.';\n  if (grid.some(row => /[^CMF.#]/.test(row))) return \"Cells may only be 'C', 'M', 'F', '.' or '#'.\";\n  const text = grid.join('');\n  for (const ch of ['C', 'M', 'F']) {\n    if (text.split(ch).length !== 2) return `'${ch}' must appear exactly once.`;\n  }\n  if (!Number.isInteger(catJump) || catJump < 1 || catJump > 8) return 'catJump is between 1 and 8.';\n  if (!Number.isInteger(mouseJump) || mouseJump < 1 || mouseJump > 8) return 'mouseJump is between 1 and 8.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function canMouseWin(grid, catJump, mouseJump) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const cells = grid.join('');\n  const size = cells.length;\n  const food = cells.indexOf('F');\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n\n  function jumps(cell, limit) {\n    const targets = [cell];\n    for (const [dr, dc] of directions) {\n      for (let step = 1; step <= limit; step++) {\n        const r = Math.floor(cell / cols) + dr * step;\n        const c = (cell % cols) + dc * step;\n        if (r < 0 || r >= rows || c < 0 || c >= cols || cells[r * cols + c] === '#') break;\n        targets.push(r * cols + c);\n      }\n    }\n    return targets;\n  }\n\n  const mouseMoves = Array.from({ length: size }, (_, cell) => jumps(cell, mouseJump));\n  const catMoves = Array.from({ length: size }, (_, cell) => jumps(cell, catJump));\n  const MOUSE_WIN = 1;\n  const CAT_WIN = 2;\n  const result = new Array(size * size * 2).fill(0);\n  const degree = new Array(size * size * 2).fill(0);\n  const queue = [];\n\n  for (let mouse = 0; mouse < size; mouse++) {\n    for (let cat = 0; cat < size; cat++) {\n      if (cells[mouse] === '#' || cells[cat] === '#') continue;\n      const state = (mouse * size + cat) * 2;\n      degree[state] = mouseMoves[mouse].length;\n      degree[state + 1] = catMoves[cat].length;\n      let winner = 0;\n      if (mouse === cat || cat === food) {\n        winner = CAT_WIN;\n      } else if (mouse === food) {\n        winner = MOUSE_WIN;\n      }\n      for (let turn = 0; winner !== 0 && turn < 2; turn++) {\n        result[state + turn] = winner;\n        queue.push(state + turn);\n      }\n    }\n  }\n\n  for (let head = 0; head < queue.length; head++) {\n    const state = queue[head];\n    const mouse = Math.floor(state / (2 * size));\n    const cat = Math.floor(state / 2) % size;\n    const prevTurn = 1 - (state % 2);\n    const moverWins = prevTurn === 0 ? MOUSE_WIN : CAT_WIN;\n    const origins = prevTurn === 0 ? mouseMoves[mouse] : catMoves[cat];\n    for (const from of origins) {\n      const prev = prevTurn === 0 ? (from * size + cat) * 2 : (mouse * size + from) * 2 + 1;\n      if (result[prev] !== 0) continue;\n      degree[prev]--;\n      if (result[state] === moverWins || degree[prev] === 0) {\n        result[prev] = result[state];\n        queue.push(prev);\n      }\n    }\n  }\n  return result[(cells.indexOf('M') * size + cells.indexOf('C')) * 2] === MOUSE_WIN;\n}",
+  "brute": "function canMouseWin(grid, catJump, mouseJump) {\n  // Value iteration with an explicit turn count: after ply k, win[t] holds the states\n  // from which the mouse can force a win within k moves (t = 0: mouse to move).\n  const R = grid.length, C = grid[0].length, N = R * C;\n  let mr = 0, mc = 0, cr = 0, cc = 0, fr = 0, fc = 0;\n  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {\n    if (grid[r][c] === 'M') { mr = r; mc = c; }\n    if (grid[r][c] === 'C') { cr = r; cc = c; }\n    if (grid[r][c] === 'F') { fr = r; fc = c; }\n  }\n  const open = (r, c) => r >= 0 && r < R && c >= 0 && c < C && grid[r][c] !== '#';\n  const isFood = (r, c) => r === fr && c === fc;\n  const id = (r, c) => r * C + c;\n  const reach = (r, c, J) => {\n    const out = [[r, c]];\n    for (const [dr, dc] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {\n      let nr = r, nc = c;\n      for (let k = 0; k < J; k++) { nr += dr; nc += dc; if (!open(nr, nc)) break; out.push([nr, nc]); }\n    }\n    return out;\n  };\n  const free = [];\n  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (open(r, c)) free.push([r, c]);\n  const mReach = new Map(), cReach = new Map();\n  for (const [r, c] of free) { mReach.set(id(r, c), reach(r, c, mouseJump)); cReach.set(id(r, c), reach(r, c, catJump)); }\n  let win = [new Uint8Array(N * N), new Uint8Array(N * N)];\n  for (const [ar, ac] of free) for (const [br, bc] of free) {\n    if ((ar !== br || ac !== bc) && isFood(ar, ac)) { win[0][id(ar, ac) * N + id(br, bc)] = 1; win[1][id(ar, ac) * N + id(br, bc)] = 1; }\n  }\n  for (let ply = 1; ply <= 1000; ply++) {\n    const next = [win[0].slice(), win[1].slice()];\n    let changed = false;\n    for (const [ar, ac] of free) for (const [br, bc] of free) {\n      const m = id(ar, ac), c = id(br, bc);\n      if (m === c || isFood(br, bc) || isFood(ar, ac)) continue;\n      if (!win[0][m * N + c] && mReach.get(m).some(([r, k]) => id(r, k) !== c && win[1][id(r, k) * N + c])) { next[0][m * N + c] = 1; changed = true; }\n      if (!win[1][m * N + c] && cReach.get(c).every(([r, k]) => id(r, k) !== m && !isFood(r, k) && win[0][m * N + id(r, k)])) { next[1][m * N + c] = 1; changed = true; }\n    }\n    win = next;\n    if (!changed) break;\n  }\n  return win[0][id(mr, mc) * N + id(cr, cc)] === 1;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  let rows, cols;\n  do {\n    rows = large ? pick(6, 8) : pick(1, 4);\n    cols = large ? pick(6, 8) : pick(1, 4);\n  } while (rows * cols < 3);\n  const wallRate = rand() * 0.4;\n  const board = Array.from({ length: rows * cols }, () => (rand() < wallRate ? '#' : '.'));\n  const spots = [];\n  while (spots.length < 3) {\n    const cell = pick(0, rows * cols - 1);\n    if (!spots.includes(cell)) spots.push(cell);\n  }\n  board[spots[0]] = 'M';\n  board[spots[1]] = 'C';\n  board[spots[2]] = 'F';\n  const grid = [];\n  for (let r = 0; r < rows; r++) grid.push(board.slice(r * cols, (r + 1) * cols).join(''));\n  const jumpMax = large ? 8 : 4;\n  return [grid, pick(1, jumpMax), pick(1, jumpMax)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["####F","#C...","M...."],1,2],"expected":true},
+    {"name":"Example 2","input":[["M.C...F"],1,4],"expected":true},
+    {"name":"Example 3","input":[["M.C...F"],1,3],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["MCF"],1,1]},
+    {"name":"Test 2","input":[["MFC"],1,1]},
+    {"name":"Test 3","input":[["M","C","F"],1,1]},
+    {"name":"Test 4","input":[["F","M","C"],8,1]},
+    {"name":"Test 5","input":[["M#F","##C"],1,1]},
+    {"name":"Test 6","input":[["M#F","###","C.."],8,8]},
+    {"name":"Test 7","input":[["M......F","########","C......."],1,1]},
+    {"name":"Test 8","input":[["F.......","........","........","........","........","........","........","M......C"],1,1]},
+    {"name":"Test 9","input":[["........","........","........","...M....","....C...","........","........","F......."],8,1]},
+    {"name":"Test 10","input":[["M.#.F","C...."],2,2]},
+    {"name":"Test 11","input":[["M.......","#######.","........",".#######","........","#######.","#F......","C#######"],8,1]},
+    {"name":"Test 12","input":[["M.......","#######.","........",".#######","...C....","#######.","#F......","########"],1,1]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA position is fully described by the mouse's cell, the cat's cell and whose turn it is: at most 64 · 64 · 2 = 8192 states. Some are decided on the spot: the cat on the mouse or on the food is a cat win, the mouse on the food is a mouse win. Working backwards from those (retrograde analysis, a topological sort of the game graph), a state is won by the player to move as soon as one move reaches a state that player wins, and lost once every move reaches a state that player loses. States never decided are ones where the cat can stall forever, so they are cat wins. Forced wins on an 8 × 8 board are short (even a winding corridor takes well under 100 moves), so the 1000-turn cap only matters for these endless games. Simulating forward with a turn counter in the state would cost about 1000 times more.\n\n## Approach\n\n1. Flatten `grid` into `cells`, and use `jumps` to list each cell's moves: staying, then sliding up to the limit in each direction until a wall or the edge.\n2. Number a state `(mouse * size + cat) * 2 + turn`, where turn 0 means the mouse moves next. `degree` holds how many moves the player to move has.\n3. Seed `queue` with the decided states (for both turns): same cell or cat on food is `CAT_WIN`, mouse on food is `MOUSE_WIN`.\n4. Pop a decided `state`. Its predecessors `prev` are the other player's turn with that player on a cell `from` one jump away (slides are reversible, so `jumps` lists them too). If `state` is a win for that mover, `prev` is too. Otherwise count one losing move off `degree[prev]`; at zero every move loses, so `prev` takes the same result.\n5. Return whether the start state, with the mouse to move, is `MOUSE_WIN`.\n\n## Example 1, step by step\n\nWith 5 columns, the food is cell `4`, the cat starts on `6` and the mouse on `10`. The seeds include every state with the mouse on `4`. Next, every mouse-to-move state with the mouse on `14` (bottom right) becomes `MOUSE_WIN` (unless the cat is on `14` or `4`): the jump `14 → 4` reaches the food, even over the cat. Cat-to-move states whose every reply leaves such a position follow, and so on back to the start (`10`, `6`, mouse to move). It is a mouse win through `10 → 12 → 14 → 4`: moving one cell a turn, the cat can never land on the mouse or reach the food first, so the answer is `true`.\n\n## Complexity\n\n- Time: O((rows·cols)² · (rows + cols)): each state is decided once and scans the at most `rows + cols - 1` jumps that lead into it.\n- Space: O((rows·cols)²) for `result`, `degree` and `queue`.\n\n## Pitfalls\n\n- Treat undecided states as cat wins instead of tracking the turn count.\n- Staying is a move: it is in every `jumps` list, so it is counted in `degree`.\n- The mouse may pass over the cat; only walls and the edge stop a slide.\n- Skip states with a player on a wall; a backward step from one would invent moves into the wall.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `cells`, `size` | the flattened board and its cell count |\n| `food` | index of the food cell |\n| `mouseMoves`, `catMoves` | cells each player can reach in one move from each cell |\n| `result` | 0 undecided, `MOUSE_WIN` or `CAT_WIN` for each state |\n| `degree` | moves of the player to move that are not yet known to lose |\n| `queue`, `head` | decided states waiting to be expanded |\n| `prevTurn`, `moverWins` | who moved into `state`, and the result that means they won |\n| `from`, `prev` | the mover's earlier cell and the earlier state |",
+  "narration": {
+    "4": "Flatten the board so every cell is a single index row * cols + col.",
+    "9": "jumps lists the cells reachable in one move from a cell, with at most limit steps per slide.",
+    "10": "Staying in place is always a legal move.",
+    "12": "Slide one more step in this direction, up to the jump limit.",
+    "15": "Leaving the board or touching a wall ends this slide; nothing beyond it is reachable.",
+    "22": "Precompute every cell's moves for the mouse; slides are reversible, so this also lists where it could have come from.",
+    "26": "result holds 0 (undecided), MOUSE_WIN or CAT_WIN for each (mouse, cat, turn) state.",
+    "27": "degree counts the moves of the player to move that are not yet known to lose.",
+    "32": "Players never stand on walls, so those states are skipped.",
+    "34": "With the mouse to move, it has one option per entry in its move list.",
+    "37": "Catching the mouse or reaching the food first wins the game for the cat.",
+    "39": "The mouse standing on the food has already won.",
+    "42": "A decided position is decided whoever moves next, so seed both turns.",
+    "49": "Expand decided states in the order they were found, working backwards.",
+    "53": "The player who moved into this state is the one not to move now.",
+    "56": "Each cell the mover could have jumped from gives an earlier state.",
+    "58": "Earlier states that are already decided stay as they are.",
+    "59": "This move is one more option of prev whose outcome is now known.",
+    "60": "The mover takes a winning move if one exists, and is lost only when every move loses.",
+    "61": "Either way prev gets the same result as this state.",
+    "66": "The answer is the start position with the mouse to move."
+  }
+}

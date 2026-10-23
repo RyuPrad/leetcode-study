@@ -1,0 +1,49 @@
+{
+  "number": 2886,
+  "title": "Change Data Type",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `students`; here the DataFrame is a table and you answer with one MySQL query.\n\n- `students(student_id, name, age, grade)`: one row per student. `student_id` is unique. `grade` is a floating-point number that is never null and never negative.\n\nThe `grade` column was stored as floats by mistake and must become an integer column. Return every row of `students` with the columns `student_id`, `name`, `age` and `grade`, where `grade` is converted to an integer by dropping its fractional part, as pandas' `astype(int)` does: `73.0` becomes `73` and `87.9` becomes `87` (not rounded up). LeetCode's own data only holds whole-number grades, but the conversion must work for any grade. The other columns are copied unchanged. Rows may come in any order.",
+  "constraints": [
+    "student_id is unique",
+    "grade is never null and never negative",
+    "The fractional part of grade is dropped, never rounded",
+    "Every input row appears once in the output"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "students": [["student_id","INT"],["name","VARCHAR"],["age","INT"],["grade","DOUBLE"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ students = [] }] = input;\n  const ids = new Set();\n  for (const [id, name, age, grade] of students) {\n    if (id === null) return 'Every student needs a student_id.';\n    if (ids.has(id)) return `student_id ${id} appears twice.`;\n    ids.add(id);\n    if (name === null) return 'Every student needs a name.';\n    if (age === null) return 'age cannot be null.';\n    if (grade === null) return 'grade cannot be null.';\n    if (grade < 0) return 'grade cannot be negative.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  student_id,\n  name,\n  age,\n  CAST(TRUNCATE(grade, 0) AS SIGNED) AS grade\nFROM students;",
+  "brute": "SELECT s.student_id, s.name, s.age, FLOOR(s.grade) AS grade\nFROM students AS s",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Ava', 'Kate', 'Liam', 'Noah', 'Emma', 'Mia', 'Owen', 'Zara'];\n  const marks = [0, 0.5, 49.99, 59.5, 73, 87, 87.9, 99.99, 100];\n  const rows = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const students = [];\n  for (let i = 0; i < rows; i++) {\n    const grade = size === 'small' && rand() < 0.6 ? pick(marks) : rand() < 0.4 ? Math.floor(rand() * 101) : Math.round(rand() * 10000) / 100;\n    students.push([i + 1, pick(names), 5 + Math.floor(rand() * 16), grade]);\n  }\n  return [{ students }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"students":[[1,"Ava",6,73],[2,"Kate",15,87]]}],"expected":{"columns":["student_id","name","age","grade"],"rows":[[1,"Ava",6,73],[2,"Kate",15,87]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"students":[]}]},
+    {"name":"Test 2","input":[{"students":[[1,"Ava",6,73]]}]},
+    {"name":"Test 3","input":[{"students":[[1,"Kate",15,87.9]]}]},
+    {"name":"Test 4","input":[{"students":[[1,"Liam",9,59.5],[2,"Noah",11,60.5],[3,"Emma",12,61.49]]}]},
+    {"name":"Test 5","input":[{"students":[[1,"Mia",7,0],[2,"Owen",8,0.99],[3,"Zara",10,100]]}]},
+    {"name":"Test 6","input":[{"students":[[4,"Ava",6,99.99],[5,"Ava",6,99.01],[6,"Ava",6,99]]}]},
+    {"name":"Test 7","input":[{"students":[[10,"Kate",15,87],[20,"Liam",14,45],[30,"Noah",13,66],[40,"Emma",12,91]]}]},
+    {"name":"Test 8","input":[{"students":[[1,"Owen",18,49.999],[2,"Zara",17,50.001],[3,"Mia",16,77.75],[4,"Kate",15,12.3]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\npandas fixes the column type with `students.astype({'grade': int})`, which keeps the whole-number part of each float and throws the fraction away. In SQL the conversion is an expression in the `SELECT` list: `TRUNCATE(grade, 0)` drops the digits after the decimal point, and `CAST(... AS SIGNED)` turns the result into an integer type. Aliasing it back to `grade` keeps the table's shape.\n\n## Approach\n\n1. `SELECT student_id`, `name` and `age` unchanged, in the original order.\n2. Replace the grade with `CAST(TRUNCATE(grade, 0) AS SIGNED)` and name it `grade` again.\n3. Read every row `FROM students`; nothing is filtered or grouped.\n\n## Example 1, step by step\n\n- Ava (id 1, age 6): grade `73.0` has no fraction, so `TRUNCATE` gives 73 and the cast stores it as the integer 73.\n- Kate (id 2, age 15): `87.0` becomes 87 the same way.\n\nBoth rows keep their other values, matching the expected output. A grade like `87.9` would also become 87.\n\n## Complexity\n\n- Time: O(n) for n rows; one conversion per row.\n- Space: O(n) for the output.\n\n## Pitfalls\n\n- `ROUND(grade)` turns 87.9 into 88; the conversion must drop the fraction, not round it.\n- In MySQL, `CAST(grade AS SIGNED)` on a floating-point value rounds to the nearest integer, so truncate first and then cast.\n- Without `AS grade` the column is named after the expression and the header no longer matches.\n- `FLOOR` matches truncation only because grades are never negative; for negative values the two differ.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `students` | the input table, every row kept |\n| `TRUNCATE(grade, 0)` | the grade with its fractional part removed |\n| `CAST(... AS SIGNED)` | turns that whole number into an integer value |\n| `AS grade` | keeps the original column name |",
+  "narration": {
+    "1": "Each output row is one input row; only the grade column changes.",
+    "2": "Copy the student id unchanged.",
+    "5": "Drop the fractional part of the grade, then cast it to an integer, keeping the name grade.",
+    "6": "Read every student with no filter."
+  }
+}

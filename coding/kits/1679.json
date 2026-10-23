@@ -1,0 +1,60 @@
+{
+  "number": 1679,
+  "title": "Max Number of K-Sum Pairs",
+  "spec": "leetcode",
+  "statement": "You are given an integer array `nums` and an integer `k`. A single operation takes two elements of `nums` (at different positions) whose values add up to exactly `k` and deletes both of them from the array.\n\nReturn the largest number of operations that can be carried out one after another.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "1 <= nums[i] <= 10^9",
+    "1 <= k <= 10^9"
+  ],
+  "signature": "int maxOperations(int[] nums, int k)",
+  "entry": "maxOperations",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1000000000)) return 'Each value is a whole number between 1 and 10^9.';\n  if (!Number.isInteger(k) || k < 1 || k > 1000000000) return 'k is a whole number between 1 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxOperations(nums, k) {\n  const waiting = new Map();\n  let operations = 0;\n\n  for (const num of nums) {\n    const partner = k - num;\n    const count = waiting.get(partner) || 0;\n    if (count > 0) {\n      waiting.set(partner, count - 1);\n      operations++;\n    } else {\n      waiting.set(num, (waiting.get(num) || 0) + 1);\n    }\n  }\n  return operations;\n}",
+  "brute": "function maxOperations(nums, k) {\n  // Sort, then match the smallest and largest remaining values from both ends.\n  const sorted = [...nums].sort((x, y) => x - y);\n  let lo = 0;\n  let hi = sorted.length - 1;\n  let pairs = 0;\n  while (lo < hi) {\n    const total = sorted[lo] + sorted[hi];\n    if (total === k) { pairs++; lo++; hi--; }\n    else if (total < k) lo++;\n    else hi--;\n  }\n  return pairs;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const roll = rand();\n  if (size === 'large') {\n    const n = int(1500, 2000);\n    if (roll < 0.5) {\n      const k = int(2, 300);\n      return [Array.from({ length: n }, () => int(1, 300)), k];\n    }\n    // Large values: plant many complementary pairs among random noise.\n    const k = int(2, 1000000000);\n    const nums = [];\n    while (nums.length < n) {\n      if (rand() < 0.6 && k > 1 && nums.length + 2 <= n) {\n        const x = int(1, Math.min(k - 1, 1000000000));\n        nums.push(x, k - x);\n      } else {\n        nums.push(int(1, 1000000000));\n      }\n    }\n    for (let i = nums.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [nums[i], nums[j]] = [nums[j], nums[i]];\n    }\n    return [nums, k];\n  }\n  const n = int(1, 10);\n  if (roll < 0.75) {\n    const k = int(1, 12);\n    return [Array.from({ length: n }, () => int(1, 8)), k];\n  }\n  // Huge values drawn from a few complementary pairs, plus the odd stray value.\n  const k = int(2, 1000000000);\n  const pool = [];\n  for (let i = 0; i < 2; i++) {\n    const x = int(1, k - 1);\n    pool.push(x, k - x);\n  }\n  return [Array.from({ length: n }, () => (rand() < 0.15 ? int(1, 1000000000) : pool[int(0, 3)])), k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4],5],"expected":2},
+    {"name":"Example 2","input":[[3,1,3,4,3],6],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],10]},
+    {"name":"Test 2","input":[[5,5],10]},
+    {"name":"Test 3","input":[[1,1,1,1,1],2]},
+    {"name":"Test 4","input":[[1,2,3,4,5,6],100]},
+    {"name":"Test 5","input":[[1000000000,1000000000],1000000000]},
+    {"name":"Test 6","input":[[500000000,500000000,500000000],1000000000]},
+    {"name":"Test 7","input":[[2,2,2,3,1,1,4,1],4]},
+    {"name":"Test 8","input":[[1,2],1]},
+    {"name":"Test 9","input":[[3,3,3,3,3,3],6]},
+    {"name":"Test 10","input":[[1,4,2,3,1,4,2,3,5],5]},
+    {"name":"Test 11","input":[[7,1,6,2,5,3,4,4,4],8]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly values matter: a value `v` can only ever pair with `k - v`, so pairs for different values never compete. Trying every pair repeatedly would be O(n²). Instead, walk through `nums` once and keep a hash map of values that are still unmatched. When a new number arrives and its partner `k - num` is waiting, pair them immediately; there is never a reason to hold back, because any other copy of `num` would need that same partner value.\n\n## Approach\n\n1. `waiting` maps a value to how many unmatched copies of it have been seen. `operations` starts at `0`.\n2. For each `num`, compute `partner = k - num` and look up its waiting `count`.\n3. If a partner is waiting, use one copy of it and count an operation.\n4. Otherwise store `num` as waiting.\n5. Return `operations`.\n\n## Example 1, step by step\n\n`nums = [1,2,3,4]`, `k = 5`.\n\n- `1`: partner `4` is not waiting, so `waiting = {1: 1}`.\n- `2`: partner `3` is not waiting, so `waiting = {1: 1, 2: 1}`.\n- `3`: partner `2` is waiting; use it, `operations = 1`.\n- `4`: partner `1` is waiting; use it, `operations = 2`.\n\nThe answer is `2`.\n\n## Complexity\n\n- Time: O(n): one pass with constant-time map operations.\n- Space: O(n) for the map of unmatched values.\n\n## Pitfalls\n\n- When `num = k / 2`, it must pair with a **different** copy of itself; checking the map before adding `num` makes that automatic.\n- Decrease the partner's count when it is used, or the same element gets paired twice.\n- Values are at least `1`, so `partner` can be zero or negative; the lookup simply finds nothing.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `waiting` | value -> number of unmatched copies seen so far |\n| `operations` | pairs removed so far |\n| `num` | current element |\n| `partner` | the value that would complete a pair with `num` |\n| `count` | unmatched copies of `partner` |",
+  "narration": {
+    "2": "waiting counts the copies of each value that have not been paired yet.",
+    "5": "Look at the numbers one at a time, left to right.",
+    "6": "Only this value can complete a pair with num.",
+    "7": "How many unmatched copies of the partner are available right now.",
+    "8": "A partner is waiting, so pairing now can never hurt the final count.",
+    "9": "Use up one copy of the partner.",
+    "10": "Count the operation that removes both numbers.",
+    "12": "No partner yet: num waits for a future partner.",
+    "15": "Return the number of pairs removed."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "number": 2882,
+  "title": "Drop Duplicate Rows",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `customers`; here the DataFrame is a table and you answer with one MySQL query.\n\n- `customers(customer_id, name, email)`: one row per customer record. `customer_id` is unique and the rows are listed in increasing `customer_id` order. `email` is never null and is written in lowercase; several rows can share the same email.\n\nTwo rows with the same `email` are duplicates. For each email keep only its first row, which is the one with the smallest `customer_id`, and drop every later row with that email. Return the kept rows with the columns `customer_id`, `name` and `email`, each row's values unchanged. Rows may come in any order.",
+  "constraints": [
+    "customer_id is unique and increases from one row to the next",
+    "email is never null and is lowercase",
+    "Rows that share an email are duplicates; only the one with the smallest customer_id is kept"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "customers": [["customer_id","INT"],["name","VARCHAR"],["email","VARCHAR"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ customers = [] }] = input;\n  let last = -Infinity;\n  for (const [id, name, email] of customers) {\n    if (id === null) return 'Every row needs a customer_id.';\n    if (id <= last) return 'customer_id must increase from row to row.';\n    last = id;\n    if (name === null) return 'Every customer needs a name.';\n    if (email === null) return 'email cannot be null.';\n    if (email !== email.toLowerCase()) return 'email must be lowercase.';\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT\n    customer_id,\n    name,\n    email,\n    ROW_NUMBER() OVER (PARTITION BY email ORDER BY customer_id) AS occurrence\n  FROM customers\n)\nSELECT customer_id, name, email\nFROM ranked\nWHERE occurrence = 1;",
+  "brute": "SELECT c.customer_id, c.name, c.email\nFROM customers AS c\nWHERE c.customer_id IN (\n  SELECT MIN(f.customer_id)\n  FROM customers AS f\n  GROUP BY f.email\n)",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Ella', 'David', 'Zachary', 'Alice', 'Finn', 'Violet', 'Amy', 'Zoe'];\n  const emails = ['emily@example.com', 'michael@example.com', 'sarah@example.com', 'john@example.com', 'alice@example.com'];\n  const rows = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const customers = [];\n  let id = 0;\n  for (let i = 0; i < rows; i++) {\n    id += 1 + Math.floor(rand() * 3);\n    const email = size === 'small' ? pick(emails) : `user${Math.floor(rand() * 800)}@example.com`;\n    customers.push([id, pick(names), email]);\n  }\n  return [{ customers }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"customers":[[1,"Ella","emily@example.com"],[2,"David","michael@example.com"],[3,"Zachary","sarah@example.com"],[4,"Alice","john@example.com"],[5,"Finn","john@example.com"],[6,"Violet","alice@example.com"]]}],"expected":{"columns":["customer_id","name","email"],"rows":[[1,"Ella","emily@example.com"],[2,"David","michael@example.com"],[3,"Zachary","sarah@example.com"],[4,"Alice","john@example.com"],[6,"Violet","alice@example.com"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"customers":[]}]},
+    {"name":"Test 2","input":[{"customers":[[7,"Ella","emily@example.com"]]}]},
+    {"name":"Test 3","input":[{"customers":[[1,"Ella","emily@example.com"],[2,"David","michael@example.com"],[3,"Zachary","sarah@example.com"]]}]},
+    {"name":"Test 4","input":[{"customers":[[1,"Zoe","john@example.com"],[2,"Amy","john@example.com"]]}]},
+    {"name":"Test 5","input":[{"customers":[[3,"Finn","alice@example.com"],[4,"Finn","alice@example.com"],[9,"Finn","alice@example.com"]]}]},
+    {"name":"Test 6","input":[{"customers":[[1,"Violet","sarah@example.com"],[2,"David","john@example.com"],[5,"Alice","sarah@example.com"],[6,"Ella","john@example.com"],[8,"Amy","sarah@example.com"]]}]},
+    {"name":"Test 7","input":[{"customers":[[1,"Alice","alice@example.com"],[2,"Alice","emily@example.com"],[3,"Alice","john@example.com"]]}]},
+    {"name":"Test 8","input":[{"customers":[[10,"Zachary","michael@example.com"],[20,"Ella","emily@example.com"],[30,"Amy","michael@example.com"],[40,"Zoe","emily@example.com"],[50,"Finn","sarah@example.com"]]}]},
+    {"name":"Test 9","input":[{"customers":[[1,"Ella","emily@example.com"],[2,"David","michael@example.com"],[3,"Zachary","sarah@example.com"],[4,"Alice","john@example.com"],[5,"Finn","john@example.com"],[6,"Violet","alice@example.com"],[7,"Amy","emily@example.com"],[8,"Zoe","alice@example.com"]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\npandas removes repeats with `customers.drop_duplicates(subset='email', keep='first')`: rows are compared on `email` only, and the earliest row of each group survives. SQL tables have no built-in row position, but here the rows are listed by increasing `customer_id`, so \"earliest\" means \"smallest `customer_id`\". Numbering the rows inside each email group by `customer_id` with `ROW_NUMBER()` marks the survivor as number 1.\n\n## Approach\n\n1. In the CTE `ranked`, copy every column and add `occurrence`: `ROW_NUMBER() OVER (PARTITION BY email ORDER BY customer_id)`. Each email group is numbered 1, 2, 3, ... from its smallest id upward.\n2. From `ranked`, keep only rows with `occurrence = 1`.\n3. Select `customer_id`, `name` and `email`, leaving the helper column out.\n\n## Example 1, step by step\n\n- `ranked` gives `occurrence = 1` to Ella (1), David (2), Zachary (3) and Violet (6): each is alone in its email group.\n- The `john@example.com` group holds Alice (4) and Finn (5); ordered by id, Alice gets 1 and Finn gets 2.\n- The filter drops Finn, leaving rows 1, 2, 3, 4 and 6, as in the expected output.\n\n## Complexity\n\n- Time: O(n log n) for n rows, to sort each email group by `customer_id`.\n- Space: O(n) for `ranked` and the result.\n\n## Pitfalls\n\n- `SELECT DISTINCT` compares whole rows; Alice and Finn differ in id and name, so both would stay.\n- `GROUP BY email` with `MIN(customer_id)` and `MIN(name)` mixes rows: the smallest name need not belong to the smallest id.\n- Ordering the window by `customer_id DESC` keeps the last occurrence instead of the first.\n- Partitioning by `name` instead of `email` removes the wrong rows; only the email decides what is a duplicate.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every customer row plus its position within its email group |\n| `occurrence` | 1 for the smallest `customer_id` of an email, 2 for the next, ... |\n| `occurrence = 1` | keeps the first row of each email and drops the rest |",
+  "narration": {
+    "1": "The CTE ranked numbers the rows inside each email group before any are dropped.",
+    "6": "ROW_NUMBER restarts for each email and counts up by customer_id, so the first occurrence gets 1.",
+    "7": "Every customer row is read; nothing is filtered yet.",
+    "9": "Return the three original columns and leave the helper column occurrence out.",
+    "11": "Keep only the first row of each email; later duplicates have occurrence 2 or more."
+  }
+}

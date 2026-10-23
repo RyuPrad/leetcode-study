@@ -1,0 +1,66 @@
+{
+  "number": 1634,
+  "title": "Add Two Polynomials Represented as Linked Lists",
+  "spec": "recalled",
+  "statement": "A polynomial is stored as a singly linked list of `PolyNode` terms. Each node has an integer `coefficient`, a non-negative integer `power` (the term is `coefficient * x^power`) and `next`, the following term or `null`. Every list is in standard form: powers strictly decrease from head to tail and no term has coefficient `0`. The zero polynomial is the empty list, `null`.\n\nGiven the heads `poly1` and `poly2` of two such lists, return the head of a list in standard form for their sum (`null` when everything cancels). You may reuse the given nodes or make new ones with `new PolyNode(coefficient, power)`; an optional third argument sets `next`.\n\nEach case is written as `[poly1, poly2]`, each polynomial listed as `[coefficient, power]` pairs from head to tail (`[]` for an empty list), and the answer is shown the same way. (The TypeScript starter types nodes as `_Node` because the signature format has no `PolyNode` type; the objects are `PolyNode`s.)",
+  "constraints": [
+    "Each list has between 0 and 10^4 nodes",
+    "-10^9 <= PolyNode.coefficient <= 10^9",
+    "PolyNode.coefficient != 0",
+    "0 <= PolyNode.power <= 10^9",
+    "PolyNode.power > PolyNode.next.power"
+  ],
+  "signature": "Node addPoly(Node poly1, Node poly2)",
+  "entry": "addPoly",
+  "kind": "function",
+  "parameters": [
+    "poly1",
+    "poly2"
+  ],
+  "validator": "function validate([poly1, poly2]) {\n  for (const poly of [poly1, poly2]) {\n    if (!Array.isArray(poly) || poly.length > 10000) return 'Each polynomial lists at most 10^4 terms.';\n    for (let i = 0; i < poly.length; i++) {\n      const term = poly[i];\n      if (!Array.isArray(term) || term.length !== 2 || !Number.isInteger(term[0]) || !Number.isInteger(term[1])) return 'Each term is a [coefficient, power] pair of whole numbers.';\n      if (term[0] === 0 || term[0] < -1000000000 || term[0] > 1000000000) return 'Coefficients are non-zero and between -10^9 and 10^9.';\n      if (term[1] < 0 || term[1] > 1000000000) return 'Powers are between 0 and 10^9.';\n      if (i > 0 && poly[i - 1][1] <= term[1]) return 'Powers must strictly decrease along each list.';\n    }\n  }\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  // LeetCode provides PolyNode; this is the same class.\n  class PolyNode {\n    constructor(x = 0, y = 0, next = null) {\n      this.coefficient = x;\n      this.power = y;\n      this.next = next;\n    }\n  }\n  globalThis.PolyNode = PolyNode;\n  const build = terms => {\n    let head = null;\n    for (let i = terms.length - 1; i >= 0; i--) head = new PolyNode(terms[i][0], terms[i][1], head);\n    return head;\n  };\n  const [poly1, poly2] = input;\n  const result = solve(build(poly1), build(poly2));\n  if (result === undefined) throw new Error('The solution did not return a value; return the head of the sum, or null.');\n  const out = [];\n  const limit = poly1.length + poly2.length;\n  for (let node = result; node !== null; node = node.next) {\n    if (typeof node !== 'object') throw new Error('Return PolyNode objects linked through next, ending in null.');\n    if (out.length >= limit) throw new Error('The returned list is longer than the two inputs together, or it loops.');\n    out.push([node.coefficient, node.power]);\n  }\n  return out;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function addPoly(poly1, poly2) {\n  const dummy = new PolyNode();\n  let tail = dummy;\n  let first = poly1;\n  let second = poly2;\n\n  while (first !== null && second !== null) {\n    if (first.power > second.power) {\n      tail.next = first;\n      tail = first;\n      first = first.next;\n    } else if (first.power < second.power) {\n      tail.next = second;\n      tail = second;\n      second = second.next;\n    } else {\n      const sum = first.coefficient + second.coefficient;\n      if (sum !== 0) {\n        tail.next = new PolyNode(sum, first.power);\n        tail = tail.next;\n      }\n      first = first.next;\n      second = second.next;\n    }\n  }\n  tail.next = first !== null ? first : second;\n  return dummy.next;\n}",
+  "brute": "function addPoly(poly1, poly2) {\n  // Collect every term into a power -> coefficient table, then rebuild the list from the highest power.\n  const totals = new Map();\n  for (let node of [poly1, poly2]) {\n    for (; node !== null; node = node.next) totals.set(node.power, (totals.get(node.power) || 0) + node.coefficient);\n  }\n  const powers = [...totals.keys()].filter(p => totals.get(p) !== 0).sort((a, b) => a - b);\n  let head = null;\n  for (const p of powers) head = new PolyNode(totals.get(p), p, head);\n  return head;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const large = size === 'large';\n  const coefMax = rand() < 0.3 ? 1000000000 : large ? 1000 : 3;\n  const coef = () => (rand() < 0.5 ? -1 : 1) * int(1, coefMax);\n  const top = large ? (rand() < 0.4 ? 1000000000 : 3000) : int(0, 6);\n  const count = () => large ? int(1000, 2000) : int(0, 4);\n  const pickPowers = n => {\n    const chosen = new Set();\n    for (let tries = 0; chosen.size < n && tries < 10 * n + 10; tries++) chosen.add(int(0, top));\n    return [...chosen];\n  };\n  const byPower = (a, b) => b[1] - a[1];\n  const poly1 = pickPowers(count()).map(p => [coef(), p]).sort(byPower);\n  if (rand() < 0.1) return [poly1, poly1.map(([c, p]) => [-c, p])];\n  // poly2 shares some of poly1's powers (sometimes cancelling them exactly) and adds its own.\n  const terms = new Map();\n  for (const [c, p] of poly1) if (rand() < 0.5) terms.set(p, rand() < 0.4 ? -c : coef());\n  for (const p of pickPowers(count())) if (!terms.has(p)) terms.set(p, coef());\n  const poly2 = [...terms].map(([p, c]) => [c, p]).sort(byPower).slice(0, large ? 2000 : 10);\n  return rand() < 0.5 ? [poly1, poly2] : [poly2, poly1];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,1]],[[1,0]]],"expected":[[1,1],[1,0]]},
+    {"name":"Example 2","input":[[[2,2],[4,1],[3,0]],[[3,2],[-4,1],[-1,0]]],"expected":[[5,2],[2,0]]},
+    {"name":"Example 3","input":[[[1,2]],[[-1,2]]],"expected":[]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[],[]]},
+    {"name":"Test 2","input":[[],[[5,3]]]},
+    {"name":"Test 3","input":[[[2,1],[1,0]],[[-2,1],[-1,0]]]},
+    {"name":"Test 4","input":[[[1,5],[1,3],[1,1]],[[1,4],[1,2],[1,0]]]},
+    {"name":"Test 5","input":[[[1000000000,1000000000]],[[1000000000,1000000000]]]},
+    {"name":"Test 6","input":[[[-1000000000,0]],[[-1000000000,0]]]},
+    {"name":"Test 7","input":[[[3,4],[2,2]],[[-3,4],[5,3],[1,2],[-7,0]]]},
+    {"name":"Test 8","input":[[[1,9],[1,8],[1,7]],[[1,2]]]},
+    {"name":"Test 9","input":[[[4,0]],[[1,10],[-4,0]]]},
+    {"name":"Test 10","input":[[[5,6],[-3,4],[2,1]],[[5,6],[3,4],[-2,1]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nAdding polynomials means adding the coefficients of equal powers. Both lists are already sorted by power, highest first, so this is the merge step of merge sort: look at the two front terms, take the one with the higher power, and when the powers tie, combine them into one term. A simpler way is to total the coefficients per power in a hash map and rebuild a sorted list, but that needs a sort and extra memory; the merge does it in one pass.\n\n## Approach\n\n1. Make a `dummy` node so the result always has a node to append after; `tail` is its last node.\n2. Walk `first` along `poly1` and `second` along `poly2` while both have terms.\n3. If one front term has the higher power, link that node after `tail` and advance that list.\n4. If the powers are equal, compute `sum`; append a new node only when `sum` is not 0, then advance both lists.\n5. One list may still have terms, all with lower powers: link the rest of it after `tail`.\n6. Return `dummy.next`, which is `null` when nothing survived.\n\n## Example 1, step by step\n\n`poly1` is `x` (`[1, 1]`) and `poly2` is `1` (`[1, 0]`). The front powers are 1 and 0, so `first` is linked after `dummy` and moves to `null`, which ends the loop. The leftover `second` is linked after it, giving `[[1, 1], [1, 0]]`, that is `x + 1`.\n\n## Complexity\n\n- Time: O(m + n): each step moves past at least one node.\n- Space: O(1) besides the result, since existing nodes are reused and only combined terms are new.\n\n## Pitfalls\n\n- Equal powers whose coefficients cancel must produce no node at all; a `[0, p]` term breaks standard form.\n- On equal powers advance both lists, or the same term is counted twice.\n- Lists run from high power to low, so the larger power goes first, the opposite of merging ascending lists.\n- Do not forget the leftover terms of the list that did not run out.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dummy` | placeholder before the result's first node |\n| `tail` | last node of the result so far |\n| `first`, `second` | current terms of `poly1` and `poly2` |\n| `sum` | combined coefficient of two terms with equal powers |",
+  "narration": {
+    "2": "A placeholder node in front of the result, so appending never needs a special case for the first term.",
+    "3": "tail always points at the last node of the result built so far.",
+    "7": "Merge while both polynomials still have terms.",
+    "8": "The front of poly1 has the higher power, so it comes next in the sum.",
+    "9": "Link that node after the result's tail.",
+    "11": "Move on to poly1's next term.",
+    "12": "The front of poly2 has the higher power, so it comes next.",
+    "15": "Move on to poly2's next term.",
+    "17": "Equal powers: their coefficients add up.",
+    "18": "Only a non-zero total becomes a term; cancelled terms disappear.",
+    "19": "Append a new node holding the combined term.",
+    "22": "Both terms are used up, so advance both lists.",
+    "26": "Whatever remains in the unfinished list has lower powers; attach it as is.",
+    "27": "Skip the placeholder; this is null when every term cancelled."
+  }
+}

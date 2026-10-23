@@ -1,0 +1,47 @@
+{
+  "number": 2880,
+  "title": "Select Data",
+  "spec": "leetcode",
+  "statement": "LeetCode poses this one in pandas, on a DataFrame named `students`; here the DataFrame is a table and you answer with one MySQL query.\n\n- `students(student_id, name, age)`: one row per student; `student_id` is unique. Different students may share a name.\n\nLook up the student whose `student_id` is `101` and return only two columns, `name` and `age`, for that student. The id column itself is not part of the output. If no student has id 101, return no rows.",
+  "constraints": [
+    "student_id is unique in students and never null",
+    "There may be no student with student_id 101"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "students": [["student_id","INT"],["name","VARCHAR"],["age","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ students = [] }] = input;\n  const ids = new Set();\n  for (const [id] of students) {\n    if (id === null) return 'Every student needs a student_id.';\n    if (ids.has(id)) return `student_id ${id} appears twice in students.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  name, age\nFROM students\nWHERE student_id = 101;",
+  "brute": "SELECT s.name, s.age\nFROM students AS s\nJOIN (SELECT 101 AS wanted_id) AS target\n  ON s.student_id = target.wanted_id",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = ['Ulysses', 'William', 'Henry', 'Mia', 'Omar', 'Lena', 'Kai'];\n  const students = [];\n  if (size === 'small') {\n    // Ids near 101 (and 101 itself) so that off-by-one filters and wrong comparisons show up.\n    const ids = [101, 53, 128, 3, 100, 102, 1, 10, 110, 1010, 11];\n    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n    const count = Math.floor(rand() * 9);\n    for (let i = 0; i < count; i++) students.push([ids[i], pick(names), 5 + Math.floor(rand() * 15)]);\n  } else {\n    // 2,000 distinct ids in scrambled order; id 101 is present about half the time.\n    const offset = Math.floor(rand() * 4001);\n    for (let i = 0; i < 2000; i++) students.push([1 + (i * 1601 + offset) % 4001, pick(names), 5 + Math.floor(rand() * 15)]);\n  }\n  return [{ students }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"students":[[101,"Ulysses",13],[53,"William",10],[128,"Henry",6],[3,"Henry",11]]}],"expected":{"columns":["name","age"],"rows":[["Ulysses",13]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"students":[]}]},
+    {"name":"Test 2","input":[{"students":[[101,"Mia",9]]}]},
+    {"name":"Test 3","input":[{"students":[[53,"William",10],[128,"Henry",6]]}]},
+    {"name":"Test 4","input":[{"students":[[100,"Omar",12],[102,"Lena",14],[1010,"Kai",7],[11,"Mia",8]]}]},
+    {"name":"Test 5","input":[{"students":[[3,"Henry",11],[101,"Henry",15],[128,"Henry",6]]}]},
+    {"name":"Test 6","input":[{"students":[[1,"Ulysses",13],[101,"Kai",13],[102,"Ulysses",13]]}]},
+    {"name":"Test 7","input":[{"students":[[128,"Henry",6],[110,"Omar",17],[102,"Lena",5],[101,"William",19],[100,"Mia",10]]}]},
+    {"name":"Test 8","input":[{"students":[[7,"Ulysses",13],[8,"William",10]]}]},
+    {"name":"Test 9","generate":{"seed":9,"size":"large"}},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe task combines the two basic ways of cutting a table down: keep only some **rows** (the student with id 101) and only some **columns** (`name` and `age`). In pandas that is `students.loc[students['student_id'] == 101, ['name', 'age']]`; in SQL the row filter is `WHERE` and the column choice is the `SELECT` list.\n\n## Approach\n\n1. `SELECT name, age` lists exactly the two output columns, leaving `student_id` out.\n2. `FROM students` reads the table.\n3. `WHERE student_id = 101` keeps the single matching row; since ids are unique there is at most one, and none when 101 is absent.\n\n## Example 1, step by step\n\n- The four rows have ids 101, 53, 128 and 3.\n- Only the first passes `student_id = 101`: Ulysses, age 13.\n- The two Henrys and William are filtered out, and projecting to `name`, `age` gives the one-row result `Ulysses | 13`.\n\n## Complexity\n\n- Time: O(n) for a scan of n students, or O(log n) with an index on `student_id` (a primary key has one).\n- Space: O(1); at most one row is returned.\n\n## Pitfalls\n\n- `SELECT *` also returns `student_id`, so the column set is wrong.\n- Filtering by name (`name = 'Ulysses'`) only works by accident in the example; names repeat and are not the key.\n- A range such as `student_id >= 101` or taking the first row with `LIMIT 1` returns the wrong student when other ids are present.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `students` | the input table, one row per student |\n| `SELECT name, age` | column filter: the two requested columns |\n| `WHERE student_id = 101` | row filter: the one student asked for |",
+  "narration": {
+    "1": "The query only projects and filters; no joins or grouping are needed.",
+    "2": "Choose only the two requested columns; student_id is used for filtering but not returned.",
+    "3": "Read every student from the students table.",
+    "4": "Keep only the row whose id is 101; ids are unique, so at most one row survives."
+  }
+}

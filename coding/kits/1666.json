@@ -1,0 +1,62 @@
+{
+  "number": 1666,
+  "title": "Change the Root of a Binary Tree",
+  "spec": "recalled",
+  "statement": "Every node of a binary tree holds a unique integer `val` and three links: `left`, `right` and `parent` (the root's `parent` is `null`). You are given the `root` and a node `leaf` that has no children. Rebuild the tree so that `leaf` becomes its root. Visit the nodes on the path from `leaf` upward, one by one, stopping before the old root, and for each visited node `cur`:\n\n1. if `cur` has a left child, that child is moved over to be `cur`'s right child;\n2. the node that was `cur`'s parent is attached as `cur`'s new left child, and that former parent drops its own link to `cur` (so it is left with at most one child).\n\nBecause each node drops its link to the path node below it before it is visited, step 1 only ever moves a child that is off the path. The old root keeps its other child on the same side. Return the new root. All `parent` links must describe the rebuilt tree (the new root's `parent` is `null`); an answer with a wrong `parent` link is wrong.\n\nEach case is written as `[root, leaf]`: the tree as a level-order array with `null` for missing children, then the value of the leaf node. Your function is called as `flipBinaryTree(root, leaf)` with the two node objects, and the tree you return is shown as a level-order array.",
+  "constraints": [
+    "The tree has 2 to 100 nodes.",
+    "-10^9 <= Node.val <= 10^9",
+    "All Node.val are unique.",
+    "leaf is a node of the tree with no children."
+  ],
+  "signature": "Node flipBinaryTree(Node root, Node leaf)",
+  "entry": "flipBinaryTree",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "leaf"
+  ],
+  "validator": "function validate([root, leaf]) {\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'root must be a non-empty level-order array.';\n  const values = root.filter(v => v !== null);\n  if (values.length < 2 || values.length > 100) return 'The tree has 2 to 100 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < -1000000000 || v > 1000000000)) return 'Node values are integers between -10^9 and 10^9.';\n  if (new Set(values).size !== values.length) return 'Node values must be unique.';\n  // Replay the level-order layout to count each node's children.\n  const children = new Map();\n  const queue = [root[0]];\n  let next = 1;\n  for (let head = 0; head < queue.length && next < root.length; head++) {\n    let count = 0;\n    for (let side = 0; side < 2 && next < root.length; side++, next++) {\n      if (root[next] !== null) { queue.push(root[next]); count++; }\n    }\n    children.set(queue[head], count);\n  }\n  if (next < root.length) return 'root has values after the last node.';\n  if (!Number.isInteger(leaf) || !values.includes(leaf)) return 'leaf must be the value of a node in the tree.';\n  if ((children.get(leaf) ?? 0) > 0) return 'leaf must be a node with no children.';\n  return null;\n}",
+  "adapter": "function adapt(input, solve, kit) {\n  const [root, leaf] = input;\n  class Node {\n    constructor(val) { this.val = val; this.left = null; this.right = null; this.parent = null; }\n  }\n  // Build the tree level by level, linking every child back to its parent.\n  const nodes = [new Node(root[0])];\n  let next = 1;\n  for (let head = 0; head < nodes.length && next < root.length; head++) {\n    for (const side of ['left', 'right']) {\n      if (next < root.length && root[next] !== null) {\n        const child = new Node(root[next]);\n        child.parent = nodes[head];\n        nodes[head][side] = child;\n        nodes.push(child);\n      }\n      next++;\n    }\n  }\n  const result = solve(nodes[0], nodes.find(node => node.val === leaf));\n  if (result === undefined) throw new Error('The solution did not return a value.');\n  if (result === null) return [];\n  if (result.parent !== null && result.parent !== undefined) return 'The new root must have parent null.';\n  // Write the returned tree in level order, checking that every child points back to its parent.\n  const values = [];\n  const seen = new Set();\n  const queue = [result];\n  for (let k = 0; k < queue.length; k++) {\n    const node = queue[k];\n    if (node === null) { values.push(null); continue; }\n    if (seen.has(node)) throw new Error('The returned structure is not a tree: a node is reached twice.');\n    seen.add(node);\n    values.push(node.val);\n    for (const child of [node.left ?? null, node.right ?? null]) {\n      if (child !== null && child.parent !== node) return `Node ${child.val} has a wrong parent link.`;\n      queue.push(child);\n    }\n  }\n  while (values.length && values[values.length - 1] === null) values.pop();\n  return values;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function flipBinaryTree(root, leaf) {\n  function reroot(node, newParent) {\n    const oldParent = node.parent;\n    node.parent = newParent;\n    if (node === root) {\n      return node;\n    }\n    if (oldParent.left === node) {\n      oldParent.left = null;\n    } else {\n      oldParent.right = null;\n    }\n    if (node.left !== null) {\n      node.right = node.left;\n    }\n    node.left = reroot(oldParent, node);\n    return node;\n  }\n\n  return reroot(leaf, null);\n}",
+  "brute": "function flipBinaryTree(root, leaf) {\n  // List the path leaf -> root first, and each path node's off-path child, before changing anything.\n  const path = [];\n  for (let node = leaf; node !== null; node = node.parent) path.push(node);\n  const last = path.length - 1;\n  const offPath = path.map((node, i) => i === 0 ? null : node.left === path[i - 1] ? node.right : node.left);\n  const rootLeftOnPath = root.left === path[last - 1];\n  for (let i = 0; i <= last; i++) {\n    const node = path[i];\n    node.parent = i === 0 ? null : path[i - 1];\n    if (i === last) {\n      if (rootLeftOnPath) node.left = null; else node.right = null;\n    } else {\n      node.left = path[i + 1];\n      node.right = offPath[i];\n    }\n  }\n  return leaf;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 90 + pick(11) : 2 + pick(9);\n  const deep = rand() < 0.4;\n  const span = size === 'large' || rand() < 0.3 ? 1000000000 : 30;\n  const used = new Set();\n  const fresh = () => { for (;;) { const v = pick(2 * span + 1) - span; if (!used.has(v)) { used.add(v); return v; } } };\n  const nodes = [{ val: fresh(), left: null, right: null }];\n  while (nodes.length < n) {\n    // Deep trees keep growing from the newest nodes; bushy trees attach anywhere.\n    const parent = deep ? nodes[Math.max(0, nodes.length - 1 - pick(2))] : nodes[pick(nodes.length)];\n    const side = rand() < 0.5 ? 'left' : 'right';\n    if (parent[side]) continue;\n    parent[side] = { val: fresh(), left: null, right: null };\n    nodes.push(parent[side]);\n  }\n  const root = [];\n  const queue = [nodes[0]];\n  for (let k = 0; k < queue.length; k++) {\n    root.push(queue[k] ? queue[k].val : null);\n    if (queue[k]) queue.push(queue[k].left, queue[k].right);\n  }\n  while (root[root.length - 1] === null) root.pop();\n  const leaves = nodes.filter(node => !node.left && !node.right);\n  return [root, leaves[pick(leaves.length)].val];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,1,6,2,0,8,null,null,7,4],7],"expected":[7,2,null,5,4,3,6,null,null,null,1,null,null,0,8]},
+    {"name":"Example 2","input":[[3,5,1,6,2,0,8,null,null,7,4],0],"expected":[0,1,null,3,8,5,null,null,null,6,2,null,null,7,4]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2],2]},
+    {"name":"Test 2","input":[[1,null,2],2]},
+    {"name":"Test 3","input":[[1,2,3],3]},
+    {"name":"Test 4","input":[[1,2,null,3,null,4,null,5],5]},
+    {"name":"Test 5","input":[[1,null,2,3,null,null,4,5],5]},
+    {"name":"Test 6","input":[[1,2,3,4,5,6,7],4]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7],7]},
+    {"name":"Test 8","input":[[-1000000000,1000000000,0,null,5,-7],5]},
+    {"name":"Test 9","input":[[10,20,30,40,50,null,null,null,null,60,70],70]},
+    {"name":"Test 10","input":[[10,20,30,40,50,null,null,null,null,60,70],60]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly the nodes on the path from `leaf` up to `root` change; every other subtree hangs off the same node as before. Each path node turns its old parent into its new left child, so the path flips into a chain going down-left from `leaf`. A node can hold just two children, so whatever off-path child it still has must sit on the right. Recursion handles this naturally: rewire one node, then ask its old parent to do the same, with this node as that parent's new parent.\n\n## Approach\n\n1. Call `reroot(leaf, null)`: `reroot(node, newParent)` rewires `node` and returns it.\n2. Save `oldParent = node.parent`, then set `node.parent = newParent`.\n3. If `node` is the old `root`, stop: it keeps its other child where it was.\n4. Otherwise cut `oldParent`'s link to `node` (left or right).\n5. The link from `node` to the path node below was already cut one call earlier, so a remaining left child is off the path: move it to the right.\n6. Set `node.left = reroot(oldParent, node)` and return `node`.\n\n## Example 1, step by step\n\nThe path is `7 -> 2 -> 5 -> 3`.\n- `reroot(7, null)`: 7's parent becomes `null`, 2 drops its left link, 7 has no left child, then 7's left becomes the result for 2.\n- `reroot(2, 7)`: 2's parent becomes 7, 5 drops its right link, 2's left is already `null` so 4 stays right, and 2's left becomes 5.\n- `reroot(5, 2)`: 5's parent becomes 2, 3 drops its left link, 5's left child 6 moves to the right, and 5's left becomes 3.\n- `reroot(3, 5)`: 3's parent becomes 5 and it is the old root, so it stops with 1 still on its right.\n\nLevel order: `[7,2,null,5,4,3,6,null,null,null,1,null,null,0,8]`.\n\n## Complexity\n\n- Time: O(h), where h is the height: only path nodes are touched.\n- Space: O(h) for the recursion.\n\n## Pitfalls\n\n- Forgetting `parent` links: every path node's parent changes, and the new root's must be `null`.\n- Moving the left child to the right before cutting the link below: then the path node itself would be moved.\n- The old root must not move its remaining child; it is not a visited node.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `node` | path node being rewired |\n| `newParent` | the path node below it, which becomes its parent (`null` for `leaf`) |\n| `oldParent` | its parent before the change, which becomes its left child |",
+  "narration": {
+    "2": "reroot rewires one path node and returns it, so its caller can hang it as a left child.",
+    "3": "Remember the old parent before the link is overwritten.",
+    "4": "The path node below becomes this node's parent; for the leaf that is null.",
+    "5": "The old root is the last node on the path and is not rewired further.",
+    "6": "It keeps its other child where it was; return it.",
+    "8": "Is this node its old parent's left child?",
+    "9": "Then the old parent drops its left link to it.",
+    "11": "Otherwise it was the right child, so drop that link instead.",
+    "13": "The link to the node below was cut one call earlier, so a left child here is off the path.",
+    "14": "Move that off-path child over to the right side.",
+    "16": "Rewire the old parent next, and hang it as this node's left child.",
+    "17": "Return this node to whoever called for it.",
+    "20": "Start at the leaf, which ends up with no parent."
+  }
+}

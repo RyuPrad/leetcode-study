@@ -1,0 +1,53 @@
+{
+  "number": 3050,
+  "title": "Pizza Toppings Cost Analysis",
+  "spec": "recalled",
+  "statement": "A pizzeria prices its toppings in one table:\n\n- `Toppings(topping_name, cost)`: one row per topping; `topping_name` is unique and `cost` is its price.\n\nEvery pizza carries exactly **three different** toppings. List every possible pizza, that is every set of three distinct toppings, once.\n\nReport the columns:\n\n- `pizza`: the three topping names in alphabetical order, joined by commas with no spaces (for example `Chicken,Pepperoni,Sausage`).\n- `total_cost`: the sum of the three costs, rounded to 2 decimal places.\n\nSort the rows by `total_cost` from highest to lowest, and rows with the same `total_cost` by `pizza` in ascending order. With fewer than three toppings the result is empty.",
+  "constraints": [
+    "topping_name is unique in Toppings",
+    "topping_name and cost are never null",
+    "cost is between 0.00 and 999.99",
+    "A pizza uses exactly three different toppings; the order of toppings inside a pizza does not make it a different pizza"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Toppings": [["topping_name","VARCHAR(100)"],["cost","DECIMAL(5, 2)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Toppings = [] }] = input;\n  const names = new Set();\n  for (const [name, cost] of Toppings) {\n    if (name === null || cost === null) return 'topping_name and cost are required.';\n    if (name.includes(',')) return 'A topping name cannot contain a comma.';\n    const key = name.toLowerCase();\n    if (names.has(key)) return `Topping ${name} appears twice.`;\n    names.add(key);\n    if (cost < 0 || cost > 999.99) return `The cost of ${name} must be between 0 and 999.99.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  CONCAT(t1.topping_name, ',', t2.topping_name, ',', t3.topping_name) AS pizza,\n  ROUND(t1.cost + t2.cost + t3.cost, 2) AS total_cost\nFROM Toppings AS t1\nJOIN Toppings AS t2\n  ON t2.topping_name > t1.topping_name\nJOIN Toppings AS t3\n  ON t3.topping_name > t2.topping_name\nORDER BY total_cost DESC, pizza;",
+  "brute": "WITH RECURSIVE build (pizza, last_name, picked, total) AS (\n  SELECT CAST(topping_name AS CHAR(400)), topping_name, 1, cost\n  FROM Toppings\n  UNION ALL\n  SELECT CONCAT(b.pizza, ',', t.topping_name), t.topping_name, b.picked + 1, b.total + t.cost\n  FROM build AS b\n  JOIN Toppings AS t ON t.topping_name > b.last_name\n  WHERE b.picked < 3\n)\nSELECT pizza, ROUND(total, 2) AS total_cost\nFROM build\nWHERE picked = 3\nORDER BY total_cost DESC, pizza",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  // Each word is capitalised, so alphabetical order is the same with or without case.\n  const pool = ['Anchovies', 'Artichokes', 'Bacon', 'Basil', 'Beef', 'Black Olives', 'Broccoli', 'Capers', 'Chicken', 'Corn',\n    'Eggplant', 'Extra Cheese', 'Feta', 'Garlic', 'Green Peppers', 'Ham', 'Jalapenos', 'Kale', 'Meatballs', 'Mushrooms',\n    'Olives', 'Onions', 'Oregano', 'Pepperoni', 'Pesto', 'Pineapple', 'Prosciutto', 'Red Onions', 'Ricotta', 'Salami',\n    'Sausage', 'Shrimp', 'Spinach', 'Sun Dried Tomatoes', 'Tomatoes', 'Tuna', 'Zucchini'];\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  // Small cases draw costs from a short list so equal totals (and the pizza tie-break) are common.\n  const cheap = [0, 0.25, 0.4, 0.5, 0.55, 0.7, 0.75, 1];\n  const count = size === 'small' ? pick(8) : 30;\n  const Toppings = pool.slice(0, count).map(name => [name, size === 'small' ? cheap[pick(cheap.length)] : (25 + pick(300)) / 100]);\n  return [{ Toppings }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Toppings":[["Pepperoni",0.5],["Sausage",0.7],["Chicken",0.55],["Extra Cheese",0.4]]}],"expected":{"columns":["pizza","total_cost"],"rows":[["Chicken,Pepperoni,Sausage",1.75],["Chicken,Extra Cheese,Sausage",1.65],["Extra Cheese,Pepperoni,Sausage",1.6],["Chicken,Extra Cheese,Pepperoni",1.45]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Toppings":[]}]},
+    {"name":"Test 2","input":[{"Toppings":[["Ham",1.2],["Basil",0.3]]}]},
+    {"name":"Test 3","input":[{"Toppings":[["Tomatoes",0.35],["Onions",0.2],["Garlic",0.15]]}]},
+    {"name":"Test 4","input":[{"Toppings":[["Olives",0.5],["Ham",0.5],["Bacon",0.5],["Corn",0.5]]}]},
+    {"name":"Test 5","input":[{"Toppings":[["Salami",1],["Feta",0.25],["Kale",0.75],["Capers",0.5],["Tuna",0]]}]},
+    {"name":"Test 6","input":[{"Toppings":[["Spinach",0],["Pesto",0],["Mushrooms",0]]}]},
+    {"name":"Test 7","input":[{"Toppings":[["Zucchini",0.1],["Shrimp",2.2],["Anchovies",0.4],["Red Onions",0.3],["Beef",1.85]]}]},
+    {"name":"Test 8","input":[{"Toppings":[["Black Olives",0.6],["Basil",0.2],["Bacon",0.9],["Broccoli",0.3],["Beef",1.1],["Corn",0.2]]}]},
+    {"name":"Test 9","input":[{"Toppings":[["Pineapple",0.45],["Prosciutto",2.05],["Pepperoni",0.5],["Ham",0.75],["Jalapenos",0.3],["Ricotta",0.95],["Oregano",0.05]]}]},
+    {"name":"Test 10","input":[{"Toppings":[["Sausage",999.99],["Chicken",999.99],["Meatballs",999.99],["Eggplant",0.01]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA pizza is a set of three toppings, so `Chicken, Sausage, Pepperoni` and `Pepperoni, Chicken, Sausage` are the same pizza. Joining the table to itself three times produces every ordered triple; requiring the names to be **strictly increasing** (`t1 < t2 < t3`) keeps exactly one ordering of each set: the alphabetical one. That one condition removes repeated toppings, removes duplicate permutations and already puts the names in the order the `pizza` string needs.\n\n## Approach\n\n1. `t1` reads every topping as the alphabetically first one.\n2. `JOIN ... t2 ON t2.topping_name > t1.topping_name` adds a later second topping.\n3. `JOIN ... t3 ON t3.topping_name > t2.topping_name` adds a later third topping.\n4. `CONCAT` glues the three names with commas into `pizza`; `ROUND(t1.cost + t2.cost + t3.cost, 2)` gives `total_cost`.\n5. `ORDER BY total_cost DESC, pizza` puts the most expensive pizzas first and breaks equal totals by name.\n\n## Example 1, step by step\n\nAlphabetically the toppings are Chicken (0.55), Extra Cheese (0.40), Pepperoni (0.50), Sausage (0.70). The increasing triples are:\n\n- Chicken, Extra Cheese, Pepperoni: 0.55 + 0.40 + 0.50 = 1.45\n- Chicken, Extra Cheese, Sausage: 1.65\n- Chicken, Pepperoni, Sausage: 1.75\n- Extra Cheese, Pepperoni, Sausage: 1.60\n\nThat is C(4, 3) = 4 pizzas. Sorted by cost from high to low: 1.75, 1.65, 1.60, 1.45.\n\n## Complexity\n\n- Time: O(T³) for T toppings in the worst case of the nested join; the output alone has C(T, 3) rows, plus sorting them.\n- Space: O(T³) for the result.\n\n## Pitfalls\n\n- `<>` instead of `>` keeps all six orderings of each set, so every pizza appears six times and most strings are not alphabetical.\n- Ordering only by `total_cost` leaves pizzas with equal totals in an arbitrary order; the `pizza` tie-break is required.\n- Sort by the rounded alias, not the raw sum: stored decimals added as floating point can differ in the last bits and split a real tie.\n- Writing `', '` with a space as the separator produces strings that do not match `Chicken,Pepperoni,Sausage`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `t1` | the alphabetically first topping of the pizza |\n| `t2` | a topping that sorts after `t1` |\n| `t3` | a topping that sorts after `t2` |\n| `pizza` | the three names joined by commas |\n| `total_cost` | the three costs added and rounded to 2 decimals |",
+  "narration": {
+    "2": "Join the three names in the order the join produced them, which is already alphabetical.",
+    "3": "Add up the three prices and round the total to two decimals.",
+    "4": "t1 is the first topping of the pizza, taken from every row of Toppings.",
+    "6": "The second topping must sort strictly after the first, which forbids repeats and reversed orders.",
+    "8": "The third topping must sort after the second, so each set of three appears exactly once.",
+    "9": "Most expensive pizzas first; equal totals fall back to the pizza string."
+  }
+}
