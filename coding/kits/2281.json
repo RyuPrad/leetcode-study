@@ -1,0 +1,61 @@
+{
+  "number": 2281,
+  "title": "Sum of Total Strength of Wizards",
+  "spec": "leetcode",
+  "statement": "The array `strength` lists the power of each wizard in a row, where `strength[i]` belongs to wizard `i`. Every non-empty contiguous subarray of `strength` is a group, and a group's total strength equals its **smallest** value multiplied by the **sum** of all its values.\n\nAdd up the total strength of every group (each pair of start and end positions counts once) and return that sum modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= strength.length <= 10^5",
+    "1 <= strength[i] <= 10^9"
+  ],
+  "signature": "int totalStrength(int[] strength)",
+  "entry": "totalStrength",
+  "kind": "function",
+  "parameters": [
+    "strength"
+  ],
+  "validator": "function validate([strength]) {\n  if (!Array.isArray(strength) || strength.length < 1 || strength.length > 100000) return 'strength needs 1 to 10^5 values.';\n  if (strength.some(v => !Number.isInteger(v) || v < 1 || v > 1000000000)) return 'Each strength is an integer from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function totalStrength(strength) {\n  const MOD = 1000000007n;\n  const n = strength.length;\n  const left = new Array(n).fill(-1);\n  const right = new Array(n).fill(n);\n  const stack = [];\n  for (let i = 0; i < n; i++) {\n    while (stack.length > 0 && strength[stack[stack.length - 1]] >= strength[i]) {\n      right[stack.pop()] = i;\n    }\n    if (stack.length > 0) {\n      left[i] = stack[stack.length - 1];\n    }\n    stack.push(i);\n  }\n\n  const prefix = new Array(n + 1).fill(0n);\n  for (let i = 0; i < n; i++) {\n    prefix[i + 1] = (prefix[i] + BigInt(strength[i])) % MOD;\n  }\n  const prefixOfPrefix = new Array(n + 2).fill(0n);\n  for (let i = 0; i <= n; i++) {\n    prefixOfPrefix[i + 1] = (prefixOfPrefix[i] + prefix[i]) % MOD;\n  }\n\n  let total = 0n;\n  for (let i = 0; i < n; i++) {\n    const startCount = BigInt(i - left[i]);\n    const endCount = BigInt(right[i] - i);\n    const endSums = prefixOfPrefix[right[i] + 1] - prefixOfPrefix[i + 1];\n    const startSums = prefixOfPrefix[i + 1] - prefixOfPrefix[left[i] + 1];\n    const groupSums = (startCount * endSums - endCount * startSums) % MOD;\n    total = (total + BigInt(strength[i]) * groupSums) % MOD;\n  }\n  return Number((total + MOD) % MOD);\n}",
+  "brute": "function totalStrength(strength) {\n  let total = 0n;\n  for (let start = 0; start < strength.length; start++) {\n    let smallest = Infinity;\n    let sum = 0;\n    for (let end = start; end < strength.length; end++) {\n      smallest = Math.min(smallest, strength[end]);\n      sum += strength[end];\n      total += BigInt(smallest) * BigInt(sum);\n    }\n  }\n  return Number(total % 1000000007n);\n}",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const n = small ? 1 + Math.floor(rand() * 10) : 2000;\n  const top = small ? [3, 10, 1000000000][Math.floor(rand() * 3)] : [5, 1000, 1000000000][Math.floor(rand() * 3)];\n  const values = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  const shape = rand();\n  if (shape < 0.15) values.sort((a, b) => a - b);\n  else if (shape < 0.3) values.sort((a, b) => b - a);\n  return [values];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,3,1,2]],"expected":44},
+    {"name":"Example 2","input":[[5,4,6]],"expected":213}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[1000000000]]},
+    {"name":"Test 3","input":[[2,2,2,2]]},
+    {"name":"Test 4","input":[[1,2,3,4,5]]},
+    {"name":"Test 5","input":[[5,4,3,2,1]]},
+    {"name":"Test 6","input":[[1000000000,1000000000,1000000000,1000000000]]},
+    {"name":"Test 7","input":[[3,1,4,1,5,9,2,6]]},
+    {"name":"Test 8","input":[[7,2,7,2,7]]},
+    {"name":"Test 9","input":[[1,1000000000,1,1000000000,1]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe brute force walks every subarray, tracking its minimum and sum: O(n²), too slow for 10^5. Flip it around: credit each subarray to the wizard who is its minimum. Wizard `i` is the minimum of every subarray that starts after `left[i]` (the previous strictly smaller value) and ends before `right[i]` (the next smaller-or-equal value). Using strict on one side and non-strict on the other gives each subarray exactly one owner even with ties. What remains is the **sum of the sums** of all those subarrays, and prefix sums of prefix sums give that in O(1).\n\n## Approach\n\n1. One monotonic `stack` pass fills `left` and `right`: when `strength[i]` is not bigger than the top, the top's `right` is `i`; whatever is left on the stack is `left[i]`.\n2. Build `prefix` (sum of the first k values) and `prefixOfPrefix` (sum of the first k prefix values), all modulo `10^9 + 7`.\n3. For wizard `i`, a subarray `[l, r]` has sum `prefix[r + 1] - prefix[l]`. Summed over the `startCount` starts and `endCount` ends this is `startCount * endSums - endCount * startSums`, where `endSums` adds `prefix[r + 1]` over the ends and `startSums` adds `prefix[l]` over the starts.\n4. Multiply by `strength[i]` and add to `total`; fix a negative remainder at the end.\n\n## Example 1, step by step\n\n`strength = [1, 3, 1, 2]` gives `left = [-1, 0, -1, 2]`, `right = [2, 2, 4, 4]`, `prefix = [0, 1, 4, 5, 7]`, `prefixOfPrefix = [0, 0, 1, 5, 10, 17]`.\n- `i = 0`: starts {0}, ends {0, 1}: 1·(5 − 0) − 2·0 = 5 (sums 1 and 4), times 1 is 5.\n- `i = 1`: 1·(5 − 1) − 1·(1 − 0) = 3, times 3 is 9.\n- `i = 2`: starts {0, 1, 2}, ends {2, 3}: 3·(17 − 5) − 2·(5 − 0) = 26, times 1 is 26.\n- `i = 3`: 1·(17 − 10) − 1·(10 − 5) = 2, times 2 is 4.\n\nTotal 5 + 9 + 26 + 4 = `44`.\n\n## Complexity\n\n- Time: O(n): each index is pushed and popped once, and the other loops are linear.\n- Space: O(n) for the boundary and prefix arrays.\n\n## Pitfalls\n\n- Use `>=` when popping (strict on one side only), or tied minimums count a subarray twice or not at all.\n- `strength[i] * groupSums` reaches about 10^18, far past 2^53; use `BigInt` (or 64-bit integers reduced modulo `MOD`).\n- Differences of residues can be negative; add `MOD` back before returning.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `left[i]`, `right[i]` | nearest smaller index on each side (exclusive bounds) |\n| `stack` | indices with increasing strengths |\n| `prefix` | `prefix[k]` = sum of the first k strengths |\n| `prefixOfPrefix` | `prefixOfPrefix[k]` = sum of `prefix[0..k-1]` |\n| `startCount`, `endCount` | number of possible starts and ends for wizard `i` |\n| `startSums`, `endSums` | totals of `prefix` over those starts and ends |\n| `groupSums` | sum of all subarray sums owned by wizard `i` |\n| `total` | the running answer modulo `MOD` |",
+  "narration": {
+    "7": "Sweep the wizards left to right while keeping a stack of indices with increasing strengths.",
+    "8": "The top is at least as strong as wizard i, so it can no longer be a minimum past i.",
+    "9": "Pop it and record i as its right boundary (the next smaller-or-equal value).",
+    "11": "Whatever remains on top is strictly weaker than wizard i...",
+    "12": "...so it is the left boundary of the subarrays that wizard i owns.",
+    "19": "prefix[i + 1] is the sum of the first i + 1 strengths, kept modulo MOD.",
+    "23": "prefixOfPrefix adds up prefix values, so a range of prefix sums costs one subtraction.",
+    "28": "Subarrays owned by wizard i can start at any index after left[i] up to i.",
+    "29": "They can end at any index from i up to just before right[i].",
+    "30": "Add prefix[r + 1] over every possible end r.",
+    "31": "Add prefix[l] over every possible start l.",
+    "32": "Pair every start with every end: this is the sum of all subarray sums wizard i owns.",
+    "33": "Each of those subarrays has wizard i as its minimum, so multiply and add.",
+    "35": "Shift a possibly negative remainder into the range 0 to MOD - 1 and return it."
+  }
+}

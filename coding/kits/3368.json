@@ -1,0 +1,52 @@
+{
+  "number": 3368,
+  "title": "First Letter Capitalization",
+  "spec": "recalled",
+  "statement": "One table holds pieces of text written by users:\n\n- `user_content(content_id, content_text)`: one row per text; `content_id` is unique. `content_text` is made only of English letters and spaces and contains at least one letter.\n\nA *word* is a maximal run of non-space characters. Rewrite each text so that every word starts with an uppercase letter and all of its remaining letters are lowercase. Every space stays exactly where it was, including repeated, leading and trailing spaces.\n\nReturn one row per row of `user_content` with the columns `content_id`, `original_text` (the text as stored) and `converted_text` (the rewritten text). Rows may come in any order.",
+  "constraints": [
+    "content_id is unique in user_content",
+    "content_text is not null and has at most 255 characters",
+    "content_text contains only English letters and spaces, and at least one letter"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "user_content": [["content_id","INT"],["content_text","VARCHAR(255)"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ user_content = [] }] = input;\n  const ids = new Set();\n  for (const [id, text] of user_content) {\n    if (id === null) return 'Every row needs a content_id.';\n    if (ids.has(id)) return `content_id ${id} appears twice.`;\n    ids.add(id);\n    if (text === null || text.length > 255) return `content_text of row ${id} must be 1 to 255 characters.`;\n    if (!/^[A-Za-z ]+$/.test(text) || !/[A-Za-z]/.test(text)) return `content_text of row ${id} must hold only letters and spaces, with at least one letter.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE words AS (\n  SELECT content_id, content_text, 1 AS word_no,\n         SUBSTRING_INDEX(content_text, ' ', 1) AS word\n  FROM user_content\n  UNION ALL\n  SELECT content_id, content_text, word_no + 1,\n         SUBSTRING_INDEX(SUBSTRING_INDEX(content_text, ' ', word_no + 1), ' ', -1)\n  FROM words\n  WHERE word_no <= CHAR_LENGTH(content_text) - CHAR_LENGTH(REPLACE(content_text, ' ', ''))\n),\ncapitalized AS (\n  SELECT content_id, content_text, word_no,\n         CONCAT(UPPER(LEFT(word, 1)), LOWER(SUBSTRING(word, 2))) AS new_word\n  FROM words\n)\nSELECT content_id,\n       content_text AS original_text,\n       GROUP_CONCAT(new_word ORDER BY word_no SEPARATOR ' ') AS converted_text\nFROM capitalized\nGROUP BY content_id, content_text;",
+  "brute": "WITH RECURSIVE positions AS (\n  SELECT 1 AS i\n  UNION ALL\n  SELECT i + 1 FROM positions WHERE i < 255\n)\nSELECT u.content_id,\n       u.content_text AS original_text,\n       GROUP_CONCAT(\n         CASE\n           WHEN p.i = 1 OR SUBSTRING(u.content_text, p.i - 1, 1) = ' ' THEN UPPER(SUBSTRING(u.content_text, p.i, 1))\n           ELSE LOWER(SUBSTRING(u.content_text, p.i, 1))\n         END\n         ORDER BY p.i SEPARATOR '') AS converted_text\nFROM user_content AS u\nJOIN positions AS p\n  ON p.i <= CHAR_LENGTH(u.content_text)\nGROUP BY u.content_id, u.content_text",
+  "generator": "function generate(rand, size) {\n  const pool = ['hello', 'world', 'of', 'sql', 'the', 'quick', 'brown', 'fox', 'data', 'science', 'and', 'a', 'i', 'top', 'rated', 'books', 'x', 'machine', 'learning'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  // Words come lowercase, uppercase, already capitalized or in random mixed case.\n  const casing = word => {\n    const r = rand();\n    if (r < 0.35) return word;\n    if (r < 0.55) return word.toUpperCase();\n    if (r < 0.7) return word[0].toUpperCase() + word.slice(1);\n    return [...word].map(c => (rand() < 0.5 ? c.toUpperCase() : c)).join('');\n  };\n  const rows = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const user_content = [];\n  let id = 0;\n  for (let r = 0; r < rows; r++) {\n    id += 1 + Math.floor(rand() * 3);\n    const count = 1 + Math.floor(rand() * (size === 'small' ? 5 : 8));\n    let text = '';\n    for (let w = 0; w < count; w++) {\n      if (w) text += rand() < 0.15 ? '  ' : ' ';\n      text += casing(pick(pool));\n    }\n    if (rand() < 0.1) text = ' ' + text;\n    if (rand() < 0.1) text += ' ';\n    user_content.push([id, text]);\n  }\n  return [{ user_content }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"user_content":[[1,"hello world of SQL"],[2,"the QUICK brown fox"],[3,"data science AND machine learning"],[4,"TOP rated programming BOOKS"]]}],"expected":{"columns":["content_id","original_text","converted_text"],"rows":[[1,"hello world of SQL","Hello World Of Sql"],[2,"the QUICK brown fox","The Quick Brown Fox"],[3,"data science AND machine learning","Data Science And Machine Learning"],[4,"TOP rated programming BOOKS","Top Rated Programming Books"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"user_content":[]}]},
+    {"name":"Test 2","input":[{"user_content":[[1,"hello"]]}]},
+    {"name":"Test 3","input":[{"user_content":[[7,"a b C d"],[8,"I"]]}]},
+    {"name":"Test 4","input":[{"user_content":[[1,"THE END"],[2,"ALL CAPS HERE"]]}]},
+    {"name":"Test 5","input":[{"user_content":[[3,"mIxEd CaSe wOrDs"],[4,"alREADY fine"]]}]},
+    {"name":"Test 6","input":[{"user_content":[[1,"Hello World"],[2,"Already Capitalized Text"]]}]},
+    {"name":"Test 7","input":[{"user_content":[[1,"two  spaces"],[2," leading space"],[3,"trailing space "],[4,"  both   sides  "]]}]},
+    {"name":"Test 8","input":[{"user_content":[[10,"same TEXT"],[11,"same TEXT"],[12,"sAME text"]]}]},
+    {"name":"Test 9","input":[{"user_content":[[1,"supercalifragilisticexpialidocious"],[2,"x y z"],[3,"qUICK bROWN fOX jUMPS oVER tHE lAZY dOG"]]}]},
+    {"name":"Test 10","input":[{"user_content":[[5,"sql"],[2,"SQL"],[9,"Sql"],[1,"sQl"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nCapitalizing one word is easy with string functions: uppercase its first character and lowercase the rest. The hard part is that a text holds several words, and MySQL has no built-in \"title case\". So split each text into its words, fix every word on its own, and glue the words back together with the same single spaces they were split on. Splitting on **every** space (not on runs of spaces) keeps the spacing intact: two spaces in a row produce an empty word, which stays empty and is joined back as two spaces.\n\n## Approach\n\n1. `words` (recursive): word 1 is everything before the first space. Each recursive step takes word `word_no + 1` with a nested `SUBSTRING_INDEX` and stops once `word_no` exceeds the number of spaces, so a text with k spaces yields k + 1 words.\n2. `capitalized`: `UPPER(LEFT(word, 1))` followed by `LOWER(SUBSTRING(word, 2))` gives each word as `new_word`.\n3. The final `SELECT` groups by text and rebuilds it with `GROUP_CONCAT(... ORDER BY word_no SEPARATOR ' ')`, keeping the original as `original_text`.\n\n## Example 1, step by step\n\n- Text 1, `hello world of SQL`, has 3 spaces, so `words` holds 4 rows: `hello`, `world`, `of`, `SQL`.\n- `capitalized` turns them into `Hello`, `World`, `Of`, `Sql` (the rest of `SQL` is lowercased).\n- Joined in `word_no` order: `Hello World Of Sql`.\n- Likewise `the QUICK brown fox` becomes `The Quick Brown Fox` and `TOP rated programming BOOKS` becomes `Top Rated Programming Books`.\n\n## Complexity\n\n- Time: O(total characters), as each of the W words is produced once and each step scans its text.\n- Space: O(W) rows for the intermediate word tables.\n\n## Pitfalls\n\n- Uppercasing only `LEFT(content_text, 1)` capitalizes the first word and nothing else.\n- Forgetting to lowercase the remainder leaves `SQL` as `SQL` instead of `Sql`.\n- `GROUP_CONCAT` without `ORDER BY word_no` may reassemble the words in any order.\n- Stopping the recursion when the remaining text is empty drops a trailing space; count the spaces instead.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `words` | one row per word: `content_id`, its text, `word_no` and the raw `word` |\n| `word_no` | the word's position in the text, starting at 1 |\n| `capitalized` | the same rows with `new_word`, the word in capitalized form |\n| `original_text` | the stored `content_text` |\n| `converted_text` | the words joined back with single spaces in their original order |",
+  "narration": {
+    "1": "The recursive CTE words starts with the first word of every text: everything before the first space.",
+    "7": "Each recursive step extracts the next word: keep the first word_no + 1 space-separated pieces, then take the last of them.",
+    "9": "A text with k spaces has k + 1 words, so the recursion stops once word_no passes the number of spaces.",
+    "11": "capitalized rewrites every word on its own.",
+    "13": "The first character is uppercased and the remaining characters are lowercased.",
+    "18": "The words are glued back with single spaces in their original order, which rebuilds the spacing exactly.",
+    "20": "One output row per text: group the words by the text they came from."
+  }
+}

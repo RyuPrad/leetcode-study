@@ -1,0 +1,58 @@
+{
+  "number": 3401,
+  "title": "Find Circular Gift Exchange Chains",
+  "spec": "recalled",
+  "statement": "A Secret Santa exchange is stored in one table:\n\n- `SecretSanta(giver_id, receiver_id, gift_value)`: one row per gift; employee `giver_id` gave a gift worth `gift_value` to employee `receiver_id`. The pair `(giver_id, receiver_id)` is unique.\n\nEvery employee who appears gives exactly one gift and receives exactly one gift, never to themselves. Following the gifts from any employee (A gives to B, B gives to C, ...) therefore always leads back to the start, closing a **circular chain**. Every employee belongs to exactly one chain.\n\nReport one row per chain with the columns `chain_id`, `chain_length` (how many employees, which equals how many gifts, are in the chain) and `total_gift_value` (the sum of the chain's gift values). Order the rows by `chain_length` descending, then by `total_gift_value` descending, and number them in that order: `chain_id` is 1 for the first row, 2 for the second, and so on.",
+  "constraints": [
+    "(giver_id, receiver_id) is unique in SecretSanta",
+    "Each giver_id appears exactly once and each receiver_id appears exactly once",
+    "The givers and the receivers are the same set of employees",
+    "giver_id <> receiver_id",
+    "gift_value is a positive integer"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "SecretSanta": [["giver_id","INT"],["receiver_id","INT"],["gift_value","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ SecretSanta = [] }] = input;\n  const givers = new Set(), receivers = new Set();\n  for (const [giver, receiver, value] of SecretSanta) {\n    if (giver === null || receiver === null || value === null) return 'Every column needs a value.';\n    if (giver === receiver) return `Employee ${giver} gives to themselves.`;\n    if (value <= 0) return 'gift_value must be positive.';\n    if (givers.has(giver)) return `Employee ${giver} gives more than one gift.`;\n    if (receivers.has(receiver)) return `Employee ${receiver} receives more than one gift.`;\n    givers.add(giver); receivers.add(receiver);\n  }\n  for (const giver of givers) if (!receivers.has(giver)) return `Employee ${giver} gives but receives nothing.`;\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH RECURSIVE walk AS (\n  SELECT giver_id AS start_id, receiver_id AS current_id, LEAST(giver_id, receiver_id) AS min_id, 1 AS steps, gift_value AS total_value\n  FROM SecretSanta\n  UNION ALL\n  SELECT w.start_id, s.receiver_id, LEAST(w.min_id, s.receiver_id), w.steps + 1, w.total_value + s.gift_value\n  FROM walk AS w\n  JOIN SecretSanta AS s\n    ON s.giver_id = w.current_id\n  WHERE w.current_id <> w.start_id\n),\nchains AS (\n  SELECT steps AS chain_length, total_value AS total_gift_value\n  FROM walk\n  WHERE current_id = start_id\n    AND min_id = start_id\n)\nSELECT ROW_NUMBER() OVER (ORDER BY chain_length DESC, total_gift_value DESC) AS chain_id,\n  chain_length,\n  total_gift_value\nFROM chains\nORDER BY chain_length DESC, total_gift_value DESC;",
+  "brute": "WITH RECURSIVE reach AS (\n  SELECT giver_id AS member, receiver_id AS other\n  FROM SecretSanta\n  UNION\n  SELECT r.member, s.receiver_id\n  FROM reach AS r\n  JOIN SecretSanta AS s ON s.giver_id = r.other\n),\ngrouped AS (\n  SELECT lbl.root, COUNT(*) AS chain_length, SUM(s.gift_value) AS total_gift_value\n  FROM SecretSanta AS s\n  JOIN (SELECT member, MIN(other) AS root FROM reach GROUP BY member) AS lbl\n    ON lbl.member = s.giver_id\n  GROUP BY lbl.root\n)\nSELECT 1 + (SELECT COUNT(*) FROM grouped AS g2\n            WHERE g2.chain_length > g.chain_length\n               OR (g2.chain_length = g.chain_length AND g2.total_gift_value > g.total_gift_value)\n               OR (g2.chain_length = g.chain_length AND g2.total_gift_value = g.total_gift_value AND g2.root < g.root)) AS chain_id,\n  g.chain_length,\n  g.total_gift_value\nFROM grouped AS g\nORDER BY chain_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  // Choose the employees: a few ids from a small pool, or up to 2,000 distinct ids.\n  let count = small ? pick(9) : 1500 + pick(501);\n  if (count === 1) count = 0;\n  const pool = [];\n  for (let id = 1; id <= (small ? 12 : 4000); id++) pool.push(id);\n  for (let i = pool.length - 1; i > 0; i--) { const j = pick(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  const people = pool.slice(0, count);\n  const values = small ? [10, 20, 30, 40] : null;\n  const SecretSanta = [];\n  // Cut the shuffled employees into cycles of at least two people.\n  for (let at = 0; at < people.length;) {\n    let length = 2 + pick(small ? 4 : 30);\n    const left = people.length - at;\n    if (length > left || left - length === 1) length = left;\n    const cycle = people.slice(at, at + length);\n    cycle.forEach((giver, i) => SecretSanta.push([giver, cycle[(i + 1) % length], values ? values[pick(values.length)] : 1 + pick(500)]));\n    at += length;\n  }\n  for (let i = SecretSanta.length - 1; i > 0; i--) { const j = pick(i + 1); [SecretSanta[i], SecretSanta[j]] = [SecretSanta[j], SecretSanta[i]]; }\n  return [{ SecretSanta }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"SecretSanta":[[1,2,20],[2,3,30],[3,1,40],[4,5,25],[5,4,35]]}],"expected":{"columns":["chain_id","chain_length","total_gift_value"],"rows":[[1,3,90],[2,2,60]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"SecretSanta":[]}]},
+    {"name":"Test 2","input":[{"SecretSanta":[[7,3,15],[3,7,5]]}]},
+    {"name":"Test 3","input":[{"SecretSanta":[[5,9,10],[9,2,20],[2,8,30],[8,6,40],[6,1,50],[1,5,60]]}]},
+    {"name":"Test 4","input":[{"SecretSanta":[[1,2,10],[2,1,10],[3,4,50],[4,3,40],[5,6,30],[6,5,5]]}]},
+    {"name":"Test 5","input":[{"SecretSanta":[[1,2,20],[2,1,30],[3,4,25],[4,3,25],[5,6,10],[6,5,40]]}]},
+    {"name":"Test 6","input":[{"SecretSanta":[[1,2,100],[2,1,100],[3,4,1],[4,5,1],[5,3,1]]}]},
+    {"name":"Test 7","input":[{"SecretSanta":[[10,4,30],[4,12,30],[12,10,30],[6,11,45],[11,6,45]]}]},
+    {"name":"Test 8","input":[{"SecretSanta":[[8,1,7],[1,8,3],[2,6,4],[6,2,6],[3,5,2],[5,4,2],[4,3,2],[9,7,1],[7,9,9]]}]},
+    {"name":"Test 9","input":[{"SecretSanta":[[1,3,10],[3,5,10],[5,1,10],[2,4,10],[4,6,10],[6,2,10]]}]},
+    {"name":"Test 10","input":[{"SecretSanta":[[1,4,5],[4,2,5],[2,7,5],[7,1,5],[3,6,50],[6,5,50],[5,3,50]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nBecause everyone gives once and receives once, the gift graph is a set of disjoint cycles. Starting at any employee and following `receiver_id` must come back to that employee, and the number of steps and the values collected along the way describe that employee's chain. The only catch is that every member of a chain produces the same closed walk, so each chain must be counted once: keep only the walk that starts at the chain's smallest employee id.\n\n## Approach\n\n1. `walk` (recursive CTE): the anchor starts one walk per gift with `steps = 1`. Each recursive step follows the next gift from `current_id`, adds its value and keeps the smallest id seen in `min_id`. A walk stops extending once it is back at `start_id`.\n2. `chains`: keep the closed walks (`current_id = start_id`) whose start is the smallest member (`min_id = start_id`), one per chain.\n3. Number the chains with `ROW_NUMBER()` ordered by length, then total, both descending, and return them in that same order.\n\n## Example 1, step by step\n\n- Anchors: 1→2 (20), 2→3 (30), 3→1 (40), 4→5 (25), 5→4 (35).\n- Step 2: walk 1 reaches 3 with total 50, walk 2 reaches 1 (70), walk 3 reaches 2 (60); walks 4 and 5 are already closed with total 60.\n- Step 3: walks 1, 2 and 3 close with `steps = 3` and total 90.\n- `chains` keeps start 1 (`min_id = 1`) and start 4 (`min_id = 4`): (3, 90) and (2, 60). Starts 2, 3 and 5 are dropped because a smaller member exists.\n- Numbered: (1, 3, 90), (2, 2, 60).\n\n## Complexity\n\n- Time: each employee walks its own chain, so a chain of length L costs L² walk rows; O(Σ L²) overall, O(N²) when everyone is in one chain.\n- Space: the same number of rows in `walk`.\n\n## Pitfalls\n\n- Without the `min_id = start_id` filter each chain of length L is reported L times.\n- `SELECT DISTINCT chain_length, total_gift_value` is not a valid way to deduplicate: two different chains with equal length and total would merge into one row.\n- The recursion needs the `current_id <> start_id` stop condition, or the walk circles forever.\n- `chain_id` must follow the output order (length first, then total), not the employee ids.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `walk` | one row per (start, steps taken): where the walk is, the smallest id seen and the value collected |\n| `w`, `s` | the walk so far and the next gift it follows |\n| `min_id` | smallest employee met on the walk, used to pick one start per chain |\n| `chains` | one closed walk per chain: its length and total value |\n| `chain_id` | position of the chain in the output order |",
+  "narration": {
+    "1": "The recursive CTE starts one walk per gift: the giver is the start and the receiver is where the walk now stands.",
+    "4": "UNION ALL appends each next step of every walk until the walks stop growing.",
+    "5": "One step follows the next gift, adds its value and remembers the smallest employee id met so far.",
+    "7": "The next gift is the one whose giver is the employee the walk currently stands on.",
+    "9": "A walk that is back at its start has closed its chain and is not extended any further.",
+    "11": "chains keeps exactly one closed walk per chain.",
+    "14": "Only closed walks count: the walk has returned to the employee it started from.",
+    "15": "Each chain is kept once, from the walk that starts at its smallest member.",
+    "17": "ROW_NUMBER numbers the chains in the required order: longer first, then higher total.",
+    "21": "The rows come out in the same order the chain ids were assigned."
+  }
+}

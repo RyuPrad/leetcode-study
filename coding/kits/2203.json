@@ -1,0 +1,77 @@
+{
+  "number": 2203,
+  "title": "Minimum Weighted Subgraph With the Required Paths",
+  "spec": "leetcode",
+  "statement": "A directed graph has `n` nodes labelled `0` to `n - 1`. Each `edges[i] = [from_i, to_i, weight_i]` is a one-way edge from `from_i` to `to_i` that costs `weight_i`; the same pair of nodes may be joined by several edges. You are also given three different nodes `src1`, `src2` and `dest`.\n\nPick a set of edges such that, travelling only along the picked edges, `dest` can be reached from `src1` and can also be reached from `src2`. The cost of a set is the sum of the weights of its edges (each picked edge counts once, however many routes use it). Return the smallest possible cost, or `-1` if no set of edges lets both sources reach `dest`.",
+  "constraints": [
+    "3 <= n <= 10^5",
+    "0 <= edges.length <= 10^5",
+    "edges[i].length == 3",
+    "0 <= from_i, to_i, src1, src2, dest <= n - 1",
+    "from_i != to_i",
+    "src1, src2 and dest are pairwise distinct",
+    "1 <= weight_i <= 10^5"
+  ],
+  "signature": "long minimumWeight(int n, int[][] edges, int src1, int src2, int dest)",
+  "entry": "minimumWeight",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges",
+    "src1",
+    "src2",
+    "dest"
+  ],
+  "validator": "function validate([n, edges, src1, src2, dest]) {\n  if (!Number.isInteger(n) || n < 3 || n > 100000) return 'n is between 3 and 10^5.';\n  if (!Array.isArray(edges) || edges.length > 100000) return 'edges has at most 10^5 entries.';\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3) return 'Each edge is [from, to, weight].';\n    const [from, to, weight] = edge;\n    if (![from, to].every(v => Number.isInteger(v) && v >= 0 && v < n)) return 'Edge endpoints must be nodes between 0 and n - 1.';\n    if (from === to) return 'An edge cannot start and end at the same node.';\n    if (!Number.isInteger(weight) || weight < 1 || weight > 100000) return 'Each weight is between 1 and 10^5.';\n  }\n  if (![src1, src2, dest].every(v => Number.isInteger(v) && v >= 0 && v < n)) return 'src1, src2 and dest must be nodes between 0 and n - 1.';\n  if (src1 === src2 || src1 === dest || src2 === dest) return 'src1, src2 and dest must be three different nodes.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumWeight(n, edges, src1, src2, dest) {\n  const forward = Array.from({ length: n }, () => []);\n  const backward = Array.from({ length: n }, () => []);\n  for (const [from, to, weight] of edges) {\n    forward[from].push([to, weight]);\n    backward[to].push([from, weight]);\n  }\n\n  const push = (heap, item) => {\n    heap.push(item);\n    let child = heap.length - 1;\n    while (child > 0) {\n      const parent = (child - 1) >> 1;\n      if (heap[parent][0] <= heap[child][0]) break;\n      [heap[parent], heap[child]] = [heap[child], heap[parent]];\n      child = parent;\n    }\n  };\n  const pop = (heap) => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    heap[0] = last;\n    let parent = 0;\n    while (true) {\n      const left = 2 * parent + 1;\n      const right = left + 1;\n      let smallest = parent;\n      if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;\n      if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;\n      if (smallest === parent) break;\n      [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];\n      parent = smallest;\n    }\n    return top;\n  };\n\n  const dijkstra = (graph, source) => {\n    const dist = new Array(n).fill(Infinity);\n    const heap = [[0, source]];\n    dist[source] = 0;\n    while (heap.length > 0) {\n      const [distance, node] = pop(heap);\n      if (distance > dist[node]) continue;\n      for (const [next, weight] of graph[node]) {\n        if (distance + weight < dist[next]) {\n          dist[next] = distance + weight;\n          push(heap, [dist[next], next]);\n        }\n      }\n    }\n    return dist;\n  };\n\n  const fromSrc1 = dijkstra(forward, src1);\n  const fromSrc2 = dijkstra(forward, src2);\n  const toDest = dijkstra(backward, dest);\n\n  let best = Infinity;\n  for (let meet = 0; meet < n; meet++) {\n    best = Math.min(best, fromSrc1[meet] + fromSrc2[meet] + toDest[meet]);\n  }\n  return best === Infinity ? -1 : best;\n}",
+  "brute": "function minimumWeight(n, edges, src1, src2, dest) {\n  // Try every subset of the edges and keep the lightest one in which both sources reach dest.\n  const m = edges.length;\n  let best = -1;\n  for (let mask = 0; mask < 2 ** m; mask++) {\n    let total = 0;\n    const out = Array.from({ length: n }, () => []);\n    for (let i = 0; i < m; i++) {\n      if (Math.floor(mask / 2 ** i) % 2 === 1) {\n        total += edges[i][2];\n        out[edges[i][0]].push(edges[i][1]);\n      }\n    }\n    if (best !== -1 && total >= best) continue;\n    const reaches = start => {\n      const seen = new Set([start]);\n      const stack = [start];\n      while (stack.length) {\n        for (const next of out[stack.pop()]) if (!seen.has(next)) { seen.add(next); stack.push(next); }\n      }\n      return seen.has(dest);\n    };\n    if (reaches(src1) && reaches(src2)) best = total;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  // Large graphs sometimes get a long chain through every node so that far-apart nodes connect.\n  const chain = size === 'large' && rand() < 0.5;\n  const n = size === 'large' ? (chain ? int(800, 1500) : int(200, 600)) : int(3, 6);\n  const m = size === 'large' ? 2000 : rand() < 0.1 ? int(0, 2) : int(5, 12);\n  const top = rand() < 0.3 ? 100000 : size === 'large' ? 1000 : 10;\n  const edges = [];\n  const addEdge = (from, to) => edges.push([from, to, int(1, top)]);\n  if (chain) {\n    const order = Array.from({ length: n }, (_, i) => i);\n    for (let i = n - 1; i > 0; i--) {\n      const j = int(0, i);\n      [order[i], order[j]] = [order[j], order[i]];\n    }\n    for (let i = 0; i + 1 < n && edges.length < m; i++) addEdge(order[i], order[i + 1]);\n  }\n  while (edges.length < m) {\n    const from = int(0, n - 1);\n    let to = int(0, n - 2);\n    if (to >= from) to++;\n    addEdge(from, to);\n  }\n  // Three distinct special nodes.\n  const src1 = int(0, n - 1);\n  let src2 = int(0, n - 2);\n  if (src2 >= src1) src2++;\n  let dest;\n  do dest = int(0, n - 1); while (dest === src1 || dest === src2);\n  return [n, edges, src1, src2, dest];\n}",
+  "examples": [
+    {"name":"Example 1","input":[6,[[0,2,2],[0,5,6],[1,0,3],[1,4,5],[2,1,1],[2,3,3],[2,3,4],[3,4,2],[4,5,1]],0,1,5],"expected":9},
+    {"name":"Example 2","input":[3,[[0,1,1],[2,1,1]],0,1,2],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[3,[],0,1,2]},
+    {"name":"Test 2","input":[3,[[0,2,4],[1,2,7]],0,1,2]},
+    {"name":"Test 3","input":[3,[[0,1,5],[1,2,3]],0,1,2]},
+    {"name":"Test 4","input":[3,[[1,0,5],[0,2,3]],0,1,2]},
+    {"name":"Test 5","input":[5,[[0,3,1],[1,3,1],[3,4,10],[0,4,6],[1,4,6]],0,1,4]},
+    {"name":"Test 6","input":[5,[[0,3,1],[1,3,1],[3,4,3],[0,4,6],[1,4,6]],0,1,4]},
+    {"name":"Test 7","input":[4,[[0,3,100000],[1,3,100000],[0,1,100000],[1,0,100000],[2,3,1]],0,1,3]},
+    {"name":"Test 8","input":[4,[[0,1,2],[1,2,2],[2,3,2],[3,0,2]],0,2,1]},
+    {"name":"Test 9","input":[6,[[0,2,1],[2,5,1],[1,3,1],[3,4,1],[4,1,1],[3,2,5],[5,0,1]],0,1,5]},
+    {"name":"Test 10","input":[4,[[0,1,1],[1,0,1],[2,3,1]],0,1,3]},
+    {"name":"Test 11","input":[5,[[0,2,3],[0,2,1],[1,2,2],[1,2,9],[2,4,5],[2,3,1],[3,4,1]],0,1,4]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTake the cheapest valid set of edges. Follow the route from `src1` and the route from `src2` towards `dest`: once they touch at some node, they can share the rest of the way, since paying for one route from that node to `dest` is enough. So the best answer always looks like three shortest paths glued at one meeting node `meet`: `src1 → meet`, `src2 → meet` and `meet → dest` (the meeting node may be `src1`, `src2` or `dest` itself). Trying every subset of edges would be exponential; three runs of Dijkstra give every candidate at once.\n\n## Approach\n\n1. Build `forward` adjacency lists, and `backward` lists with every edge reversed.\n2. Run Dijkstra (with a binary min-heap) from `src1` and from `src2` on `forward`: `fromSrc1[v]` and `fromSrc2[v]` are the cheapest costs to reach `v`.\n3. Run Dijkstra from `dest` on `backward`: `toDest[v]` is the cheapest cost from `v` to `dest` in the original graph.\n4. For every node `meet`, add the three distances and keep the minimum in `best`.\n5. If `best` is still `Infinity`, no meeting node works, so return `-1`.\n\n## Example 1, step by step\n\nWith `src1 = 0`, `src2 = 1`, `dest = 5`, the three runs give `fromSrc1 = [0,3,2,5,7,6]`, `fromSrc2 = [3,0,5,8,5,6]` and `toDest = [6,6,6,3,1,0]`. The sums per meeting node are `[9, 9, 13, 16, 13, 12]`. Meeting at node 0 means `1 → 0` (3) and then `0 → 5` (6), which serves both sources, for a total of `9`.\n\n## Complexity\n\n- Time: O((n + E) log E) for three Dijkstra runs over E edges, plus O(n) for the final scan.\n- Space: O(n + E) for the two adjacency lists, the distance arrays and the heap.\n\n## Pitfalls\n\n- Adding the two separate shortest paths to `dest` double-counts the shared part; the meeting node fixes this.\n- The distance to `dest` from every node needs the reversed graph; running Dijkstra forward from each node is far too slow.\n- Unreachable nodes have distance `Infinity`; in Java or C use a large sentinel and 64-bit sums so they do not overflow.\n- Skip stale heap entries (`distance > dist[node]`), or the run can repeat work many times.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `forward`, `backward` | adjacency lists of `[neighbor, weight]`, original and reversed |\n| `heap` | min-heap of `[distance, node]` pairs |\n| `dist` | best known distance from the run's source |\n| `fromSrc1`, `fromSrc2` | shortest distances from each source |\n| `toDest` | shortest distance from each node to `dest` |\n| `meet` | the node where the two routes join |\n| `best` | smallest total found so far |",
+  "narration": {
+    "2": "forward holds each node's outgoing edges as [neighbor, weight].",
+    "3": "backward holds the same edges reversed, for distances towards dest.",
+    "4": "Copy every edge into both adjacency lists.",
+    "9": "push adds an item to the min-heap and sifts it up past larger parents.",
+    "19": "pop removes the smallest item and sifts the last item down from the top.",
+    "38": "One Dijkstra run: cheapest distance from source to every node of graph.",
+    "40": "The heap starts with the source at distance 0.",
+    "43": "Take the closest node not yet settled.",
+    "44": "A stale entry: a shorter distance for this node was already processed.",
+    "45": "Try to relax every edge leaving this node.",
+    "46": "Going through node is cheaper than anything known for next...",
+    "47": "...so record the new distance...",
+    "48": "...and queue next to be expanded with it.",
+    "55": "Cheapest cost from src1 to every node.",
+    "56": "Cheapest cost from src2 to every node.",
+    "57": "On the reversed graph, the cheapest cost from every node to dest.",
+    "60": "Try every node as the place where the two routes join.",
+    "61": "Both sources reach meet, then one shared route goes on to dest.",
+    "63": "Infinity means no node works for both sources, so the answer is -1."
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "number": 3554,
+  "title": "Find Category Recommendation Pairs",
+  "spec": "leetcode",
+  "statement": "A shop studies which product categories its customers combine, using two tables:\n\n- `ProductPurchases(user_id, product_id, quantity)`: a user bought a product, in some positive `quantity`; `(user_id, product_id)` is unique, and every `product_id` exists in `ProductInfo`.\n- `ProductInfo(product_id, category, price)`: `product_id` is unique; each product belongs to one `category`, and many products can share a category.\n\nLook at every pair of different categories, with the alphabetically smaller name first. Its `customer_count` is the number of distinct users who bought at least one product from **each** of the two categories (how many products or units they bought does not matter). Report the pairs with `customer_count` of at least 3, with the columns `category1` (the smaller name), `category2` (the larger name) and `customer_count`.\n\nOrder the rows by `customer_count` descending, then `category1` ascending, then `category2` ascending.",
+  "constraints": [
+    "(user_id, product_id) is unique in ProductPurchases",
+    "product_id is unique in ProductInfo",
+    "Every ProductPurchases.product_id exists in ProductInfo",
+    "quantity is positive",
+    "Category names never differ only in letter case",
+    "No value is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "ProductPurchases": [["user_id","INT"],["product_id","INT"],["quantity","INT"]],
+    "ProductInfo": [["product_id","INT"],["category","VARCHAR(100)"],["price","DECIMAL(10, 2)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ ProductPurchases = [], ProductInfo = [] }] = input;\n  const products = new Set(), spelling = new Map(), bought = new Set();\n  for (const [id, category, price] of ProductInfo) {\n    if ([id, category, price].includes(null)) return 'No value in ProductInfo may be null.';\n    if (products.has(id)) return `product_id ${id} appears twice in ProductInfo.`;\n    products.add(id);\n    const folded = String(category).toLowerCase();\n    if (spelling.has(folded) && spelling.get(folded) !== category) return `Categories ${spelling.get(folded)} and ${category} differ only in letter case.`;\n    spelling.set(folded, category);\n  }\n  for (const [user, product, quantity] of ProductPurchases) {\n    if ([user, product, quantity].includes(null)) return 'No value in ProductPurchases may be null.';\n    if (!products.has(product)) return `product_id ${product} is not in ProductInfo.`;\n    if (!(quantity > 0)) return `quantity ${quantity} must be positive.`;\n    const key = `${user}|${product}`;\n    if (bought.has(key)) return `(${user}, ${product}) appears twice in ProductPurchases.`;\n    bought.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH user_categories AS (\n  SELECT DISTINCT pp.user_id, pi.category\n  FROM ProductPurchases AS pp\n  JOIN ProductInfo AS pi\n    ON pi.product_id = pp.product_id\n)\nSELECT c1.category AS category1,\n       c2.category AS category2,\n       COUNT(*) AS customer_count\nFROM user_categories AS c1\nJOIN user_categories AS c2\n  ON c2.user_id = c1.user_id\n AND c2.category > c1.category\nGROUP BY c1.category, c2.category\nHAVING COUNT(*) >= 3\nORDER BY customer_count DESC, category1, category2;",
+  "brute": "SELECT counted.category1, counted.category2, counted.customer_count\nFROM (\n  SELECT x.category AS category1,\n         y.category AS category2,\n         (SELECT COUNT(DISTINCT u.user_id)\n          FROM ProductPurchases AS u, ProductInfo AS ux\n          WHERE ux.product_id = u.product_id\n            AND ux.category = x.category\n            AND u.user_id IN (SELECT v.user_id\n                              FROM ProductPurchases AS v, ProductInfo AS vy\n                              WHERE vy.product_id = v.product_id AND vy.category = y.category)) AS customer_count\n  FROM (SELECT DISTINCT category FROM ProductInfo) AS x,\n       (SELECT DISTINCT category FROM ProductInfo) AS y\n  WHERE x.category < y.category\n) AS counted\nWHERE counted.customer_count >= 3\nORDER BY counted.customer_count DESC, counted.category1, counted.category2",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const names = small ? ['Books', 'Clothing', 'Electronics', 'Sports']\n    : ['Books', 'Clothing', 'Electronics', 'Sports', 'Kitchen', 'Garden', 'Toys', 'Music', 'Home Office', 'Beauty'];\n  const productCount = small ? 2 + Math.floor(rand() * 5) : 60;\n  const ProductInfo = [];\n  // Earlier categories get more products, so the pair counts spread out.\n  for (let i = 0; i < productCount; i++) ProductInfo.push([small ? 101 + i : 100 + i * 7, names[Math.floor(Math.pow(rand(), 1.6) * names.length)], pick([20, 35, 45, 60, 75, 100, 9.99])]);\n  const users = small ? 3 + Math.floor(rand() * 3) : 300;\n  const target = small ? Math.floor(rand() * 9) : 2000;\n  const bought = new Set(), ProductPurchases = [];\n  for (let tries = 0; ProductPurchases.length < target && tries < target * 5; tries++) {\n    const user = 1 + Math.floor(rand() * users), product = pick(ProductInfo)[0], key = `${user}|${product}`;\n    if (bought.has(key)) continue;\n    bought.add(key);\n    ProductPurchases.push([user, product, 1 + Math.floor(rand() * 5)]);\n  }\n  return [{ ProductPurchases, ProductInfo }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"ProductPurchases":[[1,101,2],[1,102,1],[1,201,3],[1,301,1],[2,101,1],[2,102,2],[2,103,1],[2,201,5],[3,101,2],[3,103,1],[3,301,4],[3,401,2],[4,101,1],[4,201,3],[4,301,1],[4,401,2],[5,102,2],[5,103,1],[5,201,2],[5,202,3]],"ProductInfo":[[101,"Electronics",100],[102,"Books",20],[103,"Books",35],[201,"Clothing",45],[202,"Clothing",60],[301,"Sports",75],[401,"Kitchen",50]]}],"expected":{"columns":["category1","category2","customer_count"],"rows":[["Books","Clothing",3],["Books","Electronics",3],["Clothing","Electronics",3],["Electronics","Sports",3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"ProductPurchases":[],"ProductInfo":[[1,"Books",10],[2,"Toys",20]]}]},
+    {"name":"Test 2","input":[{"ProductPurchases":[[1,1,1],[1,2,1],[2,1,1],[2,2,1],[3,1,1],[3,2,1]],"ProductInfo":[[1,"Books",10],[2,"Books",12]]}]},
+    {"name":"Test 3","input":[{"ProductPurchases":[[1,1,1],[1,2,1],[1,3,1],[2,1,1],[2,2,1],[2,3,1]],"ProductInfo":[[1,"Books",10],[2,"Books",12],[3,"Toys",20]]}]},
+    {"name":"Test 4","input":[{"ProductPurchases":[[1,1,1],[1,3,1],[2,2,4],[2,3,2],[3,1,1],[3,2,1],[3,3,1]],"ProductInfo":[[1,"Books",10],[2,"Books",12],[3,"Toys",20]]}]},
+    {"name":"Test 5","input":[{"ProductPurchases":[[1,10,1],[1,20,1],[1,30,1],[2,10,1],[2,20,1],[2,30,1],[3,10,1],[3,20,1],[3,30,1],[4,20,1],[4,30,1]],"ProductInfo":[[10,"Toys",10],[20,"Garden",12],[30,"Books",20],[40,"Music",25]]}]},
+    {"name":"Test 6","input":[{"ProductPurchases":[[1,5,1],[1,6,1],[1,7,1],[2,5,1],[2,6,1],[2,7,1],[3,5,1],[3,6,1],[3,7,1]],"ProductInfo":[[5,"Sports",75],[6,"Clothing",45],[7,"Electronics",100]]}]},
+    {"name":"Test 7","input":[{"ProductPurchases":[[1,1,3],[1,2,3],[2,1,9],[2,2,9],[3,3,1],[3,4,1],[4,1,1],[4,4,1]],"ProductInfo":[[1,"Books",10],[2,"Kitchen",50],[3,"Books",15],[4,"Kitchen",30]]}]},
+    {"name":"Test 8","input":[{"ProductPurchases":[[1,1,1],[1,2,1],[2,1,1],[2,2,1],[3,1,1],[3,2,1],[4,1,1],[4,2,1],[5,3,1],[5,4,1],[6,3,1],[6,4,1],[7,3,1],[7,4,1]],"ProductInfo":[[1,"Music",10],[2,"Toys",20],[3,"Beauty",15],[4,"Garden",50]]}]},
+    {"name":"Test 9","input":[{"ProductPurchases":[[1,101,2],[1,102,1],[1,201,3],[1,301,1],[2,101,1],[2,102,2],[2,103,1],[2,201,5],[3,101,2],[3,103,1],[3,301,4],[3,401,2],[4,101,1],[4,201,3],[4,301,1],[4,401,2],[5,102,2],[5,103,1],[5,201,2],[5,202,3],[5,101,1],[6,202,1],[6,301,1]],"ProductInfo":[[101,"Electronics",100],[102,"Books",20],[103,"Books",35],[201,"Clothing",45],[202,"Clothing",60],[301,"Sports",75],[401,"Kitchen",50]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWhat matters is which **categories** each user touched, not which products: a user who bought two Books titles and one Clothing item counts once for Books-Clothing. So first reduce the purchases to distinct (user, category) facts. After that the problem is the same as finding product pairs: join those facts to themselves on the user, keep each category pair once with the smaller name on the left, and count the users per pair.\n\n## Approach\n\n1. `user_categories`: join purchases `pp` to `ProductInfo` `pi` and keep `DISTINCT` (`user_id`, `category`) rows.\n2. Self-join `user_categories` as `c1` and `c2` on the same user with `c2.category > c1.category`, giving one row per user and category pair.\n3. Group by the two categories; `COUNT(*)` is now the number of users, because each user gives a pair at most one row. Keep groups with at least 3.\n4. Order by `customer_count` descending, then `category1`, then `category2`.\n\n## Example 1, step by step\n\n- `user_categories`: user 1 → Books, Clothing, Electronics, Sports; user 2 → Books, Clothing, Electronics; user 3 → Books, Electronics, Kitchen, Sports; user 4 → Clothing, Electronics, Kitchen, Sports; user 5 → Books, Clothing. User 2's two Books products collapse into one row.\n- Books-Clothing: users 1, 2, 5. Books-Electronics: users 1, 2, 3. Clothing-Electronics: users 1, 2, 4. Electronics-Sports: users 1, 3, 4. All reach 3.\n- Clothing-Sports (users 1, 4), Electronics-Kitchen (3, 4), Kitchen-Sports (3, 4) and the rest have fewer than 3 users and are dropped.\n- All four survivors tie at 3, so they appear in alphabetical order of `category1`, then `category2`.\n\n## Complexity\n\n- Time: O(P + Σ cᵤ²) for P purchases, where cᵤ is the number of categories user u bought from, plus sorting the pairs.\n- Space: O(P) for `user_categories` and O(number of category pairs) for the groups.\n\n## Pitfalls\n\n- Skipping `DISTINCT` in `user_categories`: a user with two products in one category then adds two rows to the pair and is counted twice by `COUNT(*)`.\n- Pairing products and comparing their categories afterwards still needs `COUNT(DISTINCT user_id)` for the same reason.\n- `<>` instead of `>` reports every pair in both orders; `> 3` instead of `>= 3` loses the boundary pairs.\n- Ordering only by `customer_count`: ties must fall back to `category1`, then `category2`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `pp`, `pi` | purchases and the product information that names their category |\n| `user_categories` | one row per user and category they bought from |\n| `c1`, `c2` | two categories of the same user, `c2` alphabetically later |\n| `customer_count` | users behind a category pair, at least 3 |",
+  "narration": {
+    "1": "The user_categories stage records which categories each user bought from.",
+    "2": "DISTINCT collapses several products of one category into a single fact per user.",
+    "4": "Each purchase gets its product's category from ProductInfo.",
+    "7": "The first category of each pair is the alphabetically smaller one.",
+    "9": "Each joined row is one user, so counting rows counts customers.",
+    "10": "The self-join starts from one category fact of a user.",
+    "12": "The second category must belong to the same user.",
+    "13": "Requiring the later name on the right lists each pair once, smaller name first.",
+    "14": "Grouping by the two categories gives one row per pair.",
+    "15": "Only pairs shared by at least three customers are reportable.",
+    "16": "Largest counts first; ties fall back to the category names."
+  }
+}

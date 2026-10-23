@@ -1,0 +1,50 @@
+{
+  "number": 3436,
+  "title": "Find Valid Emails",
+  "spec": "leetcode",
+  "statement": "Each user has one email address on file:\n\n- `Users(user_id, email)`: one row per user; `user_id` is unique.\n\nAn email is **valid** when all of these hold:\n\n- it has exactly one `@`;\n- the part before the `@` is non-empty and uses only letters, digits and underscores (`_`);\n- the part after the `@` is a non-empty run of letters followed by `.com`, which ends the address (so no digits, dots, hyphens or other characters in the domain name).\n\nReturn the `user_id` and `email` of every valid address, ordered by `user_id` ascending.",
+  "constraints": [
+    "user_id is unique in Users",
+    "email is not null",
+    "Letters are A-Z and a-z; digits are 0-9"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Users": [["user_id","INT"],["email","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Users = [] }] = input;\n  const ids = new Set();\n  for (const [id, email] of Users) {\n    if (id === null) return 'Every user needs a user_id.';\n    if (ids.has(id)) return `user_id ${id} appears twice.`;\n    if (email === null) return `User ${id} needs an email.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT user_id, email\nFROM Users\nWHERE email REGEXP '^[A-Za-z0-9_]+@[A-Za-z]+\\\\.com$'\nORDER BY user_id;",
+  "brute": "WITH RECURSIVE pos AS (\n  SELECT 1 AS p\n  UNION ALL\n  SELECT p + 1 FROM pos WHERE p < (SELECT MAX(CHAR_LENGTH(email)) FROM Users)\n),\nparts AS (\n  SELECT user_id, email,\n    SUBSTRING_INDEX(email, '@', 1) AS local_part,\n    SUBSTRING(email, CHAR_LENGTH(SUBSTRING_INDEX(email, '@', 1)) + 2, CHAR_LENGTH(email) - CHAR_LENGTH(SUBSTRING_INDEX(email, '@', 1)) - 5) AS domain\n  FROM Users\n  WHERE CHAR_LENGTH(email) - CHAR_LENGTH(REPLACE(email, '@', '')) = 1\n    AND RIGHT(email, 4) = '.com'\n)\nSELECT user_id, email\nFROM parts\nWHERE CHAR_LENGTH(local_part) > 0\n  AND CHAR_LENGTH(domain) > 0\n  AND NOT EXISTS (\n    SELECT 1 FROM pos\n    WHERE pos.p <= CHAR_LENGTH(local_part)\n      AND NOT (SUBSTRING(local_part, pos.p, 1) BETWEEN 'a' AND 'z'\n        OR SUBSTRING(local_part, pos.p, 1) BETWEEN 'A' AND 'Z'\n        OR SUBSTRING(local_part, pos.p, 1) BETWEEN '0' AND '9'\n        OR SUBSTRING(local_part, pos.p, 1) = '_'))\n  AND NOT EXISTS (\n    SELECT 1 FROM pos\n    WHERE pos.p <= CHAR_LENGTH(domain)\n      AND NOT (SUBSTRING(domain, pos.p, 1) BETWEEN 'a' AND 'z'\n        OR SUBSTRING(domain, pos.p, 1) BETWEEN 'A' AND 'Z'))\nORDER BY user_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const from = list => list[pick(list.length)];\n  const locals = ['alice', 'bob_99', 'Eve', 'x', '_', '42', 'first.last', 'a-b', 'j+k', '', 'Mia_Lee', 'zoe 1'];\n  const domains = ['example', 'mail', 'Domain', 'x', 'mail1', 'my-mail', 'a.b', '', 'web_site', 'leetcode'];\n  const endings = ['.com', '.com', '.com', '.net', 'com', '.comm', '.co', '.com.', ''];\n  const signs = ['@', '@', '@', '@', '@@', '_at_', ''];\n  const count = small ? pick(9) : 1500 + pick(501);\n  const ids = [];\n  for (let id = 1; id <= (small ? 12 : 4000); id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = pick(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const Users = [];\n  for (const id of ids.slice(0, count)) {\n    // About half the addresses are built only from valid pieces; the rest mix in one or more bad pieces.\n    const clean = rand() < 0.5;\n    const local = clean ? from(['alice', 'bob_99', 'Eve', 'x', '_', '42', 'Mia_Lee']) : from(locals);\n    const domain = clean ? from(['example', 'mail', 'Domain', 'x', 'leetcode']) : from(domains);\n    const email = local + (clean ? '@' : from(signs)) + domain + (clean ? '.com' : from(endings));\n    Users.push([id, email]);\n  }\n  return [{ Users }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Users":[[1,"alice@example.com"],[2,"bob_at_example.com"],[3,"charlie@example.net"],[4,"david@domain.com"],[5,"eve@invalid"]]}],"expected":{"columns":["user_id","email"],"rows":[[1,"alice@example.com"],[4,"david@domain.com"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Users":[]}]},
+    {"name":"Test 2","input":[{"Users":[[1,"sam@site.com"]]}]},
+    {"name":"Test 3","input":[{"Users":[[1,"@example.com"],[2,"user@.com"],[3,"user@@example.com"],[4,"user@example.net"]]}]},
+    {"name":"Test 4","input":[{"Users":[[1,"first.last@example.com"],[2,"first_last@example.com"],[3,"a-b@x.com"],[4,"A1_b2@Mail.com"]]}]},
+    {"name":"Test 5","input":[{"Users":[[1,"u@mail1.com"],[2,"u@my-mail.com"],[3,"u@mail.co.com"],[4,"u@mail.com"]]}]},
+    {"name":"Test 6","input":[{"Users":[[1,"a@b@c.com"],[2,"a@bcom"],[3,"a@b.comm"],[4,"a@b.com."],[5,"a@b.com "]]}]},
+    {"name":"Test 7","input":[{"Users":[[9,"zed@zoo.com"],[2,"amy@apple.com"],[5,"max_2@mint.com"]]}]},
+    {"name":"Test 8","input":[{"Users":[[1,"JOHN@EXAMPLE.com"],[2,"12345@abc.com"],[3,"john doe@example.com"],[4,"jo+hn@example.com"]]}]},
+    {"name":"Test 9","input":[{"Users":[[1,"_@x.com"],[2,"user@x_y.com"],[3,"user@xy.com"],[4,"user.com"],[5,"user@com"],[6,"pat@mailxcom"]]}]},
+    {"name":"Test 10","input":[{"Users":[[1,"alice@example.com"],[2,"bob_at_example.com"],[3,"charlie@example.net"],[4,"david@domain.com"],[5,"eve@invalid"],[6,"frank@domain.com.com"],[7,"gina@leetcode.com"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery rule is about the shape of a single string, and together they describe the whole address from its first character to its last: word characters, one `@`, letters, `.com`. A regular expression anchored at both ends states that shape in one condition, and anything that does not fit it exactly (a second `@`, a dot in the user name, a digit in the domain, a different ending) is rejected automatically.\n\n## Approach\n\n1. Read every row of `Users`.\n2. Keep the rows whose `email` matches `^[A-Za-z0-9_]+@[A-Za-z]+\\\\.com$`: `^` and `$` force the pattern to cover the whole address, `[A-Za-z0-9_]+` is the non-empty user name, `@` appears once because neither character class contains it, `[A-Za-z]+` is the letters-only domain name, and `\\\\.com` is an escaped dot (the doubled backslash in the SQL string reaches the regex as `\\.`) followed by `com`.\n3. Sort by `user_id`.\n\n## Example 1, step by step\n\n- `alice@example.com`: `alice`, `@`, `example`, `.com`: valid.\n- `bob_at_example.com`: there is no `@` at all: invalid.\n- `charlie@example.net`: ends in `.net`: invalid.\n- `david@domain.com`: valid.\n- `eve@invalid`: no `.com` ending: invalid.\n\nThe result is users 1 and 4.\n\n## Complexity\n\n- Time: O(N · L) to test N addresses of length up to L, plus sorting the matches.\n- Space: O(K) for the K valid rows.\n\n## Pitfalls\n\n- Without `^`, `first.last@example.com` matches on its tail `last@example.com`; without `$`, `a@b.comm` matches.\n- In the SQL string the backslash must be doubled (`'\\\\.com'`) so the regex receives `\\.`; an unescaped `.` matches any character, accepting `a@bxcom`.\n- `LIKE '%@%.com'` accepts dots, digits and extra `@` signs that the rules forbid.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `^` ... `$` | the pattern must span the whole address |\n| `[A-Za-z0-9_]+` | user name: one or more letters, digits or underscores |\n| `[A-Za-z]+` | domain name: one or more letters only |\n| `\\\\.com` | a literal dot, then `com` |",
+  "narration": {
+    "1": "The output keeps the user id and the address itself.",
+    "2": "Each user has one address, so every row is checked on its own.",
+    "3": "The anchored pattern requires word characters, one @, letters only, then .com at the very end.",
+    "4": "Valid addresses are listed by ascending user_id."
+  }
+}

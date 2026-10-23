@@ -1,0 +1,56 @@
+{
+  "number": 3384,
+  "title": "Team Dominance by Pass Success",
+  "spec": "recalled",
+  "statement": "Two tables record the passes of one football match:\n\n- `Teams(player_id, team_name)`: `player_id` is unique; every player plays for one of the match's two teams.\n- `Passes(pass_from, time_stamp, pass_to)`: one row per pass from player `pass_from` to player `pass_to`, both listed in `Teams`. `time_stamp` is the match time as `'MM:SS'` (minutes and seconds) from `00:00` to `90:00`, and `(pass_from, time_stamp)` is unique.\n\nThe first half covers time stamps `00:00` through `45:00` (inclusive); the second half covers `45:01` through `90:00`. A pass belongs to the team of its passer, `pass_from`. It earns that team **+1** when `pass_to` plays for the same team and **-1** when `pass_to` plays for the other team (an interception).\n\nFor each team and half, report `team_name`, `half_number` (`1` or `2`) and `dominance`, the sum of the points of the team's passes in that half. A team and half with no passes by that team does not appear. Order the rows by `team_name`, then `half_number`, both ascending.",
+  "constraints": [
+    "player_id is unique in Teams",
+    "Teams holds at most two distinct team names",
+    "(pass_from, time_stamp) is unique in Passes",
+    "pass_from and pass_to are different players listed in Teams",
+    "time_stamp is 'MM:SS' between 00:00 and 90:00"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Teams": [["player_id","INT"],["team_name","VARCHAR(100)"]],
+    "Passes": [["pass_from","INT"],["time_stamp","VARCHAR(5)"],["pass_to","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Teams = [], Passes = [] }] = input;\n  const team = new Map(), names = new Map();\n  for (const [id, name] of Teams) {\n    if (id === null || name === null) return 'Every player needs a player_id and a team_name.';\n    if (team.has(id)) return `player_id ${id} appears twice in Teams.`;\n    team.set(id, name);\n    const key = name.toLowerCase();\n    if (names.has(key) && names.get(key) !== name) return `Team ${name} is spelled two ways.`;\n    names.set(key, name);\n  }\n  if (names.size > 2) return 'A match has at most two teams.';\n  const seen = new Set();\n  for (const [from, time, to] of Passes) {\n    if (!team.has(from) || !team.has(to)) return 'Every pass must be between players listed in Teams.';\n    if (from === to) return `Player ${from} passes to themselves.`;\n    if (time === null || !/^\\d\\d:[0-5]\\d$/.test(time) || time > '90:00') return `time_stamp ${time} must be MM:SS between 00:00 and 90:00.`;\n    if (seen.has(`${from}|${time}`)) return `Player ${from} passes twice at ${time}.`;\n    seen.add(`${from}|${time}`);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH scored AS (\n  SELECT passer.team_name,\n         IF(p.time_stamp <= '45:00', 1, 2) AS half_number,\n         IF(receiver.team_name = passer.team_name, 1, -1) AS points\n  FROM Passes AS p\n  JOIN Teams AS passer\n    ON passer.player_id = p.pass_from\n  JOIN Teams AS receiver\n    ON receiver.player_id = p.pass_to\n)\nSELECT team_name, half_number, SUM(points) AS dominance\nFROM scored\nGROUP BY team_name, half_number\nORDER BY team_name, half_number;",
+  "brute": "SELECT t.team_name,\n       h.half_number,\n       SUM(CASE\n             WHEN EXISTS (SELECT 1 FROM Teams AS mate\n                          WHERE mate.player_id = p.pass_to AND mate.team_name = t.team_name) THEN 1\n             ELSE -1\n           END) AS dominance\nFROM Teams AS t\nJOIN Passes AS p\n  ON p.pass_from = t.player_id\nJOIN (SELECT 1 AS half_number, '00:00' AS first_time, '45:00' AS last_time\n      UNION ALL\n      SELECT 2, '45:01', '90:00') AS h\n  ON p.time_stamp BETWEEN h.first_time AND h.last_time\nGROUP BY t.team_name, h.half_number\nORDER BY t.team_name, h.half_number",
+  "generator": "function generate(rand, size) {\n  const clubs = ['Arsenal', 'Chelsea', 'Ajax', 'Porto', 'Lazio', 'Benfica'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const home = pick(clubs);\n  let away = pick(clubs);\n  while (away === home) away = pick(clubs);\n  const players = size === 'small' ? Math.floor(rand() * 9) : 30;\n  const Teams = [];\n  for (let i = 0; i < players; i++) Teams.push([i + 1, rand() < 0.5 ? home : away]);\n  // Boundary times come up often so both sides of half time are exercised.\n  const special = ['00:00', '45:00', '45:01', '90:00', '44:59', '46:00'];\n  const time = () => {\n    if (rand() < 0.3) return pick(special);\n    const minute = Math.floor(rand() * 91);\n    return minute === 90 ? '90:00' : `${String(minute).padStart(2, '0')}:${String(Math.floor(rand() * 60)).padStart(2, '0')}`;\n  };\n  const Passes = [], seen = new Set();\n  const target = players < 2 ? 0 : size === 'small' ? Math.floor(rand() * 9) : 2000;\n  for (let tries = 0; Passes.length < target && tries < target * 5; tries++) {\n    const from = 1 + Math.floor(rand() * players);\n    let to = 1 + Math.floor(rand() * players);\n    if (to === from) to = (to % players) + 1;\n    const at = time();\n    if (seen.has(`${from}|${at}`)) continue;\n    seen.add(`${from}|${at}`);\n    Passes.push([from, at, to]);\n  }\n  return [{ Teams, Passes }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"],[3,"Arsenal"],[4,"Chelsea"],[5,"Chelsea"],[6,"Chelsea"]],"Passes":[[1,"00:15",2],[2,"00:45",3],[3,"01:15",1],[4,"00:30",1],[2,"46:00",3],[3,"46:15",4],[1,"46:45",2],[5,"46:30",6]]}],"expected":{"columns":["team_name","half_number","dominance"],"rows":[["Arsenal",1,3],["Arsenal",2,1],["Chelsea",1,-1],["Chelsea",2,1]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Teams":[[1,"Arsenal"],[2,"Chelsea"]],"Passes":[]}]},
+    {"name":"Test 2","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"]],"Passes":[[1,"10:00",2]]}]},
+    {"name":"Test 3","input":[{"Teams":[[1,"Ajax"],[2,"Ajax"],[3,"Porto"],[4,"Porto"]],"Passes":[[1,"45:00",2],[2,"45:01",1],[3,"00:00",4],[4,"90:00",3]]}]},
+    {"name":"Test 4","input":[{"Teams":[[1,"Lazio"],[2,"Lazio"],[3,"Benfica"],[4,"Benfica"]],"Passes":[[1,"05:00",3],[2,"06:00",4],[1,"50:00",4],[3,"20:00",1]]}]},
+    {"name":"Test 5","input":[{"Teams":[[1,"Chelsea"],[2,"Chelsea"],[3,"Arsenal"],[4,"Arsenal"]],"Passes":[[1,"12:00",2],[2,"13:00",3],[3,"60:00",4],[4,"61:00",3],[3,"62:00",1]]}]},
+    {"name":"Test 6","input":[{"Teams":[[1,"Porto"],[2,"Porto"],[3,"Ajax"]],"Passes":[[1,"30:00",2],[2,"31:00",1],[1,"75:30",2]]}]},
+    {"name":"Test 7","input":[{"Teams":[[1,"Benfica"],[2,"Benfica"],[3,"Porto"],[4,"Porto"]],"Passes":[[1,"44:59",2],[1,"45:00",3],[3,"46:00",4],[4,"46:10",1],[3,"89:59",4],[4,"90:00",2]]}]},
+    {"name":"Test 8","input":[{"Teams":[[7,"Chelsea"],[8,"Chelsea"],[9,"Chelsea"],[1,"Arsenal"]],"Passes":[[7,"01:00",8],[7,"02:00",9],[7,"03:00",1],[8,"04:00",7],[1,"05:00",9],[7,"46:00",8]]}]},
+    {"name":"Test 9","input":[{"Teams":[[1,"Lazio"],[2,"Ajax"],[3,"Lazio"],[4,"Ajax"]],"Passes":[[1,"00:01",3],[2,"00:02",4],[4,"00:03",2],[3,"46:00",2],[2,"47:00",1],[2,"48:00",4]]}]},
+    {"name":"Test 10","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"],[3,"Chelsea"],[4,"Chelsea"]],"Passes":[[1,"00:10",2],[2,"00:20",3],[3,"45:30",4],[4,"45:40",1],[1,"45:50",2],[2,"46:00",1]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery pass is scored from the passer's side: +1 if it reaches a teammate, -1 if an opponent receives it. Two facts are missing from `Passes` itself: which team each of the two players plays for. Joining `Teams` twice, once for the passer and once for the receiver, supplies both. After that each pass becomes a row (team, half, points), and the answer is a plain `SUM` per team and half.\n\n## Approach\n\n1. `scored`: join `Passes` to `Teams` as `passer` (on `pass_from`) and again as `receiver` (on `pass_to`).\n2. In the same CTE, map `time_stamp <= '45:00'` to half 1 and later times to half 2. The fixed `MM:SS` format makes text comparison match time order.\n3. Still in `scored`, give `points` = 1 when both players share a team and -1 otherwise.\n4. Group by `team_name` and `half_number`, sum the points as `dominance`, and order by both keys.\n\n## Example 1, step by step\n\n- First half: Arsenal's passes 1→2 (00:15), 2→3 (00:45) and 3→1 (01:15) all reach teammates: +3. Chelsea's only first-half pass, 4→1 at 00:30, is intercepted: -1.\n- Second half: Arsenal plays 2→3 (+1), 3→4 (-1, Chelsea receives) and 1→2 (+1), a total of 1. Chelsea's 5→6 at 46:30 earns +1.\n- Sorted: (Arsenal, 1, 3), (Arsenal, 2, 1), (Chelsea, 1, -1), (Chelsea, 2, 1).\n\n## Complexity\n\n- Time: O(P + T) with hash joins for P passes and T players, plus sorting the at most four groups.\n- Space: O(P) for the scored rows.\n\n## Pitfalls\n\n- `45:00` belongs to the first half; testing `< '45:00'` moves it to the second.\n- Credit goes to the passer's team; grouping by the receiver's team scores interceptions for the wrong side.\n- Counting only successful passes ignores the -1 for interceptions.\n- A `LEFT JOIN` from `Teams` would add rows for teams with no passes, which must not appear.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `p` | `Passes`, one row per pass |\n| `passer` | `Teams` row of `pass_from`; its team owns the pass |\n| `receiver` | `Teams` row of `pass_to` |\n| `scored` | each pass as (`team_name`, `half_number`, `points`) |\n| `dominance` | sum of `points` per team and half |",
+  "narration": {
+    "1": "The CTE scored turns every pass into one row with its team, half and points.",
+    "3": "Time stamps up to 45:00 are the first half; the fixed MM:SS format makes text comparison follow time order.",
+    "4": "A pass is worth +1 when the receiver is a teammate and -1 when an opponent intercepts it.",
+    "6": "Teams joined on pass_from gives the passer's team, which owns the pass.",
+    "8": "Teams joined a second time on pass_to gives the receiver's team.",
+    "11": "Summing the points per team and half gives the dominance score.",
+    "13": "One row per team and half in which that team made at least one pass.",
+    "14": "Rows are ordered by team name, then by half."
+  }
+}

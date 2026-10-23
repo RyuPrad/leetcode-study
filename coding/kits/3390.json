@@ -1,0 +1,57 @@
+{
+  "number": 3390,
+  "title": "Longest Team Pass Streak",
+  "spec": "recalled",
+  "statement": "Two tables record the passes of one football match:\n\n- `Teams(player_id, team_name)`: `player_id` is unique; every player plays for one of the match's two teams.\n- `Passes(pass_from, time_stamp, pass_to)`: one row per pass from player `pass_from` to player `pass_to`, both listed in `Teams`. `time_stamp` is the match time as `'MM:SS'` from `00:00` to `90:00`; no two passes share a time stamp.\n\nA pass belongs to the team of its passer. It is **successful** when `pass_to` plays for the same team, and **intercepted** when `pass_to` plays for the other team. Take each team's own passes in time order: a *streak* is a run of consecutive successful passes of that team, and it ends at the team's next intercepted pass. Passes made by the other team in between do not break it.\n\nFor every team with at least one successful pass, report `team_name` and `longest_streak`, the number of passes in its longest streak. Order the rows by `team_name` ascending.",
+  "constraints": [
+    "player_id is unique in Teams",
+    "Teams holds at most two distinct team names",
+    "time_stamp is unique in Passes",
+    "pass_from and pass_to are different players listed in Teams",
+    "time_stamp is 'MM:SS' between 00:00 and 90:00"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Teams": [["player_id","INT"],["team_name","VARCHAR(100)"]],
+    "Passes": [["pass_from","INT"],["time_stamp","VARCHAR(5)"],["pass_to","INT"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Teams = [], Passes = [] }] = input;\n  const team = new Map(), names = new Map();\n  for (const [id, name] of Teams) {\n    if (id === null || name === null) return 'Every player needs a player_id and a team_name.';\n    if (team.has(id)) return `player_id ${id} appears twice in Teams.`;\n    team.set(id, name);\n    const key = name.toLowerCase();\n    if (names.has(key) && names.get(key) !== name) return `Team ${name} is spelled two ways.`;\n    names.set(key, name);\n  }\n  if (names.size > 2) return 'A match has at most two teams.';\n  const times = new Set();\n  for (const [from, time, to] of Passes) {\n    if (!team.has(from) || !team.has(to)) return 'Every pass must be between players listed in Teams.';\n    if (from === to) return `Player ${from} passes to themselves.`;\n    if (time === null || !/^\\d\\d:[0-5]\\d$/.test(time) || time > '90:00') return `time_stamp ${time} must be MM:SS between 00:00 and 90:00.`;\n    if (times.has(time)) return `Two passes happen at ${time}.`;\n    times.add(time);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH team_passes AS (\n  SELECT passer.team_name, p.time_stamp,\n         IF(receiver.team_name = passer.team_name, 1, 0) AS is_success\n  FROM Passes AS p\n  JOIN Teams AS passer\n    ON passer.player_id = p.pass_from\n  JOIN Teams AS receiver\n    ON receiver.player_id = p.pass_to\n),\nstreaks AS (\n  SELECT team_name, time_stamp, is_success,\n         SUM(1 - is_success) OVER (PARTITION BY team_name ORDER BY time_stamp) AS streak_id\n  FROM team_passes\n),\nstreak_lengths AS (\n  SELECT team_name, streak_id, COUNT(*) AS streak_length\n  FROM streaks\n  WHERE is_success = 1\n  GROUP BY team_name, streak_id\n)\nSELECT team_name, MAX(streak_length) AS longest_streak\nFROM streak_lengths\nGROUP BY team_name\nORDER BY team_name;",
+  "brute": "WITH team_passes AS (\n  SELECT f.team_name, p.time_stamp,\n         CASE WHEN f.team_name = r.team_name THEN 1 ELSE 0 END AS ok\n  FROM Passes AS p, Teams AS f, Teams AS r\n  WHERE f.player_id = p.pass_from AND r.player_id = p.pass_to\n),\nlabeled AS (\n  SELECT s.team_name,\n         COALESCE((SELECT MAX(b.time_stamp)\n                   FROM team_passes AS b\n                   WHERE b.team_name = s.team_name AND b.ok = 0 AND b.time_stamp < s.time_stamp), 'start') AS last_break\n  FROM team_passes AS s\n  WHERE s.ok = 1\n),\nruns AS (\n  SELECT team_name, last_break, COUNT(*) AS n\n  FROM labeled\n  GROUP BY team_name, last_break\n)\nSELECT team_name, MAX(n) AS longest_streak\nFROM runs\nGROUP BY team_name\nORDER BY team_name",
+  "generator": "function generate(rand, size) {\n  const clubs = ['Arsenal', 'Chelsea', 'Ajax', 'Porto', 'Lazio', 'Benfica'];\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const home = pick(clubs);\n  let away = pick(clubs);\n  while (away === home) away = pick(clubs);\n  const players = size === 'small' ? Math.floor(rand() * 9) : 30;\n  const Teams = [];\n  for (let i = 0; i < players; i++) Teams.push([i + 1, i === 0 ? home : i === 1 ? away : rand() < 0.5 ? home : away]);\n  const count = players < 2 ? 0 : size === 'small' ? Math.floor(rand() * 10) : 2000;\n  // Distinct match seconds, sorted, become the time stamps.\n  const seconds = new Set();\n  while (seconds.size < count) seconds.add(Math.floor(rand() * 5401));\n  const times = [...seconds].sort((a, b) => a - b).map(s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`);\n  // The ball usually moves on from whoever received it; sometimes another player starts a pass.\n  const Passes = [];\n  let holder = 1 + Math.floor(rand() * players);\n  for (const at of times) {\n    if (rand() < 0.25) holder = 1 + Math.floor(rand() * players);\n    const own = Teams[holder - 1][1];\n    const mates = Teams.filter(([id, name]) => id !== holder && name === own).map(([id]) => id);\n    const others = Teams.filter(([, name]) => name !== own).map(([id]) => id);\n    const pool = mates.length && (rand() < 0.75 || !others.length) ? mates : others.length ? others : mates;\n    if (!pool.length) continue;\n    const to = pick(pool);\n    Passes.push([holder, at, to]);\n    holder = to;\n  }\n  // Store the rows out of time order.\n  for (let i = Passes.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [Passes[i], Passes[j]] = [Passes[j], Passes[i]];\n  }\n  return [{ Teams, Passes }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"],[3,"Arsenal"],[4,"Arsenal"],[5,"Chelsea"],[6,"Chelsea"],[7,"Chelsea"],[8,"Chelsea"]],"Passes":[[1,"00:05",2],[2,"00:07",3],[3,"00:08",4],[4,"00:10",5],[6,"00:15",7],[7,"00:17",8],[8,"00:20",6],[6,"00:22",5],[1,"00:25",2],[2,"00:27",3]]}],"expected":{"columns":["team_name","longest_streak"],"rows":[["Arsenal",3],["Chelsea",4]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Teams":[[1,"Arsenal"],[2,"Chelsea"]],"Passes":[]}]},
+    {"name":"Test 2","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"],[3,"Chelsea"]],"Passes":[[1,"10:00",2]]}]},
+    {"name":"Test 3","input":[{"Teams":[[1,"Ajax"],[2,"Ajax"],[3,"Porto"],[4,"Porto"]],"Passes":[[1,"01:00",3],[3,"02:00",4],[4,"03:00",1],[2,"04:00",3]]}]},
+    {"name":"Test 4","input":[{"Teams":[[1,"Lazio"],[2,"Lazio"],[3,"Benfica"],[4,"Benfica"]],"Passes":[[1,"05:00",2],[2,"05:10",1],[3,"05:20",4],[4,"05:30",3],[1,"05:40",2]]}]},
+    {"name":"Test 5","input":[{"Teams":[[1,"Arsenal"],[2,"Arsenal"],[3,"Chelsea"]],"Passes":[[1,"00:10",2],[2,"00:20",1],[1,"00:30",3],[2,"00:40",1],[1,"00:50",2],[2,"01:00",1]]}]},
+    {"name":"Test 6","input":[{"Teams":[[1,"Porto"],[2,"Porto"],[3,"Ajax"],[4,"Ajax"]],"Passes":[[2,"30:00",1],[1,"10:00",2],[1,"20:00",3],[2,"40:00",1],[3,"15:00",4],[4,"25:00",3],[1,"50:00",2]]}]},
+    {"name":"Test 7","input":[{"Teams":[[1,"Benfica"],[2,"Benfica"],[3,"Lazio"],[4,"Lazio"]],"Passes":[[1,"00:01",3],[3,"00:02",1],[1,"00:03",2],[2,"00:04",1],[4,"00:05",1]]}]},
+    {"name":"Test 8","input":[{"Teams":[[1,"Chelsea"],[2,"Chelsea"],[3,"Arsenal"],[4,"Arsenal"]],"Passes":[[1,"09:59",2],[2,"10:00",1],[3,"10:01",4],[4,"10:02",3],[1,"10:03",3],[3,"10:04",1]]}]},
+    {"name":"Test 9","input":[{"Teams":[[5,"Ajax"],[6,"Ajax"],[7,"Ajax"]],"Passes":[[5,"44:00",6],[6,"45:00",7],[7,"46:00",5],[5,"89:59",7],[7,"90:00",6]]}]},
+    {"name":"Test 10","input":[{"Teams":[[1,"Porto"],[2,"Porto"],[3,"Lazio"],[4,"Lazio"]],"Passes":[[1,"00:10",2],[2,"00:20",3],[3,"00:30",4],[4,"00:40",1],[1,"00:50",2],[2,"01:00",1],[1,"01:10",4],[4,"01:20",3],[3,"01:30",4],[4,"01:40",3]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is a gaps-and-islands problem. Look at one team's passes in time order, each marked successful or intercepted. Interceptions are the gaps; every island of successful passes between two of them is a streak. A running count of the interceptions seen so far is the same for all passes of one island and grows by one at every gap, so it works as an island id: count the successful passes per id and keep the largest count.\n\n## Approach\n\n1. `team_passes`: join `Passes` to `Teams` twice, as `passer` and `receiver`, to get the owning team and `is_success` (1 when both teams match).\n2. `streaks`: `SUM(1 - is_success) OVER (PARTITION BY team_name ORDER BY time_stamp)` counts the team's interceptions up to each pass; that running count is `streak_id`.\n3. `streak_lengths`: drop the interceptions and count the passes of each `(team_name, streak_id)`.\n4. The final `SELECT` keeps the maximum `streak_length` per team, ordered by `team_name`.\n\n## Example 1, step by step\n\n- Arsenal, in time order: 00:05, 00:07, 00:08 succeed (`streak_id` 0), 00:10 is intercepted by player 5 (`streak_id` becomes 1), then 00:25 and 00:27 succeed (`streak_id` 1).\n- Chelsea: 00:15, 00:17, 00:20 and 00:22 all reach teammates, so all four have `streak_id` 0.\n- `streak_lengths`: (Arsenal, 0, 3), (Arsenal, 1, 2), (Chelsea, 0, 4).\n- Maximums: Arsenal 3, Chelsea 4.\n\n## Complexity\n\n- Time: O(P log P) for P passes, dominated by sorting each team's passes for the window.\n- Space: O(P) for the intermediate tables.\n\n## Pitfalls\n\n- Ordering the window over all passes instead of partitioning by team lets the other team's passes split a streak.\n- Counting interceptions inside a streak: filter `is_success = 1` before `COUNT(*)`.\n- The window must order by `time_stamp`; the rows are not stored in time order.\n- A team whose passes were all intercepted has no streak and does not appear.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `passer`, `receiver` | `Teams` rows of `pass_from` and `pass_to` |\n| `team_passes` | each pass with its team and `is_success` |\n| `streaks` | each pass with `streak_id`, the team's interceptions so far |\n| `streak_lengths` | successful passes per team and `streak_id` |\n| `longest_streak` | the largest `streak_length` of the team |",
+  "narration": {
+    "1": "The CTE team_passes labels every pass with the passing team and whether it reached a teammate.",
+    "3": "is_success is 1 when passer and receiver play for the same team and 0 for an interception.",
+    "5": "Teams joined on pass_from gives the team that owns the pass.",
+    "7": "Teams joined again on pass_to gives the receiver's team.",
+    "12": "A running count of interceptions per team, in time order, numbers the streaks: it only changes at an interception.",
+    "15": "streak_lengths counts the successful passes that share a team and streak_id.",
+    "18": "Interceptions are dropped so they do not count toward any streak.",
+    "21": "Each team keeps the length of its longest streak.",
+    "24": "Rows are ordered by team name."
+  }
+}

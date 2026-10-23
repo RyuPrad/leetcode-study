@@ -1,0 +1,75 @@
+{
+  "number": 2093,
+  "title": "Minimum Cost to Reach City With Discounts",
+  "spec": "recalled",
+  "statement": "There are `n` cities labelled `0` to `n - 1`. Each entry `highways[i] = [city1, city2, toll]` is a road that can be driven in either direction between `city1` and `city2`, and every trip along it costs `toll`.\n\nYou also hold `discounts` coupons. Using one coupon on a road lowers that trip's cost to `floor(toll / 2)`. A coupon is gone once used, and at most one coupon can be applied to a single trip along a road.\n\nReturn the cheapest total cost of travelling from city `0` to city `n - 1`, or `-1` if city `n - 1` cannot be reached from city `0`.",
+  "constraints": [
+    "2 <= n <= 1000",
+    "1 <= highways.length <= 1000",
+    "highways[i].length == 3",
+    "0 <= city1, city2 <= n - 1",
+    "city1 != city2",
+    "0 <= toll <= 10^5",
+    "0 <= discounts <= 500",
+    "No two highways join the same pair of cities"
+  ],
+  "signature": "int minimumCost(int n, int[][] highways, int discounts)",
+  "entry": "minimumCost",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "highways",
+    "discounts"
+  ],
+  "validator": "function validate([n, highways, discounts]) {\n  if (!Number.isInteger(n) || n < 2 || n > 1000) return 'n must be between 2 and 1000.';\n  if (!Array.isArray(highways) || highways.length < 1 || highways.length > 1000) return 'highways needs 1 to 1000 roads.';\n  const seen = new Set();\n  for (const road of highways) {\n    if (!Array.isArray(road) || road.length !== 3) return 'Each highway is [city1, city2, toll].';\n    const [a, b, toll] = road;\n    if (![a, b, toll].every(Number.isInteger)) return 'Highway values must be integers.';\n    if (a < 0 || a >= n || b < 0 || b >= n) return 'Cities must be between 0 and n - 1.';\n    if (a === b) return 'A highway joins two different cities.';\n    if (toll < 0 || toll > 100000) return 'toll must be between 0 and 100000.';\n    const key = Math.min(a, b) * 1000 + Math.max(a, b);\n    if (seen.has(key)) return 'Two highways join the same pair of cities.';\n    seen.add(key);\n  }\n  if (!Number.isInteger(discounts) || discounts < 0 || discounts > 500) return 'discounts must be between 0 and 500.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumCost(n, highways, discounts) {\n  const graph = Array.from({ length: n }, () => []);\n  for (const [a, b, toll] of highways) {\n    graph[a].push([b, toll]);\n    graph[b].push([a, toll]);\n  }\n  const fewestUsed = new Array(n).fill(Infinity);\n  const heap = [];\n  const push = (entry) => {\n    heap.push(entry);\n    let child = heap.length - 1;\n    while (child > 0) {\n      const parent = (child - 1) >> 1;\n      if (heap[parent][0] <= heap[child][0]) break;\n      [heap[parent], heap[child]] = [heap[child], heap[parent]];\n      child = parent;\n    }\n  };\n  const pop = () => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length > 0) {\n      heap[0] = last;\n      let parent = 0;\n      while (true) {\n        let smallest = parent;\n        const left = 2 * parent + 1;\n        const right = left + 1;\n        if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;\n        if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;\n        if (smallest === parent) break;\n        [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];\n        parent = smallest;\n      }\n    }\n    return top;\n  };\n  push([0, 0, 0]);\n  while (heap.length > 0) {\n    const [cost, city, used] = pop();\n    if (used >= fewestUsed[city]) continue;\n    fewestUsed[city] = used;\n    if (city === n - 1) return cost;\n    for (const [next, toll] of graph[city]) {\n      if (used < fewestUsed[next]) push([cost + toll, next, used]);\n      if (used < discounts && used + 1 < fewestUsed[next]) push([cost + Math.floor(toll / 2), next, used + 1]);\n    }\n  }\n  return -1;\n}",
+  "brute": "function minimumCost(n, highways, discounts) {\n  // Enumerate every simple path from 0 to n - 1; on a path, the coupons go on the largest tolls.\n  const adj = Array.from({ length: n }, () => []);\n  for (const [a, b, t] of highways) { adj[a].push([b, t]); adj[b].push([a, t]); }\n  let answer = -1;\n  const onPath = new Array(n).fill(false);\n  const tolls = [];\n  const dfs = (city) => {\n    if (city === n - 1) {\n      const sorted = [...tolls].sort((x, y) => y - x);\n      let total = 0;\n      sorted.forEach((t, idx) => { total += idx < discounts ? Math.floor(t / 2) : t; });\n      if (answer === -1 || total < answer) answer = total;\n      return;\n    }\n    onPath[city] = true;\n    for (const [next, t] of adj[city]) {\n      if (onPath[next]) continue;\n      tolls.push(t);\n      dfs(next);\n      tolls.pop();\n    }\n    onPath[city] = false;\n  };\n  dfs(0);\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const small = size === 'small';\n  const n = small ? int(2, 7) : int(600, 1000);\n  const maxEdges = small ? Math.min(n * (n - 1) / 2, int(1, 10)) : 1000;\n  const maxToll = small ? (rand() < 0.5 ? 9 : 40) : 100000;\n  // Shape 0: random roads only (small inputs), 1: a random tree plus extra roads, 2: a long chain plus extra roads.\n  const shape = small ? (rand() < 0.4 ? 0 : int(1, 2)) : (rand() < 0.3 ? 2 : 1);\n  const seen = new Set();\n  const highways = [];\n  const add = (a, b) => {\n    if (a === b || highways.length >= maxEdges) return;\n    const key = Math.min(a, b) * 1000 + Math.max(a, b);\n    if (seen.has(key)) return;\n    seen.add(key);\n    highways.push(rand() < 0.5 ? [a, b, int(0, maxToll)] : [b, a, int(0, maxToll)]);\n  };\n  if (shape > 0) {\n    // A random tree or a chain links the cities; now and then one city is left out so the target may be unreachable.\n    const order = Array.from({ length: n }, (_, i) => i);\n    for (let i = n - 1; i > 0; i--) { const j = int(0, i); [order[i], order[j]] = [order[j], order[i]]; }\n    const wide = rand() < 0.5;\n    const linked = !small && rand() < 0.15 ? n - 2 : n - 1;\n    for (let i = 1; i <= linked; i++) add(order[i], shape === 2 ? order[i - 1] : order[wide ? int(0, i - 1) : int(Math.max(0, i - 3), i - 1)]);\n  }\n  let guard = 0;\n  while (highways.length < maxEdges && guard++ < 100000) add(int(0, n - 1), int(0, n - 1));\n  // Long chains have long paths, so they get fewer coupons to keep the search fast.\n  const discounts = small ? int(0, 4) : shape === 2 ? int(0, 25) : int(0, 500);\n  return [n, highways, discounts];\n}",
+  "examples": [
+    {"name":"Example 1","input":[5,[[0,1,4],[2,1,3],[1,4,11],[3,2,3],[3,4,2]],1],"expected":9},
+    {"name":"Example 2","input":[4,[[1,3,17],[1,2,7],[3,2,5],[0,1,6],[3,0,20]],20],"expected":8},
+    {"name":"Example 3","input":[4,[[0,1,3],[2,3,2]],0],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,[[0,1,7]],0]},
+    {"name":"Test 2","input":[2,[[1,0,7]],1]},
+    {"name":"Test 3","input":[2,[[0,1,1]],500]},
+    {"name":"Test 4","input":[3,[[0,1,0],[1,2,0]],0]},
+    {"name":"Test 5","input":[3,[[0,1,5]],3]},
+    {"name":"Test 6","input":[4,[[0,1,1],[1,2,1],[2,3,1],[0,3,6]],1]},
+    {"name":"Test 7","input":[4,[[0,1,1],[1,2,1],[2,3,1],[0,3,6]],0]},
+    {"name":"Test 8","input":[5,[[0,1,100000],[1,2,100000],[2,3,100000],[3,4,100000]],2]},
+    {"name":"Test 9","input":[5,[[0,2,10],[2,4,10],[0,1,3],[1,3,3],[3,4,3],[1,2,1]],2]},
+    {"name":"Test 10","input":[6,[[0,1,9],[1,5,9],[0,2,2],[2,3,2],[3,4,2],[4,5,2],[2,5,13]],1]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithout coupons this is plain Dijkstra. With coupons, a position is a state `(city, used)`: arriving somewhere having spent a coupon differs from arriving having spent none. From a state, each road offers two moves: pay the full toll, or spend a coupon (if one is left) and pay half. Dijkstra takes states off the heap in cost order, so once a city has been expanded, a later state there that spent at least as many coupons is no better and can be skipped. A brute force tries every simple path with the coupons on its largest tolls; it is exponential.\n\n## Approach\n\n1. Build an adjacency list `graph`, adding each road in both directions.\n2. Keep `fewestUsed[city]` (`Infinity` at first) and a min-heap of `[cost, city, used]` holding `[0, 0, 0]`.\n3. Pop the cheapest entry. If `used >= fewestUsed[city]`, an earlier state here cost no more and spent no more coupons: skip it. Otherwise set `fewestUsed[city] = used`.\n4. If `city` is `n - 1`, return `cost`.\n5. For each road `[next, toll]`, push `[cost + toll, next, used]` and, if a coupon is left, `[cost + floor(toll / 2), next, used + 1]`, skipping states `next` has already beaten.\n6. If the heap empties, city `n - 1` is unreachable: return `-1`.\n\n## Example 1, step by step\n\n`discounts = 1`. Pop `(0, 0)` at 0: push `(1, 0)` at 4 and `(1, 1)` at 2. Pop `(1, 1)` at 2: no coupon left, so push `(2, 1)` at 5 and `(4, 1)` at 13. Pop `(1, 0)` at 4: it spent fewer coupons, so it is expanded too and pushes `(4, 1)` at `4 + 5 = 9`, among others. States at cities 2 and 3 follow (costs 5 to 8), and then `(4, 1)` at 9 is the cheapest entry, so the answer is `9`.\n\n## Complexity\n\n- Time: O(E · D · log(E · D)) for E roads and D = `discounts` + 1: each state is expanded at most once and pushes at most two entries per road.\n- Space: O(E · D) for the heap.\n\n## Pitfalls\n\n- One cost per city is not enough: a pricier arrival that saved coupons can win later.\n- Odd tolls round down: use `Math.floor(toll / 2)`.\n- Without the `fewestUsed` check, cities are re-expanded with ever more coupons spent and the search crawls.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | for each city, its `[next, toll]` roads |\n| `fewestUsed` | fewest coupons spent by a state already expanded at each city |\n| `heap`, `push`, `pop` | min-heap of `[cost, city, used]` and its operations |\n| `cost`, `city`, `used` | the state taken off the heap |\n| `next`, `toll` | a neighbouring city and the road's toll |",
+  "narration": {
+    "2": "One list of neighbours per city.",
+    "3": "Each road can be driven both ways...",
+    "4": "...so add it to city a's list...",
+    "5": "...and to city b's list.",
+    "7": "fewestUsed[city] is the fewest coupons spent by any state already expanded at that city.",
+    "8": "The min-heap holds [cost, city, used] entries ordered by cost.",
+    "9": "push adds an entry and lifts it while it is cheaper than its parent.",
+    "19": "pop removes the cheapest entry and sinks the last entry into its place.",
+    "38": "Start in city 0, no coupons spent, at cost 0.",
+    "39": "Keep expanding states while any are queued.",
+    "40": "Take the cheapest queued state.",
+    "41": "This city was already expanded more cheaply with no more coupons spent, so this state cannot help; skip it.",
+    "42": "Remember that this city has now been expanded with this few coupons spent.",
+    "43": "States come off the heap in cost order, so the first arrival at city n - 1 is the cheapest.",
+    "44": "Try every road leaving this city.",
+    "45": "Drive it paying the full toll, keeping the same number of coupons spent.",
+    "46": "If a coupon is left, also drive it for half the toll, rounded down, spending one coupon.",
+    "49": "The heap ran dry without reaching city n - 1, so it cannot be reached."
+  }
+}

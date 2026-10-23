@@ -1,0 +1,65 @@
+{
+  "number": 2305,
+  "title": "Fair Distribution of Cookies",
+  "spec": "leetcode",
+  "statement": "Bag `i` holds `cookies[i]` cookies, and there are `k` children. Every bag has to be handed, whole and unopened, to exactly one child; a child may end up with several bags. Call a distribution's **unfairness** the largest cookie total that any single child receives. Return the smallest unfairness you can achieve over all possible distributions.",
+  "constraints": [
+    "2 <= cookies.length <= 8",
+    "1 <= cookies[i] <= 10^5",
+    "2 <= k <= cookies.length"
+  ],
+  "signature": "int distributeCookies(int[] cookies, int k)",
+  "entry": "distributeCookies",
+  "kind": "function",
+  "parameters": [
+    "cookies",
+    "k"
+  ],
+  "validator": "function validate([cookies, k]) {\n  if (!Array.isArray(cookies) || cookies.length < 2 || cookies.length > 8) return 'cookies needs 2 to 8 bags.';\n  if (cookies.some(v => !Number.isInteger(v) || v < 1 || v > 100000)) return 'Each bag holds between 1 and 100000 cookies.';\n  if (!Number.isInteger(k) || k < 2 || k > cookies.length) return 'k is between 2 and the number of bags.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function distributeCookies(cookies, k) {\n  const bags = [...cookies].sort((a, b) => b - a);\n  const loads = new Array(k).fill(0);\n  let best = Infinity;\n\n  function place(index, worst) {\n    if (worst >= best) {\n      return;\n    }\n    if (index === bags.length) {\n      best = worst;\n      return;\n    }\n    for (let child = 0; child < k; child++) {\n      loads[child] += bags[index];\n      place(index + 1, Math.max(worst, loads[child]));\n      loads[child] -= bags[index];\n      if (loads[child] === 0) {\n        break;\n      }\n    }\n  }\n\n  place(0, 0);\n  return best;\n}",
+  "brute": "function distributeCookies(cookies, k) {\n  const n = cookies.length, full = (1 << n) - 1;\n  const total = new Array(1 << n).fill(0);\n  for (let mask = 1; mask <= full; mask++) {\n    const low = mask & -mask;\n    total[mask] = total[mask ^ low] + cookies[31 - Math.clz32(low)];\n  }\n  // cost[mask] = best unfairness when the bags in mask go to the children handled so far.\n  let cost = total.slice();\n  for (let child = 2; child <= k; child++) {\n    const next = new Array(1 << n).fill(Infinity);\n    for (let mask = 0; mask <= full; mask++) {\n      for (let sub = mask; ; sub = (sub - 1) & mask) {\n        next[mask] = Math.min(next[mask], Math.max(cost[mask ^ sub], total[sub]));\n        if (sub === 0) break;\n      }\n    }\n    cost = next;\n  }\n  return cost[full];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 7 + Math.floor(rand() * 2) : 2 + Math.floor(rand() * 5);\n  const k = 2 + Math.floor(rand() * (n - 1));\n  const top = size === 'large' ? 100000 : (rand() < 0.5 ? 10 : 100000);\n  const cookies = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  return [cookies, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[8,15,10,20,8],2],"expected":31},
+    {"name":"Example 2","input":[[6,1,3,2,2,4,1,2],3],"expected":7}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,1],2]},
+    {"name":"Test 2","input":[[5,9],2]},
+    {"name":"Test 3","input":[[3,3,3,3,3,3,3,3],8]},
+    {"name":"Test 4","input":[[3,3,3,3,3,3,3,3],3]},
+    {"name":"Test 5","input":[[100000,1,1,1,1,1,1,1],2]},
+    {"name":"Test 6","input":[[1,2,3,4,5,6,7,8],2]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,8],4]},
+    {"name":"Test 8","input":[[10,10,10,7,7,7,7,1],3]},
+    {"name":"Test 9","input":[[64,32,16,8,4,2,1,1],2]},
+    {"name":"Test 10","input":[[100000,99999,99998,99997,99996,99995,99994,99993],5]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith at most 8 bags, trying every way to hand them out is affordable: each bag picks one of `k` children, at most 8^8 choices. Two cuts make the search fast. First, once some child's total reaches the best unfairness already found, that branch cannot improve the answer. Second, all children who still have nothing are interchangeable, so a bag only needs to try the first empty child. Handing out the biggest bags first makes the first cut fire early.\n\n## Approach\n\n1. Copy the bags into `bags` sorted from largest to smallest, and keep each child's total in `loads`.\n2. `place(index, worst)` hands out `bags[index]`, where `worst` is the largest load so far.\n3. If `worst` is already at least `best`, stop this branch.\n4. If every bag is placed, `worst` beats `best`, so store it.\n5. Otherwise give the bag to each `child` in turn, recurse with the new maximum, then take it back.\n6. If that child's load is `0` after taking the bag back, the child was empty; every later child is empty too, so stop the loop.\n\n## Example 1, step by step\n\n`bags` becomes `[20, 15, 10, 8, 8]` with `k = 2`. The first full path gives everything to child 0, so `best = 61`. The bag `20` is never tried with child 1, because child 1 is empty at that moment. Backtracking moves the last bags to child 1 one at a time, improving `best` to `53`, `45`, `43`, `35` and finally `31` with loads `[30, 31]` (`20 + 10` and `15 + 8 + 8`). Every other branch reaches a load of `31` or more and is cut, so the answer is `31`.\n\n## Complexity\n\n- Time: O(k^n) in the worst case, with n ≤ 8; the two cuts remove most branches in practice.\n- Space: O(n + k) for the recursion depth and `loads`.\n\n## Pitfalls\n\n- Each bag goes to exactly one child whole; summing and dividing by `k` gives only a lower bound, not the answer.\n- The empty-child break must happen after undoing the bag, testing that the child is empty again.\n- Prune with `>=`, not `>`: a branch that only ties `best` cannot lower it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `bags` | the bag sizes, largest first |\n| `loads` | cookies each child holds right now |\n| `best` | smallest unfairness found so far |\n| `index` | the bag being handed out |\n| `worst` | largest load in the current partial distribution |\n| `child` | the child receiving `bags[index]` |",
+  "narration": {
+    "2": "Sort a copy of the bags from largest to smallest so that big totals appear early and pruning starts sooner.",
+    "3": "loads[child] is how many cookies that child holds in the current partial distribution.",
+    "4": "No full distribution has been found yet, so the best unfairness starts at Infinity.",
+    "6": "place hands out bags[index]; worst is the largest load so far.",
+    "7": "If some child already has at least best cookies, this branch cannot do better.",
+    "10": "Every bag has been handed out, and this distribution beats the best one.",
+    "11": "Record its unfairness as the new best.",
+    "14": "Try giving the current bag to each child in turn.",
+    "15": "Give the bag to this child.",
+    "16": "Hand out the next bag, with the largest load updated.",
+    "17": "Take the bag back so the next child can be tried.",
+    "18": "If this child is empty again, it was empty before, and so is every later child.",
+    "19": "Empty children are interchangeable, so trying another one would repeat the same work.",
+    "24": "Start with the first bag and no cookies handed out.",
+    "25": "The search has tried every useful distribution; return the smallest unfairness."
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "number": 2313,
+  "title": "Minimum Flips in Binary Tree to Get Result",
+  "spec": "recalled",
+  "statement": "The binary tree `root` encodes a boolean expression.\n\n- A leaf (a node with no children) holds `0` for false or `1` for true, and evaluates to that value.\n- Every other node holds an operator and evaluates its children first: `2` is OR, `3` is AND and `4` is XOR, each with exactly two children; `5` is NOT, with exactly one child, which may be the left or the right one.\n\nIn one operation you may pick any leaf and flip it (`0` becomes `1`, `1` becomes `0`). Return the fewest operations needed so that the root evaluates to the boolean `result`. It is always possible to reach `result`.",
+  "constraints": [
+    "The tree has between 1 and 10^5 nodes",
+    "0 <= Node.val <= 5",
+    "Leaves hold 0 or 1; every non-leaf holds 2, 3, 4 or 5",
+    "Nodes holding 2, 3 or 4 have exactly two children",
+    "Nodes holding 5 have exactly one child"
+  ],
+  "signature": "int minimumFlips(TreeNode root, boolean result)",
+  "entry": "minimumFlips",
+  "kind": "function",
+  "parameters": [
+    "root",
+    "result"
+  ],
+  "validator": "function validate([root, result]) {\n  if (typeof result !== 'boolean') return 'result must be true or false.';\n  if (!Array.isArray(root) || root.length === 0 || root[0] === null) return 'The tree needs at least one node.';\n  const values = root.filter(v => v !== null);\n  if (values.length > 100000) return 'The tree has at most 100000 nodes.';\n  if (values.some(v => !Number.isInteger(v) || v < 0 || v > 5)) return 'Every node value is between 0 and 5.';\n  // Walk the level order to count each node's children.\n  const nodes = [root[0]];\n  let next = 1;\n  for (let q = 0; q < nodes.length; q++) {\n    let children = 0;\n    for (let side = 0; side < 2 && next < root.length; side++) {\n      const v = root[next++];\n      if (v !== null) { nodes.push(v); children++; }\n    }\n    const val = nodes[q];\n    if (children === 0 && val > 1) return 'A leaf must hold 0 or 1.';\n    if (children > 0 && val < 2) return 'A node with children must hold an operator from 2 to 5.';\n    if (val === 5 && children !== 1) return 'A NOT node (5) has exactly one child.';\n    if (val >= 2 && val <= 4 && children !== 2) return 'OR, AND and XOR nodes (2, 3, 4) have exactly two children.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumFlips(root, result) {\n  // cost(node) returns [flips to make it false, flips to make it true].\n  function cost(node) {\n    if (node.left === null && node.right === null) {\n      return node.val === 1 ? [1, 0] : [0, 1];\n    }\n    if (node.val === 5) {\n      const [toFalse, toTrue] = cost(node.left ?? node.right);\n      return [toTrue, toFalse];\n    }\n    const left = cost(node.left);\n    const right = cost(node.right);\n    const best = [Infinity, Infinity];\n    for (let a = 0; a <= 1; a++) {\n      for (let b = 0; b <= 1; b++) {\n        const value = node.val === 2 ? a | b : node.val === 3 ? a & b : a ^ b;\n        best[value] = Math.min(best[value], left[a] + right[b]);\n      }\n    }\n    return best;\n  }\n\n  return cost(root)[result ? 1 : 0];\n}",
+  "brute": "function minimumFlips(root, result) {\n  const leaves = [];\n  const collect = node => {\n    if (!node) return;\n    if (!node.left && !node.right) leaves.push(node);\n    collect(node.left);\n    collect(node.right);\n  };\n  collect(root);\n  const evaluate = (node, flipped) => {\n    if (!node.left && !node.right) return flipped.has(node) ? 1 - node.val : node.val;\n    if (node.val === 5) return 1 - evaluate(node.left || node.right, flipped);\n    const x = evaluate(node.left, flipped), y = evaluate(node.right, flipped);\n    if (node.val === 2) return x || y ? 1 : 0;\n    if (node.val === 3) return x && y ? 1 : 0;\n    return x === y ? 0 : 1;\n  };\n  const want = result ? 1 : 0;\n  let fewest = Infinity;\n  for (let mask = 0; mask < 1 << leaves.length; mask++) {\n    const flipped = new Set(leaves.filter((_, i) => mask >> i & 1));\n    if (flipped.size < fewest && evaluate(root, flipped) === want) fewest = flipped.size;\n  }\n  return fewest;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 900 + Math.floor(rand() * 101) : 1 + Math.floor(rand() * 13);\n  const notRate = rand() * 0.4;\n  // Lopsided trees put almost everything on one side, which makes them deep.\n  const lopsided = rand() < 0.3;\n  const build = count => {\n    if (count === 1) return { val: rand() < 0.5 ? 0 : 1, left: null, right: null };\n    const node = { val: 5, left: null, right: null };\n    if (count === 2 || rand() < notRate) {\n      node[rand() < 0.5 ? 'left' : 'right'] = build(count - 1);\n      return node;\n    }\n    node.val = 2 + Math.floor(rand() * 3);\n    const leftCount = lopsided ? (rand() < 0.5 ? 1 : count - 2) : 1 + Math.floor(rand() * (count - 2));\n    node.left = build(leftCount);\n    node.right = build(count - 1 - leftCount);\n    return node;\n  };\n  const tree = build(n);\n  // Level-order serialisation with null for missing children, trailing nulls removed.\n  const out = [];\n  const queue = [tree];\n  for (let q = 0; q < queue.length; q++) {\n    const node = queue[q];\n    if (node === null) { out.push(null); continue; }\n    out.push(node.val);\n    queue.push(node.left, node.right);\n  }\n  while (out.length && out[out.length - 1] === null) out.pop();\n  return [out, rand() < 0.5];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,5,4,2,null,1,1,1,0],true],"expected":2},
+    {"name":"Example 2","input":[[0],false],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],true]},
+    {"name":"Test 2","input":[[1],false]},
+    {"name":"Test 3","input":[[5,null,1],true]},
+    {"name":"Test 4","input":[[3,0,0],true]},
+    {"name":"Test 5","input":[[2,1,1],false]},
+    {"name":"Test 6","input":[[4,1,1],false]},
+    {"name":"Test 7","input":[[5,5,null,5,null,1],true]},
+    {"name":"Test 8","input":[[3,3,3,0,0,0,0],true]},
+    {"name":"Test 9","input":[[2,4,3,0,0,1,5,null,null,null,null,null,null,null,0],false]},
+    {"name":"Test 10","input":[[4,3,2,1,5,0,0,null,null,1],true]},
+    {"name":"Test 11","input":[[3,5,4,2,null,1,1,1,0],false]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every set of leaves to flip is exponential. Instead, ask each node two questions: how many flips does it take to make this subtree **false**, and how many to make it **true**? A leaf answers directly (0 for the value it already has, 1 for the other). An operator node can answer from its children's answers alone, because the flips in the left and right subtrees are independent.\n\n## Approach\n\n1. `cost(node)` returns a pair: flips to make the subtree false, then flips to make it true.\n2. A leaf costs `0` for its current value and `1` for the other one.\n3. A NOT node takes its only child's pair and swaps it: making NOT false means making the child true.\n4. For OR, AND and XOR, get `left` and `right`, then try all four child values `a` and `b`. The operator turns them into `value`, and the cheapest way to reach each `value` is kept in `best`.\n5. The answer is the root's entry for `result`.\n\n## Example 1, step by step\n\nLeaves `1` cost `[1, 0]` and leaves `0` cost `[0, 1]`. The OR node over `1` and `0` gets `[1, 0]` (it is already true; one flip makes it false). The NOT above it swaps that to `[0, 1]`. The XOR over `1` and `1` is already false, and flipping either leaf makes it true, so it gets `[0, 1]`. The AND root is true only when both children are true: `1 + 1 = 2`; it is already false, which costs `0`. The root's pair is `[0, 2]` and `result` is true, so the answer is `2`.\n\n## Complexity\n\n- Time: O(n): every node is visited once and does a constant amount of work.\n- Space: O(h) for the recursion, where h is the tree height (up to n for a lopsided tree).\n\n## Pitfalls\n\n- A NOT node's child may be on the right; use whichever child exists.\n- Flips in different subtrees add up, so combine children with `+`, then take the minimum per outcome.\n- Do not greedily flip leaves along one path: an AND that must become true may need flips on both sides.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `cost(node)` | `[flips to make it false, flips to make it true]` |\n| `toFalse`, `toTrue` | the NOT node's child pair |\n| `left`, `right` | the children's pairs |\n| `a`, `b` | values chosen for the left and right child |\n| `value` | what the operator produces from `a` and `b` |\n| `best` | cheapest flips found for each result of this node |",
+  "narration": {
+    "3": "cost returns two numbers for a subtree: flips to make it false and flips to make it true.",
+    "4": "A node with no children is a leaf.",
+    "5": "Keeping its current value is free; switching to the other value takes one flip.",
+    "7": "Value 5 is NOT, which has a single child on either side.",
+    "8": "Get the costs for that one child.",
+    "9": "NOT inverts its child, so the two costs swap places.",
+    "11": "OR, AND and XOR need both children's costs.",
+    "13": "Start both outcomes at Infinity until a combination reaches them.",
+    "14": "Try every value the left child could be made to take...",
+    "15": "...combined with every value of the right child.",
+    "16": "Apply this node's operator (2 = OR, 3 = AND, 4 = XOR) to the pair.",
+    "17": "Flips in the two subtrees are independent, so they add; keep the cheapest per outcome.",
+    "20": "Hand both minimal costs up to the parent.",
+    "23": "Pick the root's cost for the requested result."
+  }
+}

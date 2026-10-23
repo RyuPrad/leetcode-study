@@ -1,0 +1,50 @@
+{
+  "number": 3465,
+  "title": "Find Products with Valid Serial Numbers",
+  "spec": "leetcode",
+  "statement": "One table lists products:\n\n- `products(product_id, product_name, description)`: one row per product; `product_id` is unique. `description` is free text.\n\nA product qualifies when its description contains a valid serial number somewhere (not necessarily at the start). A valid serial number is:\n\n- the letters `SN`, uppercase exactly (`sn` or `Sn` do not count);\n- then exactly 4 digits, a hyphen `-`, and exactly 4 digits;\n- a word of its own: the character just before `S` and the character just after the last digit, where they exist, are not a letter, a digit or `_`. So `SN1234-56789` and `XSN1234-5678` do not count, while `(SN1234-5678)` does.\n\nReport `product_id`, `product_name` and `description` of every qualifying product, ordered by `product_id` ascending.",
+  "constraints": [
+    "product_id is unique in products",
+    "SN must be uppercase; the digits are 0-9",
+    "A serial number must not touch a letter, digit or underscore on either side"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "products": [["product_id","INT"],["product_name","VARCHAR(255)"],["description","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ products = [] }] = input;\n  const ids = new Set();\n  for (const [id] of products) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (ids.has(id)) return `product_id ${id} appears twice.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT product_id, product_name, description\nFROM products\nWHERE REGEXP_LIKE(description, '\\\\bSN[0-9]{4}-[0-9]{4}\\\\b', 'c')\nORDER BY product_id;",
+  "brute": "WITH RECURSIVE pos AS (\n  SELECT 1 AS p\n  UNION ALL\n  SELECT p + 1 FROM pos WHERE p < (SELECT MAX(CHAR_LENGTH(description)) FROM products)\n)\nSELECT DISTINCT pr.product_id, pr.product_name, pr.description\nFROM products AS pr\nJOIN pos ON pos.p + 10 <= CHAR_LENGTH(pr.description)\nWHERE ASCII(SUBSTRING(pr.description, pos.p, 1)) = 83\n  AND ASCII(SUBSTRING(pr.description, pos.p + 1, 1)) = 78\n  AND SUBSTRING(pr.description, pos.p + 2, 9) REGEXP '^[0-9]{4}-[0-9]{4}$'\n  AND (pos.p = 1 OR SUBSTRING(pr.description, pos.p - 1, 1) NOT REGEXP '[A-Za-z0-9_]')\n  AND SUBSTRING(pr.description, pos.p + 11, 1) NOT REGEXP '[A-Za-z0-9_]'\nORDER BY pr.product_id",
+  "generator": "function generate(rand, size) {\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const digits = n => Array.from({ length: n }, () => Math.floor(rand() * 10)).join('');\n  const words = ['This', 'is', 'a', 'product', 'with', 'serial', 'Check', 'out', 'No', 'number', 'here', 'model', 'v2', 'in', 'stock'];\n  const serial = () => {\n    const r = rand();\n    if (r < 0.45) return `SN${digits(4)}-${digits(4)}`;\n    if (r < 0.55) return `${pick(['sn', 'Sn', 'sN'])}${digits(4)}-${digits(4)}`;\n    if (r < 0.75) return `SN${digits(pick([3, 4, 5]))}${pick(['-', '-', '_', '', ' - ', '--'])}${digits(pick([3, 4, 5]))}`;\n    return `${pick(['X', '9', '_', '(', '#', ''])}SN${digits(4)}-${digits(4)}${pick(['X', '7', '_', ')', '.', ','])}`;\n  };\n  const description = () => {\n    const parts = [];\n    for (let i = 0, n = 1 + Math.floor(rand() * 5); i < n; i++) parts.push(rand() < 0.3 ? serial() : pick(words));\n    return parts.join(rand() < 0.9 ? ' ' : '');\n  };\n  const rows = size === 'small' ? Math.floor(rand() * 9) : 2000;\n  const ids = Array.from({ length: rows }, (_, i) => i + 1);\n  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const products = ids.map(id => [id, `Widget ${pick(['A', 'B', 'C', 'D', 'E'])}`, description()]);\n  return [{ products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"products":[[1,"Widget A","This is a sample product with SN1234-5678"],[2,"Widget B","A product with serial SN9876-1234 in the description"],[3,"Widget C","Product SN1234-56789 is available now"],[4,"Widget D","No serial number here"],[5,"Widget E","Check out SN4321-8765 in this description"]]}],"expected":{"columns":["product_id","product_name","description"],"rows":[[1,"Widget A","This is a sample product with SN1234-5678"],[2,"Widget B","A product with serial SN9876-1234 in the description"],[5,"Widget E","Check out SN4321-8765 in this description"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"products":[]}]},
+    {"name":"Test 2","input":[{"products":[[1,"Widget A","No serial number here"],[2,"Widget B","Model SN-2024 only"]]}]},
+    {"name":"Test 3","input":[{"products":[[7,"Widget G","SN0000-0000 first thing"]]}]},
+    {"name":"Test 4","input":[{"products":[[1,"Widget A","lower sn1234-5678"],[2,"Widget B","mixed Sn1234-5678"],[3,"Widget C","upper SN1234-5678"],[4,"Widget D","other sN1234-5678"]]}]},
+    {"name":"Test 5","input":[{"products":[[1,"Widget A","SN123-4567"],[2,"Widget B","SN12345-6789"],[3,"Widget C","SN1234-567"],[4,"Widget D","SN1234-56789"],[5,"Widget E","ends with SN1234-5678"]]}]},
+    {"name":"Test 6","input":[{"products":[[1,"Widget A","XSN1234-5678"],[2,"Widget B","SN1234-5678X"],[3,"Widget C","(SN1234-5678)"],[4,"Widget D","Serial:SN1234-5678."],[5,"Widget E","ASN1111-2222 and SN3333-4444"],[6,"Widget F","9SN1234-5678"]]}]},
+    {"name":"Test 7","input":[{"products":[[1,"Widget A","SN1234_5678"],[2,"Widget B","SN12345678"],[3,"Widget C","SN1234 - 5678"],[4,"Widget D","SN-1234-5678"],[5,"Widget E","SN1234--5678"],[6,"Widget F","S N1234-5678"]]}]},
+    {"name":"Test 8","input":[{"products":[[9,"Widget C","see SN5555-6666 here"],[3,"Widget A","SN1-2 and SN9999-0000,"],[6,"Widget B","nothing"],[1,"Widget D","two: SN1111-1111 SN2222-2222"],[4,"Widget E","SN1234-56789 SN1234-5678"]]}]},
+    {"name":"Test 9","input":[{"products":[[2,"Widget A","SN1000-2000"],[1,"Widget B","id SN3000-4000 ok"],[3,"Widget C","#SN5000-6000#"]]}]},
+    {"name":"Test 10","input":[{"products":[[1,"Widget A","_SN1234-5678"],[2,"Widget B","SN1234-5678_"],[3,"Widget C","-SN1234-5678-"],[4,"Widget D","SNSN1234-5678"],[5,"Widget E","SN1234-5678SN1234-5678"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe rule is a text shape, which is exactly what a regular expression describes: `SN`, four digits, a hyphen, four digits. Two details decide most cases. \"Exactly four digits\" means the pattern must not continue into a fifth digit or start after a stray letter, which the word boundary `\\b` handles on both sides. And `SN` must be uppercase, while MySQL's `REGEXP` ignores case under the default collation, so the match needs the case-sensitive flag `'c'`.\n\n## Approach\n\n1. Read every row of `products`.\n2. Keep a row when `REGEXP_LIKE(description, '\\\\bSN[0-9]{4}-[0-9]{4}\\\\b', 'c')` is 1. The pattern reads: a word boundary, `SN`, four digits, `-`, four digits, a word boundary. The pattern is unanchored, so the serial may sit anywhere in the text.\n3. Return the three columns ordered by `product_id`.\n\n## Example 1, step by step\n\n- Product 1: `... with SN1234-5678` ends right after the last digit, so the end of the text is the boundary. Kept.\n- Product 2: `SN9876-1234` is surrounded by spaces. Kept.\n- Product 3: `SN1234-56789` has a fifth digit after the hyphen; after `5678` comes `9`, so no boundary there. Dropped.\n- Product 4: no `SN` at all. Dropped.\n- Product 5: `SN4321-8765` between spaces. Kept.\n\nThe result is products 1, 2 and 5 in id order.\n\n## Complexity\n\n- Time: O(n · L) for n products with descriptions of length L; the regex scans each text once.\n- Space: O(k) for the k matching rows.\n\n## Pitfalls\n\n- `description REGEXP 'SN...'` without `'c'` (or `LIKE '%SN%'`) also accepts `sn1234-5678`, because MySQL compares text without case.\n- Dropping the trailing `\\b` accepts `SN1234-56789`; dropping the leading one accepts `XSN1234-5678`.\n- `LIKE '%SN____-____%'` lets `_` match any character, letters and spaces included.\n- In a MySQL string literal a backslash must be doubled, so `\\b` is written `'\\\\b'`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `REGEXP_LIKE(text, pattern, 'c')` | 1 when `text` contains a match, comparing case exactly |\n| `\\b` | a word boundary: a letter, digit or `_` on one side only |\n| `[0-9]{4}` | exactly four digits |",
+  "narration": {
+    "1": "The output is the product row itself, with its three columns unchanged.",
+    "2": "Every product is a candidate; there is nothing to join.",
+    "3": "REGEXP_LIKE with the c flag keeps rows whose description holds SN, four digits, a hyphen and four digits as a whole word, with SN in uppercase.",
+    "4": "The statement fixes the order: products by ascending id."
+  }
+}

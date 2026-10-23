@@ -1,0 +1,70 @@
+{
+  "number": 2258,
+  "title": "Escape the Spreading Fire",
+  "spec": "leetcode",
+  "statement": "`grid` is an `m x n` field whose cells are `0` (grass), `1` (on fire) or `2` (a wall that neither you nor the fire can enter). You begin in the top-left cell `(0, 0)` and want to reach the safehouse in the bottom-right cell `(m - 1, n - 1)`. Two cells are adjacent when they share a side.\n\nTime passes in minutes. Each minute you may step to an adjacent grass cell (one that is not burning); once you have moved, every burning cell sets fire to each adjacent cell that is not a wall. You are caught if the fire ever reaches the cell you are standing on, except that arriving at the safehouse counts as safe even if the fire spreads into it in that same minute.\n\nBefore your first step you wait at `(0, 0)` for some whole number of minutes (the fire keeps spreading meanwhile). Return the largest waiting time that still lets you reach the safehouse safely. Return `-1` if no waiting time works, not even `0`, and return `10^9` if every waiting time works.",
+  "constraints": [
+    "m == grid.length",
+    "n == grid[i].length",
+    "2 <= m, n <= 300",
+    "4 <= m * n <= 2 * 10^4",
+    "grid[i][j] is 0, 1 or 2",
+    "grid[0][0] == grid[m - 1][n - 1] == 0"
+  ],
+  "signature": "int maximumMinutes(int[][] grid)",
+  "entry": "maximumMinutes",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 2 || grid.length > 300) return 'grid needs 2 to 300 rows.';\n  const n = Array.isArray(grid[0]) ? grid[0].length : 0;\n  if (n < 2 || n > 300) return 'Each row needs 2 to 300 cells.';\n  if (grid.length * n > 20000) return 'grid can have at most 20000 cells.';\n  for (const row of grid) {\n    if (!Array.isArray(row) || row.length !== n) return 'All rows must have the same length.';\n    if (row.some(v => v !== 0 && v !== 1 && v !== 2)) return 'Each cell is 0, 1 or 2.';\n  }\n  if (grid[0][0] !== 0 || grid[grid.length - 1][n - 1] !== 0) return 'The top-left and bottom-right cells must be grass (0).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumMinutes(grid) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n\n  const bfs = (sources) => {\n    const time = Array.from({ length: rows }, () => new Array(cols).fill(Infinity));\n    const queue = [];\n    for (const [r, c] of sources) {\n      time[r][c] = 0;\n      queue.push([r, c]);\n    }\n    for (let head = 0; head < queue.length; head++) {\n      const [r, c] = queue[head];\n      for (const [dr, dc] of directions) {\n        const nr = r + dr;\n        const nc = c + dc;\n        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;\n        if (grid[nr][nc] !== 0 || time[nr][nc] !== Infinity) continue;\n        time[nr][nc] = time[r][c] + 1;\n        queue.push([nr, nc]);\n      }\n    }\n    return time;\n  };\n\n  const fires = [];\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (grid[r][c] === 1) fires.push([r, c]);\n    }\n  }\n  const fire = bfs(fires);\n  const person = bfs([[0, 0]]);\n\n  const arrive = person[rows - 1][cols - 1];\n  const burn = fire[rows - 1][cols - 1];\n  if (arrive === Infinity) return -1;\n  if (burn === Infinity) return 1e9;\n  const slack = burn - arrive;\n  if (slack < 0) return -1;\n\n  for (const [r, c] of [[rows - 2, cols - 1], [rows - 1, cols - 2]]) {\n    if (person[r][c] !== Infinity && fire[r][c] - person[r][c] > slack) {\n      return slack;\n    }\n  }\n  return slack - 1;\n}",
+  "brute": "function maximumMinutes(grid) {\n  const m = grid.length, n = grid[0].length;\n  const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  const inside = (r, c) => r >= 0 && r < m && c >= 0 && c < n;\n  // Simulate waiting `wait` minutes, then walking, minute by minute.\n  const survives = wait => {\n    let burning = grid.map(row => row.map(v => v === 1));\n    const spread = () => {\n      const next = burning.map(row => row.slice());\n      for (let r = 0; r < m; r++) for (let c = 0; c < n; c++) {\n        if (!burning[r][c]) continue;\n        for (const [dr, dc] of steps) {\n          const a = r + dr, b = c + dc;\n          if (inside(a, b) && grid[a][b] !== 2) next[a][b] = true;\n        }\n      }\n      burning = next;\n    };\n    for (let i = 0; i < wait; i++) {\n      spread();\n      if (burning[0][0]) return false;\n    }\n    const visited = grid.map(row => row.map(() => false));\n    visited[0][0] = true;\n    let here = [[0, 0]];\n    while (here.length > 0) {\n      const moved = [];\n      for (const [r, c] of here) for (const [dr, dc] of steps) {\n        const a = r + dr, b = c + dc;\n        if (!inside(a, b) || visited[a][b] || grid[a][b] === 2 || burning[a][b]) continue;\n        if (a === m - 1 && b === n - 1) return true;\n        visited[a][b] = true;\n        moved.push([a, b]);\n      }\n      spread();\n      here = moved.filter(([r, c]) => !burning[r][c]);\n    }\n    return false;\n  };\n  // After m * n minutes the fire can no longer grow, so waiting that long works only if any wait works.\n  if (survives(m * n)) return 1e9;\n  let best = -1;\n  for (let wait = 0; wait < m * n; wait++) if (survives(wait)) best = wait;\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const fuse = rand() < (large ? 0.8 : 0.6);\n  const width = large ? pick(5, 30) : pick(2, 4);\n  const m = large ? pick(60, 100) : pick(fuse ? 4 : 2, 7);\n  const n = large ? pick(60, 100) : fuse ? width + pick(2, 3) : pick(2, 7);\n  const wallRate = large ? rand() * 0.25 : rand() * 0.35;\n  const grid = Array.from({ length: m }, () => Array.from({ length: n }, () => (rand() < wallRate ? 2 : 0)));\n  // Carve a right/down path so the safehouse is usually reachable.\n  const right = fuse ? n - width - 2 : n - 1;\n  if (fuse || rand() < 0.8) {\n    let r = 0, c = 0;\n    while (r < m - 1 || c < right) {\n      grid[r][c] = 0;\n      if (r === m - 1) c++;\n      else if (c === right) r++;\n      else if (rand() < 0.5) r++;\n      else c++;\n    }\n  }\n  let fires = large ? pick(0, 2) : pick(0, 2);\n  if (fuse) {\n    // A walled-off winding fuse on the right carries fire down to the bottom row the long way round.\n    const left = n - width;\n    for (let c = 0; c < n; c++) grid[m - 1][c] = 0;\n    for (let r = 0; r < m - 1; r++) {\n      grid[r][left - 1] = 2;\n      for (let c = left; c < n; c++) grid[r][c] = 0;\n      if (r % 2 === 1) {\n        const gap = (r >> 1) % 2 === 0 ? n - 1 : left;\n        for (let c = left; c < n; c++) if (c !== gap) grid[r][c] = 2;\n      }\n    }\n    if (!large && rand() < 0.7) grid[0][left] = 1;\n    else grid[2 * pick(0, Math.floor((m - 2) / 2))][pick(left, n - 1)] = 1;\n    fires = rand() < 0.25 ? 1 : 0;\n  }\n  for (let i = 0; i < fires; i++) {\n    const r = pick(0, m - 1), c = pick(0, n - 1);\n    if (grid[r][c] !== 2 && r + c >= (large ? (m + n) / 2 : 1)) grid[r][c] = 1;\n  }\n  grid[0][0] = 0;\n  grid[m - 1][n - 1] = 0;\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,2,0,0,0,0,0],[0,0,0,2,2,1,0],[0,2,0,0,1,2,0],[0,0,2,2,2,0,2],[0,0,0,0,0,0,0]]],"expected":3},
+    {"name":"Example 2","input":[[[0,0,0,0],[0,1,2,0],[0,2,0,0]]],"expected":-1},
+    {"name":"Example 3","input":[[[0,0,0],[2,2,0],[1,2,0]]],"expected":1000000000}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0],[0,0]]]},
+    {"name":"Test 2","input":[[[0,1],[1,0]]]},
+    {"name":"Test 3","input":[[[0,2],[2,0]]]},
+    {"name":"Test 4","input":[[[0,0,0,0,0,0],[2,2,2,2,2,0],[0,0,0,0,0,0],[0,2,2,2,2,2],[0,0,0,0,0,0]]]},
+    {"name":"Test 5","input":[[[0,0,0,0,0,0,0,0],[0,2,2,2,2,2,2,0],[0,2,1,0,0,0,2,0],[0,2,2,2,2,2,2,0],[0,0,0,0,0,0,0,0]]]},
+    {"name":"Test 6","input":[[[0,1,2,0],[0,2,0,0],[0,0,0,0]]]},
+    {"name":"Test 7","input":[[[0,0,2,1,0],[0,0,2,2,0],[0,0,2,0,0],[0,0,0,0,0]]]},
+    {"name":"Test 8","input":[[[0,2,1,0,0],[0,2,2,2,0],[0,2,0,0,0],[0,2,0,2,2],[0,2,0,0,0],[0,2,2,2,0],[0,0,0,0,0]]]},
+    {"name":"Test 9","input":[[[0,2,1,0,0,0],[0,2,2,2,2,0],[0,2,0,0,0,0],[0,2,0,2,2,2],[0,2,0,0,0,0],[0,0,0,0,0,0]]]},
+    {"name":"Test 10","input":[[[0,2,1,0,0,0],[0,2,2,2,2,0],[0,2,0,0,0,0],[0,2,0,2,2,2],[0,2,0,0,0,0],[0,2,2,2,2,0],[0,0,0,0,0,0]]]},
+    {"name":"Test 11","input":[[[0,2,1,0,0],[0,2,2,2,0],[0,2,0,0,0],[0,2,0,2,2],[0,0,0,0,0]]]},
+    {"name":"Test 12","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":18,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nYou could simulate every waiting time, or binary search on it with one BFS per try. Two BFS runs are enough, though: `fire[r][c]`, the minute the fire first reaches a cell, and `person[r][c]`, your fewest steps from the start. Waiting `t` minutes puts you on a cell at minute `t + person[r][c]`, which must be strictly before `fire[r][c]`, except at the safehouse where a tie is fine. Along a shortest route the margin `fire - person` never grows (the fire can chase you at your own speed), so the safehouse's margin is the tightest.\n\n## Approach\n\n1. Multi-source BFS from all burning cells gives `fire`; BFS from `(0, 0)` over grass gives `person`.\n2. Safehouse unreachable: return `-1`. Fire never reaches it: return `10^9` (fire touching your route would follow it into the safehouse).\n3. `slack = burn - arrive`. If negative, return `-1`.\n4. Waiting `slack` minutes ties with the fire at the safehouse, but the cell before it needs a strictly bigger margin. If a reachable neighbour of the safehouse has `fire - person > slack`, return `slack`; otherwise `slack - 1`.\n\n## Example 1, step by step\n\nThe fire starts at `(1,5)` and `(2,4)`. At `(4,6)`, `burn = 14` and `arrive = 10`, so `slack = 4`. Neighbour `(3,6)` is a wall; `(4,5)` has `person = 9`, `fire = 13`, a margin of exactly 4. Waiting 4 minutes would put you on `(4,5)` at minute 13 as it burns, so the answer is `3`.\n\n## Complexity\n\n- Time: O(mn): each BFS visits every cell once.\n- Space: O(mn) for the two time grids and the queue.\n\n## Pitfalls\n\n- Only the safehouse allows arriving at the same minute as the fire.\n- Skip a neighbour whose `person` is `Infinity`; `Infinity - Infinity` is `NaN`.\n- Sealed-off fire (or none) means `10^9`, but only if the safehouse is reachable.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rows`, `cols` | grid size |\n| `bfs` | multi-source BFS: earliest minute each grass cell is reached |\n| `time`, `queue`, `head` | BFS distances, cell queue, read position |\n| `fire`, `person` | fire arrival minute; your fewest steps |\n| `arrive`, `burn` | `person` and `fire` at the safehouse |\n| `slack` | how much later the fire reaches the safehouse than you |",
+  "narration": {
+    "6": "A helper that runs breadth-first search from every source at once and records the earliest minute each cell is reached.",
+    "13": "Process the queue in order; head walks forward instead of shifting the array.",
+    "18": "Skip neighbours that fall outside the grid.",
+    "19": "Only unvisited grass can be entered: walls stop both you and the fire, and burning cells are already sources.",
+    "20": "A neighbour is reached one minute after the current cell.",
+    "30": "Every burning cell is a starting point for the fire's BFS.",
+    "33": "fire[r][c] is the minute the fire first reaches each cell.",
+    "34": "person[r][c] is the fewest steps from the start to each cell, ignoring the fire.",
+    "38": "If no route to the safehouse exists at all, no waiting time works.",
+    "39": "The fire never reaches the safehouse, so it cannot touch any route to it either: any wait is fine.",
+    "40": "How many minutes later the fire reaches the safehouse than you do.",
+    "41": "The fire gets there first even if you leave at once.",
+    "43": "Look at the two cells you can step into the safehouse from.",
+    "44": "A reachable neighbour with a strictly bigger margin lets you wait the full slack and tie with the fire at the safehouse.",
+    "45": "Tying at the safehouse is allowed, so slack minutes is the answer.",
+    "48": "Otherwise the step before the safehouse would burn as you stand on it, so wait one minute less."
+  }
+}

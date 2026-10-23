@@ -1,0 +1,58 @@
+{
+  "number": 3521,
+  "title": "Find Product Recommendation Pairs",
+  "spec": "leetcode",
+  "statement": "A shop wants \"customers who bought this also bought\" suggestions from two tables:\n\n- `ProductPurchases(user_id, product_id, quantity)`: a user bought a product, in some positive `quantity`; `(user_id, product_id)` is unique, and every `product_id` exists in `ProductInfo`.\n- `ProductInfo(product_id, category, price)`: `product_id` is unique; each product has one `category` and a `price`.\n\nLook at every pair of different products with the smaller id first. Its `customer_count` is the number of distinct users who bought **both** products (quantities do not matter). Report the pairs with `customer_count` of at least 3, with the columns `product1_id` (the smaller id), `product2_id` (the larger id), `product1_category`, `product2_category` and `customer_count`.\n\nOrder the rows by `customer_count` descending, then `product1_id` ascending, then `product2_id` ascending.",
+  "constraints": [
+    "(user_id, product_id) is unique in ProductPurchases",
+    "product_id is unique in ProductInfo",
+    "Every ProductPurchases.product_id exists in ProductInfo",
+    "quantity is positive",
+    "No value is null"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "ProductPurchases": [["user_id","INT"],["product_id","INT"],["quantity","INT"]],
+    "ProductInfo": [["product_id","INT"],["category","VARCHAR(100)"],["price","DECIMAL(10, 2)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ ProductPurchases = [], ProductInfo = [] }] = input;\n  const products = new Set(), bought = new Set();\n  for (const [id, category, price] of ProductInfo) {\n    if ([id, category, price].includes(null)) return 'No value in ProductInfo may be null.';\n    if (products.has(id)) return `product_id ${id} appears twice in ProductInfo.`;\n    products.add(id);\n  }\n  for (const [user, product, quantity] of ProductPurchases) {\n    if ([user, product, quantity].includes(null)) return 'No value in ProductPurchases may be null.';\n    if (!products.has(product)) return `product_id ${product} is not in ProductInfo.`;\n    if (!(quantity > 0)) return `quantity ${quantity} must be positive.`;\n    const key = `${user}|${product}`;\n    if (bought.has(key)) return `(${user}, ${product}) appears twice in ProductPurchases.`;\n    bought.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH pairs AS (\n  SELECT a.product_id AS product1_id,\n         b.product_id AS product2_id,\n         COUNT(DISTINCT a.user_id) AS customer_count\n  FROM ProductPurchases AS a\n  JOIN ProductPurchases AS b\n    ON b.user_id = a.user_id\n   AND b.product_id > a.product_id\n  GROUP BY a.product_id, b.product_id\n  HAVING COUNT(DISTINCT a.user_id) >= 3\n)\nSELECT p.product1_id,\n       p.product2_id,\n       i1.category AS product1_category,\n       i2.category AS product2_category,\n       p.customer_count\nFROM pairs AS p\nJOIN ProductInfo AS i1\n  ON i1.product_id = p.product1_id\nJOIN ProductInfo AS i2\n  ON i2.product_id = p.product2_id\nORDER BY p.customer_count DESC, p.product1_id, p.product2_id;",
+  "brute": "SELECT counted.product1_id, counted.product2_id, counted.product1_category, counted.product2_category, counted.customer_count\nFROM (\n  SELECT x.product_id AS product1_id,\n         y.product_id AS product2_id,\n         x.category AS product1_category,\n         y.category AS product2_category,\n         (SELECT COUNT(*)\n          FROM ProductPurchases AS u\n          WHERE u.product_id = x.product_id\n            AND u.user_id IN (SELECT v.user_id FROM ProductPurchases AS v WHERE v.product_id = y.product_id)) AS customer_count\n  FROM ProductInfo AS x, ProductInfo AS y\n  WHERE x.product_id < y.product_id\n) AS counted\nWHERE counted.customer_count >= 3\nORDER BY counted.customer_count DESC, counted.product1_id, counted.product2_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const categories = ['Electronics', 'Books', 'Clothing', 'Kitchen', 'Sports', 'Toys', 'Garden'];\n  const productCount = small ? 2 + Math.floor(rand() * 4) : 40;\n  const ProductInfo = [];\n  for (let i = 0; i < productCount; i++) ProductInfo.push([small ? 101 + i : 100 + i * 3, pick(categories), pick([20, 35, 50, 75, 100, 12.5])]);\n  const users = small ? 2 + Math.floor(rand() * 4) : 400;\n  const target = small ? Math.floor(rand() * 9) : 2000;\n  // Popular products are drawn far more often, so pair counts spread out and some pairs share a count.\n  const weights = ProductInfo.map((_, i) => 1 / (1 + i * (small ? 0.3 : 0.15)));\n  const total = weights.reduce((a, b) => a + b, 0);\n  const draw = () => { let r = rand() * total; for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r < 0) return ProductInfo[i][0]; } return ProductInfo.at(-1)[0]; };\n  const bought = new Set(), ProductPurchases = [];\n  for (let tries = 0; ProductPurchases.length < target && tries < target * 5; tries++) {\n    const user = 1 + Math.floor(rand() * users), product = draw(), key = `${user}|${product}`;\n    if (bought.has(key)) continue;\n    bought.add(key);\n    ProductPurchases.push([user, product, 1 + Math.floor(rand() * 5)]);\n  }\n  for (let i = ProductInfo.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ProductInfo[i], ProductInfo[j]] = [ProductInfo[j], ProductInfo[i]]; }\n  return [{ ProductPurchases, ProductInfo }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"ProductPurchases":[[1,101,2],[1,102,1],[1,103,3],[2,101,1],[2,102,5],[2,104,1],[3,101,2],[3,103,1],[3,105,4],[4,101,1],[4,102,1],[4,103,2],[4,104,3],[5,102,2],[5,104,1]],"ProductInfo":[[101,"Electronics",100],[102,"Books",20],[103,"Clothing",35],[104,"Kitchen",50],[105,"Sports",75]]}],"expected":{"columns":["product1_id","product2_id","product1_category","product2_category","customer_count"],"rows":[[101,102,"Electronics","Books",3],[101,103,"Electronics","Clothing",3],[102,104,"Books","Kitchen",3]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"ProductPurchases":[],"ProductInfo":[[1,"Books",10],[2,"Toys",20]]}]},
+    {"name":"Test 2","input":[{"ProductPurchases":[[1,1,5],[1,2,5],[2,1,9],[2,2,9]],"ProductInfo":[[1,"Books",10],[2,"Toys",20]]}]},
+    {"name":"Test 3","input":[{"ProductPurchases":[[1,1,1],[1,2,1],[2,1,1],[2,2,1],[3,1,1],[3,2,1]],"ProductInfo":[[1,"Books",10],[2,"Toys",20]]}]},
+    {"name":"Test 4","input":[{"ProductPurchases":[[1,7,1],[1,3,1],[2,7,2],[2,3,2],[3,3,1],[3,7,1],[4,7,1],[4,3,4]],"ProductInfo":[[7,"Garden",15],[3,"Kitchen",50]]}]},
+    {"name":"Test 5","input":[{"ProductPurchases":[[1,10,1],[1,20,1],[1,30,1],[2,10,1],[2,20,1],[2,30,1],[3,10,1],[3,20,1],[3,30,1],[4,20,1],[4,30,1]],"ProductInfo":[[10,"Books",10],[20,"Books",12],[30,"Toys",20],[40,"Toys",25]]}]},
+    {"name":"Test 6","input":[{"ProductPurchases":[[1,9,1],[1,10,1],[2,9,1],[2,10,1],[3,9,1],[3,10,1],[1,2,1],[2,2,1],[3,2,1]],"ProductInfo":[[2,"Sports",30],[9,"Clothing",35],[10,"Electronics",100]]}]},
+    {"name":"Test 7","input":[{"ProductPurchases":[[1,1,100],[1,2,100],[2,1,1],[2,3,1],[3,2,1],[3,3,1],[4,1,50],[4,2,50]],"ProductInfo":[[1,"Books",10],[2,"Toys",20],[3,"Garden",15]]}]},
+    {"name":"Test 8","input":[{"ProductPurchases":[[5,1,1],[5,4,1],[6,1,1],[6,4,1],[7,1,1],[7,4,1],[8,2,1],[8,3,1],[9,2,1],[9,3,1],[10,2,1],[10,3,1],[11,2,1],[11,3,1]],"ProductInfo":[[1,"Books",10],[2,"Toys",20],[3,"Garden",15],[4,"Kitchen",50]]}]},
+    {"name":"Test 9","input":[{"ProductPurchases":[[1,101,2],[1,102,1],[1,103,3],[2,101,1],[2,102,5],[2,104,1],[3,101,2],[3,103,1],[3,102,4],[4,101,1],[4,102,1],[4,103,2],[4,104,3],[5,102,2],[5,104,1],[5,101,1]],"ProductInfo":[[101,"Electronics",100],[102,"Books",20],[103,"Clothing",35],[104,"Kitchen",50],[105,"Sports",75]]}]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA pair of products is \"bought together\" by a user when that user has a purchase row for each of them. Joining `ProductPurchases` to itself on `user_id` puts every two purchases of the same user side by side, and requiring the second id to be larger keeps each unordered pair exactly once. Grouping those joined rows by the two product ids then counts the users behind each pair; categories are looked up afterwards for the pairs that survive.\n\n## Approach\n\n1. `pairs`: self-join purchases `a` and `b` on the same `user_id` with `b.product_id > a.product_id`, so each user contributes one row per pair of products they bought.\n2. Group by the two ids, count distinct users as `customer_count`, and keep groups with `HAVING ... >= 3`.\n3. Join `ProductInfo` twice, as `i1` for the first product and `i2` for the second, to fetch both categories.\n4. Order by `customer_count` descending, then the two ids ascending.\n\n## Example 1, step by step\n\n- User 1 bought 101, 102, 103: pairs (101, 102), (101, 103), (102, 103).\n- User 2: (101, 102), (101, 104), (102, 104). User 3: (101, 103), (101, 105), (103, 105).\n- User 4 bought four products, giving six pairs, among them (101, 102), (101, 103) and (102, 104). User 5: (102, 104).\n- Counting: (101, 102) has users 1, 2, 4; (101, 103) has 1, 3, 4; (102, 104) has 2, 4, 5. Every other pair has at most 2 users and is dropped.\n- All three survivors have count 3, so they are ordered by `product1_id`, then `product2_id`, with categories Electronics/Books, Electronics/Clothing and Books/Kitchen.\n\n## Complexity\n\n- Time: O(Σ kᵤ²) for the self-join, where kᵤ is the number of products user u bought, plus sorting the pairs.\n- Space: O(number of distinct co-purchased pairs) for the grouping.\n\n## Pitfalls\n\n- Joining on `b.product_id <> a.product_id` lists every pair twice, as (x, y) and (y, x).\n- Summing `quantity` instead of counting users: buying five copies is still one customer.\n- Using `> 3` instead of `>= 3` loses pairs bought by exactly three customers.\n- Forgetting the tie-breaks: equal counts must fall back to `product1_id`, then `product2_id`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `a`, `b` | two purchases by the same user, `b` of the larger product id |\n| `pairs` | one row per product pair with its `customer_count`, at least 3 |\n| `p` | `pairs` in the final query |\n| `i1`, `i2` | `ProductInfo` rows of the first and second product |",
+  "narration": {
+    "1": "The pairs stage counts, for every product pair, how many users bought both products.",
+    "4": "COUNT(DISTINCT user_id) counts customers, not quantities or purchase rows.",
+    "6": "Joining purchases to themselves places two purchases side by side.",
+    "7": "Both purchases must belong to the same user.",
+    "8": "Requiring the larger id on the right keeps each unordered pair once, smaller id first.",
+    "9": "Grouping by the two ids gives one row per pair.",
+    "10": "Only pairs bought by at least three different customers are recommendations.",
+    "17": "The final query starts from the pairs that passed the threshold.",
+    "18": "The first product's row of ProductInfo supplies product1_category.",
+    "20": "A second copy of ProductInfo supplies product2_category.",
+    "22": "Most-shared pairs come first; ties fall back to the smaller product ids."
+  }
+}

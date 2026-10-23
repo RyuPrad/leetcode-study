@@ -1,0 +1,50 @@
+{
+  "number": 3415,
+  "title": "Find Products with Three Consecutive Digits",
+  "spec": "recalled",
+  "statement": "A catalog lists products by name:\n\n- `products(product_id, name)`: one row per product; `product_id` is unique and `name` is a string of letters, digits and other characters.\n\nFind every product whose `name` contains a run of **exactly three** digits in a row: three consecutive digits whose neighbours on both sides (if any) are not digits. A run of four or more digits does not count, but the name qualifies as long as at least one run has exactly three digits. Return the columns `product_id` and `name`, ordered by `product_id` ascending.",
+  "constraints": [
+    "product_id is unique in products",
+    "name is not null",
+    "A digit is one of the characters 0 to 9"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "products": [["product_id","INT"],["name","VARCHAR(255)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ products = [] }] = input;\n  const ids = new Set();\n  for (const [id, name] of products) {\n    if (id === null) return 'Every product needs a product_id.';\n    if (ids.has(id)) return `product_id ${id} appears twice.`;\n    if (name === null) return `Product ${id} needs a name.`;\n    ids.add(id);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT product_id, name\nFROM products\nWHERE name REGEXP '(^|[^0-9])[0-9]{3}([^0-9]|$)'\nORDER BY product_id;",
+  "brute": "WITH RECURSIVE pos AS (\n  SELECT 1 AS p\n  UNION ALL\n  SELECT p + 1 FROM pos WHERE p < (SELECT MAX(CHAR_LENGTH(name)) FROM products)\n)\nSELECT pr.product_id, pr.name\nFROM products AS pr\nWHERE EXISTS (\n  SELECT 1\n  FROM pos\n  WHERE pos.p + 2 <= CHAR_LENGTH(pr.name)\n    AND SUBSTRING(pr.name, pos.p, 1) IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')\n    AND SUBSTRING(pr.name, pos.p + 1, 1) IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')\n    AND SUBSTRING(pr.name, pos.p + 2, 1) IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')\n    AND (pos.p = 1 OR SUBSTRING(pr.name, pos.p - 1, 1) NOT IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9'))\n    AND (pos.p + 3 > CHAR_LENGTH(pr.name) OR SUBSTRING(pr.name, pos.p + 3, 1) NOT IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9'))\n)\nORDER BY pr.product_id",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const words = ['A', 'Item', 'Pro', 'x', 'Model', '-', ' ', 'Box', 'v', '.'];\n  const count = small ? pick(9) : 1500 + pick(501);\n  const ids = [];\n  for (let id = 1; id <= (small ? 12 : 4000); id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) { const j = pick(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }\n  const products = [];\n  for (const id of ids.slice(0, count)) {\n    // A name alternates words and digit runs of 1 to 5 digits, so runs of exactly three are common but not certain.\n    const parts = 1 + pick(4);\n    let name = '', digits = rand() < 0.5;\n    for (let k = 0; k < parts; k++, digits = !digits) {\n      if (digits) { const length = 1 + pick(5); for (let d = 0; d < length; d++) name += String(pick(10)); }\n      else name += words[pick(words.length)];\n    }\n    products.push([id, name]);\n  }\n  return [{ products }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"products":[[1,"ABC123XYZ"],[2,"A12B34C"],[3,"Product56789"],[4,"NoDigitsHere"],[5,"789Product"],[6,"Item003Description"],[7,"Product12X34"]]}],"expected":{"columns":["product_id","name"],"rows":[[1,"ABC123XYZ"],[5,"789Product"],[6,"Item003Description"]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"products":[]}]},
+    {"name":"Test 2","input":[{"products":[[1,"123"]]}]},
+    {"name":"Test 3","input":[{"products":[[1,"1234"],[2,"12"],[3,"Widget"],[4,"Order2024A"]]}]},
+    {"name":"Test 4","input":[{"products":[[1,"Pack12345x678"],[2,"abc123def4567"],[3,"1234-567"],[4,"R2D2"]]}]},
+    {"name":"Test 5","input":[{"products":[[4,"abc456"],[2,"123abc"],[3,"ab12c3"],[1,"9a99a999"]]}]},
+    {"name":"Test 6","input":[{"products":[[1,"A 999 B"],[2,"X-000-Y"],[3,"Model 7 8 9"],[4,"v1.2.3"],[5,"v10.20.300"]]}]},
+    {"name":"Test 7","input":[{"products":[[9,"Box100"],[3,"007Bond"],[6,"K9 Item 555"],[1,"321Go"]]}]},
+    {"name":"Test 8","input":[{"products":[[1,"123456"],[2,"123x456"],[3,"12x3456"],[4,"1234 5678 90"]]}]},
+    {"name":"Test 9","input":[{"products":[[1,"ABC123XYZ"],[2,"Product56789"],[3,"Item003Description"],[4,"00001"],[5,"Tool 42"],[6,"Lot 420"]]}]},
+    {"name":"Test 10","input":[{"products":[[5,"111"],[6,"1111"],[7,"11"],[8,"111 1111"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n\"Exactly three digits in a row\" is a pattern on the characters of one string, so a regular expression says it directly: three digits, with something that is not a digit (or the edge of the string) on each side. The boundary conditions are what keep a run of four or five digits from matching, because any three digits inside a longer run have a digit next to them.\n\n## Approach\n\n1. Read every row of `products`.\n2. Keep the rows whose `name REGEXP '(^|[^0-9])[0-9]{3}([^0-9]|$)'`: `(^|[^0-9])` is the start of the string or a non-digit, `[0-9]{3}` is the three digits, and `([^0-9]|$)` is a non-digit or the end of the string. `REGEXP` looks for the pattern anywhere in the name, so one qualifying run is enough.\n3. Sort the survivors by `product_id`.\n\n## Example 1, step by step\n\n- `ABC123XYZ`: `C`, then `123`, then `X`: matches.\n- `A12B34C`: the runs have two digits: no match.\n- `Product56789`: one run of five digits; every three-digit window touches another digit: no match.\n- `NoDigitsHere`: no digits at all.\n- `789Product`: start of string, `789`, then `P`: matches.\n- `Item003Description`: `m`, `003`, `D`: matches (leading zeros are still digits).\n- `Product12X34`: two runs of two digits: no match.\n\nThe result is products 1, 5 and 6 in id order.\n\n## Complexity\n\n- Time: O(N · L) for N products with names of length up to L, plus O(K log K) to sort the K matches.\n- Space: O(K) for the result.\n\n## Pitfalls\n\n- `name REGEXP '[0-9]{3}'` also accepts names with four or more digits in a row, such as `Product56789`.\n- Requiring the whole name to have only one run (`'^[^0-9]*[0-9]{3}[^0-9]*$'`) wrongly rejects a name like `abc123def4567` that has a valid run plus a longer one.\n- Forgetting the `^` and `$` alternatives misses runs at the very start or end, such as `789Product`.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `(^\\|[^0-9])` | the start of the name or a non-digit just before the run |\n| `[0-9]{3}` | exactly three digits |\n| `([^0-9]\\|$)` | a non-digit just after the run, or the end of the name |\n| `ORDER BY product_id` | the required ascending order |",
+  "narration": {
+    "1": "The output is the product id and its name, exactly as stored.",
+    "2": "Every product is a candidate; there is nothing to join.",
+    "3": "The regular expression finds three digits with a non-digit or the edge of the name on both sides, so longer digit runs never match.",
+    "4": "Matching products are listed in ascending product_id order."
+  }
+}

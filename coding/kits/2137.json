@@ -1,0 +1,65 @@
+{
+  "number": 2137,
+  "title": "Pour Water Between Buckets to Make Water Levels Equal",
+  "spec": "recalled",
+  "statement": "Bucket `i` starts with `buckets[i]` gallons of water. You may pour water from any bucket into any other bucket as often as you like, and an amount poured need not be a whole number. Every pour spills `loss` percent of the amount poured: if you pour `k` gallons, only `k * (100 - loss) / 100` gallons arrive in the other bucket. Your goal is for every bucket to end up holding the same amount of water. Return the largest such common amount. An answer within `10^-5` of the true value is accepted.",
+  "constraints": [
+    "1 <= buckets.length <= 10^5",
+    "0 <= buckets[i] <= 10^5",
+    "0 <= loss <= 99"
+  ],
+  "signature": "double equalizeWater(int[] buckets, int loss)",
+  "entry": "equalizeWater",
+  "kind": "function",
+  "parameters": [
+    "buckets",
+    "loss"
+  ],
+  "compare": "float",
+  "validator": "function validate([buckets, loss]) {\n  if (buckets.length < 1 || buckets.length > 100000) return 'buckets needs 1 to 10^5 values.';\n  if (buckets.some(v => !Number.isInteger(v) || v < 0 || v > 100000)) return 'Each bucket holds a whole number from 0 to 10^5.';\n  if (!Number.isInteger(loss) || loss < 0 || loss > 99) return 'loss is a whole number from 0 to 99.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function equalizeWater(buckets, loss) {\n  const keep = (100 - loss) / 100;\n  let low = Math.min(...buckets);\n  let high = Math.max(...buckets);\n\n  while (high - low > 1e-6) {\n    const level = (low + high) / 2;\n    let spare = 0;\n    let needed = 0;\n    for (const water of buckets) {\n      if (water > level) {\n        spare += (water - level) * keep;\n      } else {\n        needed += level - water;\n      }\n    }\n    if (spare >= needed) {\n      low = level;\n    } else {\n      high = level;\n    }\n  }\n  return low;\n}",
+  "brute": "function equalizeWater(buckets, loss) {\n  // Solve the balance equation exactly on each stretch between consecutive sorted values.\n  const keep = (100 - loss) / 100;\n  const sorted = [...buckets].sort((a, b) => a - b);\n  const n = sorted.length;\n  const total = sorted.reduce((sum, v) => sum + v, 0);\n  let below = 0;\n  for (let k = 1; k <= n; k++) {\n    // Assume the k smallest buckets receive water and the others give it away.\n    below += sorted[k - 1];\n    const above = total - below;\n    // keep * (above - (n - k) * x) = k * x - below\n    const x = (keep * above + below) / (k + keep * (n - k));\n    const upper = k < n ? sorted[k] : Infinity;\n    if (x >= sorted[k - 1] - 1e-9 && x <= upper + 1e-9) return x;\n  }\n  return sorted[0];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 1 + Math.floor(rand() * 8);\n  const top = size === 'large' || rand() < 0.3 ? 100000 : [1, 10, 50][Math.floor(rand() * 3)];\n  const lossChoice = rand();\n  const loss = lossChoice < 0.15 ? 0 : lossChoice < 0.3 ? 99 : Math.floor(rand() * 100);\n  const buckets = [];\n  if (size === 'small' && rand() < 0.15) {\n    const same = Math.floor(rand() * (top + 1));\n    for (let i = 0; i < n; i++) buckets.push(same);\n  } else {\n    for (let i = 0; i < n; i++) buckets.push(Math.floor(rand() * (top + 1)));\n  }\n  return [buckets, loss];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,7],80],"expected":2},
+    {"name":"Example 2","input":[[2,4,6],50],"expected":3.5},
+    {"name":"Example 3","input":[[3,3,3,3],40],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0],0]},
+    {"name":"Test 2","input":[[100000],99]},
+    {"name":"Test 3","input":[[0,100000],0]},
+    {"name":"Test 4","input":[[0,100000],99]},
+    {"name":"Test 5","input":[[5,5,5,5,5],50]},
+    {"name":"Test 6","input":[[0,0,0,10],50]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,8,9,10],25]},
+    {"name":"Test 8","input":[[100000,100000,100000,0],99]},
+    {"name":"Test 9","input":[[7,0,3,9,2,2,8],10]},
+    {"name":"Test 10","input":[[0,0,0,0,0],37]},
+    {"name":"Test 11","input":[[3,1],0]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nPouring twice only spills twice, so in the best plan water flows once, straight from buckets above the final level to buckets below it. For a candidate `level`, the full buckets can deliver `(water - level) * keep` each, where `keep` is the fraction that survives a pour, and the low buckets need `level - water` each. A level is reachable exactly when what can be delivered covers what is needed. Raising the level shrinks the supply and grows the demand, so the reachable levels form one range starting at the smallest bucket. That monotone yes/no answer is what binary search on the answer needs.\n\n## Approach\n\n1. Set `keep = (100 - loss) / 100`.\n2. Search between `low`, the smallest bucket (always reachable, nobody needs water), and `high`, the largest bucket.\n3. Try the middle `level`: add up `spare` from buckets above it and `needed` by buckets at or below it.\n4. If `spare >= needed`, the level is reachable, so move `low` up to it; otherwise move `high` down to it.\n5. Stop when the range is narrower than `1e-6` and return `low`.\n\n## Example 1, step by step\n\n`buckets = [1, 2, 7]`, `loss = 80`, so `keep = 0.2`. The search starts on `[1, 7]`. At `level = 4`, `spare = 3 * 0.2 = 0.6` but `needed = 3 + 2 = 5`, so `high = 4`. At `2.5`, `spare = 0.9` and `needed = 2`, so `high = 2.5`. At `1.75`, `spare = 1.05 + 0.05 = 1.1` covers `needed = 0.75`, so `low = 1.75`. The range keeps halving around `2`, where the 5 gallons poured from the last bucket deliver exactly the 1 gallon the first bucket lacks. The answer is `2`.\n\n## Complexity\n\n- Time: O(n log(R / ε)): about 37 halvings of a range `R` up to `10^5` down to `ε = 1e-6`, each a pass over `buckets`.\n- Space: O(1) besides the input.\n\n## Pitfalls\n\n- Apply `keep` to the water given away, not to the water received: the giver loses the full amount poured.\n- The plain average is the answer only when `loss = 0`; any spill lowers the level.\n- Loop on a tolerance (or a fixed number of rounds); waiting for `low === high` with real numbers may never end.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `keep` | fraction of a pour that arrives |\n| `low`, `high` | the range that still contains the answer |\n| `level` | the candidate common amount being tested |\n| `spare` | water the fuller buckets can deliver at this level |\n| `needed` | water the emptier buckets lack at this level |\n| `water` | the amount in the current bucket |",
+  "narration": {
+    "2": "keep is the share of every pour that reaches the other bucket.",
+    "3": "The smallest bucket's amount is always reachable, since no bucket needs water.",
+    "4": "No common level can exceed the fullest bucket.",
+    "6": "Halve the range until it is narrower than the accepted error.",
+    "7": "Test the level in the middle of the range.",
+    "10": "Look at every bucket at this level.",
+    "11": "A bucket above the level gives its extra water away.",
+    "12": "Only keep of what it pours actually arrives.",
+    "14": "A bucket at or below the level must receive this much.",
+    "17": "Delivered water covers the demand: the level is reachable.",
+    "18": "So the answer is at least level; search higher.",
+    "20": "Otherwise the level is too high; search lower.",
+    "23": "low is the highest reachable level found, within the tolerance."
+  }
+}

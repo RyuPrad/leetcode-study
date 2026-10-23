@@ -1,0 +1,65 @@
+{
+  "number": 2376,
+  "title": "Count Special Integers",
+  "spec": "leetcode",
+  "statement": "Call a positive integer *special* when its decimal digits are all different from one another.\n\nGiven a positive integer `n`, count the special integers in the range from `1` to `n`, inclusive, and return that count.",
+  "constraints": [
+    "1 <= n <= 2 * 10^9"
+  ],
+  "signature": "int countSpecialNumbers(int n)",
+  "entry": "countSpecialNumbers",
+  "kind": "function",
+  "parameters": [
+    "n"
+  ],
+  "validator": "function validate([n]) {\n  if (!Number.isInteger(n) || n < 1 || n > 2000000000) return 'n must be an integer from 1 to 2 * 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countSpecialNumbers(n) {\n  const digits = String(n).split('').map(Number);\n  const memo = new Map();\n\n  function count(pos, mask, tight, started) {\n    if (pos === digits.length) {\n      return started ? 1 : 0;\n    }\n    const reusable = !tight && started;\n    const key = pos * 1024 + mask;\n    if (reusable && memo.has(key)) {\n      return memo.get(key);\n    }\n    const limit = tight ? digits[pos] : 9;\n    let total = 0;\n    for (let digit = 0; digit <= limit; digit++) {\n      const nextTight = tight && digit === limit;\n      if (!started && digit === 0) {\n        total += count(pos + 1, mask, nextTight, false);\n      } else if ((mask & (1 << digit)) === 0) {\n        total += count(pos + 1, mask | (1 << digit), nextTight, true);\n      }\n    }\n    if (reusable) {\n      memo.set(key, total);\n    }\n    return total;\n  }\n\n  return count(0, 0, true, false);\n}",
+  "brute": "function countSpecialNumbers(n) {\n  // List every number with distinct digits by appending unused digits, and count those that do not exceed n.\n  const used = new Array(10).fill(false);\n  let total = 0;\n  const extend = (value) => {\n    total++;\n    for (let d = 0; d <= 9; d++) {\n      const next = value * 10 + d;\n      if (next > n) break;\n      if (used[d]) continue;\n      used[d] = true;\n      extend(next);\n      used[d] = false;\n    }\n  };\n  for (let first = 1; first <= 9 && first <= n; first++) {\n    used[first] = true;\n    extend(first);\n    used[first] = false;\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const pick = rand();\n    if (pick < 0.25) return [int(1000000000, 2000000000)];\n    if (pick < 0.5) return [Math.min(2000000000, 10 ** int(1, 9) - int(0, 2))];\n    return [int(1, 2000000000)];\n  }\n  const pick = rand();\n  if (pick < 0.4) return [int(1, 150)];\n  if (pick < 0.7) return [int(1, 5000)];\n  return [int(1, 300000)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[20],"expected":19},
+    {"name":"Example 2","input":[5],"expected":5},
+    {"name":"Example 3","input":[135],"expected":110}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1]},
+    {"name":"Test 2","input":[9]},
+    {"name":"Test 3","input":[10]},
+    {"name":"Test 4","input":[11]},
+    {"name":"Test 5","input":[100]},
+    {"name":"Test 6","input":[1000]},
+    {"name":"Test 7","input":[987654321]},
+    {"name":"Test 8","input":[2000000000]},
+    {"name":"Test 9","input":[1234567890]},
+    {"name":"Test 10","input":[1111111111]},
+    {"name":"Test 11","input":[999999999]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking every number from 1 to `n` is hopeless for `n` near 2 * 10^9. Instead, build numbers one digit at a time from the left, the way you would write them down. While building, you only need to know four things: which position you are at (`pos`), which digits are already used (`mask`, one bit per digit), whether the prefix so far equals `n`'s prefix so the next digit is capped (`tight`), and whether a non-zero digit has been placed yet (`started`). Shorter numbers are handled as numbers padded with leading zeros that are not yet started.\n\nOnce a state is free (`!tight`) and started, its count depends only on `pos` and `mask`, so it can be cached.\n\n## Approach\n\n1. Split `n` into its `digits`.\n2. `count(pos, mask, tight, started)` returns how many valid ways finish the number from `pos`.\n3. At the end of the digits, count 1 only if the number started (0 is not positive).\n4. Try each `digit` up to `limit` (`digits[pos]` when tight, else 9). A leading zero keeps the number unstarted and uses nothing; any other digit must be unused and is added to `mask`.\n5. Cache results of free, started states in `memo`. The answer is `count(0, 0, true, false)`.\n\n## Example 1, step by step\n\n`n = 20`, `digits = [2, 0]`. At `pos = 0` the limit is 2:\n\n- digit 0 keeps the number unstarted; at `pos = 1` the digits 1 to 9 each finish a one-digit number: 9.\n- digit 1 starts the number freely; at `pos = 1` any digit except 1 works (10, 12, ..., 19): 9.\n- digit 2 stays tight, so `pos = 1` allows only 0, giving 20: 1.\n\nTotal `9 + 9 + 1 = 19`.\n\n## Complexity\n\n- Time: O(D * 2^10 * 10) with D <= 10 digits: each cached state tries ten digits, about 10^5 steps.\n- Space: O(D * 2^10) for `memo`, plus recursion depth D.\n\n## Pitfalls\n\n- Leading zeros must not mark 0 as used, or numbers like 105 would be rejected when counted as `0105`.\n- Never cache tight states: their count depends on the rest of `n`'s digits.\n- The empty number (all leading zeros) is not special; count only started numbers.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `digits` | the decimal digits of `n` |\n| `pos` | index of the digit being chosen |\n| `mask` | bit d is set when digit d is already used |\n| `tight` | the prefix so far equals `n`'s prefix |\n| `started` | a non-zero digit has been placed |\n| `limit` | largest digit allowed at `pos` |\n| `total` | completions counted from this state |\n| `memo` | cached counts of free, started states |",
+  "narration": {
+    "2": "Turn n into a list of its decimal digits, most significant first.",
+    "5": "count returns how many special numbers can be finished from this state.",
+    "6": "Every digit has been chosen.",
+    "7": "Count it only if a non-zero digit was placed; all zeros is not a positive number.",
+    "9": "Free, started states depend only on pos and mask, so they can be cached.",
+    "11": "Has this free, started state been solved before?",
+    "12": "Yes: reuse its stored count.",
+    "14": "While tight, the next digit cannot exceed n's digit here; otherwise any digit up to 9 is allowed.",
+    "16": "Try every allowed digit for this position.",
+    "17": "We stay tight only if we were tight and chose the largest allowed digit.",
+    "18": "A zero before the number starts is just padding for a shorter number.",
+    "19": "Move on without marking 0 as used.",
+    "20": "Any other digit must not have been used yet.",
+    "21": "Mark it used, note that the number has started, and count the completions.",
+    "25": "Remember the count for this free, started state.",
+    "27": "Report how many special numbers finish from this state.",
+    "30": "Start at the first digit with nothing used, tight against n, and not started."
+  }
+}

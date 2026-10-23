@@ -1,0 +1,56 @@
+{
+  "number": 3421,
+  "title": "Find Students Who Improved",
+  "spec": "leetcode",
+  "statement": "Exam results are recorded per student, subject and date:\n\n- `Scores(student_id, subject, score, exam_date)`: one row per exam; `(student_id, subject, exam_date)` is unique, `score` is between 0 and 100, and `exam_date` is a date such as `'2023-01-15'`.\n\nFor each student and subject, the **first score** is the score on the earliest exam date and the **latest score** is the score on the most recent exam date. A student improved in a subject when they sat that subject on at least two different dates and the latest score is strictly higher than the first score; the scores in between do not matter.\n\nReport every improved (student, subject) pair with the columns `student_id`, `subject`, `first_score` and `latest_score`, ordered by `student_id` ascending, then `subject` ascending.",
+  "constraints": [
+    "(student_id, subject, exam_date) is unique in Scores",
+    "0 <= score <= 100",
+    "exam_date is a date in 'YYYY-MM-DD' form"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "Scores": [["student_id","INT"],["subject","VARCHAR(50)"],["score","INT"],["exam_date","VARCHAR(10)"]]
+  },
+  "ordered": true,
+  "validator": "function validate(input) {\n  const [{ Scores = [] }] = input;\n  const keys = new Set();\n  for (const [student, subject, score, date] of Scores) {\n    if (student === null || subject === null || score === null || date === null) return 'Every column needs a value.';\n    if (score < 0 || score > 100) return `Score ${score} is outside 0..100.`;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return `exam_date ${date} is not YYYY-MM-DD.`;\n    const key = `${student}|${String(subject).toLowerCase()}|${date}`;\n    if (keys.has(key)) return `Student ${student} has two ${subject} exams on ${date}.`;\n    keys.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "WITH ranked AS (\n  SELECT student_id, subject, score,\n    ROW_NUMBER() OVER (PARTITION BY student_id, subject ORDER BY exam_date) AS from_first,\n    ROW_NUMBER() OVER (PARTITION BY student_id, subject ORDER BY exam_date DESC) AS from_latest\n  FROM Scores\n),\nends AS (\n  SELECT student_id, subject,\n    MAX(CASE WHEN from_first = 1 THEN score END) AS first_score,\n    MAX(CASE WHEN from_latest = 1 THEN score END) AS latest_score,\n    COUNT(*) AS exams\n  FROM ranked\n  GROUP BY student_id, subject\n)\nSELECT student_id, subject, first_score, latest_score\nFROM ends\nWHERE exams >= 2\n  AND latest_score > first_score\nORDER BY student_id, subject;",
+  "brute": "SELECT d.student_id, d.subject, f.score AS first_score, l.score AS latest_score\nFROM (\n  SELECT student_id, subject, MIN(exam_date) AS first_date, MAX(exam_date) AS last_date\n  FROM Scores\n  GROUP BY student_id, subject\n) AS d\nJOIN Scores AS f\n  ON f.student_id = d.student_id AND f.subject = d.subject AND f.exam_date = d.first_date\nJOIN Scores AS l\n  ON l.student_id = d.student_id AND l.subject = d.subject AND l.exam_date = d.last_date\nWHERE d.first_date < d.last_date\n  AND l.score > f.score\nORDER BY d.student_id, d.subject",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const pick = n => Math.floor(rand() * n);\n  const subjects = small ? ['Math', 'Physics', 'Chemistry'] : ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Art'];\n  const dates = small\n    ? ['2022-12-31', '2023-01-01', '2023-01-15', '2023-02-15', '2023-03-01']\n    : Array.from({ length: 24 }, (_, i) => `${2021 + Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, '0')}-${String(1 + (i * 7) % 28).padStart(2, '0')}`);\n  const students = small ? 4 : 400;\n  const target = small ? pick(9) : 1500 + pick(501);\n  const seen = new Set(), Scores = [];\n  const scores = small ? [60, 70, 70, 85, 90, 0, 100] : null;\n  for (let tries = 0; Scores.length < target && tries < target * 20; tries++) {\n    const student = (small ? 101 : 1) + pick(students), subject = subjects[pick(subjects.length)], date = dates[pick(dates.length)];\n    const key = `${student}|${subject}|${date}`;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    Scores.push([student, subject, scores ? scores[pick(scores.length)] : pick(101), date]);\n  }\n  return [{ Scores }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"Scores":[[101,"Math",70,"2023-01-15"],[101,"Math",85,"2023-02-15"],[101,"Physics",65,"2023-01-15"],[101,"Physics",60,"2023-02-15"],[102,"Math",80,"2023-01-15"],[102,"Math",85,"2023-02-15"],[103,"Math",90,"2023-01-15"],[104,"Physics",75,"2023-01-15"],[104,"Physics",85,"2023-02-15"]]}],"expected":{"columns":["student_id","subject","first_score","latest_score"],"rows":[[101,"Math",70,85],[102,"Math",80,85],[104,"Physics",75,85]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"Scores":[]}]},
+    {"name":"Test 2","input":[{"Scores":[[1,"Math",50,"2023-01-01"]]}]},
+    {"name":"Test 3","input":[{"Scores":[[1,"Math",50,"2023-01-01"],[1,"Math",51,"2023-01-02"]]}]},
+    {"name":"Test 4","input":[{"Scores":[[1,"Math",70,"2023-01-01"],[1,"Math",70,"2023-05-01"],[2,"Art",90,"2023-01-01"],[2,"Art",40,"2023-05-01"]]}]},
+    {"name":"Test 5","input":[{"Scores":[[7,"Math",60,"2023-03-01"],[7,"Math",50,"2023-01-01"],[7,"Math",90,"2023-02-01"],[8,"Math",70,"2023-03-01"],[8,"Math",80,"2023-01-01"],[8,"Math",40,"2023-02-01"]]}]},
+    {"name":"Test 6","input":[{"Scores":[[5,"Physics",10,"2023-01-01"],[5,"Physics",20,"2023-02-01"],[5,"Biology",30,"2023-01-01"],[5,"Biology",40,"2023-02-01"],[3,"Math",0,"2023-01-01"],[3,"Math",100,"2023-02-01"]]}]},
+    {"name":"Test 7","input":[{"Scores":[[1,"Math",80,"2022-12-31"],[1,"Math",85,"2023-01-01"],[2,"Math",85,"2023-01-01"],[2,"Math",80,"2022-12-31"],[2,"Math",70,"2022-06-30"]]}]},
+    {"name":"Test 8","input":[{"Scores":[[4,"Math",55,"2023-01-01"],[4,"Physics",65,"2023-02-01"],[4,"Chemistry",75,"2023-03-01"],[9,"Math",95,"2023-04-01"]]}]},
+    {"name":"Test 9","input":[{"Scores":[[2,"Math",40,"2023-01-01"],[2,"Math",99,"2023-01-15"],[2,"Math",41,"2023-02-01"],[2,"Math",10,"2023-01-20"],[1,"History",30,"2023-02-01"],[1,"History",20,"2023-01-01"]]}]},
+    {"name":"Test 10","input":[{"Scores":[[101,"Math",70,"2023-01-15"],[101,"Math",85,"2023-02-15"],[102,"Math",80,"2023-01-15"],[102,"Math",85,"2023-02-15"],[103,"Math",60,"2023-01-15"],[103,"Math",99,"2023-02-15"],[103,"Art",50,"2023-01-15"],[103,"Art",51,"2023-02-15"]]}]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOnly two exams matter per (student, subject) group: the earliest and the most recent. Window functions can mark both ends of each group without collapsing it: number the exams by date in both directions, and the row numbered 1 from the front is the first exam while the row numbered 1 from the back is the latest. One aggregation per group then lifts those two scores side by side so they can be compared.\n\n## Approach\n\n1. `ranked`: for every exam, `from_first` is its position by `exam_date` ascending and `from_latest` its position by date descending, both within the same student and subject.\n2. `ends`: group by student and subject; `MAX(CASE WHEN from_first = 1 ...)` picks the first score, the same trick on `from_latest` picks the latest one, and `COUNT(*)` counts the exams (dates are unique per group, so this is the number of dates).\n3. Keep groups with `exams >= 2` and `latest_score > first_score`, sorted by `student_id` then `subject`.\n\n## Example 1, step by step\n\n- `ranked`: 101 Math 70 gets (1, 2) and 101 Math 85 gets (2, 1); 101 Physics 65 is (1, 2) and 60 is (2, 1); 102 Math 80 is (1, 2), 85 is (2, 1); 103 Math 90 is (1, 1); 104 Physics 75 is (1, 2), 85 is (2, 1).\n- `ends`: (101, Math, 70, 85, 2), (101, Physics, 65, 60, 2), (102, Math, 80, 85, 2), (103, Math, 90, 90, 1), (104, Physics, 75, 85, 2).\n- Filter: 101 Physics dropped (60 is not above 65); 103 Math dropped (one exam). Remaining: 101 Math, 102 Math, 104 Physics.\n\n## Complexity\n\n- Time: O(N log N) for N exams, dominated by sorting each partition for the window functions.\n- Space: O(N) for `ranked`.\n\n## Pitfalls\n\n- Comparing `MAX(score)` with `MIN(score)` measures the best and worst exam, not the first and latest: scores 50, 90, 60 give latest 60, not 90.\n- Rows are not stored in date order; positions must come from `ORDER BY exam_date`, never from insertion order.\n- Equal first and latest scores are not an improvement; the comparison is strict.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `ranked` | every exam with its position from the first and from the latest date |\n| `from_first`, `from_latest` | 1 on the earliest and on the most recent exam of the group |\n| `ends` | one row per student and subject: first score, latest score, number of exams |\n| `exams` | how many dated exams the group has |",
+  "narration": {
+    "1": "ranked keeps every exam and labels where it sits in its student and subject group.",
+    "3": "Numbering by exam_date ascending marks the first exam of each group with 1.",
+    "4": "Numbering by exam_date descending marks the most recent exam of each group with 1.",
+    "7": "ends collapses each group to one row holding both end scores.",
+    "9": "Only the first exam has from_first = 1, so this picks the first score.",
+    "10": "Likewise, from_latest = 1 picks the score of the most recent exam.",
+    "13": "One row per student and subject pair.",
+    "17": "A group needs at least two dated exams to show any change.",
+    "18": "The latest score must be strictly higher than the first.",
+    "19": "Rows come out by student_id, then subject, as required."
+  }
+}

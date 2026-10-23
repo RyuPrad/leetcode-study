@@ -1,0 +1,72 @@
+{
+  "number": 2146,
+  "title": "K Highest Ranked Items Within a Price Range",
+  "spec": "leetcode",
+  "statement": "The matrix `grid` is a shop floor. A cell holding `0` is a wall you cannot enter, a cell holding `1` is an empty aisle, and a cell holding any larger number is an item with that price. You stand at `start = [row, col]` and may step up, down, left or right into any non-wall cell; each step counts as 1.\n\nYou only care about items whose price lies in `pricing = [low, high]` (both ends included) and that you can actually reach. Rank such items by these keys, using the next key only when all earlier ones tie:\n\n1. shorter walking distance from `start` (the starting cell itself has distance 0) ranks higher;\n2. then the lower price;\n3. then the smaller row index;\n4. then the smaller column index.\n\nReturn the positions `[r, c]` of the `k` best-ranked items, best first. If fewer than `k` such items exist, return all of them.",
+  "constraints": [
+    "m == grid.length, n == grid[i].length",
+    "1 <= m, n <= 10^5",
+    "1 <= m * n <= 10^5",
+    "0 <= grid[i][j] <= 10^5",
+    "pricing.length == 2 and 2 <= low <= high <= 10^5",
+    "start.length == 2, 0 <= row <= m - 1, 0 <= col <= n - 1",
+    "grid[row][col] > 0",
+    "1 <= k <= m * n"
+  ],
+  "signature": "List<List<Integer>> highestRankedKItems(int[][] grid, int[] pricing, int[] start, int k)",
+  "entry": "highestRankedKItems",
+  "kind": "function",
+  "parameters": [
+    "grid",
+    "pricing",
+    "start",
+    "k"
+  ],
+  "validator": "function validate([grid, pricing, start, k]) {\n  const m = grid.length;\n  if (m < 1) return 'grid needs at least one row.';\n  const n = grid[0].length;\n  if (n < 1) return 'Each row needs at least one cell.';\n  if (m * n > 100000) return 'grid has at most 10^5 cells.';\n  for (const row of grid) {\n    if (row.length !== n) return 'All rows of grid must have the same length.';\n    for (const v of row) if (!Number.isInteger(v) || v < 0 || v > 100000) return 'Each cell is an integer from 0 to 10^5.';\n  }\n  if (pricing.length !== 2) return 'pricing is [low, high].';\n  const [low, high] = pricing;\n  if (!(2 <= low && low <= high && high <= 100000)) return 'pricing needs 2 <= low <= high <= 10^5.';\n  if (start.length !== 2) return 'start is [row, col].';\n  const [r, c] = start;\n  if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || r >= m || c < 0 || c >= n) return 'start must be inside the grid.';\n  if (grid[r][c] <= 0) return 'The start cell cannot be a wall.';\n  if (!Number.isInteger(k) || k < 1 || k > m * n) return 'k is between 1 and m * n.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function highestRankedKItems(grid, pricing, start, k) {\n  const rows = grid.length;\n  const cols = grid[0].length;\n  const [low, high] = pricing;\n  const dist = Array.from({ length: rows }, () => new Array(cols).fill(-1));\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  const queue = [start];\n  dist[start[0]][start[1]] = 0;\n  const items = [];\n  for (let head = 0; head < queue.length; head++) {\n    const [r, c] = queue[head];\n    const price = grid[r][c];\n    if (price >= low && price <= high) {\n      items.push([dist[r][c], price, r, c]);\n    }\n    for (const [dr, dc] of directions) {\n      const nr = r + dr;\n      const nc = c + dc;\n      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;\n      if (grid[nr][nc] === 0 || dist[nr][nc] !== -1) continue;\n      dist[nr][nc] = dist[r][c] + 1;\n      queue.push([nr, nc]);\n    }\n  }\n  items.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);\n  return items.slice(0, k).map(([, , r, c]) => [r, c]);\n}",
+  "brute": "function highestRankedKItems(grid, pricing, start, k) {\n  const m = grid.length, n = grid[0].length;\n  const INF = Number.MAX_SAFE_INTEGER;\n  const d = grid.map(row => row.map(() => INF));\n  d[start[0]][start[1]] = 0;\n  // Relax every cell from its neighbours until nothing improves.\n  let changed = true;\n  while (changed) {\n    changed = false;\n    for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) {\n      if (grid[i][j] === 0) continue;\n      for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) {\n        if (a >= 0 && a < m && b >= 0 && b < n && d[a][b] !== INF && d[a][b] + 1 < d[i][j]) { d[i][j] = d[a][b] + 1; changed = true; }\n      }\n    }\n  }\n  const pool = [];\n  for (let i = 0; i < m; i++) for (let j = 0; j < n; j++)\n    if (d[i][j] !== INF && grid[i][j] >= pricing[0] && grid[i][j] <= pricing[1]) pool.push({ i, j });\n  const better = (x, y) => {\n    const kx = [d[x.i][x.j], grid[x.i][x.j], x.i, x.j], ky = [d[y.i][y.j], grid[y.i][y.j], y.i, y.j];\n    for (let t = 0; t < 4; t++) if (kx[t] !== ky[t]) return kx[t] < ky[t];\n    return false;\n  };\n  const out = [];\n  while (out.length < k && pool.length) {\n    let best = 0;\n    for (let t = 1; t < pool.length; t++) if (better(pool[t], pool[best])) best = t;\n    out.push([pool[best].i, pool[best].j]);\n    pool.splice(best, 1);\n  }\n  return out;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const m = large ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 5);\n  const n = large ? 60 + Math.floor(rand() * 41) : 1 + Math.floor(rand() * 5);\n  const maxPrice = large ? 100000 : 3 + Math.floor(rand() * 5);\n  const wallRate = large ? 0.15 + rand() * 0.15 : rand() * 0.4;\n  const emptyRate = rand() * 0.4;\n  const grid = [];\n  for (let i = 0; i < m; i++) {\n    const row = [];\n    for (let j = 0; j < n; j++) {\n      const x = rand();\n      if (x < wallRate) row.push(0);\n      else if (x < wallRate + emptyRate * (1 - wallRate)) row.push(1);\n      else row.push(2 + Math.floor(rand() * (maxPrice - 1)));\n    }\n    grid.push(row);\n  }\n  const r0 = Math.floor(rand() * m), c0 = Math.floor(rand() * n);\n  if (grid[r0][c0] === 0) grid[r0][c0] = rand() < 0.5 ? 1 : 2 + Math.floor(rand() * (maxPrice - 1));\n  const a = 2 + Math.floor(rand() * (maxPrice - 1)), b = 2 + Math.floor(rand() * (maxPrice - 1));\n  const pricing = [Math.min(a, b), Math.max(a, b)];\n  const k = 1 + Math.floor(rand() * (large && rand() < 0.5 ? 200 : m * n));\n  return [grid, pricing, [r0, c0], Math.min(k, m * n)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2,0,1],[1,3,0,1],[0,2,5,1]],[2,5],[0,0],3],"expected":[[0,1],[1,1],[2,1]]},
+    {"name":"Example 2","input":[[[1,2,0,1],[1,3,3,1],[0,2,5,1]],[2,3],[2,3],2],"expected":[[2,1],[1,2]]},
+    {"name":"Example 3","input":[[[1,1,1],[0,0,1],[2,3,4]],[2,3],[0,0],3],"expected":[[2,1],[2,0]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[5]],[2,10],[0,0],1]},
+    {"name":"Test 2","input":[[[1]],[2,10],[0,0],1]},
+    {"name":"Test 3","input":[[[3,0,3],[0,0,0],[3,3,3]],[2,5],[0,0],9]},
+    {"name":"Test 4","input":[[[4,4,4],[4,4,4],[4,4,4]],[4,4],[1,1],9]},
+    {"name":"Test 5","input":[[[2,3,2],[3,1,3],[2,3,2]],[2,3],[1,1],5]},
+    {"name":"Test 6","input":[[[1,7,1,9,1,2]],[2,8],[0,0],6]},
+    {"name":"Test 7","input":[[[6],[1],[2],[0],[3]],[2,6],[1,0],4]},
+    {"name":"Test 8","input":[[[1,1,1,1],[1,0,0,1],[1,0,9,1],[1,1,1,1]],[9,9],[0,0],1]},
+    {"name":"Test 9","input":[[[100000,99999],[2,100000]],[99999,100000],[1,0],2]},
+    {"name":"Test 10","input":[[[2,5,3,1],[0,1,0,4],[7,2,6,1],[1,0,3,2]],[3,6],[2,1],3]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe first ranking key is the shortest walking distance, and every step costs 1, so a breadth-first search from `start` gives each reachable cell its exact distance. Once every in-range item carries its distance, price, row and column, the ranking is just a sort by those four numbers. A slower idea, repeatedly relaxing distances until nothing changes and then picking the best item one at a time, gives the same answer but costs far more.\n\n## Approach\n\n1. Mark every cell's distance `dist` as `-1` (unseen), set the start's to `0` and put it in `queue`.\n2. Pop cells in order (the index `head` walks the queue). If the cell's `price` is within `[low, high]`, record `[distance, price, r, c]` in `items`.\n3. For each of the four neighbours that lies inside the grid, is not a wall and is unseen, set its distance to one more and enqueue it.\n4. Sort `items` by distance, then price, then row, then column.\n5. Keep the first `k` entries and return their `[r, c]` positions.\n\n## Example 1, step by step\n\nFrom `(0,0)` (price 1, not in `[2, 5]`) the search reaches `(0,1)` and `(1,0)` at distance 1; `(0,1)` has price 2, so `[1, 2, 0, 1]` is recorded. At distance 2 it reaches `(1,1)` (price 3), at distance 3 `(2,1)` (price 2), at distance 4 `(2,2)` (price 5). Sorting keeps that order, and the first three positions are `[[0,1],[1,1],[2,1]]`.\n\n## Complexity\n\n- Time: O(mn log(mn)): the search touches each cell once, and sorting the items dominates.\n- Space: O(mn) for `dist`, the queue and the items.\n\n## Pitfalls\n\n- The start cell counts too: if its own price is in range it is an item at distance 0.\n- Cells with value `1` are walkable but are never items, since `low` is at least 2.\n- Use an index into the queue instead of `shift()`, which makes BFS quadratic in JavaScript.\n- Ties must fall through all four keys; comparing only distance and price leaves the order undefined.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rows`, `cols` | grid height and width |\n| `low`, `high` | the accepted price range |\n| `dist` | BFS distance of each cell, `-1` if not reached yet |\n| `queue`, `head` | BFS queue and the index of the next cell to process |\n| `items` | `[distance, price, row, col]` of every reachable in-range item |\n| `r`, `c`, `price` | the cell being processed and its value |\n| `nr`, `nc` | a neighbour of that cell |",
+  "narration": {
+    "4": "Unpack the accepted price range.",
+    "5": "Every cell starts unreached, marked with -1.",
+    "7": "Breadth-first search begins at the start cell...",
+    "8": "...which is zero steps away from itself.",
+    "10": "Process cells in the order they were discovered, so distances come out in non-decreasing order.",
+    "13": "Is this cell an item whose price is within the range?",
+    "14": "Record its four ranking keys: distance, price, row, column.",
+    "16": "Look at the four neighbours of the current cell.",
+    "19": "Skip neighbours outside the grid.",
+    "20": "Skip walls and cells that already have a distance.",
+    "21": "A newly found cell is one step farther than the current one.",
+    "22": "Queue it so its own neighbours are explored later.",
+    "25": "Sort items by distance, then price, then row, then column.",
+    "26": "Keep the k best and return just their positions."
+  }
+}
