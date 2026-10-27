@@ -1,0 +1,74 @@
+{
+  "number": 3241,
+  "title": "Time Taken to Mark All Nodes",
+  "spec": "leetcode",
+  "statement": "An undirected tree has `n` nodes labelled `0` to `n - 1`, where `n = edges.length + 1`; each `edges[i] = [u_i, v_i]` joins nodes `u_i` and `v_i`.\n\nMarks spread through the tree from one starting node, which is marked at time `0` while every other node starts unmarked. After that, a node with an **odd** label becomes marked exactly 1 time unit after the first of its neighbours is marked, and a node with an **even** label exactly 2 time units after the first of its neighbours is marked.\n\nFor every node `i`, work out the moment the whole tree has become marked if the process starts at `i`, and return these moments as the array `times` of length `n`, with `times[i]` for start `i`. Each start is a separate run from a fully unmarked tree.",
+  "constraints": [
+    "2 <= n <= 10^5",
+    "edges.length == n - 1",
+    "edges[i].length == 2",
+    "0 <= edges[i][0], edges[i][1] <= n - 1",
+    "The edges form a valid tree"
+  ],
+  "signature": "int[] timeTaken(int[][] edges)",
+  "entry": "timeTaken",
+  "kind": "function",
+  "parameters": [
+    "edges"
+  ],
+  "validator": "function validate([edges]) {\n  if (!Array.isArray(edges) || edges.length < 1 || edges.length > 99999) return 'edges must hold n - 1 edges for 2 <= n <= 10^5.';\n  const n = edges.length + 1;\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [u, v].';\n    const [u, v] = edge;\n    if (![u, v].every(x => Number.isInteger(x) && x >= 0 && x < n)) return 'Edge endpoints are nodes from 0 to n - 1.';\n    if (u === v) return 'An edge must join two different nodes.';\n    const ru = find(u), rv = find(v);\n    if (ru === rv) return 'The edges must form a tree (no cycles).';\n    root[ru] = rv;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function timeTaken(edges) {\n  const n = edges.length + 1;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) {\n    graph[u].push(v);\n    graph[v].push(u);\n  }\n  const delay = node => (node % 2 === 1 ? 1 : 2);\n\n  const parent = new Array(n).fill(-1);\n  const order = [0];\n  for (let i = 0; i < order.length; i++) {\n    const node = order[i];\n    for (const next of graph[node]) {\n      if (next !== parent[node]) {\n        parent[next] = node;\n        order.push(next);\n      }\n    }\n  }\n\n  const down = new Array(n).fill(0);\n  const second = new Array(n).fill(0);\n  const bestChild = new Array(n).fill(-1);\n  for (let i = n - 1; i > 0; i--) {\n    const node = order[i];\n    const p = parent[node];\n    const time = down[node] + delay(node);\n    if (time > down[p]) {\n      second[p] = down[p];\n      down[p] = time;\n      bestChild[p] = node;\n    } else if (time > second[p]) {\n      second[p] = time;\n    }\n  }\n\n  const up = new Array(n).fill(0);\n  const times = new Array(n).fill(0);\n  for (const node of order) {\n    if (node !== 0) {\n      const p = parent[node];\n      const sibling = bestChild[p] === node ? second[p] : down[p];\n      up[node] = delay(p) + Math.max(up[p], sibling);\n    }\n    times[node] = Math.max(down[node], up[node]);\n  }\n  return times;\n}",
+  "brute": "function timeTaken(edges) {\n  // Follow the marking rules literally, one time unit after another, from every starting node.\n  const n = edges.length + 1;\n  const adj = Array.from({ length: n }, () => []);\n  for (const [a, b] of edges) { adj[a].push(b); adj[b].push(a); }\n  const result = [];\n  for (let start = 0; start < n; start++) {\n    const markedAt = new Array(n).fill(-1);\n    markedAt[start] = 0;\n    let marked = 1, t = 0;\n    while (marked < n) {\n      t++;\n      const now = [];\n      for (let v = 0; v < n; v++) {\n        if (markedAt[v] >= 0) continue;\n        const wait = v % 2 === 1 ? 1 : 2;\n        if (adj[v].some(u => markedAt[u] >= 0 && markedAt[u] === t - wait)) now.push(v);\n      }\n      for (const v of now) markedAt[v] = t;\n      marked += now.length;\n    }\n    result.push(t);\n  }\n  return result;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 2 + Math.floor(rand() * 11);\n  const shape = Math.floor(rand() * 5);\n  const pairs = [];\n  for (let i = 1; i < n; i++) {\n    let p;\n    if (shape === 0) p = Math.floor(rand() * i);                          // random tree\n    else if (shape === 1) p = i - 1;                                     // path\n    else if (shape === 2) p = 0;                                         // star\n    else if (shape === 3) p = i % 2 === 1 ? Math.max(0, i - 2) : i - 1;  // caterpillar\n    else p = Math.floor((i - 1) / 2);                                    // binary tree\n    pairs.push([p, i]);\n  }\n  // Relabel the nodes, flip edge directions and shuffle the edge order.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [label[i], label[j]] = [label[j], label[i]]; }\n  const edges = pairs.map(([a, b]) => (rand() < 0.5 ? [label[a], label[b]] : [label[b], label[a]]));\n  for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  return [edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1],[0,2]]],"expected":[2,4,3]},
+    {"name":"Example 2","input":[[[0,1]]],"expected":[1,2]},
+    {"name":"Example 3","input":[[[2,4],[0,1],[2,3],[0,2]]],"expected":[4,6,3,5,5]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,2],[1,0]]]},
+    {"name":"Test 2","input":[[[0,1],[1,2],[2,3],[3,4],[4,5]]]},
+    {"name":"Test 3","input":[[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6]]]},
+    {"name":"Test 4","input":[[[1,0],[1,2],[1,3],[1,4],[1,5]]]},
+    {"name":"Test 5","input":[[[6,4],[4,2],[2,0],[0,1],[1,3],[3,5]]]},
+    {"name":"Test 6","input":[[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6],[3,7],[3,8],[4,9],[4,10],[5,11],[5,12],[6,13],[6,14]]]},
+    {"name":"Test 7","input":[[[0,1],[1,2],[2,3],[3,4],[0,5],[1,6],[2,7],[3,8],[4,9]]]},
+    {"name":"Test 8","input":[[[9,4],[4,10],[6,2],[2,9],[8,6],[1,3],[3,0],[7,0],[0,5],[5,2],[11,7]]]},
+    {"name":"Test 9","input":[[[17,3],[3,28],[28,11],[11,0],[0,34],[34,21],[21,8],[8,39],[39,14],[14,25],[25,6],[6,31],[31,19],[19,2],[2,36],[36,23],[23,10],[10,29],[29,15],[15,4],[4,33],[33,26],[26,12],[12,38],[38,1],[1,20],[20,9],[9,35],[35,27],[27,16],[16,5],[5,30],[30,22],[22,13],[13,37],[37,7],[7,24],[24,32],[32,18]]]},
+    {"name":"Test 10","input":[[[0,2],[2,4],[4,6],[6,8],[8,10],[10,1],[10,3],[10,5],[10,7],[10,9],[10,11]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":18,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMarking spreads like a shortest-path search in which entering node `v` costs 1 if `v` is odd and 2 if it is even. A tree has one path between any two nodes, so `times[i]` is the largest total entry cost of a path that starts at `i`. A search from every node costs O(n²); instead, root the tree at node 0 and, for each node, combine the costliest path **down** into its subtree with the costliest path that first steps **up** to its parent (rerooting).\n\n## Approach\n\n1. Build the adjacency list `graph`, then walk breadth-first from node 0 to record each node's `parent` and a visiting `order` in which parents come before children.\n2. Walk `order` backwards. A child `node` offers its parent `p` the time `down[node] + delay(node)`; `p` keeps the largest in `down[p]` (remembering `bestChild[p]`) and the largest from any other child in `second[p]`.\n3. Walk `order` forwards. To leave its subtree, `node` first enters `p` (cost `delay(p)`) and then either keeps climbing (`up[p]`) or drops into a sibling's subtree: `second[p]` if `node` is `p`'s best child, otherwise `down[p]`. That gives `up[node]`.\n4. `times[node] = max(down[node], up[node])`.\n\n## Example 1, step by step\n\n`edges = [[0,1],[0,2]]`; entering node 0 or 2 costs 2, entering node 1 costs 1.\n- Backward: node 2 offers `0 + 2 = 2`, so `down[0] = 2` with `bestChild[0] = 2`; node 1 offers `1`, so `second[0] = 1`.\n- Forward: `times[0] = 2`. Node 1 is not the best child, so `up[1] = 2 + max(0, 2) = 4`. Node 2 is, so it uses `second[0]`: `up[2] = 2 + max(0, 1) = 3`.\n\nThe answer is `[2, 4, 3]`.\n\n## Complexity\n\n- Time: O(n): the breadth-first walk and both passes touch each node and edge a constant number of times.\n- Space: O(n) for the adjacency list and the arrays.\n\n## Pitfalls\n\n- The cost belongs to the node being entered, so an edge costs different amounts in its two directions: from 0 to 1 it is 1, from 1 to 0 it is 2.\n- A best child must use its parent's second-best branch; using `down[p]` would count a path that runs back into its own subtree.\n- When two children tie for the best time, `second[p]` must take that same value, which the `else if` branch does.\n- A path of 10^5 nodes overflows a recursive DFS in many languages; the breadth-first order avoids recursion.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of the tree |\n| `delay(node)` | time to mark `node` after its first neighbour: 1 if odd, 2 if even |\n| `parent`, `order` | each node's parent with root 0, and the breadth-first visiting order |\n| `down`, `second` | the costliest and second-costliest paths down from a node, through different children |\n| `bestChild` | the child that gives `down` |\n| `up` | the costliest path that starts by stepping to the node's parent |\n| `times` | the answer for every starting node |",
+  "narration": {
+    "3": "Make an empty neighbour list for every node.",
+    "5": "Record each edge in both directions, since the tree is undirected.",
+    "8": "Entering an odd node takes 1 time unit, entering an even node takes 2.",
+    "11": "Start a breadth-first walk at node 0, which becomes the root.",
+    "12": "order grows as nodes are discovered, so this loop visits every node.",
+    "15": "Every neighbour other than the parent is a child.",
+    "16": "Remember which node discovered this child.",
+    "17": "Children join the order after their parent.",
+    "22": "down[v] will be the costliest path from v down into its own subtree.",
+    "25": "Walk the order backwards so every child is finished before its parent.",
+    "28": "The cost of stepping from the parent into this child and then following the child's best path down.",
+    "29": "Better than the parent's best so far?",
+    "30": "The old best becomes the second best...",
+    "31": "...this path becomes the best...",
+    "32": "...and this child is remembered as the one that gives it.",
+    "33": "Otherwise it may still beat the second best, which always comes from a different child.",
+    "40": "Walk forwards so a parent's up value is ready before its children need it.",
+    "43": "A best child must use the parent's second-best branch, so the path does not run back into itself.",
+    "44": "Step into the parent, then either climb further or go down a sibling's branch.",
+    "46": "The last node to be marked is either below this node or reached through its parent.",
+    "48": "Every starting node's total marking time is known."
+  }
+}

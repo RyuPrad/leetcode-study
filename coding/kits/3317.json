@@ -1,0 +1,63 @@
+{
+  "number": 3317,
+  "title": "Find the Number of Possible Ways for an Event",
+  "spec": "leetcode",
+  "statement": "An event has `n` performers and `x` stages. Every performer is sent to one of the `x` stages, and a stage may end up with nobody. The performers sharing a stage form one band, so each stage that is not empty holds exactly one band. Afterwards every band receives a score, an integer from `1` to `y`.\n\nAn event is fully described by which stage each performer went to together with the score each band received; two events differ if either part differs. Return the number of different possible events, modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= n, x, y <= 1000"
+  ],
+  "signature": "int numberOfWays(int n, int x, int y)",
+  "entry": "numberOfWays",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "x",
+    "y"
+  ],
+  "validator": "function validate([n, x, y]) {\n  for (const [name, value] of [['n', n], ['x', x], ['y', y]]) {\n    if (!Number.isInteger(value) || value < 1 || value > 1000) return `${name} must be a whole number from 1 to 1000.`;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numberOfWays(n, x, y) {\n  const MOD = 1000000007;\n  const bands = Math.min(n, x);\n  const stirling = new Array(bands + 1).fill(0);\n  stirling[0] = 1;\n  for (let i = 1; i <= n; i++) {\n    for (let k = Math.min(i, bands); k >= 1; k--) {\n      stirling[k] = (stirling[k - 1] + k * stirling[k]) % MOD;\n    }\n    stirling[0] = 0;\n  }\n  let total = 0;\n  let factor = 1;\n  for (let k = 1; k <= bands; k++) {\n    factor = factor * (x - k + 1) % MOD * y % MOD;\n    const ways = Number(BigInt(stirling[k]) * BigInt(factor) % BigInt(MOD));\n    total = (total + ways) % MOD;\n  }\n  return total;\n}",
+  "brute": "function numberOfWays(n, x, y) {\n  // Seat performers one at a time. count[j] = ways so far that use exactly j stages, every band already scored.\n  // Products stay below 2^51 (a residue times at most 1000 * 1000), so plain numbers are exact.\n  const MOD = 1000000007;\n  let count = [1];\n  for (let performer = 0; performer < n; performer++) {\n    const next = new Array(count.length + 1).fill(0);\n    for (let j = 0; j < count.length; j++) {\n      next[j] = (next[j] + count[j] * j) % MOD;\n      if (j < x) next[j + 1] = (next[j + 1] + count[j] * ((x - j) * y)) % MOD;\n    }\n    count = next;\n  }\n  let sum = 0;\n  for (const value of count) sum = (sum + value) % MOD;\n  return sum;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  if (size === 'large') return [pick(800, 1000), pick(800, 1000), pick(1, 1000)];\n  const n = rand() < 0.5 ? pick(1, 6) : pick(1, 60);\n  const x = rand() < 0.5 ? pick(1, 6) : pick(1, 60);\n  const y = rand() < 0.5 ? pick(1, 5) : pick(1, 1000);\n  return [n, x, y];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,2,3],"expected":6},
+    {"name":"Example 2","input":[5,2,1],"expected":32},
+    {"name":"Example 3","input":[3,3,4],"expected":684}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1,1]},
+    {"name":"Test 2","input":[1000,1,1]},
+    {"name":"Test 3","input":[1,1000,1000]},
+    {"name":"Test 4","input":[2,2,2]},
+    {"name":"Test 5","input":[1000,1000,1000]},
+    {"name":"Test 6","input":[1000,2,1]},
+    {"name":"Test 7","input":[4,10,1]},
+    {"name":"Test 8","input":[10,3,7]},
+    {"name":"Test 9","input":[7,1000,3]},
+    {"name":"Test 10","input":[999,500,2]},
+    {"name":"Test 11","input":[1000,1000,1]},
+    {"name":"Test 12","input":[6,6,1000]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying all `x^n` stage assignments is hopeless for `n = 1000`. Instead, group the events by `k`, the number of bands. For a fixed `k`, three independent choices multiply:\n\n- split the performers into `k` non-empty groups: `S(n, k)` ways, a Stirling number of the second kind;\n- put the groups on `k` different stages: `x · (x - 1) · ... · (x - k + 1)` ways;\n- score each band: `y^k` ways.\n\nSumming over `k = 1 .. min(n, x)` counts every event once. The Stirling numbers follow `S(i, k) = S(i - 1, k - 1) + k · S(i - 1, k)`: performer `i` starts a new group or joins one of the `k` existing ones.\n\n## Approach\n\n1. `bands = min(n, x)`: each band needs a performer and a stage of its own.\n2. Keep one row `stirling` of `S(i, ·)`, starting from `S(0, 0) = 1`. For each performer `i`, update `k` from high to low so the right side still reads row `i - 1`, then set `S(i, 0) = 0`.\n3. For `k = 1 .. bands`, extend `factor` by one more stage choice `(x - k + 1)` and one more score `y`.\n4. Add `ways = S(n, k) · factor` to `total`, modulo `10^9 + 7`.\n\n## Example 1, step by step\n\n`n = 1, x = 2, y = 3`, so `bands = 1`, and after the one performer `stirling = [0, 1]`. For `k = 1`, `factor = 2 · 3 = 6` and `ways = 1 · 6 = 6`, so the answer is `6`. (In Example 3, `S(3, ·) = 1, 3, 1` and the factors are `12, 96, 384`, giving `12 + 288 + 384 = 684`.)\n\n## Complexity\n\n- Time: O(n · min(n, x)) for the Stirling rows, plus O(min(n, x)) for the sum.\n- Space: O(min(n, x)) for the single row.\n\n## Pitfalls\n\n- Stages are told apart: multiply `S(n, k)` by the falling product, not by `C(x, k)` alone or by `x^k`.\n- Two residues near `10^9` multiply to about `10^18`, past exact JavaScript numbers. Products with a factor of at most 1000 are safe; `S(n, k) · factor` goes through `BigInt`.\n- Update `stirling` from high `k` to low `k`, or `S(i, k - 1)` is overwritten before it is used.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | `10^9 + 7` |\n| `bands` | the most bands possible, `min(n, x)` |\n| `stirling[k]` | `S(i, k)` for the performers handled so far |\n| `i`, `k` | performers handled, and a number of bands |\n| `factor` | `x(x - 1)...(x - k + 1) · y^k` modulo `MOD` |\n| `ways`, `total` | events with exactly `k` bands, and the running answer |",
+  "narration": {
+    "3": "At most min(n, x) bands can exist: each needs a performer and its own stage.",
+    "4": "One row of Stirling numbers S(i, k), reused for every performer count i.",
+    "5": "S(0, 0) = 1: zero performers split into zero groups in exactly one way.",
+    "6": "Add the performers one at a time.",
+    "7": "Go from high k to low k so the right side still reads the previous row.",
+    "8": "Performer i either starts group k on its own or joins one of k existing groups.",
+    "10": "With at least one performer, splitting into zero groups is impossible.",
+    "14": "Consider each possible number of bands k.",
+    "15": "Extend the factor by one more distinct stage, x - k + 1 choices, and one more band score, y choices.",
+    "16": "Events with exactly k bands: the groupings times the stage and score choices, multiplied exactly with BigInt.",
+    "17": "Add them to the running total, modulo 10^9 + 7.",
+    "19": "Every event has been counted exactly once, under its number of bands."
+  }
+}

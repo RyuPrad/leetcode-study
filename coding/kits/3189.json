@@ -1,0 +1,58 @@
+{
+  "number": 3189,
+  "title": "Minimum Moves to Get a Peaceful Board",
+  "spec": "recalled",
+  "statement": "An `n x n` chessboard holds `n` rooks: `rooks[i] = [xi, yi]` means the `i`-th rook stands in row `xi` and column `yi`, and no two rooks start on the same cell. In one move you shift a single rook to a neighbouring cell of the board, one step up, down, left or right; two rooks may never occupy the same cell at any moment. The board is **peaceful** when every row and every column contains exactly one rook. Return the minimum number of moves that makes the board peaceful.",
+  "constraints": [
+    "1 <= n == rooks.length <= 500",
+    "rooks[i] == [xi, yi]",
+    "0 <= xi, yi <= n - 1",
+    "No two rooks start on the same cell"
+  ],
+  "signature": "int minMoves(int[][] rooks)",
+  "entry": "minMoves",
+  "kind": "function",
+  "parameters": [
+    "rooks"
+  ],
+  "validator": "function validate([rooks]) {\n  const n = rooks.length;\n  if (n < 1 || n > 500) return 'rooks needs 1 to 500 rooks.';\n  const seen = new Set();\n  for (const rook of rooks) {\n    if (rook.length !== 2) return 'Each rook is a pair [x, y].';\n    const [x, y] = rook;\n    if (x < 0 || y < 0 || x >= n || y >= n) return 'Each coordinate is between 0 and n - 1, where n is the number of rooks.';\n    if (seen.has(x * n + y)) return 'Two rooks cannot start on the same cell.';\n    seen.add(x * n + y);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minMoves(rooks) {\n  const rows = rooks.map(rook => rook[0]).sort((a, b) => a - b);\n  const cols = rooks.map(rook => rook[1]).sort((a, b) => a - b);\n  let moves = 0;\n  for (let i = 0; i < rooks.length; i++) {\n    moves += Math.abs(rows[i] - i);\n    moves += Math.abs(cols[i] - i);\n  }\n  return moves;\n}",
+  "brute": "function minMoves(rooks) {\n  const n = rooks.length;\n  if (n <= 4) {\n    // Small boards: breadth-first search over real positions; a move slides one rook into an empty neighbouring cell.\n    const start = rooks.reduce((mask, [x, y]) => mask | 1 << (x * n + y), 0);\n    const peaceful = mask => {\n      for (let line = 0; line < n; line++) {\n        let inRow = 0, inColumn = 0;\n        for (let k = 0; k < n; k++) {\n          if (mask >> (line * n + k) & 1) inRow++;\n          if (mask >> (k * n + line) & 1) inColumn++;\n        }\n        if (inRow !== 1 || inColumn !== 1) return false;\n      }\n      return true;\n    };\n    const distance = new Map([[start, 0]]);\n    const queue = [start];\n    for (let head = 0; head < queue.length; head++) {\n      const mask = queue[head];\n      if (peaceful(mask)) return distance.get(mask);\n      for (let cell = 0; cell < n * n; cell++) {\n        if (!(mask >> cell & 1)) continue;\n        const x = Math.floor(cell / n), y = cell % n;\n        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {\n          const nx = x + dx, ny = y + dy;\n          if (nx < 0 || ny < 0 || nx >= n || ny >= n || mask >> (nx * n + ny) & 1) continue;\n          const next = mask & ~(1 << cell) | 1 << (nx * n + ny);\n          if (!distance.has(next)) {\n            distance.set(next, distance.get(mask) + 1);\n            queue.push(next);\n          }\n        }\n      }\n    }\n  }\n  // Larger boards: rows and columns are fixed separately, so try every assignment of rooks to distinct lines (subset DP).\n  const cheapest = coords => {\n    const best = new Array(1 << n).fill(Infinity);\n    best[0] = 0;\n    for (let mask = 0; mask < 1 << n; mask++) {\n      let placed = 0;\n      for (let bit = 0; bit < n; bit++) if (mask >> bit & 1) placed++;\n      for (let line = 0; line < n; line++) {\n        if (mask >> line & 1) continue;\n        const next = mask | 1 << line;\n        best[next] = Math.min(best[next], best[mask] + Math.abs(coords[placed] - line));\n      }\n    }\n    return best[(1 << n) - 1];\n  };\n  return cheapest(rooks.map(rook => rook[0])) + cheapest(rooks.map(rook => rook[1]));\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 500 : rand() < 0.7 ? 1 + Math.floor(rand() * 4) : 5 + Math.floor(rand() * 3);\n  const randomInt = limit => Math.floor(rand() * limit);\n  const shuffled = () => {\n    const order = Array.from({ length: n }, (_, i) => i);\n    for (let i = n - 1; i > 0; i--) {\n      const j = randomInt(i + 1);\n      [order[i], order[j]] = [order[j], order[i]];\n    }\n    return order;\n  };\n  const rooks = [];\n  const taken = new Set();\n  const place = (x, y) => {\n    if (taken.has(x * n + y)) return;\n    taken.add(x * n + y);\n    rooks.push([x, y]);\n  };\n  const mode = randomInt(5);\n  if (mode === 0) {\n    // Anywhere on the board.\n    while (rooks.length < n) place(randomInt(n), randomInt(n));\n  } else if (mode === 1) {\n    // All in one row or all in one column.\n    const line = randomInt(n);\n    const inRow = rand() < 0.5;\n    for (const k of shuffled()) {\n      if (inRow) place(line, k);\n      else place(k, line);\n    }\n  } else if (mode === 2) {\n    // Packed into a small block in the corner.\n    const side = Math.ceil(Math.sqrt(n));\n    while (rooks.length < n) place(randomInt(side), randomInt(side));\n  } else {\n    // A peaceful board, then (in mode 4) a few single-step nudges.\n    shuffled().forEach((y, x) => place(x, y));\n    const nudges = mode === 4 ? 1 + randomInt(Math.min(n, 30)) : 0;\n    for (let t = 0; t < nudges; t++) {\n      const index = randomInt(n);\n      const [x, y] = rooks[index];\n      const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][randomInt(4)];\n      const nx = x + dx, ny = y + dy;\n      if (nx < 0 || ny < 0 || nx >= n || ny >= n || taken.has(nx * n + ny)) continue;\n      taken.delete(x * n + y);\n      taken.add(nx * n + ny);\n      rooks[index] = [nx, ny];\n    }\n  }\n  return [rooks];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,0],[1,0],[1,1]]],"expected":3},
+    {"name":"Example 2","input":[[[0,0],[0,1],[0,2],[0,3]]],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0]]]},
+    {"name":"Test 2","input":[[[0,1],[1,0]]]},
+    {"name":"Test 3","input":[[[0,0],[0,1]]]},
+    {"name":"Test 4","input":[[[0,0],[0,1],[1,0],[1,1]]]},
+    {"name":"Test 5","input":[[[2,4],[0,4],[4,4],[1,4],[3,4]]]},
+    {"name":"Test 6","input":[[[1,3],[1,0],[1,4],[1,2],[1,1]]]},
+    {"name":"Test 7","input":[[[5,0],[2,0],[7,0],[0,0],[3,0],[6,0],[1,0],[4,0]]]},
+    {"name":"Test 8","input":[[[0,1],[1,2],[2,2],[3,4],[3,5],[5,0]]]},
+    {"name":"Test 9","input":[[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,0],[3,1],[3,2]]]},
+    {"name":"Test 10","input":[[[6,6],[0,3],[3,3],[6,0],[2,5],[5,1],[6,2]]]},
+    {"name":"Test 11","input":[[[8,8],[6,7],[7,6],[8,6],[6,8],[7,7],[6,6],[8,7],[7,8]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOn a peaceful board the rooks' rows are exactly `0, 1, ..., n - 1` in some order, and so are their columns. A move changes one rook's row or its column by one, never both, so vertical and horizontal moves can be counted separately: the answer is the cheapest way to give the rooks distinct rows plus the cheapest way to give them distinct columns. For one coordinate, the cheapest way to send the values to the targets `0..n-1` pairs them in sorted order, because uncrossing two crossed pairs never costs more. The rule that rooks may not share a cell costs nothing extra: move every rook to its target row first (inside a column the rooks keep their order, so they never meet), after which each row holds one rook and the sideways moves cannot collide.\n\n## Approach\n\n1. Put every rook's row into `rows` and every column into `cols`, and sort both lists.\n2. For each `i` from 0 to `n - 1`, the `i`-th smallest row goes to row `i` and the `i`-th smallest column goes to column `i`.\n3. Add `|rows[i] - i|` and `|cols[i] - i|` to `moves`.\n4. Return `moves`.\n\n## Example 1, step by step\n\n`rooks = [[0,0],[1,0],[1,1]]`, so `n = 3`, `rows = [0, 1, 1]` and `cols = [0, 0, 1]`.\n\n- `i = 0`: `|0 - 0| + |0 - 0| = 0`, `moves = 0`.\n- `i = 1`: `|1 - 1| + |0 - 1| = 1`, `moves = 1`.\n- `i = 2`: `|1 - 2| + |1 - 2| = 2`, `moves = 3`.\n\nThe answer is `3`: one rook moves down a row, and two rooks each shift one column to the right.\n\n## Complexity\n\n- Time: O(n log n) for the two sorts; the scan is O(n). Since every coordinate is below `n`, a counting sort would make it O(n).\n- Space: O(n) for the two sorted lists.\n\n## Pitfalls\n\n- Pair the targets with sorted coordinates, not with the input order: rows `[1, 0]` already cover rows 0 and 1, yet matching them to 0 and 1 in input order would count 2 moves.\n- Sort rows and columns independently; sorting the rooks by row and reading their columns in that order does not give the best column matching.\n- The no-sharing rule needs no simulation, since it never forces an extra move.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rows` | the rooks' row numbers, sorted |\n| `cols` | the rooks' column numbers, sorted |\n| `moves` | moves counted so far |\n| `i` | the target row and column for the `i`-th smallest values |",
+  "narration": {
+    "2": "Collect every rook's row and sort them: the smallest row should end in row 0, the next in row 1, and so on.",
+    "3": "Do the same for the columns, which can be fixed independently of the rows.",
+    "4": "No moves have been counted yet.",
+    "5": "Match the i-th smallest row and the i-th smallest column with target line i.",
+    "6": "Vertical steps needed to bring the i-th smallest row to row i.",
+    "7": "Horizontal steps needed to bring the i-th smallest column to column i.",
+    "9": "Rows and columns are fixed independently, so their step counts add up to the answer."
+  }
+}

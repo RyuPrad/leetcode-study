@@ -1,0 +1,61 @@
+{
+  "number": 3209,
+  "title": "Number of Subarrays With AND Value of K",
+  "spec": "leetcode",
+  "statement": "You get an integer array `nums` and an integer `k`. Count the non-empty contiguous subarrays of `nums` whose elements, combined with the bitwise AND operator (`&`), produce exactly `k`, and return that count. Subarrays at different positions are counted separately, even when they hold the same values.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "0 <= nums[i], k <= 10^9"
+  ],
+  "signature": "long countSubarrays(int[] nums, int k)",
+  "entry": "countSubarrays",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => v < 0 || v > 1000000000)) return 'Each value is between 0 and 10^9.';\n  if (k < 0 || k > 1000000000) return 'k is between 0 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countSubarrays(nums, k) {\n  let total = 0;\n  let ending = new Map();\n\n  for (const num of nums) {\n    const next = new Map([[num, 1]]);\n    for (const [value, count] of ending) {\n      const merged = value & num;\n      next.set(merged, (next.get(merged) ?? 0) + count);\n    }\n    total += next.get(k) ?? 0;\n    ending = next;\n  }\n  return total;\n}",
+  "brute": "function countSubarrays(nums, k) {\n  // Fix each left end and AND the elements in one by one.\n  let total = 0;\n  for (let i = 0; i < nums.length; i++) {\n    let and = nums[i];\n    for (let j = i; j < nums.length; j++) {\n      if (j > i) and &= nums[j];\n      if (and === k) total++;\n    }\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 2000 : 1 + Math.floor(rand() * 10);\n  const bits = large ? 29 : 4;\n  const pick = chance => { let value = 0; for (let b = 0; b < bits; b++) if (rand() < chance) value |= 1 << b; return value; };\n  const k = rand() < 0.15 ? 0 : pick(large ? 0.3 : 0.4);\n  // Most values contain every bit of k plus a few extra bits; now and then one loses a bit, which cuts the runs.\n  const nums = Array.from({ length: n }, () => {\n    let value = k | pick(large ? 0.15 : 0.3);\n    if (rand() < (large ? 0.04 : 0.25)) value &= ~(1 << Math.floor(rand() * bits));\n    return value;\n  });\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,1,1],1],"expected":6},
+    {"name":"Example 2","input":[[1,1,2],1],"expected":3},
+    {"name":"Example 3","input":[[1,2,3],2],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],5]},
+    {"name":"Test 2","input":[[5],4]},
+    {"name":"Test 3","input":[[0,0,0,0],0]},
+    {"name":"Test 4","input":[[7,7,7,7,7],7]},
+    {"name":"Test 5","input":[[1000000000,1000000000,999999999],1000000000]},
+    {"name":"Test 6","input":[[1,2,4,8],0]},
+    {"name":"Test 7","input":[[1,3,5,7],8]},
+    {"name":"Test 8","input":[[3,5,7,1,3],1]},
+    {"name":"Test 9","input":[[6,6,2,6,7,2],2]},
+    {"name":"Test 10","input":[[15,13,9,11,15,9,8,9,13],9]},
+    {"name":"Test 11","input":[[12,14,13,12,15,4,12,28,13],12]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every subarray and AND-ing its elements works but costs O(n²). The key fact is that AND can only clear bits: if a subarray ending at index `r` is stretched one step further left, its AND keeps or loses bits but never gains one. So among all subarrays ending at `r`, the ANDs form a chain in which each new distinct value has lost at least one bit, which leaves at most 31 distinct values for 30-bit numbers. Keeping just those values, each with how many left ends produce it, is enough to move to `r + 1` cheaply.\n\n## Approach\n\n1. `ending` maps each AND value of the subarrays that end at the previous element to how many of them have it. It starts empty, and `total = 0`.\n2. For each `num`, start `next` with the one-element subarray: `num` seen once.\n3. Every subarray in `ending` grows by `num`, so its AND becomes `merged = value & num`. Add its `count` to `next[merged]`; different values can merge into one key.\n4. The subarrays ending here with AND exactly `k` number `next.get(k)` (or 0); add that to `total`.\n5. Make `next` the new `ending`, and return `total` at the end.\n\n## Example 1, step by step\n\n`nums = [1,1,1]`, `k = 1`.\n- First `1`: `next = {1: 1}`, so `total = 1`.\n- Second `1`: `next` starts as `{1: 1}`, and the old entry `1` gives `1 & 1 = 1` with count 1, so `next = {1: 2}` and `total = 3`.\n- Third `1`: `next = {1: 1 + 2} = {1: 3}`, so `total = 6`.\n\nAll six subarrays AND to `1`, and the answer is `6`.\n\n## Complexity\n\n- Time: O(n log V), where V is the largest value: each step walks at most about 31 map entries.\n- Space: O(log V): `ending` and `next` hold at most about 31 keys.\n\n## Pitfalls\n\n- Keep counts, not just the set of values: many left ends usually share one AND value, and each is a separate subarray.\n- Do not forget the subarray made of `num` alone; it is the reason `next` starts as `{num: 1}`.\n- On LeetCode the count can reach about 5·10^9, so Java and C need a 64-bit result (`long`).\n- `k = 0` is allowed: zeros merge into a single key, and the counts still add up.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | subarrays found so far whose AND is `k` |\n| `ending` | AND value → number of subarrays ending at the previous element with that AND |\n| `num` | the element that ends the new subarrays |\n| `next` | the same map for subarrays ending at `num` |\n| `value`, `count` | one entry of `ending` |\n| `merged` | `value & num`, that entry's AND after growing by `num` |",
+  "narration": {
+    "2": "No subarray with AND k has been counted yet.",
+    "3": "Maps each AND value of the subarrays ending at the previous element to how many of them there are.",
+    "5": "Each element becomes the right end of a new batch of subarrays.",
+    "6": "The subarray holding only num has AND num.",
+    "7": "Every subarray that ended at the previous element can grow by num.",
+    "8": "Growing by num can only clear bits, so the AND becomes value & num.",
+    "9": "Add those subarrays under their new AND; equal results merge into one key.",
+    "11": "The subarrays ending here whose AND is exactly k are all counted at once.",
+    "12": "Slide forward: these become the subarrays ending at the previous element.",
+    "14": "Every right end has been processed, so total covers all subarrays."
+  }
+}

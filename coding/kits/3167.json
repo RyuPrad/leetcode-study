@@ -1,0 +1,64 @@
+{
+  "number": 3167,
+  "title": "Better Compression of String",
+  "spec": "recalled",
+  "statement": "The string `compressed` describes another string as a row of groups. Each group is one lowercase letter followed by a positive decimal count written without leading zeros, and it stands for that letter repeated count times; the groups are joined in order. The same letter may lead several groups.\n\nReturn a **better compression** of the same letters: it has exactly one group for every letter that occurs in `compressed`, the count of that group is the sum of all of that letter's counts in `compressed`, and the groups are listed in alphabetical order of their letters. The order of the letters in the described string may change as a result; only how many times each letter occurs is kept.",
+  "constraints": [
+    "1 <= compressed.length <= 6 * 10^4",
+    "compressed contains only lowercase English letters and digits",
+    "compressed is a valid compression: every letter is followed by its count",
+    "Every count is between 1 and 10^4 and has no leading zeros"
+  ],
+  "signature": "String betterCompression(String compressed)",
+  "entry": "betterCompression",
+  "kind": "function",
+  "parameters": [
+    "compressed"
+  ],
+  "validator": "function validate([compressed]) {\n  if (compressed.length < 1 || compressed.length > 60000) return 'compressed needs 1 to 6 * 10^4 characters.';\n  if (!/^(?:[a-z][1-9][0-9]*)+$/.test(compressed)) return 'compressed must be groups of one lowercase letter followed by a count without leading zeros.';\n  if (compressed.match(/[0-9]+/g).some(digits => Number(digits) > 10000)) return 'Each count is from 1 to 10^4.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function betterCompression(compressed) {\n  const base = 'a'.charCodeAt(0);\n  // total[c] is the combined count of the letter whose code is base + c.\n  const total = new Array(26).fill(0);\n  let i = 0;\n  while (i < compressed.length) {\n    const letter = compressed.charCodeAt(i) - base;\n    i++;\n    let count = 0;\n    while (i < compressed.length && compressed[i] >= '0' && compressed[i] <= '9') {\n      count = count * 10 + Number(compressed[i]);\n      i++;\n    }\n    total[letter] += count;\n  }\n  let result = '';\n  for (let c = 0; c < 26; c++) {\n    if (total[c] > 0) {\n      result += String.fromCharCode(base + c) + total[c];\n    }\n  }\n  return result;\n}",
+  "brute": "function betterCompression(compressed) {\n  // Cut the string into \"letter + digits\" pieces with a regular expression, add them up per letter, then sort the letters.\n  const sums = {};\n  for (const piece of compressed.match(/[a-z][0-9]+/g)) {\n    sums[piece[0]] = (sums[piece[0]] || 0) + parseInt(piece.slice(1), 10);\n  }\n  return Object.keys(sums).sort().map(letter => letter + sums[letter]).join('');\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  // Draw from a few random letters (small inputs) or many (large ones), so letters repeat across groups.\n  const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');\n  for (let i = alphabet.length - 1; i > 0; i--) {\n    const j = int(0, i);\n    [alphabet[i], alphabet[j]] = [alphabet[j], alphabet[i]];\n  }\n  const letters = alphabet.slice(0, large ? int(3, 26) : int(1, 5));\n  // Mostly short counts, sometimes long ones, including the largest allowed count.\n  const count = () => {\n    const r = rand();\n    return r < 0.55 ? int(1, 9) : r < 0.8 ? int(10, 999) : r < 0.95 ? int(1000, 9999) : 10000;\n  };\n  // Groups are at most 6 characters, so a large input stays under the app's 10,000 characters.\n  const target = large ? 9990 : int(2, 30);\n  let compressed = '';\n  while (compressed.length < target) compressed += letters[int(0, letters.length - 1)] + count();\n  return [compressed];\n}",
+  "examples": [
+    {"name":"Example 1","input":["a3c9b2c1"],"expected":"a3b2c10"},
+    {"name":"Example 2","input":["c2b3a1"],"expected":"a1b3c2"},
+    {"name":"Example 3","input":["a2b4c1"],"expected":"a2b4c1"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a1"]},
+    {"name":"Test 2","input":["z10000"]},
+    {"name":"Test 3","input":["a1a1a1a1a1"]},
+    {"name":"Test 4","input":["z1y1x1w1"]},
+    {"name":"Test 5","input":["b10a9b1a1"]},
+    {"name":"Test 6","input":["a10000a10000a10000"]},
+    {"name":"Test 7","input":["m12k3m8z1a100k7"]},
+    {"name":"Test 8","input":["z1y2x3w4v5u6t7s8r9q10p11o12n13m14l15k16j17i18h19g20f21e22d23c24b25a26"]},
+    {"name":"Test 9","input":["c9c1"]},
+    {"name":"Test 10","input":["e5d4c3b2a1e1"]},
+    {"name":"Test 11","input":["x9999y1x1y9999"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe better compression depends only on each letter's total count and on alphabetical order; where the groups stood in `compressed` does not matter. So read the groups once, add every count to its letter's running total, and then write the letters that occurred from `a` to `z` with their totals. Decoding the full string first would also work, but it can exceed 10^8 characters.\n\n## Approach\n\n1. Keep `total`, 26 counters (slot 0 for `a` up to slot 25 for `z`), all 0.\n2. Scan `compressed` with index `i`. The character at `i` always starts a group: turn its letter into the slot `letter`.\n3. Read the digits after it, building `count` as `count * 10 + digit`, until the next letter or the end.\n4. Add `count` to `total[letter]` and continue with the next group.\n5. Walk the slots `c` from 0 to 25 and append the letter plus its total to `result` whenever the total is positive.\n\n## Example 1, step by step\n\nFor `\"a3c9b2c1\"`: the group `a3` sets `total[a] = 3`, `c9` sets `total[c] = 9`, `b2` sets `total[b] = 2`, and `c1` raises `total[c]` to `10`. Writing the letters in order gives `\"a3\" + \"b2\" + \"c10\"`, so the answer is `\"a3b2c10\"`.\n\n## Complexity\n\n- Time: O(L), where L is the length of `compressed`: each character is read once, then 26 slots are checked.\n- Space: O(1) apart from the result, which has at most 26 groups.\n\n## Pitfalls\n\n- Counts can have up to five digits, so reading a single character after each letter breaks on `\"c10\"`.\n- A merged total can be longer than any of its parts (`c9` and `c1` become `c10`), so add the numbers instead of copying digit strings.\n- Letters that never occur must be left out, not written as `x0`.\n- Sorting the original groups as strings is not enough: equal letters must be merged into one group.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `base` | character code of `a` |\n| `total` | combined count of each letter, by slot |\n| `i` | read position in `compressed` |\n| `letter` | slot (0 to 25) of the current group's letter |\n| `count` | the current group's number, built digit by digit |\n| `c` | slot being written to the result |\n| `result` | the better compression being built |",
+  "narration": {
+    "2": "base is the code of 'a', so letter codes become slots 0 to 25.",
+    "4": "One running total per letter, all starting at 0.",
+    "6": "Each turn of this loop reads one group: a letter, then its count.",
+    "7": "A group always starts with a letter; turn it into its slot.",
+    "8": "Step past the letter to the digits.",
+    "10": "Keep reading while the next character is a digit; a letter starts the next group.",
+    "11": "Append this digit: shift the number read so far one decimal place left and add it.",
+    "14": "Add the group's count to its letter's running total.",
+    "16": "Now build the answer.",
+    "17": "Walk the letters in alphabetical order.",
+    "18": "Skip letters that never appeared.",
+    "19": "Write the letter once, followed by its combined count.",
+    "22": "Return the better compression."
+  }
+}
