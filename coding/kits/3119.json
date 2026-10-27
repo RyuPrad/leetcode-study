@@ -1,0 +1,67 @@
+{
+  "number": 3119,
+  "title": "Maximum Number of Potholes That Can Be Fixed",
+  "spec": "recalled",
+  "statement": "The string `road` describes a road where `'x'` is a pothole and `'.'` is an intact stretch. A single repair job fixes `k` potholes that stand side by side (any contiguous block of `'x'` characters with no `'.'` in between, `k >= 1`) and costs `k + 1`. You may run any number of jobs as long as their combined cost does not exceed `budget`.\n\nReturn the largest number of potholes you can fix.",
+  "constraints": [
+    "1 <= road.length <= 10^5",
+    "1 <= budget <= 10^5 + 1",
+    "road contains only the characters '.' and 'x'"
+  ],
+  "signature": "int maxPotholes(String road, int budget)",
+  "entry": "maxPotholes",
+  "kind": "function",
+  "parameters": [
+    "road",
+    "budget"
+  ],
+  "validator": "function validate([road, budget]) {\n  if (typeof road !== 'string' || road.length < 1 || road.length > 100000) return 'road has 1 to 100000 characters.';\n  if (!/^[.x]+$/.test(road)) return \"road uses only '.' and 'x'.\";\n  if (!Number.isInteger(budget) || budget < 1 || budget > 100001) return 'budget is between 1 and 100001.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxPotholes(road, budget) {\n  const runs = [];\n  let length = 0;\n  for (const ch of road) {\n    if (ch === 'x') {\n      length++;\n    } else if (length > 0) {\n      runs.push(length);\n      length = 0;\n    }\n  }\n  if (length > 0) runs.push(length);\n  runs.sort((a, b) => b - a);\n  let fixed = 0;\n  for (const run of runs) {\n    if (budget < 2) break;\n    const take = Math.min(run, budget - 1);\n    fixed += take;\n    budget -= take + 1;\n  }\n  return fixed;\n}",
+  "brute": "function maxPotholes(road, budget) {\n  // Decide pothole by pothole: skip it, extend the job on the previous pothole (+1), or start a new job (+2).\n  const memo = new Map();\n  const best = (i, left, open) => {\n    if (i === road.length) return 0;\n    const key = `${i},${left},${open}`;\n    if (memo.has(key)) return memo.get(key);\n    let result;\n    if (road[i] === '.') result = best(i + 1, left, false);\n    else {\n      result = best(i + 1, left, false);\n      const cost = open ? 1 : 2;\n      if (left >= cost) result = Math.max(result, 1 + best(i + 1, left - cost, true));\n    }\n    memo.set(key, result);\n    return result;\n  };\n  return best(0, budget, false);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    const n = pick(1, 12);\n    const p = rand();\n    let road = '';\n    for (let i = 0; i < n; i++) road += rand() < p ? 'x' : '.';\n    return [road, pick(1, 20)];\n  }\n  let road = '';\n  let cost = 0;\n  while (road.length < 10000) {\n    road += '.'.repeat(pick(1, 4));\n    const run = rand() < 0.1 ? pick(20, 200) : pick(1, 12);\n    road += 'x'.repeat(run);\n    cost += run + 1;\n  }\n  road = road.slice(0, 10000);\n  const budget = rand() < 0.2 ? 100001 : pick(1, Math.min(100001, cost));\n  return [road, budget];\n}",
+  "examples": [
+    {"name":"Example 1","input":["..",5],"expected":0},
+    {"name":"Example 2","input":["..xxxxx",4],"expected":3},
+    {"name":"Example 3","input":["x.x.xxx...x",14],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["x",1]},
+    {"name":"Test 2","input":["x",2]},
+    {"name":"Test 3","input":["xxxxx",100001]},
+    {"name":"Test 4","input":["x.x.x.x",7]},
+    {"name":"Test 5","input":["xxx.x.xxxxx",9]},
+    {"name":"Test 6","input":["xx.xxxx.x",5]},
+    {"name":"Test 7","input":["....",1]},
+    {"name":"Test 8","input":["x.xx.xxx.xxxx",2]},
+    {"name":"Test 9","input":["xxxxxxxxxx",6]},
+    {"name":"Test 10","input":["xx..x.xxx.x..xxxx",100]},
+    {"name":"Test 11","input":["x.xxxxxx.xx.xxx.x",8]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery job pays one unit of overhead on top of one unit per pothole. To fix as many potholes as possible, pay that overhead as few times as possible, which means each job should cover as many potholes as it can. So split `road` into maximal runs of `'x'`, then fix the longest runs first. If the money runs out partway through a run, a single job can still fix part of it: with `budget` left, it covers `budget - 1` potholes. Trying every combination of runs would be exponential; the greedy order is enough because with `j` jobs the best total is the sum of the `j` longest runs, capped by `budget - j`.\n\n## Approach\n\n1. Scan `road`, counting the current run `length` of `'x'`; at each `'.'` (and at the end) store a non-empty run in `runs`.\n2. Sort `runs` from longest to shortest.\n3. For each `run`: stop if `budget < 2` (no job is affordable). Otherwise fix `take = min(run, budget - 1)` potholes and pay `take + 1`.\n4. Return the total `fixed`.\n\n## Example 1, step by step\n\n`road = \"..\"` has no `'x'`, so `runs` stays empty, the second loop never runs, and the answer is `0` even though `budget = 5`. For contrast, Example 3 (`\"x.x.xxx...x\"`, `budget = 14`) gives `runs = [3, 1, 1, 1]` after sorting; the jobs cost 4, 2, 2 and 2, so `budget` falls to 10, 8, 6 and 4 and all `6` potholes are fixed.\n\n## Complexity\n\n- Time: O(n log n) for sorting the runs (O(n) with counting sort, since every run is at most n long).\n- Space: O(n) for the list of runs.\n\n## Pitfalls\n\n- A job on `k` potholes costs `k + 1`, so `budget = 1` fixes nothing.\n- A partial job is allowed: when `budget - 1 < run`, still fix `budget - 1` potholes instead of skipping the run.\n- Remember the last run when `road` ends with `'x'`.\n- Splitting one run into two jobs only adds overhead; never do it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `runs` | lengths of the maximal blocks of `'x'` |\n| `length` | size of the block being scanned |\n| `run` | the block currently considered for repair |\n| `take` | potholes fixed by this job |\n| `fixed` | total potholes fixed so far |\n| `budget` | money still available |",
+  "narration": {
+    "2": "Collect the length of every maximal block of potholes.",
+    "4": "Walk the road one character at a time.",
+    "5": "A pothole extends the current block...",
+    "6": "...so its length grows by one.",
+    "7": "An intact stretch ends a non-empty block...",
+    "8": "...so store its length...",
+    "9": "...and start counting a new block.",
+    "12": "The road may end in the middle of a block; keep that one too.",
+    "13": "Longest blocks first, so each unit of job overhead buys the most potholes.",
+    "15": "Consider the blocks in that order.",
+    "16": "With less than 2 left, not even one pothole can be paid for.",
+    "17": "Fix the whole block, or as many potholes as the remaining money allows.",
+    "18": "Count the potholes this job fixes.",
+    "19": "Pay one unit per pothole plus one unit for the job.",
+    "21": "Every affordable job has been done; return the total."
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "number": 3049,
+  "title": "Earliest Second to Mark Indices II",
+  "spec": "leetcode",
+  "statement": "You get two arrays that are indexed from 1: `nums` of length `n` and `changeIndices` of length `m`. Every index of `nums` starts unmarked, and the goal is to mark all of them.\n\nTime runs in seconds `s = 1, 2, ..., m`. During second `s` you may do exactly one of these:\n\n- pick any index `i` (1 to `n`) and lower `nums[i]` by 1;\n- overwrite `nums[changeIndices[s]]` with any non-negative integer you like;\n- pick an index `i` whose `nums[i]` is currently 0 and mark it;\n- do nothing.\n\nActing as well as possible, return the smallest second `s` (between 1 and `m`) by whose end every index can be marked, or `-1` if that never happens within the `m` seconds.",
+  "constraints": [
+    "1 <= n == nums.length <= 5000",
+    "0 <= nums[i] <= 10^9",
+    "1 <= m == changeIndices.length <= 5000",
+    "1 <= changeIndices[i] <= n"
+  ],
+  "signature": "int earliestSecondToMarkIndices(int[] nums, int[] changeIndices)",
+  "entry": "earliestSecondToMarkIndices",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "changeIndices"
+  ],
+  "validator": "function validate([nums, changeIndices]) {\n  const n = nums.length;\n  if (n < 1 || n > 5000) return 'nums needs 1 to 5000 values.';\n  if (changeIndices.length < 1 || changeIndices.length > 5000) return 'changeIndices needs 1 to 5000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v > 1e9)) return 'Each nums value is an integer from 0 to 10^9.';\n  if (changeIndices.some(v => !Number.isInteger(v) || v < 1 || v > n)) return 'Each changeIndices value is an index from 1 to nums.length.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function earliestSecondToMarkIndices(nums, changeIndices) {\n  const n = nums.length;\n  const m = changeIndices.length;\n  const total = nums.reduce((sum, value) => sum + value, 0) + n;\n  const first = new Array(n + 1).fill(-1);\n  for (let s = m - 1; s >= 0; s--) first[changeIndices[s]] = s;\n\n  const pushMin = (heap, value) => {\n    let child = heap.length;\n    heap.push(value);\n    while (child > 0 && heap[(child - 1) >> 1] > value) {\n      heap[child] = heap[(child - 1) >> 1];\n      child = (child - 1) >> 1;\n    }\n    heap[child] = value;\n  };\n  const popMin = (heap) => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    let parent = 0;\n    let child = 1;\n    while (child < heap.length) {\n      if (child + 1 < heap.length && heap[child + 1] < heap[child]) child++;\n      if (last <= heap[child]) break;\n      heap[parent] = heap[child];\n      parent = child;\n      child = 2 * parent + 1;\n    }\n    heap[parent] = last;\n    return top;\n  };\n\n  const canFinish = (seconds) => {\n    const heap = [];\n    let saved = 0;\n    let free = 0;\n    for (let s = seconds - 1; s >= 0; s--) {\n      const index = changeIndices[s];\n      const value = nums[index - 1];\n      if (first[index] !== s || value <= 1) {\n        free++;\n        continue;\n      }\n      pushMin(heap, value);\n      saved += value - 1;\n      if (free > 0) {\n        free--;\n      } else {\n        saved -= popMin(heap) - 1;\n        free++;\n      }\n    }\n    return total - saved <= seconds;\n  };\n\n  let low = n;\n  let high = m + 1;\n  while (low < high) {\n    const mid = (low + high) >> 1;\n    if (canFinish(mid)) high = mid;\n    else low = mid + 1;\n  }\n  return low > m ? -1 : low;\n}",
+  "brute": "function earliestSecondToMarkIndices(nums, changeIndices) {\n  // Breadth-first over every reachable state: the current values plus a bitmask of marked indices.\n  // Overwriting with 0 is the only useful overwrite, and a marked index keeps the value 0.\n  const n = nums.length;\n  const full = (1 << n) - 1;\n  let states = new Map([[nums.join(',') + '|0', { values: nums.slice(), marked: 0 }]]);\n  for (let s = 0; s < changeIndices.length; s++) {\n    const next = new Map();\n    const add = (values, marked) => next.set(values.join(',') + '|' + marked, { values, marked });\n    for (const { values, marked } of states.values()) {\n      add(values, marked);\n      for (let i = 0; i < n; i++) {\n        if (marked & (1 << i)) continue;\n        if (values[i] > 0) add(values.map((v, j) => (j === i ? v - 1 : v)), marked);\n        else if ((marked | (1 << i)) === full) return s + 1;\n        else add(values, marked | (1 << i));\n      }\n      const target = changeIndices[s] - 1;\n      if (!(marked & (1 << target))) add(values.map((v, j) => (j === target ? 0 : v)), marked);\n    }\n    states = next;\n  }\n  return -1;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  if (size === 'large') {\n    const n = pick(200, 600);\n    const m = 2000;\n    const changeIndices = Array.from({ length: m }, () => pick(1, n));\n    const seen = new Set(changeIndices);\n    const share = rand() * 0.4;\n    const nums = Array.from({ length: n }, (_, i) => (seen.has(i + 1) && rand() < share ? pick(2, 1e9) : pick(0, 3)));\n    return [nums, changeIndices];\n  }\n  const n = pick(1, 4);\n  const m = pick(1, 10);\n  const top = pick(0, 4);\n  const nums = Array.from({ length: n }, () => pick(0, top));\n  const changeIndices = Array.from({ length: m }, () => pick(1, n));\n  return [nums, changeIndices];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,2,3],[1,3,2,2,2,2,3]],"expected":6},
+    {"name":"Example 2","input":[[0,0,1,2],[1,2,1,2,1,2,1,2]],"expected":7},
+    {"name":"Example 3","input":[[1,2,3],[1,2,3]],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0],[1]]},
+    {"name":"Test 2","input":[[5],[1]]},
+    {"name":"Test 3","input":[[1000000000],[1,1]]},
+    {"name":"Test 4","input":[[2,2],[1,1,1,1,1,1]]},
+    {"name":"Test 5","input":[[0,0,0,0],[4,3,2,1]]},
+    {"name":"Test 6","input":[[0,0,0],[1,2]]},
+    {"name":"Test 7","input":[[1000000000,0],[2,2,1]]},
+    {"name":"Test 8","input":[[1000000000,1000000000,1],[1,2,1,2,3,3,3]]},
+    {"name":"Test 9","input":[[3,10,4],[2,1,3,2,1,3,1,2]]},
+    {"name":"Test 10","input":[[1,1,1],[1,2,3,1,2,3,1,2,3]]},
+    {"name":"Test 11","input":[[4,0,6,2],[3,1,4,3,3,2,1,4,2,1,3,4]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithout overwrites, index `i` costs `nums[i]` decrements plus one mark. An overwrite turns that into two seconds (overwrite to 0, then mark), so it saves `nums[i] - 1` seconds, but only if it happens at a second where `changeIndices` points at `i` and a later second is left to mark it. Using the earliest such second is always best, because it leaves the most room for the mark. If all indices can be marked by second `x`, they can by any later second too, so we binary search `x`. Trying every sequence of actions (the brute force) is exponential.\n\n## Approach\n\n1. Record `first[i]`, the earliest second that points at index `i`, and `total`, the cost with no overwrites: the sum of `nums` plus `n`.\n2. `canFinish(seconds)` walks the seconds from last to first. `free` counts later seconds not yet given a job.\n3. A second that is not some index's first pointer, or points at a value of 0 or 1 (no gain), just becomes free.\n4. Otherwise overwrite there: push the value on a min-heap and add `value - 1` to `saved`. Use one free second as its mark; if none is free, drop the overwrite with the smallest value (`popMin`), which frees a second.\n5. The plan fits when `total - saved <= seconds`.\n6. Binary search the smallest such second between `n` and `m`; return `-1` if even `m` fails.\n\n## Example 1, step by step\n\n`nums = [3, 2, 3]`, `total = 8 + 3 = 11`, and first pointers are seconds 1, 3, 2 for indices 1, 2, 3. For `seconds = 6`, the walk sees seconds 6, 5, 4 as free (`free = 3`), then overwrites index 2 (value 2), index 3 (value 3) and index 1 (value 3), each using a free mark: `saved = 1 + 2 + 2 = 5` and `11 - 5 = 6 <= 6`. For `seconds = 5` only two seconds are free, so the cheapest overwrite (value 2) is dropped: `11 - 4 = 7 > 5`. The answer is `6`.\n\n## Complexity\n\n- Time: O(m log² m): each of O(log m) checks scans up to `m` seconds with heap operations.\n- Space: O(n + m) for `first` and the heap.\n\n## Pitfalls\n\n- Only the first pointer at an index matters; a later one leaves less room for the mark.\n- An overwrite needs its own later mark second, so count seconds, not just savings.\n- The sum of `nums` reaches about 5 · 10^12; it still fits in a double, but not in a 32-bit int.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `first` | earliest second (0-based) pointing at each index |\n| `total` | seconds needed with no overwrites |\n| `heap` | values of the overwrites currently chosen |\n| `saved` | seconds those overwrites save |\n| `free` | later seconds still available for marks |\n| `low`, `high` | binary search range for the answer |",
+  "narration": {
+    "4": "Without any overwrite, every index costs its value in decrements plus one mark.",
+    "6": "Scanning backwards leaves first[i] at the earliest second that points at index i.",
+    "8": "pushMin adds a value to the min-heap of chosen overwrites, moving it up past larger parents.",
+    "17": "popMin removes and returns the smallest chosen overwrite, sifting the last value down.",
+    "34": "canFinish decides whether every index can be marked within the first seconds seconds.",
+    "38": "Walk the seconds from last to first so later seconds are known when an overwrite needs a mark.",
+    "41": "Not the first pointer at its index, or a value too small to gain anything from an overwrite...",
+    "42": "...so this second is free for a decrement or a mark.",
+    "45": "Overwrite this index to 0 here: remember its value in the heap.",
+    "46": "The overwrite turns value + 1 seconds into 2, saving value - 1.",
+    "47": "Is there a later free second to mark this index?",
+    "48": "Yes: reserve it for the mark.",
+    "50": "No: give up the overwrite with the smallest value, losing its saving.",
+    "51": "Dropping one overwrite frees a second overall.",
+    "54": "The plan works when the remaining work fits in the available seconds.",
+    "57": "At least n seconds are needed, one mark per index.",
+    "58": "high = m + 1 stands for the case where no second works.",
+    "61": "If seconds = mid is enough, the answer is mid or earlier; otherwise it is later.",
+    "64": "Return the earliest feasible second, or -1 if even m was not enough."
+  }
+}

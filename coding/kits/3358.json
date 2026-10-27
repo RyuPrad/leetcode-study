@@ -2,11 +2,10 @@
   "number": 3358,
   "title": "Books with NULL Ratings",
   "spec": "recalled",
-  "statement": "One table lists a library's books:\n\n- `books(book_id, title, author, published_year, rating)`: one row per book; `book_id` is unique. `rating` is a decimal with one digit after the point, or `null` when the book has not been rated yet.\n\nFind every book that has **not been rated**, that is, whose `rating` is `null`. A rating of `0.0` is still a rating. Report the columns `book_id`, `title`, `author` and `published_year`, ordered by `book_id` ascending.",
+  "statement": "One table lists a library's books:\n\n- `books(book_id, title, author, published_year, rating)`: one row per book; `book_id` is unique. `rating` is a decimal with one digit after the point; it is `null` for a book nobody has rated so far.\n\nReport the books still waiting for their first rating: exactly those whose `rating` is `null` (a rating of `0.0` is a real rating). Output the columns `book_id`, `title`, `author` and `published_year`, sorted by `book_id` ascending.",
   "constraints": [
     "book_id is unique in books",
-    "title, author and published_year are never null",
-    "rating is null or between 0.0 and 5.0"
+    "rating is a DECIMAL(3, 1) value, or null when the book has not been rated"
   ],
   "signature": "query",
   "entry": "query",
@@ -16,7 +15,7 @@
     "books": [["book_id","INT"],["title","VARCHAR(255)"],["author","VARCHAR(100)"],["published_year","INT"],["rating","DECIMAL(3, 1)"]]
   },
   "ordered": true,
-  "validator": "function validate(input) {\n  const [{ books = [] }] = input;\n  const ids = new Set();\n  for (const [id, title, author, year, rating] of books) {\n    if (id === null || title === null || author === null || year === null) return 'Only rating may be null.';\n    if (ids.has(id)) return `book_id ${id} appears twice.`;\n    ids.add(id);\n    if (rating !== null && (rating < 0 || rating > 5)) return `Book ${id} has a rating outside 0.0 to 5.0.`;\n  }\n  return null;\n}",
+  "validator": "function validate(input) {\n  const [{ books = [] }] = input;\n  const ids = new Set();\n  for (const [id, , , , rating] of books) {\n    if (id === null) return 'Every book needs a book_id.';\n    if (ids.has(id)) return `book_id ${id} appears twice.`;\n    ids.add(id);\n    if (rating !== null && (Math.abs(rating) >= 100 || Math.abs(rating * 10 - Math.round(rating * 10)) > 1e-9)) return `Book ${id}: rating must fit DECIMAL(3, 1).`;\n  }\n  return null;\n}",
   "languages": [
     "sql"
   ],
@@ -38,7 +37,7 @@
     {"name":"Test 9","generate":{"seed":9,"size":"large"}},
     {"name":"Test 10","generate":{"seed":10,"size":"large"}}
   ],
-  "notes": "## Intuition\n\nA missing rating is stored as `null`, and `null` is not a value that ordinary comparisons can match: `rating = NULL` is never true, not even for unrated books. SQL has a dedicated test for it, `IS NULL`, so the whole problem is one filter plus the requested columns and order.\n\n## Approach\n\n1. Read from `books`.\n2. Keep the rows where `rating IS NULL`.\n3. Select `book_id`, `title`, `author`, `published_year` and order by `book_id`.\n\n## Example 1, step by step\n\n- Books 1, 3 and 5 have ratings 4.5, 4.8 and 4.2, so `rating IS NULL` is false and they are dropped.\n- Books 2, 4 and 6 (To Kill a Mockingbird, The Catcher in the Rye, Lord of the Flies) have `null` ratings and are kept.\n\nSorted by `book_id` they give the rows 2, 4, 6 with their title, author and year.\n\n## Complexity\n\n- Time: O(n log n) for n books: one scan for the filter, then the sort (O(n) when the rows already arrive in key order).\n- Space: O(k) for the k unrated books returned.\n\n## Pitfalls\n\n- `WHERE rating = NULL` (or `<> NULL`) is never true and returns no rows.\n- `IFNULL(rating, 0) = 0` or `WHERE NOT rating` also catches books rated `0.0`, which have a rating.\n- Selecting `*` adds the `rating` column, which is not part of the output.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `books` | the only table; every output row is one of its rows |\n| `WHERE rating IS NULL` | keeps the books that have not been rated |\n| `ORDER BY book_id` | the required output order |",
+  "notes": "## Intuition\n\nA missing rating is stored as `null`, and `null` is not a value that ordinary comparisons can match: `rating = NULL` is never true, not even for unrated books. SQL has a dedicated test for it, `IS NULL`, so the whole problem is one filter plus the requested columns and order.\n\n## Approach\n\n1. Read from `books`.\n2. Keep the rows where `rating IS NULL`.\n3. Select `book_id`, `title`, `author`, `published_year` and order by `book_id`.\n\n## Example 1, step by step\n\n- Books 1, 3 and 5 have ratings 4.5, 4.8 and 4.2, so `rating IS NULL` is false and they are dropped.\n- Books 2, 4 and 6 (To Kill a Mockingbird, The Catcher in the Rye, Lord of the Flies) have `null` ratings and are kept.\n\nSorted by `book_id` they give the rows 2, 4, 6 with their title, author and year.\n\n## Complexity\n\n- Time: O(n log n) for n books: one scan for the filter, then the sort (O(n) when the rows already arrive in key order).\n- Space: O(k) for the k unrated books returned.\n\n## Pitfalls\n\n- `WHERE rating = NULL` (or `<> NULL`) is never true and returns no rows.\n- `IFNULL(rating, 0) = 0` also catches books rated `0.0`, which do have a rating; `WHERE NOT rating` is worse: it is null for unrated books, so it returns only the `0.0` ones.\n- Selecting `*` adds the `rating` column, which is not part of the output.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `books` | the only table; every output row is one of its rows |\n| `WHERE rating IS NULL` | keeps the books that have not been rated |\n| `ORDER BY book_id` | the required output order |",
   "narration": {
     "1": "Choose the four output columns; the rating itself is not reported.",
     "2": "Every answer row is a book from the books table.",

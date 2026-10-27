@@ -1,0 +1,64 @@
+{
+  "number": 3076,
+  "title": "Shortest Uncommon Substring in an Array",
+  "spec": "leetcode",
+  "statement": "You are given an array `arr` of `n` non-empty strings. Build and return an array `answer` of the same length `n`, where `answer[i]` is chosen like this:\n\n- Look at the substrings (contiguous, non-empty pieces) of `arr[i]` that appear as a substring of no other element `arr[j]` with `j != i`.\n- `answer[i]` is the shortest of them; when several have that shortest length, pick the lexicographically smallest one.\n- If `arr[i]` has no such substring, `answer[i]` is the empty string `\"\"`.",
+  "constraints": [
+    "n == arr.length",
+    "2 <= n <= 100",
+    "1 <= arr[i].length <= 20",
+    "arr[i] contains only lowercase English letters"
+  ],
+  "signature": "String[] shortestSubstrings(String[] arr)",
+  "entry": "shortestSubstrings",
+  "kind": "function",
+  "parameters": [
+    "arr"
+  ],
+  "validator": "function validate([arr]) {\n  if (!Array.isArray(arr) || arr.length < 2 || arr.length > 100) return 'arr needs 2 to 100 strings.';\n  for (const word of arr) {\n    if (typeof word !== 'string' || word.length < 1 || word.length > 20) return 'Each string has 1 to 20 characters.';\n    if (!/^[a-z]+$/.test(word)) return 'Strings use only lowercase English letters.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function shortestSubstrings(arr) {\n  const owners = new Map();\n  for (const word of arr) {\n    const seen = new Set();\n    for (let start = 0; start < word.length; start++) {\n      for (let end = start + 1; end <= word.length; end++) {\n        seen.add(word.slice(start, end));\n      }\n    }\n    for (const sub of seen) {\n      owners.set(sub, (owners.get(sub) ?? 0) + 1);\n    }\n  }\n\n  const answer = [];\n  for (const word of arr) {\n    let best = '';\n    for (let length = 1; length <= word.length && best === ''; length++) {\n      for (let start = 0; start + length <= word.length; start++) {\n        const sub = word.slice(start, start + length);\n        if (owners.get(sub) === 1 && (best === '' || sub < best)) {\n          best = sub;\n        }\n      }\n    }\n    answer.push(best);\n  }\n  return answer;\n}",
+  "brute": "function shortestSubstrings(arr) {\n  // For each string, test every substring against every other string with includes, then sort the survivors.\n  return arr.map((word, i) => {\n    const unique = [];\n    for (let a = 0; a < word.length; a++) {\n      for (let b = a + 1; b <= word.length; b++) {\n        const piece = word.substring(a, b);\n        if (arr.every((other, j) => j === i || !other.includes(piece))) unique.push(piece);\n      }\n    }\n    unique.sort((x, y) => x.length - y.length || (x < y ? -1 : x > y ? 1 : 0));\n    return unique.length ? unique[0] : '';\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = limit => Math.floor(rand() * limit);\n  const large = size === 'large';\n  const n = large ? 60 + pick(41) : 2 + pick(5);\n  const letters = large ? 2 + pick(5) : 1 + pick(3);\n  const longest = large ? 20 : 1 + pick(6);\n  const word = () => Array.from({ length: 1 + pick(longest) }, () => String.fromCharCode(97 + pick(letters))).join('');\n  const arr = [];\n  for (let i = 0; i < n; i++) {\n    // Sometimes repeat or trim an earlier string so that shared substrings and empty answers show up.\n    const roll = rand();\n    if (arr.length && roll < 0.15) arr.push(arr[pick(arr.length)]);\n    else if (arr.length && roll < 0.3) {\n      const base = arr[pick(arr.length)];\n      const from = pick(base.length);\n      arr.push(base.slice(from, from + 1 + pick(base.length - from)));\n    } else arr.push(word());\n  }\n  return [arr];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["cab","ad","bad","c"]],"expected":["ab","","ba",""]},
+    {"name":"Example 2","input":[["abc","bcd","abcd"]],"expected":["","","abcd"]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["a","b"]]},
+    {"name":"Test 2","input":[["a","a"]]},
+    {"name":"Test 3","input":[["aaa","aa"]]},
+    {"name":"Test 4","input":[["ab","ba"]]},
+    {"name":"Test 5","input":[["abc","abc","d"]]},
+    {"name":"Test 6","input":[["zyx","xyz","yzx"]]},
+    {"name":"Test 7","input":[["abcdefghijklmnopqrst","bcdefghijklmnopqrstu"]]},
+    {"name":"Test 8","input":[["leetcode","code","lee","etc"]]},
+    {"name":"Test 9","input":[["aaaaaaaaaaaaaaaaaaaa","aaaaaaaaaaaaaaaaaaa","b"]]},
+    {"name":"Test 10","input":[["ab","abab","ba","bab"]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe strings are tiny (at most 20 characters, so at most 210 substrings each), which makes it affordable to list every substring of every string. The direct check, \"does this piece appear inside any other string?\", costs a scan of the whole array per piece. A hash map removes that scan: record, for each substring, how many different strings contain it. A substring of `arr[i]` with a count of exactly 1 can only belong to `arr[i]` itself, so it is uncommon.\n\n## Approach\n\n1. For each `word`, put all its substrings in a set `seen` (so a piece repeated inside one word counts once), then add 1 to `owners` for every piece in `seen`.\n2. For each `word`, try lengths `1, 2, 3, ...` in order. Within one length, scan every start and keep the smallest `sub` whose count in `owners` is 1.\n3. Stop growing the length as soon as `best` is found, since any longer piece loses. If no length works, `best` stays `\"\"`.\n4. Push `best` into `answer` and return it.\n\n## Example 1, step by step\n\n`arr = [\"cab\", \"ad\", \"bad\", \"c\"]`. The counts include `a: 3`, `b: 2`, `c: 2`, `d: 2`, `ad: 2`, and `ca`, `ab`, `cab`, `ba`, `bad` with count 1. For `\"cab\"` no single letter works; at length 2, `\"ca\"` is found first and then the smaller `\"ab\"` replaces it, giving `\"ab\"`. Every piece of `\"ad\"` is shared, so it gets `\"\"`. For `\"bad\"` length 2 yields `\"ba\"` (`\"ad\"` is shared). `\"c\"` also appears in `\"cab\"`, so it gets `\"\"`. The result is `[\"ab\", \"\", \"ba\", \"\"]`.\n\n## Complexity\n\n- Time: O(n·L³) with L ≤ 20: each of the n·L² substrings takes O(L) to slice and hash.\n- Space: O(n·L³) for the map's keys in the worst case.\n\n## Pitfalls\n\n- Count each substring once per string (use a set first); otherwise `\"aa\"` would count `\"a\"` twice and look shared with itself.\n- Identical strings share every substring, so both get `\"\"`.\n- Shortest wins first; lexicographic order only breaks ties between pieces of the same length.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `owners` | substring → number of strings in `arr` that contain it |\n| `seen` | distinct substrings of the current word |\n| `start`, `end` | slice bounds of a substring |\n| `length` | the substring length currently being tried |\n| `sub` | the substring being examined |\n| `best` | the chosen uncommon substring for the current word, or `\"\"` |\n| `answer` | the result array |",
+  "narration": {
+    "2": "owners will count, for each substring, how many strings contain it.",
+    "4": "Collect this word's distinct substrings so repeats inside one word count once.",
+    "5": "Pick every start position...",
+    "6": "...and every end after it.",
+    "7": "Record the substring word[start..end).",
+    "10": "Each distinct substring of this word adds one owner.",
+    "16": "Now choose the answer for each word in turn.",
+    "17": "No uncommon substring is known yet; the empty string is the fallback.",
+    "18": "Try lengths from short to long, stopping once one length gives an answer.",
+    "19": "Slide a window of this length across the word.",
+    "21": "Owned by exactly one string means only this word has it; keep the smallest such piece.",
+    "22": "Remember it as the best so far.",
+    "26": "Store the shortest, smallest uncommon substring, or an empty string.",
+    "28": "Every word has its answer."
+  }
+}

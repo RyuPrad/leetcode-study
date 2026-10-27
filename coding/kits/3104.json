@@ -1,0 +1,64 @@
+{
+  "number": 3104,
+  "title": "Find Longest Self-Contained Substring",
+  "spec": "recalled",
+  "statement": "Given a string `s`, a substring `t` of `s` is **self-contained** when two things hold:\n\n- `t` is not the whole of `s`, and\n- every letter that occurs in `t` has all of its occurrences in `s` inside `t`; no copy of it appears in the part of `s` outside `t`.\n\nReturn the length of the longest self-contained substring of `s`, or `-1` if `s` has none.",
+  "constraints": [
+    "2 <= s.length <= 5 * 10^4",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "int maxSubstringLength(String s)",
+  "entry": "maxSubstringLength",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (s.length < 2 || s.length > 50000) return 's needs 2 to 50000 letters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxSubstringLength(s) {\n  const n = s.length;\n  const first = new Map();\n  const last = new Map();\n  for (let i = 0; i < n; i++) {\n    if (!first.has(s[i])) {\n      first.set(s[i], i);\n    }\n    last.set(s[i], i);\n  }\n\n  let best = -1;\n  for (const start of first.values()) {\n    let end = start;\n    for (let i = start; i < n; i++) {\n      if (first.get(s[i]) < start) {\n        break;\n      }\n      end = Math.max(end, last.get(s[i]));\n      if (i === end && end - start + 1 < n) {\n        best = Math.max(best, end - start + 1);\n      }\n    }\n  }\n  return best;\n}",
+  "brute": "function maxSubstringLength(s) {\n  const total = {};\n  for (const ch of s) total[ch] = (total[ch] || 0) + 1;\n  let answer = -1;\n  for (let i = 0; i < s.length; i++) {\n    const inside = {};\n    for (let j = i; j < s.length; j++) {\n      inside[s[j]] = (inside[s[j]] || 0) + 1;\n      if (j - i + 1 === s.length) continue;\n      const closed = Object.keys(inside).every(ch => inside[ch] === total[ch]);\n      if (closed && j - i + 1 > answer) answer = j - i + 1;\n    }\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');\n  for (let i = letters.length - 1; i > 0; i--) {\n    const j = int(0, i);\n    [letters[i], letters[j]] = [letters[j], letters[i]];\n  }\n  if (size === 'small') {\n    if (rand() < 0.5) {\n      const alpha = letters.slice(0, int(1, 4));\n      return [Array.from({ length: int(2, 10) }, () => alpha[int(0, alpha.length - 1)]).join('')];\n    }\n  }\n  // Build blocks that each use their own letters, then sometimes nest one block inside another.\n  const target = size === 'large' ? 10000 : int(2, 12);\n  const groups = Math.min(int(1, 6), target);\n  const alphabets = [];\n  let used = 0;\n  for (let g = 0; g < groups; g++) {\n    const count = int(1, 4);\n    alphabets.push(letters.slice(used, used + count));\n    used += count;\n  }\n  const lengths = alphabets.map(() => 1);\n  for (let extra = target - groups; extra > 0; extra--) lengths[int(0, groups - 1)]++;\n  const blocks = alphabets.map((alpha, g) => Array.from({ length: lengths[g] }, () => alpha[int(0, alpha.length - 1)]).join(''));\n  if (blocks.length >= 2 && rand() < 0.4) {\n    const outer = blocks.shift();\n    const cut = int(0, outer.length);\n    blocks[0] = outer.slice(0, cut) + blocks[0] + outer.slice(cut);\n  }\n  let s = blocks.join('');\n  if (s.length < 2) s += s;\n  return [s];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abba"],"expected":2},
+    {"name":"Example 2","input":["abab"],"expected":-1},
+    {"name":"Example 3","input":["abacd"],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["aa"]},
+    {"name":"Test 2","input":["ab"]},
+    {"name":"Test 3","input":["abc"]},
+    {"name":"Test 4","input":["aaaa"]},
+    {"name":"Test 5","input":["abcba"]},
+    {"name":"Test 6","input":["zabcdz"]},
+    {"name":"Test 7","input":["aabbccdd"]},
+    {"name":"Test 8","input":["abcdefghijklmnopqrstuvwxyz"]},
+    {"name":"Test 9","input":["abacabad"]},
+    {"name":"Test 10","input":["xyxzzyx"]},
+    {"name":"Test 11","input":["qwqwqwerer"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking every substring against the letter counts is O(26 · n²). A shortcut comes from the first character of a self-contained substring: all copies of that letter must be inside, so the substring has to **start at the first occurrence** of its first letter. There are at most 26 such starting points. From each one, scan right: any letter whose first occurrence lies before `start` makes every longer substring from `start` invalid, and every letter seen forces the substring to stretch at least to that letter's last occurrence. Whenever the scan reaches the farthest required position, the substring is closed and self-contained.\n\n## Approach\n\n1. Record `first` and `last`, the first and last index of each letter.\n2. For each `start` in `first`'s values (one per distinct letter), set `end = start`.\n3. Scan `i` from `start`. If `s[i]` first appears before `start`, stop: no longer substring from here can work.\n4. Otherwise stretch `end` to `last` of `s[i]`.\n5. When `i === end`, `s[start..end]` holds every copy of every letter in it. If it is shorter than `s`, update `best`.\n6. Return `best`, which stays `-1` when nothing qualifies.\n\n## Example 1, step by step\n\n`s = \"abba\"`: `first = {a: 0, b: 1}`, `last = {a: 3, b: 2}`.\n\n- `start = 0`: `a` stretches `end` to 3, and `i` reaches 3 with `end = 3`, but length 4 is the whole string, so it is skipped.\n- `start = 1`: `b` stretches `end` to 2; at `i = 2`, `i === end`, length 2, so `best = 2`. At `i = 3`, `a` first appears at 0 < 1, so the scan stops.\n\nThe answer is `2`.\n\n## Complexity\n\n- Time: O(26 · n): at most 26 starts, each scanning the string once.\n- Space: O(26): two maps keyed by letter.\n\n## Pitfalls\n\n- The whole string never counts, even though it trivially contains all its letters.\n- Stopping only when `i === end` matters: an earlier `i` still has letters whose later copies lie outside.\n- A start that is not a first occurrence can never work, which is why only 26 starts are needed.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `first`, `last` | first and last index of each letter |\n| `start` | where the candidate substring begins |\n| `end` | farthest index the candidate must reach |\n| `i` | current scan position |\n| `best` | longest self-contained length so far, or -1 |",
+  "narration": {
+    "3": "first maps each letter to the index where it first appears.",
+    "4": "last maps each letter to the index where it last appears.",
+    "5": "One pass over the string fills both maps.",
+    "7": "Only the first sighting of a letter is stored in first.",
+    "9": "Every sighting overwrites last, so it ends at the final one.",
+    "12": "No self-contained substring found yet.",
+    "13": "A valid substring must begin at some letter's first occurrence, so try only those starts.",
+    "14": "So far the substring only needs to reach start itself.",
+    "15": "Extend the candidate one character at a time.",
+    "16": "This letter also occurs before start, so no substring from start can include it.",
+    "17": "Stop scanning from this start.",
+    "19": "Every copy of this letter must be included, so stretch end to its last occurrence.",
+    "20": "Reached the farthest required index, and the substring is not the whole string.",
+    "21": "It is self-contained; keep its length if it is the longest.",
+    "25": "Return the longest length found, or -1."
+  }
+}

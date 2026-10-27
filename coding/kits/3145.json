@@ -1,0 +1,76 @@
+{
+  "number": 3145,
+  "title": "Find Products of Elements of Big Array",
+  "spec": "leetcode",
+  "statement": "Every positive integer `x` is a sum of distinct powers of two in exactly one way (its binary form). Listing those powers from smallest to largest gives the *powerful array* of `x`; for instance `13` gives `[1, 4, 8]` and `8` gives `[8]`.\n\nWrite the powerful arrays of `1`, `2`, `3`, ... back to back to form an endless sequence `big_nums`, indexed from 0, which opens with `1, 2, 1, 2, 4, 1, 4, 2, 4, 1, 2, 4, 8, ...`.\n\nEach `queries[i] = [from_i, to_i, mod_i]` asks for the product `big_nums[from_i] * big_nums[from_i + 1] * ... * big_nums[to_i]` (both ends included), reduced modulo `mod_i`. Return an array `answer` in which `answer[i]` is the result of query `i`.",
+  "constraints": [
+    "1 <= queries.length <= 500",
+    "queries[i].length == 3",
+    "0 <= queries[i][0] <= queries[i][1] <= 10^15",
+    "1 <= queries[i][2] <= 10^5"
+  ],
+  "signature": "int[] findProductsOfElements(long[][] queries)",
+  "entry": "findProductsOfElements",
+  "kind": "function",
+  "parameters": [
+    "queries"
+  ],
+  "validator": "function validate([queries]) {\n  if (!Array.isArray(queries) || queries.length < 1 || queries.length > 500) return 'queries needs 1 to 500 entries.';\n  for (const query of queries) {\n    if (!Array.isArray(query) || query.length !== 3 || !query.every(Number.isInteger)) return 'Each query is three integers [from, to, mod].';\n    const [from, to, mod] = query;\n    if (from < 0 || from > to || to > 1e15) return 'Each query needs 0 <= from <= to <= 10^15.';\n    if (mod < 1 || mod > 100000) return 'Each mod is between 1 and 10^5.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findProductsOfElements(queries) {\n  const BITS = 50;\n\n  // How many integers in 1..n have this bit set.\n  function countWithBit(n, bit) {\n    const half = 2 ** bit;\n    const fullBlocks = Math.floor((n + 1) / (2 * half));\n    return fullBlocks * half + Math.max(0, ((n + 1) % (2 * half)) - half);\n  }\n\n  // counts[bit] = how many of the first k elements of big_nums equal 2^bit.\n  function powerCounts(k) {\n    let low = 0;\n    let high = k;\n    while (low < high) {\n      const mid = Math.ceil((low + high) / 2);\n      let used = 0;\n      for (let bit = 0; bit < BITS && used <= k; bit++) {\n        used += countWithBit(mid, bit);\n      }\n      if (used <= k) {\n        low = mid;\n      } else {\n        high = mid - 1;\n      }\n    }\n    const counts = [];\n    let used = 0;\n    for (let bit = 0; bit < BITS; bit++) {\n      counts.push(countWithBit(low, bit));\n      used += counts[bit];\n    }\n    const next = low + 1;\n    for (let bit = 0; used < k; bit++) {\n      if (Math.floor(next / 2 ** bit) % 2 === 1) {\n        counts[bit]++;\n        used++;\n      }\n    }\n    return counts;\n  }\n\n  function powMod(base, exponent, mod) {\n    let result = 1 % mod;\n    base %= mod;\n    while (exponent > 0) {\n      if (exponent % 2 === 1) result = (result * base) % mod;\n      base = (base * base) % mod;\n      exponent = Math.floor(exponent / 2);\n    }\n    return result;\n  }\n\n  const answer = [];\n  for (const [from, to, mod] of queries) {\n    const upper = powerCounts(to + 1);\n    const lower = powerCounts(from);\n    let product = 1 % mod;\n    for (let bit = 0; bit < BITS; bit++) {\n      const factor = powMod(2 ** bit, upper[bit] - lower[bit], mod);\n      product = (product * factor) % mod;\n    }\n    answer.push(product);\n  }\n  return answer;\n}",
+  "brute": "function findProductsOfElements(queries) {\n  // A different method with BigInt: fix the bits of the number where the first k elements end, from the top bit down.\n  // A block of 2^j numbers sharing higher bits (with ones set bits whose exponents add to bitsSum) holds\n  // 2^j * ones + j * 2^(j-1) elements whose exponents add to 2^j * bitsSum + 2^(j-1) * j(j-1)/2.\n  const exponentPrefix = (k) => {\n    let remaining = BigInt(k);\n    let ones = 0n, bitsSum = 0n, total = 0n, number = 0n;\n    for (let j = 50n; j >= 0n; j--) {\n      const size = 1n << j;\n      const half = j > 0n ? size / 2n : 0n;\n      const count = size * ones + j * half;\n      const sum = size * bitsSum + half * (j * (j - 1n) / 2n);\n      if (count <= remaining) {\n        remaining -= count;\n        total += sum;\n        number += size;\n        ones++;\n        bitsSum += j;\n      }\n    }\n    // The rest are the smallest powers of the number that is cut off.\n    for (let j = 0n; remaining > 0n; j++) {\n      if ((number >> j) & 1n) {\n        total += j;\n        remaining--;\n      }\n    }\n    return total;\n  };\n  const powerOfTwo = (exponent, mod) => {\n    let result = 1n % mod;\n    let base = 2n % mod;\n    for (; exponent > 0n; exponent >>= 1n) {\n      if (exponent & 1n) result = (result * base) % mod;\n      base = (base * base) % mod;\n    }\n    return result;\n  };\n  return queries.map(([from, to, mod]) => Number(powerOfTwo(exponentPrefix(to + 1) - exponentPrefix(from), BigInt(mod))));\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const LIMIT = 1e15;\n  // A value in [0, 10^15] with random low digits too.\n  const huge = () => Math.min(LIMIT, int(0, 1e9) * 1e6 + int(0, 999999));\n  const pickMod = () => {\n    const r = rand();\n    if (r < 0.15) return int(1, 2);\n    if (r < 0.3) return 2 ** int(1, 16);\n    if (r < 0.65) return int(3, 60);\n    return int(1, 100000);\n  };\n  const queries = [];\n  if (size === 'small') {\n    const count = int(1, 5);\n    for (let i = 0; i < count; i++) {\n      const from = int(0, 80);\n      const to = rand() < 0.2 ? from : from + int(0, 60);\n      queries.push([from, to, pickMod()]);\n    }\n    return [queries];\n  }\n  for (let i = 0; i < 500; i++) {\n    const r = rand();\n    let from, to;\n    if (r < 0.3) {\n      from = huge();\n      to = Math.min(LIMIT, from + int(0, 1000));\n    } else if (r < 0.4) {\n      from = int(0, 1000);\n      to = LIMIT - int(0, 1000);\n    } else {\n      const a = huge();\n      const b = huge();\n      from = Math.min(a, b);\n      to = Math.max(a, b);\n    }\n    queries.push([from, to, pickMod()]);\n  }\n  return [queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,3,7]]],"expected":[4]},
+    {"name":"Example 2","input":[[[2,5,3],[7,7,4]]],"expected":[2,2]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0,1]]]},
+    {"name":"Test 2","input":[[[0,0,7],[0,1,7],[12,12,100000]]]},
+    {"name":"Test 3","input":[[[0,12,1000],[3,3,5],[10,20,97],[5,9,2]]]},
+    {"name":"Test 4","input":[[[0,1000000000000000,100000]]]},
+    {"name":"Test 5","input":[[[1000000000000000,1000000000000000,99991],[999999999999999,1000000000000000,99991]]]},
+    {"name":"Test 6","input":[[[123456789012345,987654321098765,65536],[123456789012345,987654321098765,99999]]]},
+    {"name":"Test 7","input":[[[0,1000000,1],[0,1000000,2],[0,1000000,3],[0,1000000,99989]]]},
+    {"name":"Test 8","input":[[[562949953421311,562949953421400,1000],[70368744177663,70368744177700,77777]]]},
+    {"name":"Test 9","input":[[[41,41,100000],[42,57,100000],[100,140,100000]]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery element of `big_nums` is a power of two, so a range product is `2^E`, where `E` adds up the exponents in the range. The sequence is far too long to list, but it can be counted: as numbers count up, bit `b` cycles through `2^b` zeros then `2^b` ones, so how many of `1..n` have that bit set has a closed form. Summing those counts gives the length of the prefix built from `1..n`, and a binary search finds which number any index falls in.\n\n## Approach\n\n1. `countWithBit(n, bit)` counts the numbers in `1..n` with `bit` set: full blocks of size `2^(bit+1)` each give `2^bit`, plus the part of the last block past its first half.\n2. `powerCounts(k)` describes the first `k` elements: binary search the largest `low` whose numbers `1..low` use at most `k` elements.\n3. Count each bit over `1..low`; the missing `k - used` elements are the lowest set bits of `next = low + 1`.\n4. For a query, `upper = powerCounts(to + 1)` and `lower = powerCounts(from)`; their difference tells how many times each `2^bit` occurs in the range.\n5. Multiply `powMod(2^bit, upper[bit] - lower[bit], mod)` over all bits.\n\n## Example 1, step by step\n\nQuery `[1, 3, 7]`. For `k = 4` the search finds `low = 3` (`1, 2, 3` use `1 + 1 + 2 = 4` elements), so `upper` has two 1s and two 2s. For `k = 1`, `low = 1` and `lower` has one 1. The range therefore holds one 1 and two 2s, and `product = 2^2 % 7 = 4`.\n\n## Complexity\n\n- Time: O(q · B²) with B = 50 bits: each binary search takes about B steps of B counts, and each `powMod` takes about B squarings.\n- Space: O(B) per query besides the output.\n\n## Pitfalls\n\n- Indices go up to `10^15`, beyond 32 bits: use division and `%` instead of `>>` and `&` in JavaScript.\n- The total exponent can exceed `2^53`; raising each power separately keeps every number small.\n- Do not forget the partial powerful array of `low + 1` at the end of a prefix.\n- `mod` can be 1, so start products at `1 % mod`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `BITS` | how many bit positions are enough for numbers up to `10^15` |\n| `half` | `2^bit`, half the length of that bit's repeating pattern |\n| `low`, `high`, `mid` | binary search bounds for the last complete number |\n| `used` | elements produced by `1..mid` (or `1..low`) |\n| `counts` | how often each `2^bit` appears among the first `k` elements |\n| `next` | the number whose powerful array is cut off at `k` |\n| `upper`, `lower` | counts for the prefixes ending at `to` and before `from` |\n| `factor`, `product` | one bit's contribution, and the query's answer modulo `mod` |",
+  "narration": {
+    "2": "Indices stay below 10^15 < 2^50, so 50 bit positions cover every number involved.",
+    "6": "Bit `bit` repeats a pattern of `half` zeros followed by `half` ones as numbers count up.",
+    "7": "Count how many complete zero-then-one blocks fit in the numbers 0..n.",
+    "8": "Each complete block adds `half` ones; the unfinished block adds whatever lies past its first half.",
+    "13": "The answer for the last complete number lies between 0 and k, since every number adds at least one element.",
+    "15": "Binary search for the largest number whose powerful arrays, from 1 up to it, fit inside the first k elements.",
+    "16": "Round up so that setting low = mid always makes progress.",
+    "18": "Add up the elements produced by 1..mid, bit by bit, stopping early once it is already too many.",
+    "21": "Everything up to mid fits, so mid is a candidate: search higher.",
+    "24": "Too many elements: the last complete number is below mid.",
+    "30": "Numbers 1..low are written out completely, so each bit's count is exact.",
+    "31": "Track how many elements those complete arrays produce.",
+    "33": "The remaining elements come from the start of the powerful array of the next number.",
+    "34": "Take its set bits from the smallest upward until exactly k elements are covered.",
+    "35": "Is this bit set in the next number?",
+    "36": "Yes: that power of two is one more element of the prefix.",
+    "40": "Return how many times each power 2^bit appears among the first k elements.",
+    "46": "Fast exponentiation: square the base and halve the exponent each round.",
+    "47": "An odd exponent contributes the current base to the result.",
+    "55": "Answer each query independently.",
+    "56": "Count the powers in the prefix that ends at index `to`...",
+    "57": "...and in the prefix that stops just before `from`.",
+    "58": "Start from 1 reduced by `mod`, which is 0 when `mod` is 1.",
+    "60": "The range holds 2^bit exactly upper[bit] - lower[bit] times; raise it to that count modulo `mod`.",
+    "61": "Fold that factor into the product, keeping it small.",
+    "63": "Store this query's result.",
+    "65": "Return one result per query."
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "number": 3129,
+  "title": "Find All Possible Stable Binary Arrays I",
+  "spec": "leetcode",
+  "statement": "A binary array (every element is `0` or `1`) is **stable** when all of these hold:\n\n- it contains exactly `zero` elements equal to `0`,\n- it contains exactly `one` elements equal to `1`, and\n- every contiguous subarray whose length is greater than `limit` contains at least one `0` and at least one `1`.\n\nReturn how many different stable arrays exist. The count can be huge, so return it modulo `10^9 + 7`.",
+  "constraints": [
+    "1 <= zero, one, limit <= 200"
+  ],
+  "signature": "int numberOfStableArrays(int zero, int one, int limit)",
+  "entry": "numberOfStableArrays",
+  "kind": "function",
+  "parameters": [
+    "zero",
+    "one",
+    "limit"
+  ],
+  "validator": "function validate([zero, one, limit]) {\n  for (const [name, value] of [['zero', zero], ['one', one], ['limit', limit]]) {\n    if (!Number.isInteger(value) || value < 1 || value > 200) return `${name} must be a whole number from 1 to 200.`;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numberOfStableArrays(zero, one, limit) {\n  const MOD = 1_000_000_007;\n  const endZero = Array.from({ length: zero + 1 }, () => new Array(one + 1).fill(0));\n  const endOne = Array.from({ length: zero + 1 }, () => new Array(one + 1).fill(0));\n  for (let i = 1; i <= Math.min(zero, limit); i++) {\n    endZero[i][0] = 1;\n  }\n  for (let j = 1; j <= Math.min(one, limit); j++) {\n    endOne[0][j] = 1;\n  }\n  for (let i = 1; i <= zero; i++) {\n    for (let j = 1; j <= one; j++) {\n      let zeros = endZero[i - 1][j] + endOne[i - 1][j];\n      if (i > limit) {\n        zeros -= endOne[i - limit - 1][j];\n      }\n      let ones = endZero[i][j - 1] + endOne[i][j - 1];\n      if (j > limit) {\n        ones -= endZero[i][j - limit - 1];\n      }\n      endZero[i][j] = (zeros % MOD + MOD) % MOD;\n      endOne[i][j] = (ones % MOD + MOD) % MOD;\n    }\n  }\n  return (endZero[zero][one] + endOne[zero][one]) % MOD;\n}",
+  "brute": "function numberOfStableArrays(zero, one, limit) {\n  // A stable array is a sequence of alternating runs, each 1..limit long. ways[i][j][v] counts arrays with\n  // i zeros and j ones whose last run has value v, by trying every length t of that last run.\n  const MOD = 1000000007;\n  const ways = [];\n  for (let i = 0; i <= zero; i++) {\n    ways.push([]);\n    for (let j = 0; j <= one; j++) {\n      const cell = [0, 0];\n      for (let t = 1; t <= Math.min(i, limit); t++) {\n        cell[0] = (cell[0] + (i - t === 0 && j === 0 ? 1 : ways[i - t][j][1])) % MOD;\n      }\n      for (let t = 1; t <= Math.min(j, limit); t++) {\n        cell[1] = (cell[1] + (i === 0 && j - t === 0 ? 1 : ways[i][j - t][0])) % MOD;\n      }\n      ways[i].push(cell);\n    }\n  }\n  return (ways[zero][one][0] + ways[zero][one][1]) % MOD;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'small') {\n    const zero = 1 + Math.floor(rand() * 6);\n    const one = 1 + Math.floor(rand() * 6);\n    const limit = 1 + Math.floor(rand() * 7);\n    return [zero, one, limit];\n  }\n  const zero = 120 + Math.floor(rand() * 81);\n  const one = 120 + Math.floor(rand() * 81);\n  const limit = rand() < 0.5 ? 1 + Math.floor(rand() * 6) : 1 + Math.floor(rand() * 200);\n  return [zero, one, limit];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,1,2],"expected":2},
+    {"name":"Example 2","input":[1,2,1],"expected":1},
+    {"name":"Example 3","input":[3,3,2],"expected":14}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1,1]},
+    {"name":"Test 2","input":[2,2,1]},
+    {"name":"Test 3","input":[1,5,1]},
+    {"name":"Test 4","input":[3,1,1]},
+    {"name":"Test 5","input":[5,1,5]},
+    {"name":"Test 6","input":[5,1,4]},
+    {"name":"Test 7","input":[7,3,2]},
+    {"name":"Test 8","input":[10,10,3]},
+    {"name":"Test 9","input":[200,200,200]},
+    {"name":"Test 10","input":[200,200,1]},
+    {"name":"Test 11","input":[200,1,200]},
+    {"name":"Test 12","input":[200,100,2]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe third rule simply says that no run of equal values may be longer than `limit`. Listing all arrangements (a brute force) is exponential, but a stable array is described well enough by how many zeros and ones it has used and which value it ends with. That suggests a DP over `(zeros used, ones used, last value)`.\n\nTo build an array that ends in `0`, append a `0` to any shorter stable array. That is only wrong when the new `0` makes a run of `limit + 1` zeros; such arrays are exactly \"an array ending in `1`, then `limit + 1` zeros\", and we subtract them.\n\n## Approach\n\n1. `endZero[i][j]` counts stable arrays with `i` zeros and `j` ones that end in `0`; `endOne[i][j]` is the same for arrays that end in `1`.\n2. Base cases: an array of only zeros is stable when it has at most `limit` of them, so `endZero[i][0] = 1` for `i <= limit`; likewise `endOne[0][j] = 1` for `j <= limit`.\n3. For `i, j >= 1`: `zeros = endZero[i-1][j] + endOne[i-1][j]`, minus `endOne[i-limit-1][j]` when `i > limit`. Compute `ones` the same way with the roles swapped.\n4. Store both modulo `10^9 + 7` (add `MOD` back so a subtraction never leaves a negative value).\n5. The answer is `endZero[zero][one] + endOne[zero][one]`.\n\n## Example 1, step by step\n\n`zero = 1, one = 1, limit = 2`. The base cases give `endZero[1][0] = 1` (`[0]`) and `endOne[0][1] = 1` (`[1]`). For `i = 1, j = 1`: `zeros = endZero[0][1] + endOne[0][1] = 0 + 1 = 1` (that is `[1,0]`) and `ones = endZero[1][0] + endOne[1][0] = 1 + 0 = 1` (`[0,1]`). Neither index exceeds `limit`, so nothing is subtracted, and the answer is `1 + 1 = 2`.\n\n## Complexity\n\n- Time: O(zero × one): each cell is filled in constant time.\n- Space: O(zero × one) for the two tables.\n\n## Pitfalls\n\n- Subtract the over-long run instead of looping over every run length; the loop works here but costs an extra factor of `limit`.\n- After subtracting, the value can be negative modulo `MOD`; normalise with `(x % MOD + MOD) % MOD`.\n- Base cases stop at `limit`: `[0, 0, 0]` is not stable when `limit = 2`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | the modulus `10^9 + 7` |\n| `endZero[i][j]` | stable arrays with `i` zeros and `j` ones ending in `0` |\n| `endOne[i][j]` | stable arrays with `i` zeros and `j` ones ending in `1` |\n| `i`, `j` | zeros and ones used so far |\n| `zeros`, `ones` | the new counts for `endZero[i][j]` and `endOne[i][j]` before reduction |",
+  "narration": {
+    "2": "Answers are reported modulo 10^9 + 7.",
+    "3": "endZero[i][j] counts stable arrays with i zeros and j ones whose last value is 0.",
+    "4": "endOne[i][j] counts the same arrays but ending in 1.",
+    "5": "An array of only zeros is stable while it has at most limit of them...",
+    "6": "...so each such length contributes exactly one array.",
+    "8": "Arrays of only ones work the same way...",
+    "9": "...one array for each length up to limit.",
+    "11": "Fill the tables for every count of zeros...",
+    "12": "...and every count of ones, both at least 1.",
+    "13": "Append a 0 to any stable array with one fewer zero.",
+    "14": "If i exceeds limit, some of those arrays now end in limit + 1 zeros.",
+    "15": "Those are an array ending in 1 followed by limit + 1 zeros; remove them.",
+    "17": "Append a 1 to any stable array with one fewer one.",
+    "18": "If j exceeds limit, some of those arrays end in limit + 1 ones.",
+    "19": "Remove the arrays ending in 0 followed by limit + 1 ones.",
+    "21": "Reduce modulo MOD, adding MOD back in case the subtraction went negative.",
+    "25": "Stable arrays with all the zeros and ones end in either value; add both."
+  }
+}

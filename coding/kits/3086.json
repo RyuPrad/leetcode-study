@@ -1,0 +1,68 @@
+{
+  "number": 3086,
+  "title": "Minimum Moves to Pick K Ones",
+  "spec": "leetcode",
+  "statement": "`nums` is a binary array of length n, and Alice wants to collect `k` ones from it in as few moves as possible.\n\nShe begins by choosing a cell `aliceIndex` (any index from 0 to n - 1) and stays on it for the whole game. If that cell holds a 1 at the start, she collects it for free and the cell turns into 0. After that, every move is exactly one of these two actions:\n\n- **Create:** choose an index `j` different from `aliceIndex` with `nums[j] == 0` and turn it into 1. Over the whole game this action may be used at most `maxChanges` times.\n- **Shift:** choose two neighbouring indices `x` and `y` (`|x - y| == 1`) with `nums[x] == 1` and `nums[y] == 0`, and exchange their values. If `y` is `aliceIndex`, Alice collects the one that just arrived and that cell becomes 0 again.\n\nReturn the fewest moves after which Alice has collected exactly `k` ones. The inputs guarantee that `maxChanges` plus the number of ones in `nums` is at least `k`, so it is always possible.",
+  "constraints": [
+    "2 <= nums.length <= 10^5",
+    "nums[i] is 0 or 1",
+    "1 <= k <= 10^5",
+    "0 <= maxChanges <= 10^5",
+    "maxChanges + (number of ones in nums) >= k"
+  ],
+  "signature": "long minimumMoves(int[] nums, int k, int maxChanges)",
+  "entry": "minimumMoves",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k",
+    "maxChanges"
+  ],
+  "validator": "function validate([nums, k, maxChanges]) {\n  if (nums.length < 2 || nums.length > 100000) return 'nums needs 2 to 100000 values.';\n  if (nums.some(v => v !== 0 && v !== 1)) return 'Every value of nums is 0 or 1.';\n  if (k < 1 || k > 100000) return 'k is between 1 and 100000.';\n  if (maxChanges < 0 || maxChanges > 100000) return 'maxChanges is between 0 and 100000.';\n  let count = 0;\n  for (const v of nums) count += v;\n  if (maxChanges + count < k) return 'maxChanges plus the number of ones must be at least k.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumMoves(nums, k, maxChanges) {\n  const ones = [];\n  for (let i = 0; i < nums.length; i++) {\n    if (nums[i] === 1) ones.push(i);\n  }\n  const prefix = [0];\n  for (const position of ones) {\n    prefix.push(prefix[prefix.length - 1] + position);\n  }\n\n  const fewest = Math.max(0, k - maxChanges);\n  const most = Math.min(k, ones.length, fewest + 3);\n  let best = fewest === 0 ? 2 * k : Infinity;\n\n  for (let size = Math.max(1, fewest); size <= most; size++) {\n    for (let left = 0; left + size <= ones.length; left++) {\n      const right = left + size;\n      const mid = left + Math.floor(size / 2);\n      const pullLeft = ones[mid] * (mid - left) - (prefix[mid] - prefix[left]);\n      const pullRight = prefix[right] - prefix[mid] - ones[mid] * (right - mid);\n      best = Math.min(best, pullLeft + pullRight + 2 * (k - size));\n    }\n  }\n  return best;\n}",
+  "brute": "function minimumMoves(nums, k, maxChanges) {\n  // Breadth-first search over the real game: (board, collected, creates used) for every starting cell.\n  const n = nums.length;\n  let best = Infinity;\n  for (let alice = 0; alice < n; alice++) {\n    let board = 0;\n    for (let i = 0; i < n; i++) if (nums[i] === 1 && i !== alice) board |= 1 << i;\n    const start = nums[alice] === 1 ? 1 : 0;\n    if (start === k) { best = 0; continue; }\n    const seen = new Set([board + ',' + start + ',0']);\n    let frontier = [[board, start, 0]];\n    let depth = 0;\n    search: while (frontier.length && depth < best) {\n      depth++;\n      const next = [];\n      for (const [b, got, used] of frontier) {\n        const options = [];\n        if (used < maxChanges) for (let j = 0; j < n; j++) if (j !== alice && !((b >> j) & 1)) options.push([b | (1 << j), got, used + 1]);\n        for (let x = 0; x < n; x++) {\n          if (!((b >> x) & 1)) continue;\n          for (const y of [x - 1, x + 1]) {\n            if (y < 0 || y >= n || ((b >> y) & 1)) continue;\n            const moved = (b & ~(1 << x)) | (1 << y);\n            options.push(y === alice ? [moved & ~(1 << y), got + 1, used] : [moved, got, used]);\n          }\n        }\n        for (const option of options) {\n          if (option[1] === k) { best = Math.min(best, depth); break search; }\n          const id = option.join(',');\n          if (!seen.has(id)) { seen.add(id); next.push(option); }\n        }\n      }\n      frontier = next;\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 1500 + Math.floor(rand() * 501) : 2 + Math.floor(rand() * 6);\n  const density = rand();\n  const nums = Array.from({ length: n }, () => (rand() < density ? 1 : 0));\n  let maxChanges;\n  if (size === 'large') maxChanges = rand() < 0.6 ? Math.floor(rand() * 20) : Math.floor(rand() * 100001);\n  else maxChanges = rand() < 0.2 ? 100000 : Math.floor(rand() * 4);\n  let count = nums.reduce((a, b) => a + b, 0);\n  if (count + maxChanges === 0) {\n    nums[Math.floor(rand() * n)] = 1;\n    count = 1;\n  }\n  const cap = Math.min(size === 'large' ? 100000 : 5, count + maxChanges);\n  // Large inputs with few creates aim k at the ones on the board, where the window search matters.\n  const k = size === 'large' && maxChanges < 20 && rand() < 0.7 ? Math.max(1, Math.min(cap, maxChanges + 1 + Math.floor(rand() * count))) : 1 + Math.floor(rand() * cap);\n  return [nums, k, maxChanges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,1,0,0,0,1,1,0,0,1],3,1],"expected":3},
+    {"name":"Example 2","input":[[0,0,0,0],2,3],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0,1],1,0]},
+    {"name":"Test 2","input":[[1,1],2,0]},
+    {"name":"Test 3","input":[[1,1,1],3,0]},
+    {"name":"Test 4","input":[[1,0,1],2,0]},
+    {"name":"Test 5","input":[[1,0,0,0,1],2,0]},
+    {"name":"Test 6","input":[[0,0],3,3]},
+    {"name":"Test 7","input":[[1,1,1,1,1],5,0]},
+    {"name":"Test 8","input":[[1,1,1,1,1],5,100000]},
+    {"name":"Test 9","input":[[1,0,0,1,0,0,1,0,0,1],4,1]},
+    {"name":"Test 10","input":[[0,0,0,1,1,0,0,0],2,5]},
+    {"name":"Test 11","input":[[1,0,1,0,1,1,0,1],4,2]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nPrice each collected one separately. The one already under Alice costs 0 moves, a one in a neighbouring cell costs 1 shift, and a one d cells away costs d shifts. A created one costs exactly 2: create it next to Alice, then shift it in. So creating is the cheapest way to get any one that is at least two cells away, but there are only `maxChanges` creates.\n\nThat means at least `fewest = k - maxChanges` ones must come from the board, and taking more than `fewest + 3` from the board never helps: beyond Alice's own cell and her two neighbours, every board one costs at least 2, the same as a create. For a fixed count `size`, the cheapest board ones are `size` consecutive ones, gathered at their median cell. A sliding window of that fixed size over the one positions, with prefix sums for the distances, prices every choice in O(1). (A brute force would search every game state, which is exponential.)\n\n## Approach\n\n1. List the positions of the ones in `ones` and build `prefix`, the running sums of those positions.\n2. Set `fewest = max(0, k - maxChanges)` and `most = min(k, ones.length, fewest + 3)`.\n3. If `fewest` is 0, creating all `k` ones is allowed, so `best` starts at `2 * k`.\n4. For each `size` from `max(1, fewest)` to `most`, slide a window `[left, right)` of `size` ones. Alice stands at `ones[mid]`, the median. `pullLeft` and `pullRight` are the total distances of the left and right parts, from prefix sums. Add `2 * (k - size)` for the created ones and keep the minimum.\n5. Return `best`.\n\n## Example 1, step by step\n\n`ones = [0, 1, 5, 6, 9]`, `prefix = [0, 0, 1, 6, 12, 21]`, `fewest = 2`, `most = 3`, and `best` starts at Infinity.\n\n- `size = 2`: window `[0, 1]` costs `1 + 2 = 3`, `[1, 5]` costs `4 + 2 = 6`, `[5, 6]` costs `1 + 2 = 3`, `[6, 9]` costs `3 + 2 = 5`.\n- `size = 3`: `[0, 1, 5]` costs 5, `[1, 5, 6]` costs 5, `[5, 6, 9]` costs 4.\n\nThe minimum is `3`.\n\n## Complexity\n\n- Time: O(n): one scan builds `ones` and `prefix`, then at most four window sweeps, each O(1) per window.\n- Space: O(n) for `ones` and `prefix`.\n\n## Pitfalls\n\n- Spending every create before touching the board is wrong: the cell under Alice and her neighbours cost 0 and 1, which is why sizes up to `fewest + 3` are tried.\n- At least `k - maxChanges` ones must come from the board even when they are far apart; do not cap the window by distance.\n- The answer can exceed 2^31 (about 2.5 billion with `10^5` ones), so use 64-bit integers in Java and C.\n- With no ones at all, `ones[mid]` does not exist; the `size = 0` case is handled by the initial `2 * k`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `ones` | indices of the cells holding 1, in order |\n| `prefix` | `prefix[i]` is the sum of the first `i` positions in `ones` |\n| `fewest`, `most` | smallest and largest number of board ones worth taking |\n| `best` | fewest moves found so far |\n| `size` | how many board ones the current windows take |\n| `left`, `right` | the window `[left, right)` of indices into `ones` |\n| `mid` | median index of the window, where Alice stands |\n| `pullLeft`, `pullRight` | shifts needed to bring the left and right parts to `ones[mid]` |",
+  "narration": {
+    "3": "Scan the board once to find every cell holding a 1.",
+    "4": "Record the index of each one, in order.",
+    "7": "Build running sums of the one positions so any window's distances take O(1).",
+    "8": "Each prefix entry adds the next position to the previous total.",
+    "11": "Creates cover at most maxChanges ones, so at least k - maxChanges must come from the board.",
+    "12": "Beyond Alice's cell and two neighbours, board ones cost 2 or more, so at most three extra are worth taking.",
+    "13": "If every one may be created, 2 moves each is a valid plan to start from.",
+    "15": "Try each worthwhile number of board ones.",
+    "16": "Slide a window of exactly size consecutive ones across the list.",
+    "18": "Alice stands at the window's median one, which minimises the total distance.",
+    "19": "Shifts to bring the ones left of the median to it: their count times the median position, minus their position sum.",
+    "20": "Shifts to bring the ones right of the median to it, computed the same way.",
+    "21": "Add 2 moves for each one still to create and keep the cheapest plan.",
+    "24": "Return the fewest moves over all window sizes and positions."
+  }
+}

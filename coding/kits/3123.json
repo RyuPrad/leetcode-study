@@ -1,0 +1,76 @@
+{
+  "number": 3123,
+  "title": "Find Edges in Shortest Paths",
+  "spec": "leetcode",
+  "statement": "An undirected graph has `n` nodes labeled `0` to `n - 1`. Each `edges[i] = [a_i, b_i, w_i]` joins nodes `a_i` and `b_i` with a positive weight `w_i`, and a path's length is the sum of its edge weights.\n\nAmong all paths from node `0` to node `n - 1`, consider every one whose length is the minimum possible. Return a boolean array `answer` with one entry per edge, where `answer[i]` is `true` if edge `i` is used by at least one of those minimum-length paths and `false` otherwise. The graph need not be connected; when node `n - 1` cannot be reached from node `0`, every entry is `false`.",
+  "constraints": [
+    "2 <= n <= 5 * 10^4",
+    "m == edges.length",
+    "1 <= m <= min(5 * 10^4, n * (n - 1) / 2)",
+    "0 <= a_i, b_i < n",
+    "a_i != b_i",
+    "1 <= w_i <= 10^5",
+    "No two edges join the same pair of nodes"
+  ],
+  "signature": "boolean[] findAnswer(int n, int[][] edges)",
+  "entry": "findAnswer",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges"
+  ],
+  "validator": "function validate([n, edges]) {\n  if (!Number.isInteger(n) || n < 2 || n > 50000) return 'n is between 2 and 5 * 10^4.';\n  if (!Array.isArray(edges) || edges.length < 1 || edges.length > Math.min(50000, (n * (n - 1)) / 2)) return 'edges needs 1 to min(5 * 10^4, n * (n - 1) / 2) entries.';\n  const seen = new Set();\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3) return 'Each edge is [a, b, w].';\n    const [a, b, w] = edge;\n    if (![a, b].every(v => Number.isInteger(v) && v >= 0 && v < n)) return 'Edge endpoints must be nodes 0 to n - 1.';\n    if (a === b) return 'An edge cannot join a node to itself.';\n    if (!Number.isInteger(w) || w < 1 || w > 100000) return 'Each weight is between 1 and 10^5.';\n    const key = Math.min(a, b) * n + Math.max(a, b);\n    if (seen.has(key)) return 'No two edges may join the same pair of nodes.';\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findAnswer(n, edges) {\n  const graph = Array.from({ length: n }, () => []);\n  for (const [a, b, w] of edges) {\n    graph[a].push([b, w]);\n    graph[b].push([a, w]);\n  }\n  const push = (heap, item) => {\n    heap.push(item);\n    let i = heap.length - 1;\n    while (i > 0 && heap[(i - 1) >> 1][0] > heap[i][0]) {\n      const parent = (i - 1) >> 1;\n      [heap[i], heap[parent]] = [heap[parent], heap[i]];\n      i = parent;\n    }\n  };\n  const pop = (heap) => {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length > 0) {\n      heap[0] = last;\n      let i = 0;\n      for (;;) {\n        let smallest = i;\n        for (const child of [2 * i + 1, 2 * i + 2]) {\n          if (child < heap.length && heap[child][0] < heap[smallest][0]) smallest = child;\n        }\n        if (smallest === i) break;\n        [heap[i], heap[smallest]] = [heap[smallest], heap[i]];\n        i = smallest;\n      }\n    }\n    return top;\n  };\n  const dijkstra = (source) => {\n    const dist = new Array(n).fill(Infinity);\n    dist[source] = 0;\n    const heap = [[0, source]];\n    while (heap.length > 0) {\n      const [d, node] = pop(heap);\n      if (d > dist[node]) continue;\n      for (const [next, w] of graph[node]) {\n        if (d + w < dist[next]) {\n          dist[next] = d + w;\n          push(heap, [dist[next], next]);\n        }\n      }\n    }\n    return dist;\n  };\n  const fromStart = dijkstra(0);\n  const fromEnd = dijkstra(n - 1);\n  const best = fromStart[n - 1];\n  return edges.map(([a, b, w]) =>\n    best !== Infinity &&\n    (fromStart[a] + w + fromEnd[b] === best || fromStart[b] + w + fromEnd[a] === best));\n}",
+  "brute": "function findAnswer(n, edges) {\n  // Enumerate every simple path from 0 to n - 1 and keep the edge sets of the lightest ones.\n  const answer = edges.map(() => false);\n  let bestLength = Infinity;\n  let bestPaths = [];\n  const visited = new Array(n).fill(false);\n  const used = [];\n  const walk = (node, length) => {\n    if (node === n - 1) {\n      if (length < bestLength) { bestLength = length; bestPaths = []; }\n      if (length === bestLength) bestPaths.push([...used]);\n      return;\n    }\n    visited[node] = true;\n    edges.forEach(([a, b, w], index) => {\n      const other = a === node ? b : b === node ? a : -1;\n      if (other >= 0 && !visited[other]) {\n        used.push(index);\n        walk(other, length + w);\n        used.pop();\n      }\n    });\n    visited[node] = false;\n  };\n  walk(0, 0);\n  for (const path of bestPaths) for (const index of path) answer[index] = true;\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? int(500, 1500) : int(2, 7);\n  const maxEdges = Math.min(size === 'large' ? 2000 : 11, (n * (n - 1)) / 2);\n  const m = size === 'large' ? maxEdges : int(1, maxEdges);\n  const maxWeight = size === 'large' ? (rand() < 0.5 ? 3 : 100000) : (rand() < 0.7 ? 3 : 20);\n  const seen = new Set();\n  const edges = [];\n  // Large graphs get a random chain from 0 to n - 1 first so the target is usually reachable.\n  if (size === 'large') {\n    const middle = Array.from({ length: n - 2 }, (_, i) => i + 1).filter(() => rand() < 0.02);\n    const chain = [0, ...middle, n - 1];\n    for (let i = 0; i + 1 < chain.length; i++) {\n      const a = chain[i], b = chain[i + 1];\n      seen.add(Math.min(a, b) * n + Math.max(a, b));\n      edges.push([a, b, int(1, maxWeight)]);\n    }\n  }\n  while (edges.length < m) {\n    const a = int(0, n - 1), b = int(0, n - 1);\n    const key = Math.min(a, b) * n + Math.max(a, b);\n    if (a === b || seen.has(key)) continue;\n    seen.add(key);\n    edges.push([a, b, int(1, maxWeight)]);\n  }\n  for (let i = edges.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [edges[i], edges[j]] = [edges[j], edges[i]];\n  }\n  return [n, edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[6,[[0,1,4],[0,2,1],[1,3,2],[1,4,3],[1,5,1],[2,3,1],[3,5,3],[4,5,2]]],"expected":[true,true,true,false,true,true,true,false]},
+    {"name":"Example 2","input":[4,[[2,0,1],[0,1,1],[0,3,4],[3,2,2]]],"expected":[true,false,false,true]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,[[0,1,5]]]},
+    {"name":"Test 2","input":[3,[[0,1,1]]]},
+    {"name":"Test 3","input":[3,[[0,1,1],[1,2,1],[0,2,2]]]},
+    {"name":"Test 4","input":[3,[[0,1,1],[1,2,1],[0,2,3]]]},
+    {"name":"Test 5","input":[4,[[0,1,1],[0,2,1],[1,3,1],[2,3,1],[1,2,1]]]},
+    {"name":"Test 6","input":[5,[[0,1,2],[1,4,2],[1,2,1],[2,4,1],[2,3,1],[3,4,1]]]},
+    {"name":"Test 7","input":[6,[[0,1,25000],[1,2,25000],[2,3,25000],[3,4,25000],[4,5,25000],[0,3,75000],[2,5,75001]]]},
+    {"name":"Test 8","input":[9,[[0,1,1],[1,2,1],[3,4,1],[4,5,1],[6,7,1],[7,8,1],[0,3,1],[3,6,1],[1,4,1],[4,7,1],[2,5,1],[5,8,1],[0,4,3]]]},
+    {"name":"Test 9","input":[6,[[0,1,1],[1,2,1],[2,3,1],[3,4,1]]]},
+    {"name":"Test 10","input":[7,[[6,3,4],[3,0,2],[0,5,1],[5,6,5],[1,2,7],[2,4,1],[4,3,9]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every path from `0` to `n - 1` explodes quickly. Instead, an edge `a – b` of weight `w` lies on some shortest path exactly when going *shortest to `a`, across the edge, shortest from `b` to the end* adds up to the overall shortest length (or the same with `a` and `b` swapped). So two runs of Dijkstra, one from each end, answer the question for every edge at once.\n\n## Approach\n\n1. Build an adjacency list `graph`; each undirected edge appears in both directions.\n2. Run Dijkstra from node `0` to get `fromStart` and from node `n - 1` to get `fromEnd`. A binary min-heap (`push`/`pop`) orders the frontier, and stale heap entries (`d > dist[node]`) are skipped.\n3. Let `best = fromStart[n - 1]`. If it is `Infinity`, the target is unreachable and every answer is `false`.\n4. Otherwise edge `[a, b, w]` is `true` when `fromStart[a] + w + fromEnd[b]` or `fromStart[b] + w + fromEnd[a]` equals `best`.\n\n## Example 1, step by step\n\nFrom node 0: `fromStart = [0, 4, 1, 2, 7, 5]`. From node 5: `fromEnd = [5, 1, 4, 3, 2, 0]`. So `best = 5`.\n\n- `[0,1,4]`: 0 + 4 + 1 = 5, true. `[0,2,1]`: 0 + 1 + 4 = 5, true.\n- `[1,3,2]`: 4 + 2 + 3 = 9, but the other way 2 + 2 + 1 = 5, true.\n- `[1,4,3]`: 9 or 11, false. `[1,5,1]`: 4 + 1 + 0 = 5, true.\n- `[2,3,1]`: 1 + 1 + 3 = 5, true. `[3,5,3]`: 2 + 3 + 0 = 5, true.\n- `[4,5,2]`: 9 either way, false.\n\n## Complexity\n\n- Time: O((n + m) log m) for two Dijkstra runs, plus O(m) to test the edges.\n- Space: O(n + m) for the graph, distances and heap.\n\n## Pitfalls\n\n- Test both orientations of each edge; the input order of `a` and `b` says nothing about the direction a path uses it.\n- Guard the unreachable case: `Infinity + w + Infinity === Infinity` would wrongly report `true`.\n- Path lengths reach about 5·10⁹, beyond 32-bit integers, so Java and C need 64-bit distances.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of `[neighbor, weight]` pairs |\n| `push`, `pop` | binary min-heap operations on `[distance, node]` items |\n| `dist`, `d`, `node` | Dijkstra's distances, and the popped entry |\n| `fromStart`, `fromEnd` | shortest distances from node `0` and from node `n - 1` |\n| `best` | length of the shortest `0` to `n - 1` path |",
+  "narration": {
+    "2": "Create an empty neighbor list for every node.",
+    "3": "Read each edge once...",
+    "4": "...record it from a to b...",
+    "5": "...and from b to a, because the graph is undirected.",
+    "7": "push adds an item to the min-heap and lifts it while its parent is larger.",
+    "16": "pop removes the smallest item and sinks the moved last item back into place.",
+    "34": "dijkstra computes the shortest distance from source to every node.",
+    "35": "Every node starts unreachable.",
+    "36": "The source is at distance 0.",
+    "38": "Process the frontier until the heap is empty.",
+    "39": "Take the closest unsettled entry.",
+    "40": "Skip stale entries whose distance was already improved.",
+    "41": "Look at every edge leaving this node.",
+    "42": "Does going through node give next a shorter distance?",
+    "43": "Yes: record the shorter distance...",
+    "44": "...and queue next with it.",
+    "50": "Shortest distances from node 0.",
+    "51": "Shortest distances from node n - 1.",
+    "52": "best is the shortest total length from 0 to n - 1.",
+    "53": "Decide each edge on its own.",
+    "54": "An unreachable target means no edge is on a shortest path.",
+    "55": "The edge is used if crossing it in either direction fits exactly into a shortest path."
+  }
+}

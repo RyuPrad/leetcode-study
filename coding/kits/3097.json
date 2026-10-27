@@ -1,0 +1,67 @@
+{
+  "number": 3097,
+  "title": "Shortest Subarray With OR at Least K II",
+  "spec": "leetcode",
+  "statement": "You get an array `nums` of non-negative integers and an integer `k`. Call a non-empty contiguous subarray **special** when the bitwise OR of all its elements is greater than or equal to `k`.\n\nReturn the length of the shortest special subarray of `nums`. If none exists, return `-1`.",
+  "constraints": [
+    "1 <= nums.length <= 2 * 10^5",
+    "0 <= nums[i] <= 10^9",
+    "0 <= k <= 10^9"
+  ],
+  "signature": "int minimumSubarrayLength(int[] nums, int k)",
+  "entry": "minimumSubarrayLength",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (nums.length < 1 || nums.length > 200000) return 'nums needs 1 to 200000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v > 1000000000)) return 'Each value is a whole number between 0 and 10^9.';\n  if (!Number.isInteger(k) || k < 0 || k > 1000000000) return 'k is a whole number between 0 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumSubarrayLength(nums, k) {\n  const BITS = 30;\n  const counts = new Array(BITS).fill(0);\n  let windowOr = 0;\n  let best = Infinity;\n  let left = 0;\n\n  for (let right = 0; right < nums.length; right++) {\n    for (let bit = 0; bit < BITS; bit++) {\n      if ((nums[right] >> bit) & 1) {\n        counts[bit]++;\n      }\n    }\n    windowOr |= nums[right];\n\n    while (left <= right && windowOr >= k) {\n      best = Math.min(best, right - left + 1);\n      for (let bit = 0; bit < BITS; bit++) {\n        if ((nums[left] >> bit) & 1) {\n          counts[bit]--;\n          if (counts[bit] === 0) {\n            windowOr ^= 1 << bit;\n          }\n        }\n      }\n      left++;\n    }\n  }\n  return best === Infinity ? -1 : best;\n}",
+  "brute": "function minimumSubarrayLength(nums, k) {\n  let answer = -1;\n  for (let start = 0; start < nums.length; start++) {\n    let value = 0;\n    for (let end = start; end < nums.length; end++) {\n      value = value | nums[end];\n      if (value >= k) {\n        const length = end - start + 1;\n        if (answer === -1 || length < answer) answer = length;\n        break;\n      }\n    }\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    // Each value has one or two set bits, with high bits rare, and k needs several of the high bits at once,\n    // so the shortest qualifying window is usually long.\n    const n = 2000;\n    const bitOf = () => Math.floor(30 * Math.pow(rand(), 2));\n    const nums = Array.from({ length: n }, () => (rand() < 0.7 ? 1 << bitOf() : (1 << bitOf()) | (1 << bitOf())));\n    let k = 0;\n    const need = int(2, 6);\n    for (let i = 0; i < need; i++) k |= 1 << (29 - i);\n    return [nums, Math.min(k - int(0, 1), 1000000000)];\n  }\n  const n = int(1, 8);\n  const top = rand() < 0.7 ? 15 : 1000000000;\n  const nums = Array.from({ length: n }, () => (rand() < 0.2 ? 0 : int(0, top)));\n  const k = rand() < 0.15 ? 0 : int(0, top === 15 ? 20 : 1000000000);\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3],2],"expected":1},
+    {"name":"Example 2","input":[[2,1,8],10],"expected":3},
+    {"name":"Example 3","input":[[1,2],0],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0],0]},
+    {"name":"Test 2","input":[[0],1]},
+    {"name":"Test 3","input":[[0,0,0],1]},
+    {"name":"Test 4","input":[[1,2,4,8],15]},
+    {"name":"Test 5","input":[[5,1,2,4,0,8],12]},
+    {"name":"Test 6","input":[[1000000000],1000000000]},
+    {"name":"Test 7","input":[[7,1000000000,3],999999999]},
+    {"name":"Test 8","input":[[1,1,1,1,2],3]},
+    {"name":"Test 9","input":[[3,5,6],7]},
+    {"name":"Test 10","input":[[16,1,1,1,1,1,1,8,1,1,4,2],31]},
+    {"name":"Test 11","input":[[6,6,6,6],7]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nChecking every subarray and OR-ing it from its start costs O(n²). The useful fact is that OR never loses bits as a window grows: extending a window can only keep or raise its OR, and shrinking it can only keep or lower it. That monotonic behaviour is exactly what a variable-size sliding window needs. The one difficulty is removing an element from an OR, which cannot be undone directly, so the window keeps a **count per bit** of how many of its elements have that bit set. A bit leaves the OR only when its count drops to zero.\n\n## Approach\n\n1. Keep `counts[bit]` for the 30 bits that values up to 10^9 can use, plus the window's OR in `windowOr`.\n2. Move `right` across `nums`; add `nums[right]`'s set bits to `counts` and OR it into `windowOr`.\n3. While the window `[left, right]` is non-empty and `windowOr >= k`, record its length in `best`, then remove `nums[left]`: decrement its bits' counts, clear any bit whose count reaches zero, and advance `left`.\n4. Return `best`, or `-1` if no window ever qualified.\n\n## Example 1, step by step\n\n`nums = [1, 2, 3]`, `k = 2`.\n\n- `right = 0`: `windowOr = 1 < 2`, nothing to shrink.\n- `right = 1`: `windowOr = 1 | 2 = 3 >= 2`; `best = 2`. Removing `1` leaves `windowOr = 2`, still `>= 2`, so `best = 1`; removing `2` empties the window.\n- `right = 2`: `windowOr = 3 >= 2`; `best` stays 1, and removing `3` empties the window.\n\nThe answer is `1`.\n\n## Complexity\n\n- Time: O(30 · n): each element is added and removed once, touching 30 bit counters each time.\n- Space: O(1): 30 counters, independent of `n`.\n\n## Pitfalls\n\n- With `k = 0` every single element qualifies, so the answer is 1; the `left <= right` guard stops the loop from shrinking an empty window forever.\n- You cannot subtract from an OR; clear a bit only when its count reaches zero.\n- Return `-1`, not `Infinity` or 0, when the whole array's OR is still below `k`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `counts` | how many window elements have each bit set |\n| `windowOr` | bitwise OR of `nums[left..right]` |\n| `left`, `right` | window bounds, inclusive |\n| `best` | shortest qualifying length found so far |\n| `bit` | the bit position being updated |",
+  "narration": {
+    "2": "Values are at most 10^9, which fits in 30 bits.",
+    "3": "counts[bit] says how many elements in the window have that bit set.",
+    "4": "The OR of the current window, kept in sync with counts.",
+    "8": "Grow the window by one element on the right.",
+    "10": "Is this bit set in the new element?",
+    "11": "Yes: one more window element carries this bit.",
+    "14": "Adding an element can only turn bits on.",
+    "16": "While the window is non-empty and already reaches k, try to shrink it.",
+    "17": "This window qualifies; keep its length if it is the shortest yet.",
+    "18": "Look at each bit of the element about to leave on the left.",
+    "19": "Did that element carry this bit?",
+    "20": "It carried this bit, so one fewer element in the window has it.",
+    "21": "No element left carries this bit...",
+    "22": "...so it disappears from the window's OR.",
+    "26": "The leftmost element is now outside the window.",
+    "29": "No qualifying window means -1; otherwise the shortest length."
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "number": 3072,
+  "title": "Distribute Elements Into Two Arrays II",
+  "spec": "leetcode",
+  "statement": "Let `greaterCount(arr, val)` be how many entries of `arr` are strictly larger than `val`. Two lists `arr1` and `arr2` start empty, and the elements of `nums` are handed out one at a time, from left to right, each appended to the end of one list:\n\n- The first element goes to `arr1` and the second goes to `arr2`.\n- Each later element `v` goes to the list whose `greaterCount(list, v)` is bigger.\n- When those two counts are equal, `v` goes to the list that currently holds fewer elements.\n- When the lengths are equal as well, `v` goes to `arr1`.\n\nReturn one array made of all of `arr1` followed by all of `arr2`.",
+  "constraints": [
+    "3 <= nums.length <= 10^5",
+    "1 <= nums[i] <= 10^9"
+  ],
+  "signature": "int[] resultArray(int[] nums)",
+  "entry": "resultArray",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (!Array.isArray(nums) || nums.length < 3 || nums.length > 100000) return 'nums needs 3 to 100000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1e9)) return 'Each value is an integer from 1 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function resultArray(nums) {\n  const sorted = [...new Set(nums)].sort((a, b) => a - b);\n  const rank = new Map();\n  sorted.forEach((value, index) => rank.set(value, index + 1));\n  const size = sorted.length;\n  const tree1 = new Array(size + 1).fill(0);\n  const tree2 = new Array(size + 1).fill(0);\n  const add = (tree, index) => {\n    while (index <= size) {\n      tree[index]++;\n      index += index & -index;\n    }\n  };\n  const countUpTo = (tree, index) => {\n    let total = 0;\n    while (index > 0) {\n      total += tree[index];\n      index -= index & -index;\n    }\n    return total;\n  };\n\n  const arr1 = [nums[0]];\n  const arr2 = [nums[1]];\n  add(tree1, rank.get(nums[0]));\n  add(tree2, rank.get(nums[1]));\n  for (let i = 2; i < nums.length; i++) {\n    const value = nums[i];\n    const position = rank.get(value);\n    const greater1 = arr1.length - countUpTo(tree1, position);\n    const greater2 = arr2.length - countUpTo(tree2, position);\n    if (greater1 > greater2 || (greater1 === greater2 && arr1.length <= arr2.length)) {\n      arr1.push(value);\n      add(tree1, position);\n    } else {\n      arr2.push(value);\n      add(tree2, position);\n    }\n  }\n  return arr1.concat(arr2);\n}",
+  "brute": "function resultArray(nums) {\n  const first = [nums[0]], second = [nums[1]];\n  const greaterCount = (list, v) => list.filter(x => x > v).length;\n  for (const v of nums.slice(2)) {\n    const a = greaterCount(first, v), b = greaterCount(second, v);\n    let target;\n    if (a !== b) target = a > b ? first : second;\n    else if (first.length !== second.length) target = first.length < second.length ? first : second;\n    else target = first;\n    target.push(v);\n  }\n  return [...first, ...second];\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'large') {\n    const top = [1e9, 1000, 20][int(0, 2)];\n    return [Array.from({ length: 2000 }, () => int(1, top))];\n  }\n  const n = int(3, 10);\n  const top = [3, 8, 1e9][int(0, 2)];\n  return [Array.from({ length: n }, () => int(1, top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,1,3,3]],"expected":[2,3,1,3]},
+    {"name":"Example 2","input":[[5,14,3,1,2]],"expected":[5,3,1,2,14]},
+    {"name":"Example 3","input":[[3,3,3,3]],"expected":[3,3,3,3]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,2,3]]},
+    {"name":"Test 2","input":[[3,2,1]]},
+    {"name":"Test 3","input":[[7,7,7,7,7]]},
+    {"name":"Test 4","input":[[1,2,3,4,5,6,7,8,9,10]]},
+    {"name":"Test 5","input":[[10,9,8,7,6,5,4,3,2,1]]},
+    {"name":"Test 6","input":[[10,1,9,2,8,3,7,4,6,5]]},
+    {"name":"Test 7","input":[[1000000000,1,1000000000,1,500000000,500000000]]},
+    {"name":"Test 8","input":[[2,2,1,3,1,3,2,4,4,1,5]]},
+    {"name":"Test 9","input":[[1,100,50,50,99,2,2,100,1,51]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe placing rules are fixed, so the only real work is answering \"how many entries of this list are larger than `v`?\" quickly. Scanning both lists each time is O(n) per element and O(n²) overall. Instead, keep a count of every value placed in each list, indexed by the value's rank among the distinct values. A Fenwick tree (binary indexed tree) per list adds a value and counts values up to a rank in O(log n); the larger-than count is the list length minus that.\n\n## Approach\n\n1. Compress values: sort the distinct values and map each one to its 1-based `rank`.\n2. Make two Fenwick trees, `tree1` for `arr1` and `tree2` for `arr2`, with `add` (record one value) and `countUpTo` (how many recorded values have rank at most a given rank).\n3. Put `nums[0]` in `arr1` and `nums[1]` in `arr2`, recording each in its tree.\n4. For each later `value`, compute `greater1 = arr1.length - countUpTo(tree1, position)` and `greater2` the same way.\n5. Choose `arr1` if `greater1 > greater2`, or if they tie and `arr1` is not longer; otherwise choose `arr2`. Append and record.\n6. Return `arr1` concatenated with `arr2`.\n\n## Example 1, step by step\n\n`nums = [2, 1, 3, 3]`; the ranks are `1 → 1`, `2 → 2`, `3 → 3`. Start with `arr1 = [2]`, `arr2 = [1]`. For the first `3` (position 3), `greater1 = 1 - 1 = 0` and `greater2 = 1 - 1 = 0`; the lengths tie, so it joins `arr1 = [2, 3]`. For the second `3`, both counts are again 0, and `arr2` is shorter, so `arr2 = [1, 3]`. The result is `[2, 3, 1, 3]`.\n\n## Complexity\n\n- Time: O(n log n): sorting for the ranks, then two O(log n) queries and one update per element.\n- Space: O(n) for the ranks, the two trees and the two lists.\n\n## Pitfalls\n\n- \"Greater\" is strict: count values with rank at most the current one and subtract from the length, so equal values are not counted.\n- The tie order matters: compare counts first, then lengths, and only then default to `arr1`.\n- Values reach 10^9, so a tree indexed by raw value is far too big; compress to ranks first.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `sorted`, `rank` | the distinct values in order, and each value's 1-based position among them |\n| `size` | number of distinct values (the trees' range) |\n| `tree1`, `tree2` | Fenwick trees counting the ranks placed in `arr1` and `arr2` |\n| `add`, `countUpTo` | record one rank / count recorded ranks that are at most a rank |\n| `arr1`, `arr2` | the two lists being built |\n| `value`, `position` | the element being placed and its rank |\n| `greater1`, `greater2` | how many entries of each list are larger than `value` |",
+  "narration": {
+    "2": "List the distinct values in increasing order so each can be given a small index.",
+    "4": "Map every value to its 1-based rank among the distinct values.",
+    "6": "One Fenwick tree counts the ranks placed in arr1...",
+    "7": "...and another counts the ranks placed in arr2.",
+    "8": "add records one more value at this rank by updating every tree cell that covers it.",
+    "14": "countUpTo adds up how many recorded values have rank at most index.",
+    "23": "The first element always starts arr1.",
+    "24": "The second element always starts arr2.",
+    "27": "Place every remaining element in order.",
+    "30": "Entries of arr1 larger than value are all entries minus those with rank at most its rank.",
+    "31": "The same count for arr2.",
+    "32": "Choose arr1 when it has more larger entries, or when the counts tie and arr1 is not longer.",
+    "33": "Append the value to arr1...",
+    "34": "...and record its rank in arr1's tree.",
+    "36": "Otherwise the value goes to arr2 and its rank into arr2's tree.",
+    "40": "The answer is arr1 followed by arr2."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "number": 3116,
+  "title": "Kth Smallest Amount With Single Denomination Combination",
+  "spec": "leetcode",
+  "statement": "Each value in `coins` is a coin denomination (all values differ), and you may use as many coins of a denomination as you like. The catch: one amount must be paid with coins of **a single denomination only**, so an amount is reachable exactly when it is a positive multiple of at least one value in `coins`.\n\nReturn the `k`-th smallest reachable amount, counting each distinct amount once even if several denominations reach it.",
+  "constraints": [
+    "1 <= coins.length <= 15",
+    "1 <= coins[i] <= 25",
+    "1 <= k <= 2 * 10^9",
+    "The values in coins are pairwise distinct"
+  ],
+  "signature": "long findKthSmallest(int[] coins, int k)",
+  "entry": "findKthSmallest",
+  "kind": "function",
+  "parameters": [
+    "coins",
+    "k"
+  ],
+  "validator": "function validate([coins, k]) {\n  if (!Array.isArray(coins) || coins.length < 1 || coins.length > 15) return 'coins needs 1 to 15 values.';\n  if (coins.some(c => !Number.isInteger(c) || c < 1 || c > 25)) return 'Each coin is an integer from 1 to 25.';\n  if (new Set(coins).size !== coins.length) return 'The coins must all be different.';\n  if (!Number.isInteger(k) || k < 1 || k > 2000000000) return 'k is between 1 and 2 * 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findKthSmallest(coins, k) {\n  const gcd = (a, b) => {\n    while (b !== 0) {\n      [a, b] = [b, a % b];\n    }\n    return a;\n  };\n  const subsets = 1 << coins.length;\n  const lcm = new Array(subsets).fill(1);\n  const sign = new Array(subsets).fill(-1);\n  for (let mask = 1; mask < subsets; mask++) {\n    const lowBit = mask & -mask;\n    const rest = mask ^ lowBit;\n    const coin = coins[31 - Math.clz32(lowBit)];\n    lcm[mask] = (lcm[rest] / gcd(lcm[rest], coin)) * coin;\n    sign[mask] = -sign[rest];\n  }\n  const countUpTo = (x) => {\n    let count = 0;\n    for (let mask = 1; mask < subsets; mask++) {\n      count += sign[mask] * Math.floor(x / lcm[mask]);\n    }\n    return count;\n  };\n  let left = 1;\n  let right = Math.min(...coins) * k;\n  while (left < right) {\n    const mid = Math.floor((left + right) / 2);\n    if (countUpTo(mid) >= k) {\n      right = mid;\n    } else {\n      left = mid + 1;\n    }\n  }\n  return left;\n}",
+  "brute": "function findKthSmallest(coins, k) {\n  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));\n  const period = coins.reduce((acc, c) => (acc / gcd(acc, c)) * c, 1);\n  if (period <= 2000000) {\n    // Reachable amounts repeat with the LCM of all coins as the period.\n    const inPeriod = [];\n    for (let amount = 1; amount <= period; amount++) {\n      if (coins.some(c => amount % c === 0)) inPeriod.push(amount);\n    }\n    const full = Math.floor((k - 1) / inPeriod.length);\n    return full * period + inPeriod[(k - 1) % inPeriod.length];\n  }\n  let found = 0;\n  for (let amount = 1; ; amount++) {\n    if (coins.some(c => amount % c === 0)) {\n      found++;\n      if (found === k) return amount;\n    }\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (count, top) => {\n    const pool = Array.from({ length: top }, (_, i) => i + 1);\n    for (let i = pool.length - 1; i > 0; i--) {\n      const j = Math.floor(rand() * (i + 1));\n      [pool[i], pool[j]] = [pool[j], pool[i]];\n    }\n    return pool.slice(0, count);\n  };\n  if (size === 'large') {\n    const n = 10 + Math.floor(rand() * 6);\n    const k = 1000000000 + Math.floor(rand() * 1000000001);\n    return [pick(n, 25), k];\n  }\n  const top = rand() < 0.5 ? 10 : 25;\n  const n = 1 + Math.floor(rand() * 5);\n  const k = 1 + Math.floor(rand() * 60);\n  return [pick(n, top), k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,6,9],3],"expected":9},
+    {"name":"Example 2","input":[[5,2],7],"expected":12}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[25],2000000000]},
+    {"name":"Test 3","input":[[4,6],5]},
+    {"name":"Test 4","input":[[7,1,13],100]},
+    {"name":"Test 5","input":[[2,3,5,7,11,13,17,19,23],1000]},
+    {"name":"Test 6","input":[[25,24,23,22,21,20,19,18,17,16,15,14,13,12,11],5000]},
+    {"name":"Test 7","input":[[10,15,6],9]},
+    {"name":"Test 8","input":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],123456789]},
+    {"name":"Test 9","input":[[8,12,18,20],17]},
+    {"name":"Test 10","input":[[23,25],1999999999]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nListing reachable amounts one by one is far too slow when `k` reaches 2·10⁹. Flip the question: for a candidate amount `x`, how many reachable amounts are at most `x`? That count only grows as `x` grows, so the answer is the smallest `x` whose count reaches `k`, which binary search finds.\n\nCounting multiples of *at least one* coin is a union, so use inclusion–exclusion: add `floor(x / c)` for every single coin, subtract it for the LCM of every pair, add it back for every triple, and so on. With at most 15 coins there are at most 32,767 non-empty subsets.\n\n## Approach\n\n1. Precompute, for every non-empty subset `mask`, the LCM of its coins (`lcm[mask]`) and its inclusion–exclusion sign (`+1` for odd size, `-1` for even). Each subset is built from `rest`, the subset without its lowest coin.\n2. `countUpTo(x)` sums `sign[mask] * floor(x / lcm[mask])` over all subsets.\n3. Binary search `x` between `left = 1` and `right = min(coins) * k` (the smallest coin alone already reaches `k` amounts by then).\n4. If `countUpTo(mid) >= k`, the answer is at most `mid`; otherwise it is above `mid`. Return `left` when the range closes.\n\n## Example 1, step by step\n\n`coins = [3, 6, 9]`, `k = 3`. Every 6 and 9 multiple is also a 3 multiple, and the signed terms cancel so that `countUpTo(x) = floor(x / 3)`. The search starts at `left = 1`, `right = 9`: `mid = 5` counts 1, so `left = 6`; `mid = 7` counts 2, so `left = 8`; `mid = 8` counts 2, so `left = 9`. The range closes and the answer is `9`.\n\n## Complexity\n\n- Time: O(2ⁿ · log(min(coins) · k)): each of about 36 search steps scans every subset once.\n- Space: O(2ⁿ) for the subset LCMs and signs.\n\n## Pitfalls\n\n- Do not simply add `floor(x / c)` per coin: amounts like 12 for coins 4 and 6 would be counted twice.\n- The answer can reach 25 · 2·10⁹ = 5·10¹⁰, beyond 32-bit integers; use 64-bit types in Java and C.\n- Compute an LCM as `a / gcd(a, b) * b` (divide first) to keep intermediate values small.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `subsets` | number of coin subsets, `2^n` |\n| `lcm[mask]` | least common multiple of the coins in `mask` |\n| `sign[mask]` | `+1` for odd-sized subsets, `-1` for even-sized ones |\n| `lowBit`, `rest`, `coin` | lowest set bit of `mask`, `mask` without it, and that bit's coin |\n| `countUpTo(x)` | how many reachable amounts are at most `x` |\n| `left`, `right`, `mid` | binary search range and its midpoint |",
+  "narration": {
+    "2": "A small Euclid helper for greatest common divisors, needed to build LCMs.",
+    "8": "There are 2^n subsets of coins, numbered by bit masks.",
+    "9": "lcm[mask] will hold the least common multiple of the coins in mask; the empty set starts at 1.",
+    "10": "The empty set gets sign -1 so that single coins flip to +1.",
+    "11": "Visit every non-empty subset in increasing order, so its smaller parts are already done.",
+    "12": "Isolate the lowest coin in this subset.",
+    "13": "rest is the same subset without that coin, already computed.",
+    "14": "Look up which coin the low bit stands for.",
+    "15": "Extend rest's LCM by this coin, dividing first to keep numbers small.",
+    "16": "Adding one coin flips the inclusion-exclusion sign.",
+    "18": "countUpTo(x) counts reachable amounts no larger than x.",
+    "21": "Add or subtract the multiples of this subset's LCM, as inclusion-exclusion says.",
+    "25": "The smallest possible answer is 1.",
+    "26": "The smallest coin alone reaches k amounts by min(coins) * k, so the answer is no larger.",
+    "27": "Shrink the range until a single candidate is left.",
+    "28": "Try the middle amount.",
+    "29": "If at least k amounts fit under mid, the answer is mid or smaller.",
+    "30": "Keep mid as a possible answer.",
+    "32": "Too few amounts: the answer is above mid.",
+    "35": "left is the smallest amount with k reachable amounts up to it."
+  }
+}
