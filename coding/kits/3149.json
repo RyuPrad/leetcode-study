@@ -1,0 +1,68 @@
+{
+  "number": 3149,
+  "title": "Find the Minimum Cost Array Permutation",
+  "spec": "leetcode",
+  "statement": "`nums` is a permutation of the integers `0` to `n - 1`. Every permutation `perm` of those same integers has a **score**, found by going around `perm` as a circle: each element `perm[i]` is paired with the element after it, `perm[(i + 1) % n]` (the last element wraps around to `perm[0]`), and the pair adds `|perm[i] - nums[perm[(i + 1) % n]]|` to the score.\n\nReturn the permutation `perm` with the smallest score. If several permutations reach that score, return the lexicographically smallest one (the one with the smaller number at the first position where they differ).",
+  "constraints": [
+    "2 <= n == nums.length <= 14",
+    "nums is a permutation of 0, 1, ..., n - 1"
+  ],
+  "signature": "int[] findPermutation(int[] nums)",
+  "entry": "findPermutation",
+  "kind": "function",
+  "parameters": [
+    "nums"
+  ],
+  "validator": "function validate([nums]) {\n  if (nums.length < 2 || nums.length > 14) return 'nums needs 2 to 14 values.';\n  const seen = new Array(nums.length).fill(false);\n  for (const value of nums) {\n    if (value < 0 || value >= nums.length || seen[value]) return 'nums must contain each of 0 to n - 1 exactly once.';\n    seen[value] = true;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findPermutation(nums) {\n  const n = nums.length;\n  const full = (1 << n) - 1;\n  const dp = Array.from({ length: 1 << n }, () => new Array(n).fill(Infinity));\n  for (let last = 0; last < n; last++) {\n    dp[full][last] = Math.abs(last - nums[0]);\n  }\n\n  for (let mask = full - 1; mask > 0; mask--) {\n    if ((mask & 1) === 0) {\n      continue;\n    }\n    for (let last = 0; last < n; last++) {\n      if ((mask & (1 << last)) === 0) {\n        continue;\n      }\n      for (let next = 1; next < n; next++) {\n        const bit = 1 << next;\n        if ((mask & bit) === 0) {\n          const cost = Math.abs(last - nums[next]) + dp[mask | bit][next];\n          dp[mask][last] = Math.min(dp[mask][last], cost);\n        }\n      }\n    }\n  }\n\n  const perm = [0];\n  let used = 1;\n  while (perm.length < n) {\n    const last = perm[perm.length - 1];\n    for (let next = 1; next < n; next++) {\n      const bit = 1 << next;\n      if ((used & bit) === 0 && Math.abs(last - nums[next]) + dp[used | bit][next] === dp[used][last]) {\n        perm.push(next);\n        used |= bit;\n        break;\n      }\n    }\n  }\n  return perm;\n}",
+  "brute": "function findPermutation(nums) {\n  // Try every permutation in lexicographic order and keep the first one with the smallest score.\n  const n = nums.length;\n  let best = null;\n  let bestScore = Infinity;\n  const perm = [];\n  const taken = new Array(n).fill(false);\n  const build = () => {\n    if (perm.length === n) {\n      let score = 0;\n      for (let i = 0; i < n; i++) score += Math.abs(perm[i] - nums[perm[(i + 1) % n]]);\n      if (score < bestScore) {\n        bestScore = score;\n        best = perm.slice();\n      }\n      return;\n    }\n    for (let value = 0; value < n; value++) {\n      if (taken[value]) continue;\n      taken[value] = true;\n      perm.push(value);\n      build();\n      perm.pop();\n      taken[value] = false;\n    }\n  };\n  build();\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 13 + Math.floor(rand() * 2) : 2 + Math.floor(rand() * 6);\n  const nums = Array.from({ length: n }, (_, i) => i);\n  const mode = rand();\n  // Mostly random shuffles, sometimes the identity or the reversed order.\n  if (mode < 0.1) return [nums];\n  if (mode < 0.2) return [nums.reverse()];\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [nums[i], nums[j]] = [nums[j], nums[i]];\n  }\n  return [nums];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,0,2]],"expected":[0,1,2]},
+    {"name":"Example 2","input":[[0,2,1]],"expected":[0,2,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[0,1]]},
+    {"name":"Test 2","input":[[1,0]]},
+    {"name":"Test 3","input":[[0,1,2,3,4]]},
+    {"name":"Test 4","input":[[4,3,2,1,0]]},
+    {"name":"Test 5","input":[[1,2,3,4,5,0]]},
+    {"name":"Test 6","input":[[2,0,1]]},
+    {"name":"Test 7","input":[[3,1,0,2]]},
+    {"name":"Test 8","input":[[5,0,6,2,4,1,3]]},
+    {"name":"Test 9","input":[[2,7,4,0,6,1,5,3]]},
+    {"name":"Test 10","input":[[6,3,0,7,1,4,2,5]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe score goes around `perm` in a circle, so rotating `perm` never changes it. Any best permutation can be rotated to start with `0`, and starting with `0` beats every other start lexicographically, so `perm[0] = 0`. What is left looks like a travelling-salesman tour: placing `next` right after `last` costs `|last - nums[next]|`, and the tour closes with `|last - nums[0]|`. With `n <= 14`, a bitmask of the numbers placed plus the last one placed describes every partial tour. Trying all `n!` orders is the brute force.\n\n## Approach\n\n1. Let `dp[mask][last]` be the cheapest way to finish the circle when the numbers in `mask` are placed and `last` was placed most recently.\n2. When `mask` is `full`, only the closing pair remains: `dp[full][last] = |last - nums[0]|`.\n3. Visit masks from high to low, skipping those without `0`. Adding a `bit` makes a mask larger, so `dp[mask | bit]` is already final. For each `last` in `mask` and each unused `next`, keep the smallest `cost = |last - nums[next]| + dp[mask | bit][next]`.\n4. Rebuild from `perm = [0]` and `used = 1`: try `next` upwards and take the first one with `|last - nums[next]| + dp[used | bit][next] === dp[used][last]`. That choice keeps the score optimal, and being the smallest such `next`, it keeps `perm` lexicographically smallest.\n\n## Example 1, step by step\n\n`nums = [1,0,2]` and `full = 7`. First `dp[7][1] = |1 - 1| = 0` and `dp[7][2] = |2 - 1| = 1`. With 0 and 2 placed (`mask = 5`) and 2 last, only 1 is left: `dp[5][2] = |2 - nums[1]| + dp[7][1] = 2`; likewise `dp[3][1] = |1 - nums[2]| + dp[7][2] = 2`. For `mask = 1`, choosing `1` costs `0 + dp[3][1] = 2` and choosing `2` costs `2 + dp[5][2] = 4`, so `dp[1][0] = 2`. The rebuild takes `1` (cost 2 matches), then `2`, giving `[0,1,2]` with score 2.\n\n## Complexity\n\n- Time: O(2^n · n²): about 2^(n-1) masks, each with n choices of `last` and `next`.\n- Space: O(2^n · n) for `dp`.\n\n## Pitfalls\n\n- The closing pair uses `nums[0]`, because the element after `perm[n - 1]` is `perm[0] = 0`.\n- Visit masks in decreasing order (or memoise a recursion): a superset must be finished before it is read.\n- The tie rule is applied while rebuilding: scan `next` from small to large and stop at the first choice that keeps the optimal cost.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n`, `full` | the length of `nums` and the mask with all `n` bits set |\n| `dp[mask][last]` | cheapest cost to finish the circle from that state |\n| `mask`, `used` | bitmask of the numbers placed so far |\n| `last` | the number placed most recently |\n| `next`, `bit` | a candidate to place next and its bit, `1 << next` |\n| `cost` | the pair's cost plus the cheapest finish after placing `next` |\n| `perm` | the answer, rebuilt from the front |",
+  "narration": {
+    "3": "full has one bit per number: the state where every number is placed.",
+    "4": "dp[mask][last] will hold the cheapest way to finish the circle from that state.",
+    "6": "With everything placed, only the closing pair is left: last is followed by perm[0] = 0.",
+    "9": "Go from high masks to low ones, so every larger mask a step leads to is already final.",
+    "10": "perm always starts with 0, so a mask without 0 never occurs.",
+    "13": "Consider each number that could have been placed last.",
+    "14": "The last number must be one of the placed ones.",
+    "17": "Try every number that could come next; 0 is already at the front.",
+    "19": "Only a number that is not placed yet can come next.",
+    "20": "Placing next after last costs |last - nums[next]|, plus the cheapest finish from the new state.",
+    "21": "Keep the cheapest way to finish from this state.",
+    "27": "Rebuild the answer from the front, which always starts with 0.",
+    "28": "used is the bitmask of the numbers already in perm.",
+    "30": "The number placed most recently.",
+    "31": "Try candidates from smallest to largest, so the first match is the lexicographically smallest.",
+    "33": "Is next unused, and does placing it keep the optimal total?",
+    "34": "Yes: append it to the answer...",
+    "35": "...mark it as used...",
+    "36": "...and move on to the next position.",
+    "40": "Every position holds the smallest choice that keeps the score minimal."
+  }
+}

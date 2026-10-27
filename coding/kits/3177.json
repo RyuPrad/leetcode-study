@@ -1,0 +1,63 @@
+{
+  "number": 3177,
+  "title": "Find the Maximum Length of a Good Subsequence II",
+  "spec": "leetcode",
+  "statement": "Call an integer sequence `seq` **good** if, read from left to right, its value switches at most `k` times: the number of positions `i` (`0 <= i <= seq.length - 2`) where `seq[i] != seq[i + 1]` is no more than `k`.\n\nGiven the integer array `nums` and the non-negative integer `k`, return the length of the longest good subsequence of `nums`. A subsequence keeps any selection of the elements (possibly all of them) in their original order.",
+  "constraints": [
+    "1 <= nums.length <= 5 * 10^3",
+    "1 <= nums[i] <= 10^9",
+    "0 <= k <= min(50, nums.length)"
+  ],
+  "signature": "int maximumLength(int[] nums, int k)",
+  "entry": "maximumLength",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (!Array.isArray(nums) || nums.length < 1 || nums.length > 5000) return 'nums needs 1 to 5000 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1000000000)) return 'Each value is a whole number from 1 to 10^9.';\n  if (!Number.isInteger(k) || k < 0 || k > Math.min(50, nums.length)) return 'k is between 0 and min(50, nums.length).';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumLength(nums, k) {\n  const dp = new Map();\n  const best = new Array(k + 1).fill(0);\n\n  for (const x of nums) {\n    if (!dp.has(x)) {\n      dp.set(x, new Array(k + 1).fill(0));\n    }\n    const row = dp.get(x);\n    for (let changes = k; changes >= 0; changes--) {\n      row[changes]++;\n      if (changes > 0) {\n        row[changes] = Math.max(row[changes], best[changes - 1] + 1);\n      }\n      best[changes] = Math.max(best[changes], row[changes]);\n    }\n  }\n  return best[k];\n}",
+  "brute": "function maximumLength(nums, k) {\n  // Walk through nums deciding to skip or keep each element, remembering the last kept index\n  // and how many value changes are still allowed.\n  const memo = new Map();\n  const go = (i, last, left) => {\n    if (i === nums.length) return 0;\n    const key = i + ',' + last + ',' + left;\n    if (memo.has(key)) return memo.get(key);\n    let result = go(i + 1, last, left);\n    if (last === -1 || nums[last] === nums[i]) result = Math.max(result, 1 + go(i + 1, i, left));\n    else if (left > 0) result = Math.max(result, 1 + go(i + 1, i, left - 1));\n    memo.set(key, result);\n    return result;\n  };\n  return go(0, -1, k);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? pick(1800, 2000) : pick(1, 10);\n  const roll = rand();\n  // Few distinct values make long equal runs; many distinct values make every change count.\n  const distinct = roll < 0.4 ? pick(1, 3) : roll < 0.8 ? pick(2, size === 'large' ? 200 : 6) : 0;\n  const pool = Array.from({ length: Math.max(distinct, 1) }, () => pick(1, 1000000000));\n  const nums = Array.from({ length: n }, () => distinct === 0 ? pick(1, 1000000000) : pool[pick(0, pool.length - 1)]);\n  const k = pick(0, Math.min(50, n));\n  return [nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,1,1,3],2],"expected":4},
+    {"name":"Example 2","input":[[1,2,3,4,5,1],0],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],0]},
+    {"name":"Test 2","input":[[5],1]},
+    {"name":"Test 3","input":[[7,7,7,7],0]},
+    {"name":"Test 4","input":[[1,2,3,4,5],0]},
+    {"name":"Test 5","input":[[1,2,3,4,5],5]},
+    {"name":"Test 6","input":[[1,2,1,2,1,2,1],1]},
+    {"name":"Test 7","input":[[1000000000,1,1000000000,1,1000000000],2]},
+    {"name":"Test 8","input":[[3,1,3,1,3,1,2,2,2,3,1,3],3]},
+    {"name":"Test 9","input":[[4,4,2,4,2,2,4],0]},
+    {"name":"Test 10","input":[[1,1,2,2,3,3,4,4,5,5,6,6],12]},
+    {"name":"Test 11","input":[[9,8,7,6,5,4,3,2,1,9,8,7,6,5,4,3,2,1,9,8,7,6,5,4,3,2,1,9,8,7,6,5,4,3,2,1,9,8,7,6],30]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA good subsequence is a chain of runs of equal values with at most `k` switches between runs. Trying every subsequence is exponential, and the usual table \"longest chain ending at index `i` with at most `c` switches\" checks every earlier index, which is O(n² · k): too slow for 5000 numbers.\n\nTwo observations remove the inner scan. To append `x` without a switch, only the best chain ending in the **value** `x` matters, not its index. To append `x` with a switch, any chain with one switch fewer will do, so only the overall best for each budget matters. So keep `dp[x][changes]` per value and `best[changes]` over all values.\n\n## Approach\n\n1. `dp` maps each value to a row of `k + 1` lengths, all starting at 0; `best` has one entry per budget.\n2. For each `x` in `nums`, go through the budgets `changes` from `k` **down** to 0:\n   - append `x` to the best chain already ending in `x` (no switch): `row[changes] + 1`;\n   - or, if `changes > 0`, append it to the best chain with one switch fewer: `best[changes - 1] + 1`;\n   - raise `best[changes]` to the new value.\n3. Return `best[k]`.\n\nGoing downward means `best[changes - 1]` has not yet been raised by the current element, so no element is used twice. If the best chain with one switch fewer already ends in `x`, appending `x` costs no switch at all, so the value is still reachable.\n\n## Example 1, step by step\n\n`nums = [1, 2, 1, 1, 3]`, `k = 2`. Rows are budgets 0 to 2:\n\n- `1`: `dp[1] = [1, 1, 1]`, `best = [1, 1, 1]`.\n- `2`: `dp[2] = [1, 2, 2]`, `best = [1, 2, 2]`.\n- `1`: `dp[1] = [2, 2, 3]` (budget 2 extends `best[1] = 2`), `best = [2, 2, 3]`.\n- `1`: `dp[1] = [3, 3, 4]`, `best = [3, 3, 4]`.\n- `3`: `dp[3] = [1, 4, 4]`, `best = [3, 4, 4]`.\n\nThe answer is `best[2] = 4`, for example `[1, 2, 1, 1]`.\n\n## Complexity\n\n- Time: O(n · k): constant work per element and budget.\n- Space: O(d · k) for `d` distinct values (at most `n`).\n\n## Pitfalls\n\n- Looping `changes` upward lets `best[changes - 1]` already contain the current element, which then counts twice.\n- Values reach 10^9, so index the table by a `Map` (or compressed values), not by the value itself.\n- The budget means \"at most `k`\" switches, so the answer is `best[k]`, not a maximum over exact counts.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `dp` | for each value `x`, its row of lengths |\n| `row[changes]` | longest good subsequence ending in value `x` with at most `changes` switches |\n| `best[changes]` | longest good subsequence so far, any last value, at most `changes` switches |\n| `x` | the current element of `nums` |\n| `changes` | the switch budget being updated |",
+  "narration": {
+    "2": "dp maps each value to its row: the longest good subsequence ending in that value, for every switch budget.",
+    "3": "best[changes] is the longest good subsequence so far with at most changes switches, whatever its last value.",
+    "5": "Take the elements in order; each one may extend subsequences built from earlier elements.",
+    "6": "The first time a value appears it has no chains yet...",
+    "7": "...so give it a row of zeros.",
+    "9": "row is the table entry for the current value x.",
+    "10": "Go through the budgets from k down to 0, so best[changes - 1] still describes earlier elements only.",
+    "11": "Append x to the best chain already ending in x: equal neighbours need no switch.",
+    "12": "With at least one switch to spend...",
+    "13": "...x may instead follow the best chain that used one switch fewer, whatever value it ends in.",
+    "15": "Raise the overall best for this budget.",
+    "18": "Return the longest good subsequence with at most k switches."
+  }
+}

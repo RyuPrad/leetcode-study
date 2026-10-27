@@ -1,0 +1,59 @@
+{
+  "number": 3207,
+  "title": "Maximum Points After Enemy Battles",
+  "spec": "leetcode",
+  "statement": "Enemy `i` has energy `enemyEnergies[i]`. You begin with `currentEnergy` energy and 0 points, and no enemy is marked yet. You may repeat the two moves below in any order and as often as you like (including never):\n\n- **Fight**: pick an unmarked enemy `i` with `enemyEnergies[i] <= currentEnergy`. You earn 1 point and your energy drops by `enemyEnergies[i]`. The enemy stays unmarked, so it can be fought again later.\n- **Absorb**: only possible while you hold at least 1 point (it does not spend any). Pick an unmarked enemy `i`: your energy rises by `enemyEnergies[i]` and enemy `i` becomes marked for good.\n\nReturn the largest number of points you can finish with.",
+  "constraints": [
+    "1 <= enemyEnergies.length <= 10^5",
+    "1 <= enemyEnergies[i] <= 10^9",
+    "0 <= currentEnergy <= 10^9"
+  ],
+  "signature": "long maximumPoints(int[] enemyEnergies, int currentEnergy)",
+  "entry": "maximumPoints",
+  "kind": "function",
+  "parameters": [
+    "enemyEnergies",
+    "currentEnergy"
+  ],
+  "validator": "function validate([enemyEnergies, currentEnergy]) {\n  if (enemyEnergies.length < 1 || enemyEnergies.length > 100000) return 'enemyEnergies needs 1 to 10^5 values.';\n  if (enemyEnergies.some(e => !Number.isInteger(e) || e < 1 || e > 1000000000)) return 'Each enemy energy is an integer from 1 to 10^9.';\n  if (!Number.isInteger(currentEnergy) || currentEnergy < 0 || currentEnergy > 1000000000) return 'currentEnergy is an integer from 0 to 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumPoints(enemyEnergies, currentEnergy) {\n  let weakest = Infinity;\n  let total = 0;\n  for (const energy of enemyEnergies) {\n    weakest = Math.min(weakest, energy);\n    total += energy;\n  }\n  if (currentEnergy < weakest) {\n    return 0;\n  }\n  const pool = currentEnergy + total - weakest;\n  return Math.floor(pool / weakest);\n}",
+  "brute": "function maximumPoints(enemyEnergies, currentEnergy) {\n  // Tries every sequence of moves, memoised on (marked set, energy, whether a point is held).\n  const n = enemyEnergies.length;\n  const memo = new Map();\n  const best = (mask, energy, scored) => {\n    const key = (energy * 4096 + mask) * 2 + scored;\n    if (memo.has(key)) return memo.get(key);\n    let result = 0;\n    for (let i = 0; i < n; i++) {\n      if (mask & (1 << i)) continue;\n      if (energy >= enemyEnergies[i]) result = Math.max(result, 1 + best(mask, energy - enemyEnergies[i], 1));\n      if (scored) result = Math.max(result, best(mask | (1 << i), energy + enemyEnergies[i], 1));\n    }\n    memo.set(key, result);\n    return result;\n  };\n  return best(0, currentEnergy, 0);\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const n = 1500 + Math.floor(rand() * 501);\n    const high = rand() < 0.5 ? 1000000000 : 1000;\n    const enemyEnergies = Array.from({ length: n }, () => 1 + Math.floor(rand() * high));\n    return [enemyEnergies, Math.floor(rand() * 1000000001)];\n  }\n  const n = 1 + Math.floor(rand() * 5);\n  const enemyEnergies = Array.from({ length: n }, () => 1 + Math.floor(rand() * 6));\n  return [enemyEnergies, Math.floor(rand() * 13)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,2,2],2],"expected":3},
+    {"name":"Example 2","input":[[2],10],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],0]},
+    {"name":"Test 2","input":[[4,9,6],3]},
+    {"name":"Test 3","input":[[3],2]},
+    {"name":"Test 4","input":[[1000000000],1000000000]},
+    {"name":"Test 5","input":[[1000000000,1000000000,1000000000],1000000000]},
+    {"name":"Test 6","input":[[7,7,7,7],7]},
+    {"name":"Test 7","input":[[2,9,4,1,3],1]},
+    {"name":"Test 8","input":[[5,3,8],10]},
+    {"name":"Test 9","input":[[6,6,2,2],3]},
+    {"name":"Test 10","input":[[999999999,1000000000,999999998],999999998]},
+    {"name":"Test 11","input":[[1,2,3,4,5,6,7,8],5]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every sequence of moves only works for tiny inputs, but the moves have a simple best use. Every fight costs at least the energy of the weakest enemy, so the cheapest way to score is to fight that enemy over and over. Absorbing is the only way to regain energy, and once you hold a single point it is always allowed. The weakest enemy must stay unmarked so it can keep being fought; every other enemy is best absorbed. That plan needs one first fight, so if even the weakest enemy costs more than `currentEnergy`, nothing can ever happen. Nothing beats the plan: each point costs at least `weakest`, and the energy you can spend is your start plus the enemies absorbed before your last fight, which leaves out the enemy of that last fight.\n\n## Approach\n\n1. Scan `enemyEnergies` once to get `weakest` (the smallest energy) and `total` (the sum).\n2. If `currentEnergy < weakest`, no fight is affordable, so no point is earned and absorbing is never allowed: return 0.\n3. Otherwise fight the weakest enemy once and absorb all the others. The energy available for fights is `pool = currentEnergy + total - weakest`.\n4. Each fight against the weakest enemy costs `weakest`, so return `Math.floor(pool / weakest)`.\n\n## Example 1, step by step\n\n`enemyEnergies = [3, 2, 2]`, `currentEnergy = 2`. The scan gives `weakest = 2` and `total = 7`. Since `2 >= 2`, the first fight is affordable. `pool = 2 + 7 - 2 = 7`: the starting 2 plus the absorbed 3 and the absorbed second 2. `Math.floor(7 / 2) = 3` fights fit (1 energy is left over), so the answer is 3.\n\n## Complexity\n\n- Time: O(n) for the single pass over the enemies.\n- Space: O(1).\n\n## Pitfalls\n\n- Absorbing needs a point first: when `currentEnergy < weakest` the answer is 0, however much energy the other enemies hold.\n- Leave exactly one weakest enemy out of the pool; it must stay unmarked to be fought. Other copies of the same value are separate enemies and can be absorbed, which `total - weakest` already counts.\n- With LeetCode's limits the answer can reach about 10^14: fine for JavaScript numbers, but Java and C need 64-bit arithmetic for `pool`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `weakest` | smallest enemy energy, the cheapest enemy to fight repeatedly |\n| `total` | sum of all enemy energies |\n| `energy` | energy of the enemy being scanned |\n| `pool` | energy available for fights: the start plus every enemy except one weakest |",
+  "narration": {
+    "2": "weakest will hold the smallest enemy energy, the cheapest fight there is.",
+    "3": "total will hold the energy of all enemies together.",
+    "4": "Visit every enemy once.",
+    "5": "Keep the smallest energy seen so far.",
+    "6": "Add this enemy's energy to the total.",
+    "8": "Is even the weakest enemy too strong for the starting energy?",
+    "9": "Then no fight is possible, no point is ever earned, and absorbing is never allowed.",
+    "11": "Absorb every enemy except one weakest: all of that energy can go into fights.",
+    "12": "Each fight against the weakest enemy costs weakest energy, so this many fights fit."
+  }
+}

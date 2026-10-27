@@ -1,0 +1,79 @@
+{
+  "number": 3161,
+  "title": "Block Placement Queries",
+  "spec": "leetcode",
+  "statement": "Picture a number line that starts at `0` and runs forever to the right. You process `queries` in order, and each query is one of:\n\n- `[1, x]`: put an obstacle at position `x`. No obstacle stands at `x` before this query.\n- `[2, x, sz]`: decide whether a block of length `sz` could sit somewhere on the line with both of its ends inside `[0, x]` and no obstacle strictly inside it. Its ends may touch obstacles. Nothing is actually placed, so these queries change nothing.\n\nReturn a list of booleans with one answer per type-2 query, in the order those queries appear: `true` if the block fits, `false` if it does not. At least one query has type 2.",
+  "constraints": [
+    "1 <= queries.length <= 15 * 10^4",
+    "2 <= queries[i].length <= 3",
+    "1 <= queries[i][0] <= 2",
+    "A type-1 query is [1, x] and a type-2 query is [2, x, sz]",
+    "1 <= x, sz <= min(5 * 10^4, 3 * queries.length)",
+    "A type-1 query never builds where an obstacle already stands",
+    "At least one query has type 2"
+  ],
+  "signature": "List<Boolean> getResults(int[][] queries)",
+  "entry": "getResults",
+  "kind": "function",
+  "parameters": [
+    "queries"
+  ],
+  "validator": "function validate([queries]) {\n  if (!Array.isArray(queries) || queries.length < 1 || queries.length > 150000) return 'queries needs 1 to 15 * 10^4 entries.';\n  const bound = Math.min(50000, 3 * queries.length);\n  const built = new Set();\n  let asks = 0;\n  for (const query of queries) {\n    if (!Array.isArray(query) || !(query[0] === 1 && query.length === 2 || query[0] === 2 && query.length === 3)) return 'Each query is [1, x] or [2, x, sz].';\n    if (query.slice(1).some(v => !Number.isInteger(v) || v < 1 || v > bound)) return 'x and sz are between 1 and min(5 * 10^4, 3 * queries.length).';\n    if (query[0] === 2) asks++;\n    else if (built.has(query[1])) return 'Two obstacles cannot be built at the same x.';\n    else built.add(query[1]);\n  }\n  if (asks === 0) return 'At least one query must have type 2.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function getResults(queries) {\n  const limit = queries.reduce((most, query) => Math.max(most, query[1]), 0);\n  const first = new Array(4 * (limit + 1)).fill(-1);\n  const last = new Array(4 * (limit + 1)).fill(-1);\n  const gap = new Array(4 * (limit + 1)).fill(0);\n\n  const update = (node, lo, hi, pos) => {\n    if (lo === hi) {\n      first[node] = pos;\n      last[node] = pos;\n      return;\n    }\n    const mid = (lo + hi) >> 1;\n    const left = 2 * node;\n    const right = 2 * node + 1;\n    if (pos <= mid) {\n      update(left, lo, mid, pos);\n    } else {\n      update(right, mid + 1, hi, pos);\n    }\n    first[node] = first[left] !== -1 ? first[left] : first[right];\n    last[node] = last[right] !== -1 ? last[right] : last[left];\n    gap[node] = Math.max(gap[left], gap[right]);\n    if (last[left] !== -1 && first[right] !== -1) {\n      gap[node] = Math.max(gap[node], first[right] - last[left]);\n    }\n  };\n\n  let prev = 0;\n  let best = 0;\n  const scan = (node, lo, hi, x) => {\n    if (lo > x || first[node] === -1) {\n      return;\n    }\n    if (hi <= x) {\n      best = Math.max(best, gap[node], first[node] - prev);\n      prev = last[node];\n      return;\n    }\n    const mid = (lo + hi) >> 1;\n    scan(2 * node, lo, mid, x);\n    scan(2 * node + 1, mid + 1, hi, x);\n  };\n\n  const results = [];\n  for (const [type, x, sz] of queries) {\n    if (type === 1) {\n      update(1, 0, limit, x);\n    } else {\n      prev = 0;\n      best = 0;\n      scan(1, 0, limit, x);\n      results.push(Math.max(best, x - prev) >= sz);\n    }\n  }\n  return results;\n}",
+  "brute": "function getResults(queries) {\n  const obstacles = [];\n  const results = [];\n  for (const query of queries) {\n    if (query[0] === 1) {\n      obstacles.push(query[1]);\n      continue;\n    }\n    const [, x, sz] = query;\n    // Obstacles sit on whole numbers, so a block that fits can slide left until its start is a whole number too.\n    let fits = false;\n    for (let start = 0; start + sz <= x; start++) {\n      if (!obstacles.some(p => start < p && p < start + sz)) fits = true;\n    }\n    results.push(fits);\n  }\n  return results;\n}",
+  "generator": "function generate(rand, size) {\n  const count = size === 'large' ? 2000 : 1 + Math.floor(rand() * 10);\n  const bound = Math.min(50000, 3 * count);\n  const share = 0.15 + 0.7 * rand();\n  const taken = new Set();\n  const walls = [];\n  const queries = [];\n  let asked = false;\n  for (let i = 0; i < count; i++) {\n    // The last query must ask if none has yet, since at least one type-2 query is guaranteed.\n    if (rand() < share && (asked || i < count - 1)) {\n      let x = 1 + Math.floor(rand() * bound);\n      while (taken.has(x)) x = 1 + Math.floor(rand() * bound);\n      taken.add(x);\n      let lo = 0, hi = walls.length;\n      while (lo < hi) { const mid = (lo + hi) >> 1; if (walls[mid] < x) lo = mid + 1; else hi = mid; }\n      walls.splice(lo, 0, x);\n      queries.push([1, x]);\n      continue;\n    }\n    const x = 1 + Math.floor(rand() * bound);\n    // Aim sz near the widest free piece of [0, x] so that both answers show up.\n    let widest = 0, prev = 0;\n    for (const wall of walls) {\n      if (wall > x) break;\n      widest = Math.max(widest, wall - prev);\n      prev = wall;\n    }\n    widest = Math.max(widest, x - prev);\n    const sz = rand() < 0.2 ? 1 + Math.floor(rand() * bound) : Math.min(bound, Math.max(1, widest + Math.floor(rand() * 5) - 2));\n    queries.push([2, x, sz]);\n    asked = true;\n  }\n  return [queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2],[2,3,3],[2,3,1],[2,2,2]]],"expected":[false,true,true]},
+    {"name":"Example 2","input":[[[1,7],[2,7,6],[1,2],[2,7,5],[2,7,6]]],"expected":[true,true,false]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[2,1,1]]]},
+    {"name":"Test 2","input":[[[2,2,3]]]},
+    {"name":"Test 3","input":[[[1,3],[2,3,3]]]},
+    {"name":"Test 4","input":[[[1,2],[1,5],[2,6,3],[2,6,4]]]},
+    {"name":"Test 5","input":[[[1,1],[1,9],[2,6,5],[2,6,6]]]},
+    {"name":"Test 6","input":[[[1,1],[1,2],[1,3],[1,4],[2,4,1],[2,4,2],[2,5,1]]]},
+    {"name":"Test 7","input":[[[1,10],[2,10,10],[1,5],[2,10,6],[2,10,5],[1,3],[2,12,4],[2,12,6]]]},
+    {"name":"Test 8","input":[[[2,5,5],[1,1],[2,5,5],[2,5,4]]]},
+    {"name":"Test 9","input":[[[1,12],[1,6],[2,12,6],[2,11,6],[2,5,6],[2,11,7]]]},
+    {"name":"Test 10","input":[[[2,3,1],[2,3,3],[2,1,2]]]},
+    {"name":"Test 11","input":[[[1,4],[1,8],[1,12],[1,16],[2,20,4],[2,20,5],[1,2],[2,3,2],[2,18,4]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nFor a type-2 query only obstacles up to `x` matter. With the origin, they cut `[0, x]` into pieces: from `0` to the first obstacle, between neighbours, and from the last obstacle to `x`. The block fits exactly when the longest piece is at least `sz`. Rescanning every obstacle per query is the O(q²) brute force.\n\nA segment tree over the positions does better. Each node stores the `first` and `last` obstacle in its range and the widest `gap` between neighbouring obstacles inside it. Two halves combine easily: the only new gap runs from the left half's last obstacle to the right half's first.\n\n## Approach\n\n1. `limit` is the largest position in any query. The arrays `first`, `last` (`-1` when a range has no obstacle) and `gap` are indexed by tree node.\n2. Type 1: `update` walks down to leaf `x`, marks it, and on the way back up rebuilds each node from its children `left` and `right`.\n3. Type 2: reset `prev = 0` (the origin) and `best = 0`, then `scan` the nodes covering `[0, x]` from left to right. Each covered node with obstacles offers its inner `gap` and the piece `first[node] - prev`; then `prev` moves to its `last` obstacle.\n4. Push whether `Math.max(best, x - prev) >= sz`, where `x - prev` is the final piece.\n\n## Example 1, step by step\n\n`queries = [[1,2],[2,3,3],[2,3,1],[2,2,2]]`, so `limit = 3`.\n\n- `[1,2]`: the leaf for 2 and every node above it get `first = last = 2`.\n- `[2,3,3]`: the scan meets obstacle 2, so `best = 2 - 0 = 2` and `prev = 2`; the final piece is `3 - 2 = 1`. `2 < 3`: `false`.\n- `[2,3,1]`: same pieces; `2 >= 1`: `true`.\n- `[2,2,2]`: `best = 2`, `prev = 2`, final piece `0`; `2 >= 2`: `true`.\n\nResult: `[false, true, true]`.\n\n## Complexity\n\n- Time: O(X + q log X) for X = `limit`: O(X) to fill the arrays, then O(log X) nodes per update or scan.\n- Space: O(X) for the three arrays of about `4X` entries.\n\n## Pitfalls\n\n- Ends may touch obstacles and `x`: compare with `>=`, not `>`.\n- The piece crossing `x` counts only up to `x`, not up to the next obstacle.\n- The origin acts as an obstacle: the first piece starts at `0`.\n- `scan` must visit the left child first, or `prev` pairs obstacles that are not neighbours.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `limit` | largest position in any query |\n| `first`, `last` | first and last obstacle in a node's range, `-1` if none |\n| `gap` | widest gap between neighbouring obstacles inside a node's range |\n| `node`, `lo`, `hi`, `mid` | a tree node, its range, and the split point |\n| `left`, `right` | the node's children |\n| `pos` | position becoming an obstacle |\n| `prev` | last obstacle the scan passed, starting at the origin |\n| `best` | widest piece the scan found |\n| `results` | answers to the type-2 queries |\n| `type`, `x`, `sz` | fields of one query |",
+  "narration": {
+    "2": "Every position is at most the largest x in the queries, so the tree covers 0..limit.",
+    "3": "first[node] is the leftmost obstacle in the node's range, or -1 when the range has none.",
+    "4": "last[node] is the rightmost obstacle in the node's range.",
+    "5": "gap[node] is the widest distance between neighbouring obstacles inside the range.",
+    "7": "update turns pos into an obstacle and repairs every node above it.",
+    "8": "A leaf covers the single position pos.",
+    "9": "It now holds one obstacle, which is both its first and its last.",
+    "16": "Go down into the half that contains pos.",
+    "21": "The range's first obstacle is the left half's first, if the left half has any.",
+    "22": "Its last obstacle is the right half's last, if the right half has any.",
+    "23": "Gaps inside either half are still gaps of the whole range.",
+    "24": "When both halves hold obstacles, one more gap joins them...",
+    "25": "...running from the left half's last obstacle to the right half's first.",
+    "31": "scan visits the nodes that cover [0, x], from left to right.",
+    "32": "Skip ranges that start past x and ranges with no obstacles.",
+    "35": "This node lies fully inside [0, x], so take it as a whole.",
+    "36": "Its inner gaps and the piece from the previous obstacle to its first one are candidates.",
+    "37": "Its last obstacle becomes the previous obstacle for the nodes further right.",
+    "41": "Visit the left half first so that obstacles are met in increasing order.",
+    "46": "Handle the queries in their given order.",
+    "48": "Type 1 builds an obstacle at x.",
+    "50": "Type 2 starts its scan at the origin, which acts like an obstacle.",
+    "52": "Find the widest piece between obstacles up to x.",
+    "53": "The final piece runs from the last obstacle to x; the block fits if some piece is at least sz.",
+    "56": "Return one answer per type-2 query."
+  }
+}

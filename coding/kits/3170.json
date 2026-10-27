@@ -1,0 +1,64 @@
+{
+  "number": 3170,
+  "title": "Lexicographically Minimum String After Removing Stars",
+  "spec": "leetcode",
+  "statement": "You are given a string `s` made of lowercase English letters and `'*'` characters. Repeat the following step until no `'*'` is left: take the leftmost `'*'` and erase it together with one occurrence of the smallest letter that remains to its left. When that smallest letter occurs more than once there, you choose which occurrence to erase.\n\nReturn the lexicographically smallest string you can end up with once every `'*'` is gone (it may be empty). The input guarantees that whenever a `'*'` is processed, at least one letter remains to its left.",
+  "constraints": [
+    "1 <= s.length <= 10^5",
+    "s contains only lowercase English letters and '*'",
+    "Every prefix of s has at least as many letters as '*' characters, so every '*' can be removed"
+  ],
+  "signature": "String clearStars(String s)",
+  "entry": "clearStars",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 100000) return 's needs 1 to 100000 characters.';\n  if (!/^[a-z*]+$/.test(s)) return 's may contain only lowercase letters and *.';\n  let balance = 0;\n  for (const ch of s) {\n    balance += ch === '*' ? -1 : 1;\n    if (balance < 0) return 'Each * needs an unerased letter somewhere before it.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function clearStars(s) {\n  const stacks = Array.from({ length: 26 }, () => []);\n  const removed = new Array(s.length).fill(false);\n\n  for (let i = 0; i < s.length; i++) {\n    if (s[i] === '*') {\n      removed[i] = true;\n      for (let c = 0; c < 26; c++) {\n        if (stacks[c].length > 0) {\n          removed[stacks[c].pop()] = true;\n          break;\n        }\n      }\n    } else {\n      stacks[s.charCodeAt(i) - 97].push(i);\n    }\n  }\n\n  const kept = [];\n  for (let i = 0; i < s.length; i++) {\n    if (!removed[i]) {\n      kept.push(s[i]);\n    }\n  }\n  return kept.join('');\n}",
+  "brute": "function clearStars(s) {\n  // Follow the rules literally: at every '*' try erasing each copy of the smallest letter before it,\n  // and keep the smallest final string (memoized on the current string).\n  const memo = new Map();\n  const finish = (t) => {\n    const star = t.indexOf('*');\n    if (star === -1) return t;\n    if (memo.has(t)) return memo.get(t);\n    let smallest = '{';\n    for (let j = 0; j < star; j++) if (t[j] < smallest) smallest = t[j];\n    let answer = null;\n    for (let j = 0; j < star; j++) {\n      if (t[j] !== smallest) continue;\n      const result = finish(t.slice(0, j) + t.slice(j + 1, star) + t.slice(star + 1));\n      if (answer === null || result < answer) answer = result;\n    }\n    memo.set(t, answer);\n    return answer;\n  };\n  return finish(s);\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 10000 : 1 + Math.floor(rand() * 12);\n  const alphabet = size === 'large' || rand() < 0.2 ? 26 : 1 + Math.floor(rand() * 4);\n  const starRate = rand() * 0.55;\n  let letters = 0;\n  let stars = 0;\n  let s = '';\n  for (let i = 0; i < n; i++) {\n    // A '*' is only allowed while some letter before it is still unerased.\n    if (letters > stars && rand() < starRate) {\n      s += '*';\n      stars++;\n    } else {\n      s += String.fromCharCode(97 + Math.floor(rand() * alphabet));\n      letters++;\n    }\n  }\n  return [s];\n}",
+  "examples": [
+    {"name":"Example 1","input":["aaba*"],"expected":"aab"},
+    {"name":"Example 2","input":["abc"],"expected":"abc"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["a*"]},
+    {"name":"Test 3","input":["abc*"]},
+    {"name":"Test 4","input":["cba**"]},
+    {"name":"Test 5","input":["aaa*b*"]},
+    {"name":"Test 6","input":["abab*ab*"]},
+    {"name":"Test 7","input":["dcbaabcd****"]},
+    {"name":"Test 8","input":["zz*a*zz*"]},
+    {"name":"Test 9","input":["leetcode"]},
+    {"name":"Test 10","input":["zyxwvutsrqponmlkjihgfedcba*************"]},
+    {"name":"Test 11","input":["bacab*ca*b*ba**cab*a*"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA `'*'` has no say over which letter it erases, only over which copy: it must take the smallest letter to its left. Among several copies, erase the **rightmost** one. That keeps every earlier copy of the small letter where it is, near the front; erasing an earlier copy would instead pull the larger letters after it one step forward. A brute force that tries every copy at every `'*'` agrees, but takes exponential time.\n\nSo for every letter we only need its surviving positions with the newest on top: one stack per letter.\n\n## Approach\n\n1. Make 26 stacks, `stacks[c]` holding the indices of letter `c` not erased yet, and a `removed` flag for each index.\n2. Scan `s`. A letter pushes its index onto its own stack.\n3. A `'*'` marks itself removed, then looks for the first non-empty stack from `'a'` upwards and pops its top: the rightmost copy of the smallest remaining letter, which is marked removed too.\n4. Collect the characters that were never removed, in order, into `kept` and join them.\n\n## Example 1, step by step\n\n`s = \"aaba*\"`. Indices 0, 1 and 3 go onto the stack for `'a'` (`[0, 1, 3]`) and index 2 onto the stack for `'b'`. At index 4 the `'*'` is removed; the first non-empty stack is the one for `'a'`, whose top is 3, so index 3 is removed as well. The survivors are indices 0, 1 and 2, giving `\"aab\"`. Erasing index 0 or 1 instead would leave `\"aba\"`, which is larger.\n\n## Complexity\n\n- Time: O(26 · n): each `'*'` checks at most 26 stacks and every other step is O(1).\n- Space: O(n) for the stacks and the `removed` flags.\n\n## Pitfalls\n\n- Erasing the leftmost copy of the smallest letter is wrong: `\"aaba*\"` would become `\"aba\"`.\n- An erased letter must leave its stack so that a later `'*'` cannot pick it again; popping does exactly that.\n- The `'*'` characters disappear too, and the answer can be the empty string (`\"a*\"`).\n- Deleting characters from the string one by one costs O(n²); mark them and build the result once.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `stacks[c]` | indices of the surviving copies of letter `c` (0 is `'a'`), rightmost on top |\n| `removed[i]` | whether the character at index `i` has been erased |\n| `i` | the index being scanned |\n| `c` | the letter a `'*'` is currently trying, smallest first |\n| `kept` | the surviving characters, in order |",
+  "narration": {
+    "2": "One stack per letter will hold the indices of that letter's copies that are still in the string.",
+    "3": "removed[i] marks every character, star or letter, that gets erased.",
+    "5": "Scan from left to right, so the stars are handled in the order the rules require.",
+    "6": "A '*' must be erased together with one letter before it.",
+    "7": "The star itself never appears in the answer.",
+    "8": "Try the letters from 'a' upwards to find the smallest one still available.",
+    "9": "A non-empty stack means this letter still has a copy to the left of the star.",
+    "10": "Pop and erase the rightmost copy, so the earlier copies of this small letter stay in front.",
+    "11": "Each star erases exactly one letter, so stop searching.",
+    "15": "A letter pushes its index onto its own stack; the newest copy ends up on top.",
+    "20": "Walk the string again to collect what survived.",
+    "21": "Skip every erased star and letter.",
+    "22": "Keep the surviving character, in its original order.",
+    "25": "Join the survivors into the final string."
+  }
+}
