@@ -1,0 +1,67 @@
+{
+  "number": 3302,
+  "title": "Find the Lexicographically Smallest Valid Sequence",
+  "spec": "leetcode",
+  "statement": "Call a list of indices `seq` into the string `word1` valid when it is strictly increasing, has length `word2.length`, and the string `word1[seq[0]] + word1[seq[1]] + ...` can be turned into the string `word2` by changing at most one of its characters.\n\nReturn the lexicographically smallest valid `seq`, comparing the index arrays themselves (the first position where two of them differ decides), not the strings they spell. When there is none, the answer is an empty array.",
+  "constraints": [
+    "1 <= word2.length < word1.length <= 3 * 10^5",
+    "word1 and word2 consist only of lowercase English letters"
+  ],
+  "signature": "int[] validSequence(String word1, String word2)",
+  "entry": "validSequence",
+  "kind": "function",
+  "parameters": [
+    "word1",
+    "word2"
+  ],
+  "validator": "function validate([word1, word2]) {\n  if (word2.length < 1 || word2.length >= word1.length) return 'Need 1 <= word2.length < word1.length.';\n  if (word1.length > 300000) return 'word1 has at most 3 * 10^5 letters.';\n  if (!/^[a-z]+$/.test(word1) || !/^[a-z]+$/.test(word2)) return 'Both words use only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function validSequence(word1, word2) {\n  const n = word1.length;\n  const m = word2.length;\n  // suffix[i]: length of the longest suffix of word2 that is a subsequence of word1 from index i on.\n  const suffix = new Array(n + 1).fill(0);\n  for (let i = n - 1; i >= 0; i--) {\n    suffix[i] = suffix[i + 1];\n    if (suffix[i] < m && word1[i] === word2[m - 1 - suffix[i]]) {\n      suffix[i]++;\n    }\n  }\n  const sequence = [];\n  let changed = false;\n  for (let i = 0; i < n && sequence.length < m; i++) {\n    const j = sequence.length;\n    if (word1[i] === word2[j]) {\n      sequence.push(i);\n    } else if (!changed && suffix[i + 1] >= m - j - 1) {\n      sequence.push(i);\n      changed = true;\n    }\n  }\n  return sequence.length === m ? sequence : [];\n}",
+  "brute": "function validSequence(word1, word2) {\n  // Try increasing index lists in lexicographic order; the first one needing at most one change wins.\n  const chosen = [];\n  const search = (start, changes) => {\n    if (chosen.length === word2.length) return true;\n    for (let i = start; i < word1.length; i++) {\n      const cost = changes + (word1[i] === word2[chosen.length] ? 0 : 1);\n      if (cost > 1) continue;\n      chosen.push(i);\n      if (search(i + 1, cost)) return true;\n      chosen.pop();\n    }\n    return false;\n  };\n  return search(0, 0) ? chosen : [];\n}",
+  "generator": "function generate(rand, size) {\n  const pick = limit => Math.floor(rand() * limit);\n  const large = size === 'large';\n  const alphabet = 'abcdefghijklmnopqrstuvwxyz';\n  const n = large ? 10000 : 2 + pick(9);\n  const letters = alphabet.slice(0, large ? 2 + pick(25) : 1 + pick(3));\n  const letter = () => letters[pick(letters.length)];\n  const word1 = Array.from({ length: n }, letter).join('');\n  const m = 1 + pick(n - 1);\n  const changes = pick(3);\n  if (changes === 0) return [word1, Array.from({ length: m }, letter).join('')];\n  // Otherwise word2 spells a random subsequence of word1 with one change (always solvable) or two (often not).\n  const indices = [...Array(n).keys()];\n  for (let i = n - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [indices[i], indices[j]] = [indices[j], indices[i]];\n  }\n  const chars = indices.slice(0, m).sort((a, b) => a - b).map(i => word1[i]);\n  for (let k = 0; k < changes; k++) chars[pick(m)] = alphabet[pick(26)];\n  return [word1, chars.join('')];\n}",
+  "examples": [
+    {"name":"Example 1","input":["vbcca","abc"],"expected":[0,1,2]},
+    {"name":"Example 2","input":["bacdc","abc"],"expected":[1,2,4]},
+    {"name":"Example 3","input":["aaaaaa","aaabc"],"expected":[]},
+    {"name":"Example 4","input":["abc","ab"],"expected":[0,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["ab","a"]},
+    {"name":"Test 2","input":["ab","z"]},
+    {"name":"Test 3","input":["ba","a"]},
+    {"name":"Test 4","input":["aaaa","bbb"]},
+    {"name":"Test 5","input":["xyzabc","abc"]},
+    {"name":"Test 6","input":["abcd","abd"]},
+    {"name":"Test 7","input":["zbcdefg","abcdef"]},
+    {"name":"Test 8","input":["abcdefgh","hgf"]},
+    {"name":"Test 9","input":["baaaaaaaaa","aaaaaaaaa"]},
+    {"name":"Test 10","input":["cabbacbcab","ccbb"]},
+    {"name":"Test 11","input":["qwertyuiopasdf","pqsd"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nIndex arrays compare at their first difference, so the answer should take the smallest index it can for position 0, then for position 1, and so on, as long as the choice can still be completed. An index holding the needed letter is always safe to take: any completion that works after a later index also works after this one, and the change stays unspent. Spending the single change at index `i` is safe only if the rest of `word2` can then be matched exactly after `i`. Rescanning for that would cost O(n · m); the table `suffix[i]`, the longest suffix of `word2` that is a subsequence of `word1[i..]`, answers it in O(1). Trying every set of `m` indices would cost C(n, m).\n\n## Approach\n\n1. Build `suffix` from right to left: `suffix[i]` starts as `suffix[i + 1]` and grows by one when `word1[i]` is the next letter of `word2` counted from its end.\n2. Scan `i` from 0 while `sequence` is shorter than `m`; `j = sequence.length` is the position of `word2` to fill next.\n3. If `word1[i] === word2[j]`, take `i`.\n4. Otherwise, if the change is unspent and `suffix[i + 1] >= m - j - 1` (the remaining letters fit exactly after `i`), take `i` and spend the change.\n5. Return `sequence` if it reached length `m`, otherwise `[]`.\n\n## Example 1, step by step\n\n`word1 = \"vbcca\"`, `word2 = \"abc\"`, so `suffix = [2, 2, 1, 1, 0, 0]`.\n\n- `i = 0`: `'v'` is not `'a'`, but `suffix[1] = 2 >= 2` (\"bc\" fits in \"bcca\"), so take 0 and spend the change.\n- `i = 1`: `'b'` matches, take 1.\n- `i = 2`: `'c'` matches, take 2.\n\nThe answer is `[0, 1, 2]`.\n\n## Complexity\n\n- Time: O(n): one pass builds `suffix`, one greedy pass picks the indices.\n- Space: O(n) for `suffix`.\n\n## Pitfalls\n\n- Spending the change without the `suffix` check fails Example 2: changing `'b'` at index 0 leaves \"bc\" to find in \"acdc\", which has no `'b'`.\n- Waiting for an exact match is not always best: for `\"xyzabc\"` and `\"abc\"` the answer is `[0, 4, 5]`, smaller than `[3, 4, 5]`.\n- \"Smallest\" compares the index arrays, not the strings they spell.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n`, `m` | lengths of `word1` and `word2` |\n| `suffix` | `suffix[i]`: longest suffix of `word2` that is a subsequence of `word1[i..]` |\n| `sequence` | the indices chosen so far |\n| `changed` | whether the one allowed change is spent |\n| `i` | the index of `word1` being considered |\n| `j` | the position of `word2` to fill next |",
+  "narration": {
+    "5": "suffix[i] will count how many letters at the end of word2 can be matched, in order, inside word1[i..]; suffix[n] = 0.",
+    "6": "Fill the table from right to left.",
+    "7": "Whatever can be matched from i + 1 on can also be matched from i.",
+    "8": "Is word1[i] the next letter of word2, counting from its end?",
+    "9": "Yes: matching it extends the suffix by one letter.",
+    "12": "sequence collects the chosen indices, smallest first.",
+    "13": "changed records whether the single allowed change is already used.",
+    "14": "Scan word1 from the left until every position of word2 has an index.",
+    "15": "j is the position of word2 that the next chosen index covers.",
+    "16": "Same letter: taking i is always safe, and the change stays unspent.",
+    "17": "Take i for position j.",
+    "18": "Different letter: spend the change here only if the remaining m - j - 1 letters fit exactly after i.",
+    "19": "Take i for position j as the changed character.",
+    "20": "The change is used up; every later position must match exactly.",
+    "23": "A full sequence is the smallest valid one; a short one means none exists."
+  }
+}

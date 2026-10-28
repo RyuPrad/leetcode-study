@@ -1,0 +1,65 @@
+{
+  "number": 3449,
+  "title": "Maximize the Minimum Game Score",
+  "spec": "leetcode",
+  "statement": "A game is played on an array `points` of length `n`. Every index has a score that starts at 0, and a marker starts just outside the array at index `-1`. You may make at most `m` moves. Each move shifts the marker one step left or right and must leave it on an index `i` between `0` and `n - 1`; then `points[i]` is added to the score of index `i`. (So the first move always goes to index `0`.)\n\nReturn the largest value that the smallest of the `n` scores can have after your moves. The answer may not fit in 32 bits.",
+  "constraints": [
+    "2 <= n == points.length <= 5 * 10^4",
+    "1 <= points[i] <= 10^6",
+    "1 <= m <= 10^9"
+  ],
+  "signature": "long maxScore(int[] points, int m)",
+  "entry": "maxScore",
+  "kind": "function",
+  "parameters": [
+    "points",
+    "m"
+  ],
+  "validator": "function validate([points, m]) {\n  if (points.length < 2 || points.length > 50000) return 'points needs 2 to 50,000 values.';\n  if (points.some(p => p < 1 || p > 1000000)) return 'Each value in points is between 1 and 1,000,000.';\n  if (m < 1 || m > 1000000000) return 'm is between 1 and 1,000,000,000.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxScore(points, m) {\n  const n = points.length;\n\n  function canReach(target) {\n    let moves = 0;\n    let carried = 0;\n    for (let i = 0; i < n; i++) {\n      const needed = Math.ceil(target / points[i]) - carried;\n      if (i === n - 1 && needed <= 0) {\n        break;\n      }\n      const arrivals = Math.max(needed, 1);\n      moves += 2 * arrivals - 1;\n      if (moves > m) {\n        return false;\n      }\n      carried = arrivals - 1;\n    }\n    return true;\n  }\n\n  let low = 0;\n  let high = Math.ceil(m / 2) * Math.min(...points);\n  while (low < high) {\n    const mid = Math.ceil((low + high) / 2);\n    if (canReach(mid)) {\n      low = mid;\n    } else {\n      high = mid - 1;\n    }\n  }\n  return low;\n}",
+  "brute": "function maxScore(points, m) {\n  // Try every walk of at most m moves from index -1 and keep the best smallest score seen along the way.\n  const n = points.length;\n  const score = new Array(n).fill(0);\n  let best = 0;\n  const walk = (index, movesLeft) => {\n    best = Math.max(best, Math.min(...score));\n    if (movesLeft === 0) return;\n    for (const next of [index - 1, index + 1]) {\n      if (next < 0 || next >= n) continue;\n      score[next] += points[next];\n      walk(next, movesLeft - 1);\n      score[next] -= points[next];\n    }\n  };\n  walk(-1, m);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  if (size === 'small') {\n    // Walks are enumerated by the brute force, so m stays small; values are tiny or occasionally huge.\n    const top = rand() < 0.2 ? 1000000 : int(1, 10);\n    const points = Array.from({ length: int(2, 5) }, () => int(1, top));\n    return [points, int(1, 12)];\n  }\n  const n = int(1000, 2000);\n  const shape = int(0, 2);\n  // 0: huge values and the largest m; 1: small values and a moderate m; 2: equal values and m near n.\n  const points = Array.from({ length: n }, () => shape === 0 ? int(1, 1000000) : shape === 1 ? int(1, 100) : 777);\n  const m = shape === 0 ? int(900000000, 1000000000) : shape === 1 ? int(n, 20 * n) : int(n - 5, 3 * n);\n  return [points, m];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[2,4],3],"expected":4},
+    {"name":"Example 2","input":[[1,2,3],5],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1,1],1]},
+    {"name":"Test 2","input":[[5,3],2]},
+    {"name":"Test 3","input":[[1000000,1000000],4]},
+    {"name":"Test 4","input":[[3,3,3,3],3]},
+    {"name":"Test 5","input":[[3,3,3,3],4]},
+    {"name":"Test 6","input":[[1,2,3,4,5],12]},
+    {"name":"Test 7","input":[[5,4,3,2,1],12]},
+    {"name":"Test 8","input":[[7,1,7],9]},
+    {"name":"Test 9","input":[[2,9,1,6],14]},
+    {"name":"Test 10","input":[[1000000,1],13]},
+    {"name":"Test 11","input":[[1,1000000],13]},
+    {"name":"Test 12","generate":{"seed":3,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every walk is exponential in `m`. A yes/no question is easier: can every score reach at least `target`? If a target is reachable, so is every smaller one, so binary search on `target`. For a fixed target, index `i` needs `ceil(target / points[i])` landings. Go left to right: once on `i`, the cheapest extra landing is a round trip to `i + 1` and back (2 moves), which also lands on `i + 1` once. Bouncing toward `i - 1` would waste that landing on an index already done.\n\n## Approach\n\n1. Search `target` between `low = 0`, always reachable, and `high = ceil(m / 2) · min(points)`, since no index can be landed on more than `ceil(m / 2)` times.\n2. `canReach(target)` scans the indices; `carried` counts the landings index `i` already got from the previous index's round trips.\n3. `needed` is what index `i` still lacks. On the last index, if nothing is lacking, stop: there is no need to step onto it.\n4. Otherwise land on `i` `arrivals = max(needed, 1)` times (one step onto it plus `arrivals - 1` round trips), costing `2 · arrivals - 1` moves. Once `moves` passes `m`, the target is out of reach.\n5. The round trips leave `arrivals - 1` landings on `i + 1`: the next `carried`.\n6. Raise `low` to each reachable `mid`; drop `high` below each unreachable one.\n\n## Example 1, step by step\n\n`points = [2, 4]`, `m = 3`, so `low = 0` and `high = 2 · 2 = 4`. `mid = 2` and then `mid = 3` are reachable, so `low` becomes 3. For `mid = 4`, index 0 needs `ceil(4 / 2) = 2` landings: step onto it and make one round trip, 3 moves in all. That trip lands on index 1 once, and `ceil(4 / 4) = 1` is all it needs, so the scan stops. Now `low = high = 4`, the answer (scores `[4, 4]`).\n\n## Complexity\n\n- Time: O(n · log(m · min(points))): about 50 binary-search rounds, each an O(n) scan.\n- Space: O(1) besides the input.\n\n## Pitfalls\n\n- The answer can reach about `5 · 10^14`: use 64-bit integers for the target and the move count.\n- Return as soon as `moves` exceeds `m`; summed over all indices the count can overflow even 64 bits.\n- Do not charge a step onto the last index when the round trips before it already covered it; Example 1 depends on this.\n- Every other index needs at least one landing even when its score is already enough, because the walk has to pass through it.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `low`, `high` | range of targets still possible; `low` is always reachable |\n| `mid` | the target being tested |\n| `moves` | moves spent so far by the scan |\n| `carried` | landings index `i` got from the previous index's round trips |\n| `needed` | landings index `i` still lacks |\n| `arrivals` | landings made on index `i` during its turn |",
+  "narration": {
+    "4": "canReach answers whether every score can reach target within m moves.",
+    "7": "Settle the indices from left to right.",
+    "8": "Landings index i still needs, after those carried over from the previous index's round trips.",
+    "9": "The last index may already be covered; then the walk never needs to step onto it.",
+    "12": "Land at least once, since the walk must pass through i.",
+    "13": "One step onto i plus a two-move round trip to the next index for each extra landing.",
+    "14": "Too many moves: this target is out of reach.",
+    "17": "Each round trip also landed on the next index once.",
+    "22": "A smallest score of 0 is always possible.",
+    "23": "No index can be landed on more than ceil(m / 2) times, which bounds the answer.",
+    "25": "Test the upper middle so the search always makes progress.",
+    "27": "Reachable: the answer is at least mid.",
+    "29": "Unreachable: the answer is below mid.",
+    "32": "low is the largest reachable target."
+  }
+}

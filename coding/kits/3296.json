@@ -1,0 +1,67 @@
+{
+  "number": 3296,
+  "title": "Minimum Number of Seconds to Make Mountain Height Zero",
+  "spec": "leetcode",
+  "statement": "A mountain is `mountainHeight` units tall, and `workerTimes[i]` is the base time of worker `i`. Each worker removes some whole number of units `x >= 0` of their own choosing; for worker `i` the `k`-th unit costs `workerTimes[i] * k` seconds, so `x` units take `workerTimes[i] * (1 + 2 + ... + x)` seconds in total. The workers all work at once, so the job lasts as long as the largest of their totals. Return the smallest number of seconds in which the workers' units can add up to `mountainHeight`, leaving the mountain at height 0.",
+  "constraints": [
+    "1 <= mountainHeight <= 10^5",
+    "1 <= workerTimes.length <= 10^4",
+    "1 <= workerTimes[i] <= 10^6"
+  ],
+  "signature": "long minNumberOfSeconds(int mountainHeight, int[] workerTimes)",
+  "entry": "minNumberOfSeconds",
+  "kind": "function",
+  "parameters": [
+    "mountainHeight",
+    "workerTimes"
+  ],
+  "validator": "function validate([mountainHeight, workerTimes]) {\n  if (mountainHeight < 1 || mountainHeight > 100000) return 'mountainHeight is between 1 and 10^5.';\n  if (workerTimes.length < 1 || workerTimes.length > 10000) return 'workerTimes needs 1 to 10^4 workers.';\n  if (workerTimes.some(t => t < 1 || t > 1000000)) return 'Each work time is between 1 and 10^6.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minNumberOfSeconds(mountainHeight, workerTimes) {\n  // The most units a worker with time t removes within seconds: the largest x with t * x(x+1)/2 <= seconds.\n  const unitsWithin = (t, seconds) => {\n    let x = Math.floor((Math.sqrt(1 + (8 * seconds) / t) - 1) / 2);\n    x = Math.min(x, mountainHeight);\n    // The square root is a floating-point estimate, so correct it with exact integer checks.\n    while (x > 0 && t * ((x * (x + 1)) / 2) > seconds) {\n      x--;\n    }\n    while (x < mountainHeight && t * (((x + 1) * (x + 2)) / 2) <= seconds) {\n      x++;\n    }\n    return x;\n  };\n  const canFinish = (seconds) => {\n    let removed = 0;\n    for (const t of workerTimes) {\n      removed += unitsWithin(t, seconds);\n      if (removed >= mountainHeight) {\n        return true;\n      }\n    }\n    return false;\n  };\n  let low = 1;\n  let high = Math.min(...workerTimes) * ((mountainHeight * (mountainHeight + 1)) / 2);\n  while (low < high) {\n    const mid = low + Math.floor((high - low) / 2);\n    if (canFinish(mid)) {\n      high = mid;\n    } else {\n      low = mid + 1;\n    }\n  }\n  return low;\n}",
+  "brute": "function minNumberOfSeconds(mountainHeight, workerTimes) {\n  // best[h]: least time for the workers so far to remove h units, trying every share x for each new worker.\n  let best = Array.from({ length: mountainHeight + 1 }, (_, h) => (h === 0 ? 0 : Infinity));\n  for (const t of workerTimes) {\n    const next = best.slice();\n    for (let h = 1; h <= mountainHeight; h++) {\n      for (let x = 1; x <= h; x++) {\n        next[h] = Math.min(next[h], Math.max(best[h - x], (t * x * (x + 1)) / 2));\n      }\n    }\n    best = next;\n  }\n  return best[mountainHeight];\n}",
+  "generator": "function generate(rand, size) {\n  const pick = limit => Math.floor(rand() * limit);\n  if (size === 'large') {\n    const shape = pick(3);\n    // The largest possible answer: one slowest worker removes the tallest mountain alone.\n    if (shape === 0) return [100000, [1000000]];\n    // Many identical fast workers share the work evenly.\n    if (shape === 1) return [100000, new Array(2000).fill(1)];\n    return [99000 + pick(1001), Array.from({ length: 2000 }, () => 1 + pick(1000000))];\n  }\n  const span = [3, 10, 1000000][pick(3)];\n  const workerTimes = Array.from({ length: 1 + pick(6) }, () => 1 + pick(span));\n  return [1 + pick(30), workerTimes];\n}",
+  "examples": [
+    {"name":"Example 1","input":[4,[2,1,1]],"expected":3},
+    {"name":"Example 2","input":[10,[3,2,2,4]],"expected":12},
+    {"name":"Example 3","input":[5,[1]],"expected":15}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[5,3,9]]},
+    {"name":"Test 2","input":[1,[1000000]]},
+    {"name":"Test 3","input":[300,[1000000]]},
+    {"name":"Test 4","input":[10,[1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 5","input":[11,[1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 6","input":[7,[1000000,1]]},
+    {"name":"Test 7","input":[20,[2,3,5,7]]},
+    {"name":"Test 8","input":[50,[4,4,4]]},
+    {"name":"Test 9","input":[1000,[7,13,1,100,1000000]]},
+    {"name":"Test 10","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMore time never hurts: if the workers can finish within `T` seconds, they can finish within `T + 1`. So the answer is the smallest feasible `T`, and binary search on `T` finds it. For a fixed `T` the workers do not interact: each should remove as many units as fit in `T`, the largest `x` with `t · x(x+1)/2 <= T`, and the quadratic formula gives `x ≈ (√(1 + 8T/t) − 1) / 2` at once. Trying every way to split the `H = mountainHeight` units among the `n` workers would instead cost O(n · H²).\n\n## Approach\n\n1. `unitsWithin(t, seconds)` estimates `x` with the square root, caps it at `mountainHeight`, and nudges it down or up with exact integer checks.\n2. `canFinish(seconds)` adds up `unitsWithin` over all workers and stops as soon as `removed` reaches `mountainHeight`.\n3. Search between `low = 1` and `high` = the fastest worker removing everything alone, `min(workerTimes) · H(H+1)/2`, which is always enough.\n4. If `canFinish(mid)`, the answer is at most `mid` (`high = mid`); otherwise it is above `mid` (`low = mid + 1`).\n5. When the range closes, `low` is the answer.\n\n## Example 1, step by step\n\n`mountainHeight = 4`, `workerTimes = [2, 1, 1]`, so `high = 1 · 10 = 10`.\n\n- `mid = 5`: worker 0 fits 1 unit and the others 2 each, 5 in total — feasible, `high = 5`.\n- `mid = 3`: worker 0 fits 1 unit (2 s), each other worker 2 units (1 + 2 = 3 s), 5 in total — feasible, `high = 3`.\n- `mid = 2`: 1 unit each, only 3 in total — not enough, `low = 3`.\n\nNow `low = high = 3`, the expected answer.\n\n## Complexity\n\n- Time: O(n · log(min(t) · H²)): about 53 rounds, each with one square root per worker.\n- Space: O(1) besides the input.\n\n## Pitfalls\n\n- The answer reaches 10^6 · 10^5 · (10^5 + 1) / 2 ≈ 5 · 10^15: use `long` in Java and C. JavaScript numbers hold it exactly, but cap `x` at `mountainHeight` first: with `t = 1` the uncapped `x` nears 10^8, and `x · (x + 1)` then passes 2^53 and loses precision.\n- The square root is inexact for large `T / t`, so check the estimate with exact arithmetic.\n- Splitting the units evenly is wrong when the times differ: faster workers should take more units.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `unitsWithin` | most units a worker with time `t` removes within `seconds` |\n| `canFinish` | whether all workers together remove `mountainHeight` units within `seconds` |\n| `t`, `seconds` | one worker's base time, and the time limit being checked |\n| `x` | the units that worker can remove |\n| `removed` | units removed by the workers counted so far |\n| `low`, `high` | the range that still holds the answer |\n| `mid` | the time being tested |",
+  "narration": {
+    "3": "For a time limit, find the most units a worker with base time t can remove.",
+    "4": "Solve t * x(x+1)/2 = seconds for x with the quadratic formula, rounded down.",
+    "5": "No worker needs more than mountainHeight units, and the cap keeps the products below 2^53, where they are exact.",
+    "7": "If the estimate is one too high, step it down.",
+    "10": "If one more unit still fits in time, step it up.",
+    "15": "Can the workers together remove mountainHeight units within this many seconds?",
+    "17": "Go through the workers; each removes as many units as fit within the time limit.",
+    "18": "Add this worker's units to the running total.",
+    "19": "Enough units already: the time limit works.",
+    "25": "The answer is at least 1 second.",
+    "26": "The fastest worker doing everything alone always finishes, so the answer is at most this.",
+    "27": "Binary search: keep halving the range that holds the smallest feasible time.",
+    "28": "Pick the middle time; this form never passes high, so it stays below 2^53 and exact.",
+    "29": "Feasible: the answer is mid or smaller.",
+    "30": "Keep mid as a candidate.",
+    "32": "Infeasible: the answer must be larger than mid.",
+    "35": "low and high met at the smallest feasible time."
+  }
+}

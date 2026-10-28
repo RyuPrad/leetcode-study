@@ -1,0 +1,68 @@
+{
+  "number": 3385,
+  "title": "Minimum Time to Break Locks II",
+  "spec": "recalled",
+  "statement": "There are `n` locks, and lock `i` needs `strength[i]` energy to break. You break them one at a time, in any order you choose, with a sword that has an energy level and a growth factor `X`:\n\n- At the very start the energy is 0 and `X` is 1.\n- Each passing minute adds `X` to the energy.\n- The lock you are working on breaks as soon as the energy is at least its strength. Breaking it takes no extra time; the energy then drops back to 0 and `X` goes up by 1 for the next lock.\n\nFind the fewest minutes in which every lock can be broken, and return that number.",
+  "constraints": [
+    "n == strength.length",
+    "1 <= n <= 80",
+    "1 <= strength[i] <= 10^6"
+  ],
+  "signature": "int findMinimumTime(int[] strength)",
+  "entry": "findMinimumTime",
+  "kind": "function",
+  "parameters": [
+    "strength"
+  ],
+  "validator": "function validate([strength]) {\n  if (strength.length < 1 || strength.length > 80) return 'strength needs 1 to 80 locks.';\n  if (strength.some(s => s < 1 || s > 1000000)) return 'Each strength is between 1 and 10^6.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMinimumTime(strength) {\n  const n = strength.length;\n  const cost = (lock, turn) => Math.ceil(strength[lock - 1] / turn);\n  const lockPotential = new Array(n + 1).fill(0);\n  const turnPotential = new Array(n + 1).fill(0);\n  const owner = new Array(n + 1).fill(0);\n  const cameFrom = new Array(n + 1).fill(0);\n  for (let lock = 1; lock <= n; lock++) {\n    owner[0] = lock;\n    let turn = 0;\n    const minSlack = new Array(n + 1).fill(Infinity);\n    const visited = new Array(n + 1).fill(false);\n    while (owner[turn] !== 0) {\n      visited[turn] = true;\n      const current = owner[turn];\n      let delta = Infinity;\n      let nextTurn = 0;\n      for (let j = 1; j <= n; j++) {\n        if (visited[j]) continue;\n        const slack = cost(current, j) - lockPotential[current] - turnPotential[j];\n        if (slack < minSlack[j]) {\n          minSlack[j] = slack;\n          cameFrom[j] = turn;\n        }\n        if (minSlack[j] < delta) {\n          delta = minSlack[j];\n          nextTurn = j;\n        }\n      }\n      for (let j = 0; j <= n; j++) {\n        if (visited[j]) {\n          lockPotential[owner[j]] += delta;\n          turnPotential[j] -= delta;\n        } else {\n          minSlack[j] -= delta;\n        }\n      }\n      turn = nextTurn;\n    }\n    while (turn !== 0) {\n      const previous = cameFrom[turn];\n      owner[turn] = owner[previous];\n      turn = previous;\n    }\n  }\n  let total = 0;\n  for (let turn = 1; turn <= n; turn++) {\n    total += cost(owner[turn], turn);\n  }\n  return total;\n}",
+  "brute": "function findMinimumTime(strength) {\n  // best[mask]: fewest minutes to break exactly the locks in mask; the next lock then uses factor |mask| + 1.\n  const n = strength.length;\n  const best = new Array(1 << n).fill(Infinity);\n  best[0] = 0;\n  for (let mask = 0; mask < (1 << n); mask++) {\n    if (best[mask] === Infinity) continue;\n    let factor = 1;\n    for (let i = 0; i < n; i++) if (mask & (1 << i)) factor++;\n    for (let i = 0; i < n; i++) {\n      if (mask & (1 << i)) continue;\n      const minutes = Math.floor((strength[i] + factor - 1) / factor);\n      const next = mask | (1 << i);\n      best[next] = Math.min(best[next], best[mask] + minutes);\n    }\n  }\n  return best[(1 << n) - 1];\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 80 : 1 + Math.floor(rand() * 8);\n  // Small strengths make many rounded costs tie; large ones spread them out.\n  const shape = rand();\n  const top = shape < 0.35 ? 12 : shape < 0.7 ? 300 : 1000000;\n  return [Array.from({ length: n }, () => 1 + Math.floor(rand() * top))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,4,1]],"expected":4},
+    {"name":"Example 2","input":[[2,5,4]],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1]]},
+    {"name":"Test 2","input":[[1000000]]},
+    {"name":"Test 3","input":[[6,6,6,6,6,6]]},
+    {"name":"Test 4","input":[[1,1,1,1,1,1,1,1,1,1,1,1]]},
+    {"name":"Test 5","input":[[1,2,3,4,5,6,7,8,9,10]]},
+    {"name":"Test 6","input":[[100,90,80,70,60,50,40,30,20,10]]},
+    {"name":"Test 7","input":[[7,1,8,2,9,3,10]]},
+    {"name":"Test 8","input":[[1000000,999999,999998,1,2,3,500000,250000,125000,62500,31250,15625]]},
+    {"name":"Test 9","input":[[1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]]},
+    {"name":"Test 10","input":[[5,9,3,9,5,3,7,7,2]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":17,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":23,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith factor `X`, a lock of strength `s` takes `⌈s / X⌉` minutes, and the lock broken on turn `t` always has `X = t`. So an order is an assignment of locks to turns 1..n that costs the sum of `⌈strength / turn⌉`. Weakest-first fails because of the rounding (on example 1 it gives 1 + 2 + 2 = 5, yet 4 is possible), and n! orders are far too many. This is the assignment problem: a minimum-cost perfect matching between locks and turns, which the Hungarian algorithm finds in O(n³).\n\n## Approach\n\n1. `cost(lock, turn)` is `⌈strength[lock - 1] / turn⌉`, both numbered from 1.\n2. Potentials on locks and turns keep every slack, `cost - lockPotential - turnPotential`, non-negative.\n3. Insert the locks one by one, starting from the placeholder turn 0 (`owner[0]`). For each unvisited turn, `minSlack` is its smallest slack from a visited lock and `cameFrom` the turn that lock was reached through.\n4. Move to the unvisited turn with the smallest slack, `delta`, shifting the potentials by `delta`. If that turn has an owner, expand the owner next; if it is free, stop.\n5. Walk back along `cameFrom`, moving each lock on the path to its next turn: the new lock is matched and no lock loses its turn.\n6. Sum `cost(owner[turn], turn)` over all turns.\n\n## Example 1, step by step\n\n`strength = [3, 4, 1]`. Lock 1 costs 3, 2, 1 on turns 1 to 3 and takes the free turn 3 (slack 1). Lock 2 costs 4, 2, 2; the smallest slack, 2, is first reached on the free turn 2. Lock 3 costs 1 on every turn and takes turn 1. The total is `1 + 2 + 1 = 4`.\n\n## Complexity\n\n- Time: O(n³): n insertions, each with at most n rounds that scan all n turns.\n- Space: O(n): a few arrays of length n + 1; costs are computed on demand.\n\n## Pitfalls\n\n- Sorting by strength ignores the rounding, as example 1 shows.\n- Round up: `Math.ceil(s / t)`, or `(s + t - 1) / t` with integer division.\n- Set `owner[0]` to the new lock before each search, so the first round expands it.\n- A bitmask DP over the set of broken locks is exact but needs 2^n states.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `cost(lock, turn)` | minutes for `lock` when it is broken on `turn` |\n| `lockPotential`, `turnPotential` | potentials that keep every slack non-negative |\n| `owner[turn]` | the lock on `turn` (0 = free); `owner[0]` is the lock being inserted |\n| `cameFrom[turn]` | the previous turn on the search path |\n| `minSlack`, `visited` | smallest slack to each turn; turns already in the search |\n| `current`, `delta`, `nextTurn` | lock being expanded, potential shift, turn it makes tight |\n| `total` | cost of the final matching, the answer |",
+  "narration": {
+    "3": "A lock broken on turn t uses factor t, so it takes its strength divided by t, rounded up, minutes.",
+    "4": "Every lock and every turn gets a potential, starting at 0, so that no slack is ever negative.",
+    "6": "owner[turn] is the lock broken on that turn; 0 means the turn is still free.",
+    "8": "Add the locks to the matching one at a time.",
+    "9": "Park the new lock in the placeholder turn 0, where the search starts.",
+    "13": "Keep searching while the turn just reached already belongs to some lock.",
+    "15": "Expand from the lock that owns this turn.",
+    "20": "The slack says how far the edge from this lock to turn j is from being tight.",
+    "21": "Found a smaller slack for turn j...",
+    "23": "...so remember the turn it was reached from.",
+    "25": "Track the unvisited turn with the smallest slack.",
+    "32": "Shift the potentials by delta: each visited turn's lock goes up...",
+    "33": "...and the visited turn goes down, so tight edges stay tight.",
+    "35": "Every unvisited turn is now delta closer to tight.",
+    "38": "Step to the turn that has just become tight.",
+    "40": "A free turn was reached: walk the path back to turn 0.",
+    "42": "Each turn on the path takes the lock of the turn before it, which places the new lock.",
+    "48": "Add the minutes each lock needs on the turn it was matched to.",
+    "50": "The matching has the smallest total cost, which is the fewest minutes."
+  }
+}

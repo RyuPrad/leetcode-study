@@ -1,0 +1,71 @@
+{
+  "number": 3420,
+  "title": "Count Non-Decreasing Subarrays After K Operations",
+  "spec": "leetcode",
+  "statement": "`nums` is an integer array and `k` is a positive integer. Consider each contiguous, non-empty subarray of `nums` separately, always starting from the original values: an operation adds 1 to one element of that subarray, and at most `k` operations may be used on it.\n\nReturn how many subarrays can be made non-decreasing this way, meaning every element ends up at least as large as the one before it.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "1 <= nums[i] <= 10^9",
+    "1 <= k <= 10^9"
+  ],
+  "signature": "long countNonDecreasingSubarrays(int[] nums, int k)",
+  "entry": "countNonDecreasingSubarrays",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([nums, k]) {\n  if (nums.length < 1 || nums.length > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => v < 1 || v > 1000000000)) return 'Each value is between 1 and 10^9.';\n  if (k < 1 || k > 1000000000) return 'k is between 1 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function countNonDecreasingSubarrays(nums, k) {\n  const n = nums.length;\n  const nextAtLeast = new Array(n).fill(n);\n  const takeOver = Array.from({ length: n }, () => []);\n  const stack = [];\n  for (let i = 0; i < n; i++) {\n    while (stack.length > 0 && nums[stack[stack.length - 1]] <= nums[i]) {\n      nextAtLeast[stack.pop()] = i;\n    }\n    if (stack.length > 0) {\n      takeOver[stack[stack.length - 1]].push(i);\n    }\n    stack.push(i);\n  }\n\n  const maxQueue = [];\n  let head = 0;\n  let left = 0;\n  let cost = 0;\n  let count = 0;\n  for (let right = 0; right < n; right++) {\n    while (maxQueue.length > head && nums[maxQueue[maxQueue.length - 1]] <= nums[right]) {\n      maxQueue.pop();\n    }\n    maxQueue.push(right);\n    cost += nums[maxQueue[head]] - nums[right];\n    while (cost > k) {\n      for (const i of takeOver[left]) {\n        if (i > right) break;\n        cost -= (nums[left] - nums[i]) * (Math.min(nextAtLeast[i], right + 1) - i);\n      }\n      left++;\n      if (maxQueue[head] < left) head++;\n    }\n    count += right - left + 1;\n  }\n  return count;\n}",
+  "brute": "function countNonDecreasingSubarrays(nums, k) {\n  // Fix each subarray greedily: every element that dips below the one before it is raised to match it.\n  let count = 0;\n  for (let start = 0; start < nums.length; start++) {\n    let last = nums[start], spent = 0;\n    for (let end = start; end < nums.length; end++) {\n      if (nums[end] < last) spent += last - nums[end];\n      else last = nums[end];\n      if (spent <= k) count++;\n    }\n  }\n  return count;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const large = size === 'large';\n  const n = large ? 2000 : 1 + pick(8);\n  // Values come from a narrow or a wide range; some arrays are sorted up or down.\n  const top = large ? [10, 1000, 1000000000][pick(3)] : [3, 10, 1000000000][pick(3)];\n  const nums = Array.from({ length: n }, () => 1 + pick(top));\n  const order = pick(5);\n  if (order === 1) nums.sort((a, b) => a - b);\n  if (order === 2) nums.sort((a, b) => b - a);\n  // k is tiny, comparable to the values, or the largest allowed.\n  const choice = pick(3);\n  const k = choice === 0 ? 1 + pick(3) : choice === 1 ? 1 + pick(top * (large ? 50 : 3)) : 1000000000;\n  return [nums, Math.min(k, 1000000000)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[6,3,1,2,4,4],7],"expected":17},
+    {"name":"Example 2","input":[[6,3,1,3,6],4],"expected":12}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[5],1]},
+    {"name":"Test 2","input":[[1,2,3,4,5],1]},
+    {"name":"Test 3","input":[[5,4,3,2,1],1]},
+    {"name":"Test 4","input":[[5,4,3,2,1],1000000000]},
+    {"name":"Test 5","input":[[1000000000,1,1000000000,1],1000000000]},
+    {"name":"Test 6","input":[[3,3,3,3],1]},
+    {"name":"Test 7","input":[[1,1000000000,1,1000000000,1],999999999]},
+    {"name":"Test 8","input":[[2,1,2,1,2,1,2,1],1]},
+    {"name":"Test 9","input":[[10,1,1,1,1,1,1,1,1,1],9]},
+    {"name":"Test 10","input":[[4,8,2,9,1,7,3,6,5],6]},
+    {"name":"Test 11","input":[[5,3,3,3,1,4],4]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":25,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":47,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe cheapest fix raises each element to its running maximum (the largest value up to it), so a subarray costs the sum of running maximum minus value. Trying every subarray is O(n²).\n\nThe cost grows when the subarray gains an element on the right and shrinks when it loses its first one. So for each right end the working left ends form a range whose start never moves back: a sliding window. The hard part is the left end leaving, since it may have been the running maximum of a whole stretch.\n\n## Approach\n\n1. A monotonic stack finds `nextAtLeast[i]`, the first later index whose value is at least `nums[i]`, and `takeOver[p]`, the indices whose nearest strictly larger value on the left is `p`. These are the new running maxima once `p` is gone.\n2. Move `right` across `nums`. The deque `maxQueue` (read from `head`) holds the window's maximum, so adding `nums[right]` costs `nums[maxQueue[head]] - nums[right]`.\n3. While `cost > k`, drop `left`. Each `i` in `takeOver[left]` up to `right` becomes the running maximum of positions `i` to `min(nextAtLeast[i], right + 1) - 1`, saving `nums[left] - nums[i]` on each. Advance `left`, and `head` if it pointed there.\n4. Every start from `left` to `right` works, so add `right - left + 1`.\n\n## Example 1, step by step\n\n`nums = [6,3,1,2,4,4]`, `k = 7`. Windows `[6]` and `[6,3]` cost 0 and 3, adding 1 and 2. Taking in the 1 raises the cost by 5 to 8, over 7, so 6 leaves: index 1 (value 3) takes over positions 1 and 2, saving `(6 - 3) · 2 = 6`. Window `[3,1]` costs 2 and adds 2. It then grows to `[3,1,2,4,4]`, whose cost stays at 3, adding 3, 4 and 5. The total is `1 + 2 + 2 + 3 + 4 + 5 = 17`.\n\n## Complexity\n\n- Time: O(n): each index enters and leaves the stack and the deque once, and sits in at most one `takeOver` list.\n- Space: O(n) for the lists, the stack and the deque.\n\n## Pitfalls\n\n- The cost is not the sum of drops between neighbours: `[3,1,2]` needs `2 + 1 = 3` operations, because 2 must also reach 3.\n- When the first element leaves, every position it dominated gets cheaper, not just its own (which cost 0).\n- Stop each stretch at the next value that is at least as large; stopping only at larger values counts equal values twice.\n- The count can pass 2^31, so Java and C need 64-bit integers.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `nextAtLeast[i]` | first index after `i` with a value at least `nums[i]` (`n` if none) |\n| `takeOver[p]` | indices whose nearest strictly larger value on the left is `p` |\n| `stack` | indices still waiting for their `nextAtLeast` |\n| `maxQueue`, `head` | window indices with decreasing values; `maxQueue[head]` is the maximum |\n| `left`, `right` | the window's ends |\n| `cost` | operations that make `nums[left..right]` non-decreasing |\n| `count` | subarrays counted so far |",
+  "narration": {
+    "3": "By default no later value is at least nums[i], so its stretch runs to the end.",
+    "4": "takeOver[p] will list the indices that become running maxima once p leaves the window.",
+    "6": "Scan left to right, keeping a stack of indices whose values decrease.",
+    "7": "Each stacked value no larger than nums[i] has found its next value that is at least as big.",
+    "8": "Record i as that index's nextAtLeast and pop it.",
+    "10": "Whatever remains on top is the nearest strictly larger value left of i.",
+    "11": "So i takes over as the running maximum when that index leaves.",
+    "21": "Grow the window one element at a time to the right.",
+    "22": "Deque entries no larger than the new value can never be the maximum again...",
+    "23": "...so drop them from the back.",
+    "25": "The new index joins the back of the deque.",
+    "26": "The new element must rise to the window's maximum, found at the deque's head.",
+    "27": "Too many operations: shrink the window from the left.",
+    "28": "Visit the indices that take over from the leaving element...",
+    "29": "...but only those already inside the window.",
+    "30": "Positions from i up to its next at-least-as-large value now rise only to nums[i], saving nums[left] - nums[i] each.",
+    "32": "The old left end is gone.",
+    "33": "If the maximum was the old left end, the next deque entry becomes the maximum.",
+    "35": "Every start from left to right gives a subarray ending at right that can be fixed.",
+    "37": "Return the number of subarrays counted."
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "number": 3283,
+  "title": "Maximum Number of Moves to Kill All Pawns",
+  "spec": "leetcode",
+  "statement": "A 50 × 50 chessboard has squares `(x, y)` with `0 <= x, y <= 49`. A knight starts on `(kx, ky)`, and pawn `i` stands on `positions[i] = [x_i, y_i]`; a knight move goes two squares along one axis and one square along the other, staying on the board.\n\nAlice and Bob alternate turns, Alice first. On a turn the player picks any remaining pawn (not necessarily the closest), and the knight captures it by a shortest knight path, adding that path's length to the game's total. Other pawns never block the path, and they are not captured when it passes over their squares. The game ends when every pawn is captured; Alice plays to make the total as large as possible and Bob to make it as small as possible. Return the total under optimal play by both.",
+  "constraints": [
+    "0 <= kx, ky <= 49",
+    "1 <= positions.length <= 15",
+    "positions[i].length == 2",
+    "0 <= positions[i][0], positions[i][1] <= 49",
+    "All positions[i] are distinct",
+    "No pawn starts on the knight's square: positions[i] != [kx, ky]"
+  ],
+  "signature": "int maxMoves(int kx, int ky, int[][] positions)",
+  "entry": "maxMoves",
+  "kind": "function",
+  "parameters": [
+    "kx",
+    "ky",
+    "positions"
+  ],
+  "validator": "function validate([kx, ky, positions]) {\n  const inside = v => v >= 0 && v <= 49;\n  if (!inside(kx) || !inside(ky)) return 'kx and ky are between 0 and 49.';\n  if (positions.length < 1 || positions.length > 15) return 'positions needs 1 to 15 pawns.';\n  if (positions.some(p => p.length !== 2 || !inside(p[0]) || !inside(p[1]))) return 'Each pawn is [x, y] with 0 <= x, y <= 49.';\n  const squares = new Set(positions.map(([x, y]) => x * 50 + y));\n  if (squares.size !== positions.length) return 'Two pawns share a square.';\n  if (squares.has(kx * 50 + ky)) return \"A pawn cannot start on the knight's square.\";\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxMoves(kx, ky, positions) {\n  const n = positions.length;\n  const points = [...positions, [kx, ky]];\n  const dx = [1, 2, 2, 1, -1, -2, -2, -1];\n  const dy = [2, 1, -1, -2, -2, -1, 1, 2];\n  // dist[i][j]: fewest knight moves from points[i] to points[j], found by a BFS from points[i].\n  const dist = [];\n  for (const [startX, startY] of points) {\n    const steps = Array.from({ length: 50 }, () => new Array(50).fill(-1));\n    steps[startX][startY] = 0;\n    const queue = [[startX, startY]];\n    for (let head = 0; head < queue.length; head++) {\n      const [x, y] = queue[head];\n      for (let d = 0; d < 8; d++) {\n        const nx = x + dx[d];\n        const ny = y + dy[d];\n        if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50 || steps[nx][ny] !== -1) continue;\n        steps[nx][ny] = steps[x][y] + 1;\n        queue.push([nx, ny]);\n      }\n    }\n    dist.push(points.map(([x, y]) => steps[x][y]));\n  }\n  // dp[mask][at]: moves still to come when the pawns in mask remain and the knight is on points[at].\n  const full = (1 << n) - 1;\n  const dp = Array.from({ length: full + 1 }, () => new Array(n + 1).fill(0));\n  for (let mask = 1; mask <= full; mask++) {\n    const pawns = [];\n    for (let j = 0; j < n; j++) {\n      if (mask & (1 << j)) pawns.push(j);\n    }\n    const aliceTurn = (n - pawns.length) % 2 === 0;\n    for (let at = 0; at <= n; at++) {\n      if (at < n && (mask & (1 << at))) continue;\n      let best = aliceTurn ? -Infinity : Infinity;\n      for (const j of pawns) {\n        const total = dist[at][j] + dp[mask ^ (1 << j)][j];\n        best = aliceTurn ? Math.max(best, total) : Math.min(best, total);\n      }\n      dp[mask][at] = best;\n    }\n  }\n  return dp[full][n];\n}",
+  "brute": "function maxMoves(kx, ky, positions) {\n  // Knight distance by a level-by-level search with string keys, stopping at the target.\n  const distance = (from, to) => {\n    const goal = to.join(',');\n    let frontier = [from];\n    const seen = new Set([from.join(',')]);\n    for (let moves = 0; ; moves++) {\n      if (frontier.some(p => p.join(',') === goal)) return moves;\n      const next = [];\n      for (const [x, y] of frontier) {\n        for (const [a, b] of [[1, 2], [2, 1]]) {\n          for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {\n            const p = [x + sx * a, y + sy * b];\n            if (p[0] < 0 || p[0] > 49 || p[1] < 0 || p[1] > 49 || seen.has(p.join(','))) continue;\n            seen.add(p.join(','));\n            next.push(p);\n          }\n        }\n      }\n      frontier = next;\n    }\n  };\n  const squares = [[kx, ky], ...positions];\n  const far = squares.map(a => squares.map(b => distance(a, b)));\n  // Plain minimax over every order of captures, with no memory of earlier states.\n  const play = (left, at, alice) => {\n    if (!left.length) return 0;\n    const totals = left.map(i => far[at][i] + play(left.filter(j => j !== i), i, !alice));\n    return alice ? Math.max(...totals) : Math.min(...totals);\n  };\n  return play(positions.map((_, i) => i + 1), 0, true);\n}",
+  "generator": "function generate(rand, size) {\n  const pick = limit => Math.floor(rand() * limit);\n  const large = size === 'large';\n  // Large inputs use 14 pawns: at the limit of 15, typical O(2^n * n^2) solutions come close to the judge's 2 second limit.\n  const count = large ? 14 : 1 + pick(6);\n  // Small inputs often crowd into a corner, where knight distances are least regular.\n  const span = large ? 50 : [3, 4, 6, 10, 50][pick(5)];\n  const baseX = pick(2) ? 0 : 50 - span;\n  const baseY = pick(2) ? 0 : 50 - span;\n  const used = new Set();\n  const squares = [];\n  while (squares.length < count + 1) {\n    const x = baseX + pick(span);\n    const y = baseY + pick(span);\n    if (used.has(x * 50 + y)) continue;\n    used.add(x * 50 + y);\n    squares.push([x, y]);\n  }\n  const [kx, ky] = squares.pop();\n  return [kx, ky, squares];\n}",
+  "examples": [
+    {"name":"Example 1","input":[1,1,[[0,0]]],"expected":4},
+    {"name":"Example 2","input":[0,2,[[1,1],[2,2],[3,3]]],"expected":8},
+    {"name":"Example 3","input":[0,0,[[1,2],[2,4]]],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[0,0,[[49,49]]]},
+    {"name":"Test 2","input":[25,25,[[26,27]]]},
+    {"name":"Test 3","input":[0,0,[[0,1]]]},
+    {"name":"Test 4","input":[10,10,[[11,12],[30,40]]]},
+    {"name":"Test 5","input":[24,24,[[0,0],[0,49],[49,0],[49,49],[25,25]]]},
+    {"name":"Test 6","input":[0,0,[[0,1],[1,0],[1,1],[2,2],[0,2],[2,0],[3,3],[1,3]]]},
+    {"name":"Test 7","input":[49,0,[[0,0],[0,10],[0,20],[0,30],[0,40],[0,49]]]},
+    {"name":"Test 8","input":[5,5,[[45,45],[45,46],[46,45],[44,44]]]},
+    {"name":"Test 9","input":[20,20,[[21,22],[22,24],[23,26],[24,28],[25,30],[26,32],[27,34]]]},
+    {"name":"Test 10","input":[3,47,[[48,1],[2,2],[47,48]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA turn costs the knight distance from the knight's square to the chosen pawn, and the knight then stands on that pawn's square. So the rest of the game depends only on which pawns remain and where the knight is; whose turn it is follows from the number of captures. Trying every capture order is O(n!), but orders keep meeting in the same state, so a DP over bitmasks of remaining pawns solves each state once. A BFS from each point supplies the distances, which near the edges follow no simple formula.\n\n## Approach\n\n1. Append the knight's start to `points` as index `n`.\n2. A BFS from each point fills `steps`; `dist[i]` keeps its entries at all points.\n3. `dp[mask][at]` is the number of moves still to come when the pawns in `mask` remain and the knight is on `points[at]`; it is 0 for `mask = 0`.\n4. Visit masks in increasing order (a capture always leads to a smaller mask) and list the `pawns` in each. Alice moves when the captures so far, `n - pawns.length`, are even.\n5. For each square `at` the knight can be on (a captured pawn or the start), try every pawn `j`: `dist[at][j] + dp[mask ^ (1 << j)][j]`. Alice keeps the largest total, Bob the smallest.\n6. Return `dp[full][n]`.\n\n## Example 1, step by step\n\n`points = [(0, 0), (1, 1)]` and `n = 1`. The corner is 4 moves from `(1, 1)`, for example `(1, 1) → (3, 2) → (1, 3) → (2, 1) → (0, 0)`, so `dist[1][0] = 4`. For `mask = 1`, `pawns = [0]` and nothing is captured yet, so Alice moves. `at = 0` is skipped because pawn 0 is still there, and `at = 1` gives `4 + dp[0][0] = 4`. The answer is `dp[1][1] = 4`.\n\n## Complexity\n\n- Time: O(n · 50² + 2^n · n²): one BFS per point, then 2^n masks × (n + 1) squares × up to n choices.\n- Space: O(2^n · n) for `dp`.\n\n## Pitfalls\n\n- Pawns do not block the knight, so the BFS runs on an empty board.\n- The infinite-board distance formula fails near edges: `(1, 1)` to `(0, 0)` takes 4 moves, not 2.\n- Greedy picks (always the nearest or the farthest pawn) are wrong: each capture also decides where the opponent starts.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `points` | pawn squares, then the knight's start (index `n`) |\n| `dx`, `dy` | the eight knight moves |\n| `dist` | `dist[i][j]`: knight distance from `points[i]` to `points[j]` |\n| `steps` | distances from the BFS start `(startX, startY)`; -1 = unseen |\n| `queue`, `head` | the BFS queue and the next entry to expand, `(x, y)` |\n| `nx`, `ny` | the square that move `d` reaches |\n| `dp`, `full` | `dp[mask][at]`: moves still to come; `full` has every pawn |\n| `mask`, `pawns` | the remaining pawns as bits, and their indices |\n| `aliceTurn` | whether Alice moves in this state |\n| `at` | index of the point where the knight stands |\n| `best`, `total` | best total so far, and the total if pawn `j` is captured next |",
+  "narration": {
+    "2": "Pawns get indices 0 to n - 1.",
+    "3": "The knight's start becomes point n, so the same BFS covers it.",
+    "4": "dx[d] and dy[d] together form one of the eight knight moves.",
+    "8": "Run one BFS from every point: each pawn and the knight's start.",
+    "9": "steps[x][y] will be the fewest moves from this start to (x, y); -1 means not reached yet.",
+    "12": "Expand squares in the order they were found, which is the order of their distance.",
+    "14": "Try all eight knight moves from (x, y).",
+    "17": "Skip moves that leave the board or land on a square whose distance is already known.",
+    "18": "BFS reaches a square first along a shortest route, so it is one move farther than (x, y).",
+    "22": "Keep the distances from this start to every point.",
+    "26": "Every state starts at 0, already right for mask 0: no pawns left, no moves to come.",
+    "27": "Visit masks from small to large: a capture always leads to a smaller mask.",
+    "30": "Collect the pawns still on the board in this state.",
+    "32": "n - pawns.length pawns are gone; after an even number of captures it is Alice's turn.",
+    "33": "The knight stands on a captured pawn's square or on its start, point n.",
+    "34": "A pawn still in mask is not captured, so the knight cannot be there; skip that state.",
+    "35": "Start from the worst value for the player to move.",
+    "36": "Try capturing each remaining pawn j next.",
+    "37": "That capture costs dist[at][j] moves, and the game continues from j's square without j.",
+    "38": "Alice keeps the largest total, Bob the smallest.",
+    "40": "Store this state's value for larger masks to use.",
+    "43": "At the start every pawn remains and the knight is on its starting square."
+  }
+}

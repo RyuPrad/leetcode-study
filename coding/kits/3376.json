@@ -1,0 +1,66 @@
+{
+  "number": 3376,
+  "title": "Minimum Time to Break Locks I",
+  "spec": "leetcode",
+  "statement": "There are `n` locks, and lock `i` can be broken once the sword's energy is at least `strength[i]`. The sword starts with energy `0` and a growth factor `x = 1`; at the end of every minute its energy rises by `x`. Locks are broken one at a time, in any order you choose: as soon as the energy reaches the strength of the lock you are working on, that lock breaks, the energy drops back to `0`, and `x` grows by `k`.\n\nReturn the fewest minutes in which all `n` locks can be broken.",
+  "constraints": [
+    "n == strength.length",
+    "1 <= n <= 8",
+    "1 <= k <= 10",
+    "1 <= strength[i] <= 10^6"
+  ],
+  "signature": "int findMinimumTime(List<Integer> strength, int k)",
+  "entry": "findMinimumTime",
+  "kind": "function",
+  "parameters": [
+    "strength",
+    "k"
+  ],
+  "validator": "function validate([strength, k]) {\n  if (strength.length < 1 || strength.length > 8) return 'strength needs 1 to 8 locks.';\n  if (strength.some(v => v < 1 || v > 1000000)) return 'Each strength is between 1 and 10^6.';\n  if (k < 1 || k > 10) return 'k is between 1 and 10.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findMinimumTime(strength, k) {\n  const n = strength.length;\n  const used = new Array(n).fill(false);\n  let best = Infinity;\n\n  function search(broken, time) {\n    if (time >= best) return;\n    if (broken === n) {\n      best = time;\n      return;\n    }\n    const factor = 1 + broken * k;\n    for (let i = 0; i < n; i++) {\n      if (used[i]) continue;\n      used[i] = true;\n      search(broken + 1, time + Math.ceil(strength[i] / factor));\n      used[i] = false;\n    }\n  }\n\n  search(0, 0);\n  return best;\n}",
+  "brute": "function findMinimumTime(strength, k) {\n  // Bitmask DP: dp[mask] is the least time to break exactly the locks in mask, in some order.\n  const n = strength.length;\n  const dp = new Array(1 << n).fill(Infinity);\n  dp[0] = 0;\n  for (let mask = 0; mask < (1 << n); mask++) {\n    let done = 0;\n    for (let j = 0; j < n; j++) if (mask & (1 << j)) done++;\n    const x = 1 + done * k;\n    for (let j = 0; j < n; j++) {\n      if (mask & (1 << j)) continue;\n      const minutes = Math.floor((strength[j] + x - 1) / x);\n      dp[mask | (1 << j)] = Math.min(dp[mask | (1 << j)], dp[mask] + minutes);\n    }\n  }\n  return dp[(1 << n) - 1];\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 8 : 1 + Math.floor(rand() * 6);\n  const k = 1 + Math.floor(rand() * 10);\n  // Small strengths make rounding up matter; large ones test the full range.\n  const top = rand() < 0.5 ? 1000000 : large ? 1000 : 40;\n  const strength = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  return [strength, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[3,4,1],1],"expected":4},
+    {"name":"Example 2","input":[[2,5,4],2],"expected":5}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],1]},
+    {"name":"Test 2","input":[[1000000],10]},
+    {"name":"Test 3","input":[[1,1,1,1,1,1,1,1],1]},
+    {"name":"Test 4","input":[[1000000,1000000,1000000,1000000,1000000,1000000,1000000,1000000],10]},
+    {"name":"Test 5","input":[[5,5],1]},
+    {"name":"Test 6","input":[[10,1],10]},
+    {"name":"Test 7","input":[[27,29,20],4]},
+    {"name":"Test 8","input":[[29,22,5,4],7]},
+    {"name":"Test 9","input":[[8,6,4,2,7,5,3,1],2]},
+    {"name":"Test 10","input":[[999999,1,500000],5]},
+    {"name":"Test 11","input":[[12,12,12],10]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":17,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWith factor `x`, the energy after `t` minutes is `t · x`, so a lock of strength `s` takes `ceil(s / x)` minutes. The next lock's factor depends only on how many locks are already broken (`1 + broken · k`), so the total depends only on the order. With at most 8 locks there are at most 8! = 40,320 orders: try them all with backtracking, abandoning a partial order once it is no faster than the best complete one.\n\n## Approach\n\n1. `search(broken, time)` extends a partial order: `broken` locks are open after `time` minutes, and `used` marks which ones.\n2. If `time >= best`, stop: finishing this order cannot beat `best`.\n3. If all `n` locks are broken, this order is the fastest so far: `best = time`.\n4. Otherwise the factor is `1 + broken * k`. For each unused lock `i`, mark it, recurse with `time + ceil(strength[i] / factor)`, then unmark it.\n5. Call `search(0, 0)` and return `best`.\n\n## Example 1, step by step\n\n`strength = [3, 4, 1]`, `k = 1`. The first full order, locks 0, 1, 2, takes `3 + ceil(4/2) + ceil(1/3) = 3 + 2 + 1 = 6` minutes, so `best = 6`. Every other order that starts with lock 0 or lock 1 also reaches 6 and is dropped. Starting with lock 2 costs 1 minute; lock 0 then lock 1 adds `ceil(3/2) + ceil(4/3) = 2 + 2`, total 5. Lock 1 then lock 0 adds `ceil(4/2) + ceil(3/3) = 2 + 1`, total 4, the answer.\n\n## Complexity\n\n- Time: O(n · n!) in the worst case: up to n! orders, each step scanning `n` locks; pruning usually skips much of it.\n- Space: O(n) for `used` and the recursion depth.\n\n## Pitfalls\n\n- A lock takes `ceil(strength / factor)` minutes; a partial last minute still counts in full.\n- The factor depends on how many locks are already broken, not on the lock's index.\n- Weakest first is not always optimal: for `strength = [27, 29, 20]`, `k = 4`, the order 20, 29, 27 takes 29 minutes but 20, 27, 29 takes 30.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `used` | which locks the current partial order has broken |\n| `best` | the least total time of any complete order found so far |\n| `broken` | how many locks the partial order has broken |\n| `time` | minutes the partial order has taken |\n| `factor` | the sword's growth factor for the next lock |\n| `i` | the lock tried next |",
+  "narration": {
+    "3": "used marks the locks the current partial order has already broken.",
+    "4": "best is the fastest complete order found so far; none yet.",
+    "6": "search extends a partial order that has broken some locks in time minutes.",
+    "7": "Already no faster than the best complete order: finishing this one cannot help.",
+    "8": "Every lock is broken...",
+    "9": "...and faster than any earlier order, so remember this time.",
+    "12": "The sword's factor grows by k for each lock already broken.",
+    "13": "Try each lock as the next one to break.",
+    "14": "Skip locks this order has already broken.",
+    "15": "Choose lock i next.",
+    "16": "Breaking it takes ceil(strength[i] / factor) minutes; continue the order from there.",
+    "17": "Undo the choice so the next branch can use lock i later.",
+    "21": "Start with no locks broken and no time spent.",
+    "22": "The least total time over all orders."
+  }
+}

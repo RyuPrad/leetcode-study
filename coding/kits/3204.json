@@ -1,0 +1,51 @@
+{
+  "number": 3204,
+  "title": "Bitwise User Permissions Analysis",
+  "spec": "recalled",
+  "statement": "A single table stores what each user is allowed to do, packed into the bits of one number:\n\n- `user_permissions(user_id, permissions)`: one row per user; `user_id` is unique. Read `permissions` in binary: each bit that is 1 (worth 1, 2, 4, 8, ...) gives the user one particular right, so 5 = binary 101 means the rights worth 1 and 4. The value is a non-negative integer and never null, and the table has at least one row.\n\nReturn exactly one row with two integer columns:\n\n- `common_perms`: the bitwise AND of the `permissions` of all users, i.e. the bits that every user has set.\n- `any_perms`: the bitwise OR of the `permissions` of all users, i.e. the bits that at least one user has set.\n\nThe result has a single row, so row order does not matter.",
+  "constraints": [
+    "user_id is unique in user_permissions",
+    "0 <= permissions <= 2147483647, and permissions is never null",
+    "user_permissions has at least one row"
+  ],
+  "signature": "query",
+  "entry": "query",
+  "kind": "sql",
+  "parameters": [],
+  "schema": {
+    "user_permissions": [["user_id","INT"],["permissions","INT"]]
+  },
+  "ordered": false,
+  "validator": "function validate(input) {\n  const [{ user_permissions = [] }] = input;\n  if (!user_permissions.length) return 'user_permissions needs at least one row.';\n  const ids = new Set();\n  for (const [id, permissions] of user_permissions) {\n    if (id === null) return 'Every row needs a user_id.';\n    if (ids.has(id)) return `user_id ${id} appears twice.`;\n    ids.add(id);\n    if (permissions === null) return `User ${id} has null permissions; use 0 for none.`;\n    if (permissions < 0 || permissions > 2147483647) return `User ${id}'s permissions must be from 0 to 2147483647.`;\n  }\n  return null;\n}",
+  "languages": [
+    "sql"
+  ],
+  "reference": "SELECT\n  BIT_AND(permissions) AS common_perms,\n  BIT_OR(permissions) AS any_perms\nFROM user_permissions;",
+  "brute": "WITH RECURSIVE powers AS (\n  SELECT 1 AS weight\n  UNION ALL\n  SELECT weight * 2 FROM powers WHERE weight < 1073741824\n),\nper_bit AS (\n  SELECT p.weight,\n         MIN((u.permissions DIV p.weight) % 2) AS held_by_all,\n         MAX((u.permissions DIV p.weight) % 2) AS held_by_any\n  FROM powers AS p\n  CROSS JOIN user_permissions AS u\n  GROUP BY p.weight\n)\nSELECT SUM(weight * held_by_all) AS common_perms,\n       SUM(weight * held_by_any) AS any_perms\nFROM per_bit",
+  "generator": "function generate(rand, size) {\n  const small = size === 'small';\n  const count = small ? 1 + Math.floor(rand() * 8) : 2000;\n  // Distinct user ids from a wider pool, shuffled so they are neither consecutive nor sorted.\n  const pool = Array.from({ length: small ? 20 : 4000 }, (_, i) => i + 1);\n  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }\n  // A random mask over the lowest `width` bits; width <= 31 keeps every value a non-negative INT.\n  const mask = (width, chance) => { let m = 0; for (let bit = 0; bit < width; bit++) if (rand() < chance) m |= 1 << bit; return m; };\n  const width = small ? 3 + Math.floor(rand() * 3) : 31;\n  // Bits every user has (often none), and the bits users may hold on top of them.\n  const shared = rand() < 0.6 ? mask(width, small ? 0.3 : 0.15) : 0;\n  const optional = mask(width, small ? 0.8 : 0.5);\n  const high = small && rand() < 0.2 ? 1 << 30 : 0;\n  const user_permissions = [];\n  for (let i = 0; i < count; i++) {\n    let permissions = shared | (mask(width, 0.5) & optional);\n    if (high && rand() < 0.7) permissions |= high;\n    // Small tables sometimes hold a user with no rights or one with every right.\n    if (small) { const roll = rand(); if (roll < 0.1) permissions = 0; else if (roll < 0.14) permissions = 2147483647; }\n    user_permissions.push([pool[i], permissions]);\n  }\n  return [{ user_permissions }];\n}",
+  "examples": [
+    {"name":"Example 1","input":[{"user_permissions":[[1,5],[2,12],[3,7],[4,3]]}],"expected":{"columns":["common_perms","any_perms"],"rows":[[0,15]]}}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[{"user_permissions":[[7,9]]}]},
+    {"name":"Test 2","input":[{"user_permissions":[[1,0]]}]},
+    {"name":"Test 3","input":[{"user_permissions":[[3,6],[8,6],[5,6],[1,6]]}]},
+    {"name":"Test 4","input":[{"user_permissions":[[1,5],[2,7],[3,0],[4,21]]}]},
+    {"name":"Test 5","input":[{"user_permissions":[[1,2],[2,6],[3,14],[4,30]]}]},
+    {"name":"Test 6","input":[{"user_permissions":[[10,1],[20,2],[30,4],[40,8],[50,16]]}]},
+    {"name":"Test 7","input":[{"user_permissions":[[4,13],[9,11],[2,7]]}]},
+    {"name":"Test 8","input":[{"user_permissions":[[1,2147483647],[2,1073741824],[3,1073741825]]}]},
+    {"name":"Test 9","input":[{"user_permissions":[[1,170],[2,85]]}]},
+    {"name":"Test 10","input":[{"user_permissions":[[1,12],[2,10],[3,9],[4,8]]}]},
+    {"name":"Test 11","input":[{"user_permissions":[[15,0],[4,0],[9,0]]}]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThink of each `permissions` value as a row of on/off switches, one per bit. A right is shared by **every** user exactly when its bit is 1 in every row, and that is what bitwise AND keeps. A right is held by **someone** when its bit is 1 in at least one row, which is what bitwise OR keeps. MySQL offers both as aggregate functions, `BIT_AND` and `BIT_OR`, which fold a whole column the way `SUM` adds one up. Without a `GROUP BY`, the whole table is a single group, so one `SELECT` gives the one-row answer.\n\n## Approach\n\n1. `FROM user_permissions`: read every row; nothing is filtered, because both answers are about all users.\n2. `BIT_AND(permissions)` combines the column with AND and is named `common_perms`.\n3. `BIT_OR(permissions)` combines the same column with OR and is named `any_perms`.\n4. Leave out `GROUP BY`, so both aggregates cover the whole table and exactly one row comes back.\n\n## Example 1, step by step\n\nThe four masks in binary, lowest bit on the right:\n\n| user_id | permissions | binary |\n| --- | --- | --- |\n| 1 | 5 | 0101 |\n| 2 | 12 | 1100 |\n| 3 | 7 | 0111 |\n| 4 | 3 | 0011 |\n\n- AND: the 1-bit is missing for user 2, the 2-bit for users 1 and 2, the 4-bit for user 4 and the 8-bit for users 1, 3 and 4. No bit is set in all four rows, so `common_perms = 0`. Folding row by row agrees: 5 & 12 = 4, 4 & 7 = 4, 4 & 3 = 0.\n- OR: every bit is set by someone (the 1-bit and the 4-bit by user 1, the 8-bit by user 2, the 2-bit by user 3), so `any_perms = 1 + 2 + 4 + 8 = 15`.\n\nThe result is the single row `common_perms = 0`, `any_perms = 15`.\n\n## Complexity\n\n- Time: O(U) for U users: one scan with a constant-time AND and OR per row.\n- Space: O(1): each aggregate keeps one running value.\n\n## Pitfalls\n\n- `SUM(permissions)` is not OR: a bit that two users share is counted twice (5 + 7 = 12, while 5 | 7 = 7).\n- `MIN` and `MAX` are not AND and OR: on Example 1 they give 3 and 12 instead of 0 and 15.\n- Do not filter out users with `permissions = 0`: one user without rights makes `common_perms` 0, and if a filter leaves no rows, MySQL's `BIT_AND` returns 18446744073709551615 (all 64 bits set).\n- A `GROUP BY user_id` returns one row per user instead of the single summary row.\n\n## Clauses\n\n| Name | Meaning |\n| --- | --- |\n| `user_permissions` | the input, one bit mask per user, read in full |\n| `BIT_AND(permissions)` | the bits set in every row |\n| `BIT_OR(permissions)` | the bits set in at least one row |\n| `common_perms` | the AND result: the rights all users share |\n| `any_perms` | the OR result: the rights at least one user holds |",
+  "narration": {
+    "1": "Only aggregates are selected and there is no GROUP BY, so the whole table forms one group and exactly one row comes back.",
+    "2": "BIT_AND folds every permissions value with AND, keeping just the bits that all users have.",
+    "3": "BIT_OR folds the same column with OR, keeping every bit that at least one user has.",
+    "4": "Both aggregates read all of user_permissions; no row is filtered out, because the answers concern every user."
+  }
+}

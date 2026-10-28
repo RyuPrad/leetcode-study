@@ -1,0 +1,82 @@
+{
+  "number": 3387,
+  "title": "Maximize Amount After Two Days of Conversions",
+  "spec": "leetcode",
+  "statement": "You begin with exactly `1.0` unit of the currency `initialCurrency`, and you trade over two days.\n\n- On day 1, each pair `pairs1[i] = [start, target]` lets you swap one unit of `start` for `rates1[i]` units of `target`, and also one unit of `target` for `1 / rates1[i]` units of `start`.\n- Day 2 works the same way with `pairs2` and `rates2`.\n\nFirst make any number of swaps (zero is fine) using only day 1's pairs, then any number of swaps (zero is fine) using only day 2's pairs. Return the largest amount of `initialCurrency` you can be holding at the end of day 2.\n\nWithin one day the rates never contradict each other and the pairs never form a cycle; the two days' rates have nothing to do with each other. The answer never exceeds `5 * 10^10`, and answers within a relative error of `10^-5` are accepted.",
+  "constraints": [
+    "1 <= initialCurrency.length <= 3",
+    "initialCurrency consists only of uppercase English letters",
+    "1 <= n == pairs1.length <= 10",
+    "1 <= m == pairs2.length <= 10",
+    "pairs1[i] and pairs2[i] are [startCurrency, targetCurrency]",
+    "1 <= startCurrency.length, targetCurrency.length <= 3",
+    "Every currency name consists only of uppercase English letters",
+    "rates1.length == n and rates2.length == m",
+    "1.0 <= rates1[i], rates2[i] <= 10.0",
+    "Neither day's pairs contain a contradiction or a cycle",
+    "The answer is at most 5 * 10^10"
+  ],
+  "signature": "double maxAmount(String initialCurrency, List<List<String>> pairs1, double[] rates1, List<List<String>> pairs2, double[] rates2)",
+  "entry": "maxAmount",
+  "kind": "function",
+  "parameters": [
+    "initialCurrency",
+    "pairs1",
+    "rates1",
+    "pairs2",
+    "rates2"
+  ],
+  "compare": "float",
+  "validator": "function validate([initialCurrency, pairs1, rates1, pairs2, rates2]) {\n  const name = /^[A-Z]{1,3}$/;\n  if (!name.test(initialCurrency)) return 'initialCurrency is 1 to 3 uppercase letters.';\n  const reached = [];\n  for (const [pairs, rates, label] of [[pairs1, rates1, 'day 1'], [pairs2, rates2, 'day 2']]) {\n    if (pairs.length < 1 || pairs.length > 10) return `Each day needs 1 to 10 pairs (${label} has ${pairs.length}).`;\n    if (rates.length !== pairs.length) return `Give ${label} exactly one rate per pair.`;\n    const parent = new Map();\n    const find = (x) => { while (parent.get(x) !== x) x = parent.get(x); return x; };\n    for (let i = 0; i < pairs.length; i++) {\n      const pair = pairs[i];\n      if (pair.length !== 2 || !pair.every(c => name.test(c))) return 'Each pair is two currency names of 1 to 3 uppercase letters.';\n      if (!(rates[i] >= 1 && rates[i] <= 10)) return 'Every rate is between 1.0 and 10.0.';\n      for (const c of pair) if (!parent.has(c)) parent.set(c, c);\n      const a = find(pair[0]);\n      const b = find(pair[1]);\n      if (a === b) return `The ${label} pairs must not form a cycle.`;\n      parent.set(a, b);\n    }\n    const amount = new Map([[initialCurrency, 1]]);\n    for (let round = 0; round <= pairs.length; round++) {\n      pairs.forEach(([a, b], i) => {\n        if (amount.has(a) && !amount.has(b)) amount.set(b, amount.get(a) * rates[i]);\n        if (amount.has(b) && !amount.has(a)) amount.set(a, amount.get(b) / rates[i]);\n      });\n    }\n    reached.push(amount);\n  }\n  let best = 1;\n  for (const [currency, held] of reached[0]) if (reached[1].has(currency)) best = Math.max(best, held / reached[1].get(currency));\n  if (best > 5e10 * (1 + 1e-9)) return 'These rates allow more than 5 * 10^10; the answer must stay within that.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxAmount(initialCurrency, pairs1, rates1, pairs2, rates2) {\n  const explore = (pairs, rates) => {\n    const graph = new Map();\n    const addEdge = (from, to, rate) => {\n      if (!graph.has(from)) {\n        graph.set(from, []);\n      }\n      graph.get(from).push([to, rate]);\n    };\n    for (let i = 0; i < pairs.length; i++) {\n      const [from, to] = pairs[i];\n      addEdge(from, to, rates[i]);\n      addEdge(to, from, 1 / rates[i]);\n    }\n    const amount = new Map();\n    const dfs = (currency, value) => {\n      amount.set(currency, value);\n      for (const [next, rate] of graph.get(currency) ?? []) {\n        if (!amount.has(next)) {\n          dfs(next, value * rate);\n        }\n      }\n    };\n    dfs(initialCurrency, 1);\n    return amount;\n  };\n\n  const day1 = explore(pairs1, rates1);\n  const day2 = explore(pairs2, rates2);\n  let best = 1;\n  for (const [currency, held] of day1) {\n    if (day2.has(currency)) {\n      best = Math.max(best, held / day2.get(currency));\n    }\n  }\n  return best;\n}",
+  "brute": "function maxAmount(initialCurrency, pairs1, rates1, pairs2, rates2) {\n  // Bellman-Ford style: relax every swap in both directions until no holding grows.\n  // Day 2 starts from every day-1 holding at once, since you may end day 1 in any of them.\n  const relax = (holding, pairs, rates) => {\n    let changed = true;\n    while (changed) {\n      changed = false;\n      pairs.forEach(([a, b], i) => {\n        for (const [from, to, rate] of [[a, b, rates[i]], [b, a, 1 / rates[i]]]) {\n          if (!holding.has(from)) continue;\n          const value = holding.get(from) * rate;\n          if (!holding.has(to) || value > holding.get(to) * (1 + 1e-12)) {\n            holding.set(to, value);\n            changed = true;\n          }\n        }\n      });\n    }\n    return holding;\n  };\n  const afterDay1 = relax(new Map([[initialCurrency, 1]]), pairs1, rates1);\n  return relax(new Map(afterDay1), pairs2, rates2).get(initialCurrency);\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (k) => Math.floor(rand() * k);\n  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';\n  const makeName = () => {\n    let name = '';\n    const length = 1 + pick(3);\n    for (let j = 0; j < length; j++) name += letters[pick(large ? 26 : 6)];\n    return name;\n  };\n  // A random forest of swaps over the shared pool, so the two days overlap in currencies.\n  const makeDay = (pool, edges) => {\n    const parent = pool.map((_, i) => i);\n    const find = (x) => (parent[x] === x ? x : (parent[x] = find(parent[x])));\n    const pairs = [];\n    const rates = [];\n    while (pairs.length < edges) {\n      const a = pick(pool.length);\n      const b = pick(pool.length);\n      if (find(a) === find(b)) continue;\n      parent[find(a)] = find(b);\n      pairs.push([pool[a], pool[b]]);\n      rates.push((10 + pick(91)) / 10);\n    }\n    return [pairs, rates];\n  };\n  const reach = (start, pairs, rates) => {\n    const amount = new Map([[start, 1]]);\n    for (let round = 0; round <= pairs.length; round++) {\n      pairs.forEach(([a, b], i) => {\n        if (amount.has(a) && !amount.has(b)) amount.set(b, amount.get(a) * rates[i]);\n        if (amount.has(b) && !amount.has(a)) amount.set(a, amount.get(b) / rates[i]);\n      });\n    }\n    return amount;\n  };\n  for (;;) {\n    const names = new Set();\n    // Large inputs use 10 swaps a day over 11 currencies: two spanning trees, so every currency is shared.\n    const count = large ? 11 : 2 + pick(5);\n    while (names.size < count) names.add(makeName());\n    const pool = [...names];\n    let initialCurrency = pool[0];\n    if (!large && rand() < 0.1) {\n      do initialCurrency = makeName(); while (names.has(initialCurrency));\n    }\n    const [pairs1, rates1] = makeDay(pool, large ? 10 : 1 + pick(Math.min(5, pool.length - 1)));\n    const [pairs2, rates2] = makeDay(pool, large ? 10 : 1 + pick(Math.min(5, pool.length - 1)));\n    // Keep the answer within the guaranteed 5 * 10^10.\n    const day1 = reach(initialCurrency, pairs1, rates1);\n    const day2 = reach(initialCurrency, pairs2, rates2);\n    let best = 1;\n    for (const [currency, held] of day1) if (day2.has(currency)) best = Math.max(best, held / day2.get(currency));\n    if (best <= 5e10) return [initialCurrency, pairs1, rates1, pairs2, rates2];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":["EUR",[["EUR","USD"],["USD","JPY"]],[2,3],[["JPY","USD"],["USD","CHF"],["CHF","EUR"]],[4,5,6]],"expected":720},
+    {"name":"Example 2","input":["NGN",[["NGN","EUR"]],[9],[["NGN","EUR"]],[6]],"expected":1.5},
+    {"name":"Example 3","input":["USD",[["USD","EUR"]],[1],[["EUR","JPY"]],[10]],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["A",[["B","C"]],[2],[["C","B"]],[3]]},
+    {"name":"Test 2","input":["X",[["X","A"],["X","B"]],[10,2],[["X","A"],["B","X"]],[9,3]]},
+    {"name":"Test 3","input":["A",[["B","A"]],[2],[["B","A"]],[8]]},
+    {"name":"Test 4","input":["USD",[["USD","EUR"],["EUR","GBP"],["GBP","JPY"]],[1.5,1.2,2.5],[["USD","EUR"],["EUR","GBP"],["GBP","JPY"]],[1.5,1.2,2.5]]},
+    {"name":"Test 5","input":["A",[["A","B"],["B","C"],["C","D"],["D","E"],["E","F"],["F","G"],["G","H"],["H","I"],["I","J"],["J","K"]],[10,10,10,10,10,10,10,10,10,10],[["K","A"]],[5]]},
+    {"name":"Test 6","input":["AB",[["AB","CD"],["CD","EF"]],[1,1],[["EF","AB"],["CD","GH"]],[1,1]]},
+    {"name":"Test 7","input":["JPY",[["USD","JPY"],["EUR","USD"]],[10,1.1],[["USD","CHF"],["CHF","JPY"],["EUR","CHF"]],[4,5,9]]},
+    {"name":"Test 8","input":["GBP",[["GBP","EUR"],["USD","JPY"]],[1.2,9],[["JPY","GBP"],["EUR","GBP"]],[2,1.5]]},
+    {"name":"Test 9","input":["Q",[["Q","RS"],["RS","TUV"],["Q","W"]],[3.5,2,7.5],[["TUV","W"],["W","Q"]],[1.5,1.2]]},
+    {"name":"Test 10","input":["EUR",[["EUR","USD"]],[10],[["USD","JPY"],["JPY","CHF"]],[10,10]]},
+    {"name":"Test 11","input":["C",[["C","A"],["C","B"],["C","D"],["D","E"]],[2.5,4,1.5,6.5],[["A","C"],["C","B"],["E","D"],["D","C"]],[3,4,1.5,1.5]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithin one day the rates are consistent and the pairs form a forest, so every route from one currency to another gives the same rate: the product along the unique path, using `1 / rate` when a pair is walked backwards. The whole plan therefore comes down to one choice, the currency `c` you hold when day 1 ends. You hold `day1[c]` units of it, and on day 2 each unit turns back into `1 / day2[c]` units of `initialCurrency`, where `dayK[c]` is the rate from `initialCurrency` to `c` on day `K`. One depth-first search per day finds all of these rates at once.\n\n## Approach\n\n1. For one day, build an adjacency list `graph`: the pair `[from, to]` with rate `r` adds the edge `from → to` with weight `r` and `to → from` with weight `1 / r`.\n2. Run `dfs` from `initialCurrency` with value `1`. Crossing an edge of weight `rate` into an unseen currency `next` stores `value * rate` in `amount`.\n3. Do this for both days to get `day1` and `day2`.\n4. Start `best` at `1` (no swaps at all). For each currency in both maps, the `held` day-1 units become `held / day2[currency]` units of `initialCurrency`; keep the largest.\n\n## Example 1, step by step\n\n- Day 1 from EUR: `EUR = 1`, `USD = 2`, `JPY = 2 * 3 = 6`.\n- Day 2 from EUR: `CHF = 1/6`, `USD = 1/30`, `JPY = 1/120` (each step walks a pair backwards).\n- Candidates: EUR gives `1`, USD gives `2 / (1/30) = 60`, JPY gives `6 / (1/120) = 720`. So `best = 720`.\n\n## Complexity\n\n- Time: O(n + m): each day's graph is built and searched once, and the final loop visits each day-1 currency once.\n- Space: O(n + m) for the graphs, the `amount` maps and the recursion.\n\n## Pitfalls\n\n- Every pair also works backwards at `1 / rate`; without those edges example 2 cannot get back to NGN.\n- The best currency to end day 1 in is not the one with the most units: the ratio `day1[c] / day2[c]` decides.\n- A currency only counts if `initialCurrency` reaches it on both days.\n- `initialCurrency` may be missing from a day's pairs. Nothing can be gained then and the answer is `1`, but the search still starts there, which is why `dfs` reads `graph.get(currency) ?? []`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | one day's adjacency list: currency → list of `[next, rate]` |\n| `amount` | units of each reachable currency that one unit of `initialCurrency` buys that day |\n| `dfs(currency, value)` | records `value` for `currency`, then visits its unseen neighbours |\n| `day1`, `day2` | the `amount` maps of the two days |\n| `held` | units of `currency` held at the end of day 1 |\n| `best` | the most `initialCurrency` found so far |",
+  "narration": {
+    "2": "explore builds one day's conversion graph and returns how much of every reachable currency one starting unit buys.",
+    "8": "Record the edge from one currency to another with its rate.",
+    "10": "Go through the day's pairs one by one.",
+    "12": "Swapping start for target multiplies the amount by the rate...",
+    "13": "...and swapping back divides by it, so add the reverse edge with 1 / rate.",
+    "16": "dfs visits a currency holding value units of it.",
+    "17": "Remember the amount of this currency; it also marks it as visited.",
+    "18": "Look at every currency one swap away.",
+    "19": "The graph is a forest, so the first route found to a currency is the only one.",
+    "20": "Continue the search with the amount after this swap.",
+    "24": "Start the search from one unit of the initial currency.",
+    "28": "Rates from the initial currency to everything reachable on day 1.",
+    "29": "The same for day 2.",
+    "30": "Making no swaps at all keeps 1.0 of the initial currency.",
+    "31": "Try ending day 1 in each currency we could reach.",
+    "32": "It is only useful if day 2 can take it back to the initial currency.",
+    "33": "held units, each worth 1 / day2[currency] of the initial currency, give held / day2[currency].",
+    "36": "The largest amount over every choice of the day-1 currency."
+  }
+}

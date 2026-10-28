@@ -1,0 +1,65 @@
+{
+  "number": 3394,
+  "title": "Check if Grid can be Cut into Sections",
+  "spec": "leetcode",
+  "statement": "An `n x n` grid has its origin at the bottom-left corner. Each `rectangles[i] = [startX, startY, endX, endY]` is a rectangle drawn on it, with bottom-left corner `(startX, startY)` and top-right corner `(endX, endY)`. No two rectangles overlap, although they may share edges or corners.\n\nDecide whether you can draw either two horizontal lines or two vertical lines across the grid so that:\n\n- no line runs through the inside of a rectangle, so every rectangle lies entirely within one of the three strips the lines create (running along a rectangle's edge is fine), and\n- none of those three strips is empty: each holds at least one rectangle.\n\nReturn `true` if such a pair of lines exists and `false` otherwise.",
+  "constraints": [
+    "3 <= n <= 10^9",
+    "3 <= rectangles.length <= 10^5",
+    "0 <= rectangles[i][0] < rectangles[i][2] <= n",
+    "0 <= rectangles[i][1] < rectangles[i][3] <= n",
+    "No two rectangles overlap"
+  ],
+  "signature": "boolean checkValidCuts(int n, int[][] rectangles)",
+  "entry": "checkValidCuts",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "rectangles"
+  ],
+  "validator": "function validate([n, rectangles]) {\n  if (n < 3 || n > 1e9) return 'n is between 3 and 10^9.';\n  if (rectangles.length < 3 || rectangles.length > 1e5) return 'rectangles needs 3 to 10^5 rectangles.';\n  for (const r of rectangles) {\n    if (r.length !== 4) return 'Each rectangle is [startX, startY, endX, endY].';\n    if (r.some((v) => v < 0 || v > n)) return 'Every coordinate is between 0 and n.';\n    if (r[0] >= r[2] || r[1] >= r[3]) return 'Each rectangle needs startX < endX and startY < endY.';\n  }\n  // Sweep across x: rectangles present at the same x must have disjoint y-ranges.\n  const events = [];\n  rectangles.forEach((r, i) => events.push([r[0], 1, i], [r[2], 0, i]));\n  events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);\n  const active = [];\n  const position = (y) => {\n    let lo = 0;\n    let hi = active.length;\n    while (lo < hi) {\n      const mid = (lo + hi) >> 1;\n      if (active[mid][0] < y) lo = mid + 1;\n      else hi = mid;\n    }\n    return lo;\n  };\n  for (const [, open, i] of events) {\n    const y1 = rectangles[i][1];\n    const y2 = rectangles[i][3];\n    const at = position(y1);\n    if (!open) {\n      active.splice(at, 1);\n      continue;\n    }\n    if ((at > 0 && active[at - 1][1] > y1) || (at < active.length && active[at][0] < y2)) return 'No two rectangles may overlap.';\n    active.splice(at, 0, [y1, y2]);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function checkValidCuts(n, rectangles) {\n  const countBlocks = (from, to) => {\n    const spans = rectangles.map((rect) => [rect[from], rect[to]]);\n    spans.sort((a, b) => a[0] - b[0]);\n    let blocks = 0;\n    let reach = 0;\n    for (const [start, end] of spans) {\n      if (start >= reach) {\n        blocks++;\n      }\n      reach = Math.max(reach, end);\n    }\n    return blocks;\n  };\n\n  return countBlocks(0, 2) >= 3 || countBlocks(1, 3) >= 3;\n}",
+  "brute": "function checkValidCuts(n, rectangles) {\n  // Try every pair of rectangle edges as the two lines on each axis and test the definition directly.\n  for (const [lo, hi] of [[0, 2], [1, 3]]) {\n    const lines = [...new Set(rectangles.flatMap((r) => [r[lo], r[hi]]))].sort((a, b) => a - b);\n    for (const first of lines) {\n      for (const second of lines) {\n        if (first >= second) continue;\n        const crossed = rectangles.some((r) => (r[lo] < first && first < r[hi]) || (r[lo] < second && second < r[hi]));\n        if (crossed) continue;\n        const below = rectangles.filter((r) => r[hi] <= first).length;\n        const middle = rectangles.filter((r) => r[lo] >= first && r[hi] <= second).length;\n        const above = rectangles.filter((r) => r[lo] >= second).length;\n        if (below > 0 && middle > 0 && above > 0) return true;\n      }\n    }\n  }\n  return false;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (k) => Math.floor(rand() * k);\n  const shuffle = (list) => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = pick(i + 1);\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  // Guillotine tiling: split regions in two along an axis until there are enough tiles.\n  // With twoSlabs, the first cut is followed by cuts across it in both halves, which usually blocks every split.\n  const tile = (n, target, twoSlabs) => {\n    const regions = [[0, 0, n, n]];\n    const split = (i, vertical) => {\n      const [x1, y1, x2, y2] = regions[i];\n      const low = vertical ? x1 : y1;\n      const high = vertical ? x2 : y2;\n      if (high - low < 2) return;\n      const cut = low + 1 + pick(high - low - 1);\n      regions[i] = vertical ? [x1, y1, cut, y2] : [x1, y1, x2, cut];\n      regions.push(vertical ? [cut, y1, x2, y2] : [x1, cut, x2, y2]);\n    };\n    if (twoSlabs) {\n      const vertical = rand() < 0.5;\n      split(0, vertical);\n      for (let i = regions.length - 1; i >= 0; i--) split(i, !vertical);\n    }\n    for (let tries = 0; regions.length < target && tries < 20 * target; tries++) split(pick(regions.length), rand() < 0.5);\n    const keep = rand() < 0.5 ? 1 : 0.6 + 0.4 * rand();\n    return regions.filter(() => rand() < keep);\n  };\n  for (;;) {\n    const n = large ? 1000 + pick(999999001) : 3 + pick(6);\n    let rects;\n    if (large || rand() < 0.5) {\n      rects = tile(n, large ? 1500 + pick(501) : 3 + pick(7), rand() < 0.5);\n    } else {\n      // Random placement: a new rectangle is kept only if it misses every earlier one.\n      const target = 3 + pick(6);\n      rects = [];\n      for (let attempt = 0; attempt < 300 && rects.length < target; attempt++) {\n        const w = 1 + pick(Math.min(n, 4));\n        const h = 1 + pick(Math.min(n, 4));\n        const x = pick(n - w + 1);\n        const y = pick(n - h + 1);\n        if (rects.every(([a, b, c, d]) => c <= x || x + w <= a || d <= y || y + h <= b)) rects.push([x, y, x + w, y + h]);\n      }\n    }\n    if (rects.length >= 3 && rects.length <= 2000) return [n, shuffle(rects)];\n  }\n}",
+  "examples": [
+    {"name":"Example 1","input":[5,[[1,0,5,2],[0,2,2,4],[3,2,5,3],[0,4,4,5]]],"expected":true},
+    {"name":"Example 2","input":[4,[[0,0,1,1],[2,0,3,4],[0,2,2,3],[3,0,4,3]]],"expected":true},
+    {"name":"Example 3","input":[4,[[0,2,2,4],[1,0,3,2],[2,2,3,4],[3,0,4,2],[3,2,4,4]]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[3,[[0,0,3,1],[0,1,3,2],[0,2,3,3]]]},
+    {"name":"Test 2","input":[3,[[2,0,3,3],[0,0,1,3],[1,0,2,3]]]},
+    {"name":"Test 3","input":[3,[[0,0,2,1],[2,0,3,2],[1,2,3,3],[0,1,1,3],[1,1,2,2]]]},
+    {"name":"Test 4","input":[4,[[0,0,2,2],[2,0,4,2],[0,2,2,4],[2,2,4,4]]]},
+    {"name":"Test 5","input":[10,[[8,8,10,10],[0,0,1,1],[4,5,6,6]]]},
+    {"name":"Test 6","input":[1000000000,[[0,0,1000000000,1],[0,1,500000000,999999999],[500000000,1,1000000000,1000000000]]]},
+    {"name":"Test 7","input":[6,[[0,0,2,6],[2,0,4,3],[4,0,6,6]]]},
+    {"name":"Test 8","input":[6,[[0,0,5,1],[1,1,2,2],[3,1,4,2],[5,0,6,6]]]},
+    {"name":"Test 9","input":[5,[[0,0,5,1],[1,1,2,3],[3,1,4,2],[0,3,5,5]]]},
+    {"name":"Test 10","input":[7,[[0,0,3,2],[0,2,2,7],[2,2,3,4],[3,0,6,7],[6,3,7,4]]]},
+    {"name":"Test 11","input":[6,[[0,0,2,3],[2,0,4,3],[4,0,6,3],[0,3,1,6],[1,3,3,6],[3,3,5,6],[5,3,6,6]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":15,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":20,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA horizontal line `y = c` is allowed exactly when no rectangle has `c` strictly between its `startY` and `endY`. So only each rectangle's span on one axis matters. Merge the spans that overlap (spans that merely touch stay apart, because a line may run along a shared edge): each merged **block** is a stretch no line can cross, and a line fits between any two neighbouring blocks. Two lines with a rectangle in every section therefore exist exactly when some axis has at least three blocks. A brute force would try every pair of rectangle edges as the two lines and check the sections directly.\n\n## Approach\n\n1. `countBlocks(from, to)` takes every rectangle's span `[rect[from], rect[to]]` on one axis: indices 0 and 2 for x, 1 and 3 for y.\n2. Sort the spans by their start.\n3. Scan them while `reach` holds the furthest end seen so far. A span whose `start` is at or past `reach` shares no block with anything before it, so it opens a new block; either way `reach` grows to cover its `end`.\n4. Return `true` when either axis has at least 3 blocks: cut where the second and the third blocks begin.\n\n## Example 1, step by step\n\n- x-axis first: the sorted spans are `[0,2]`, `[0,4]`, `[1,5]`, `[3,5]`. The first opens block 1 and every later one starts before `reach`, so x has a single block.\n- y-axis: `[0,2]` opens block 1 and sets `reach = 2`; `[2,4]` starts at `2 >= 2`, opening block 2 with `reach = 4`; `[2,3]` starts inside it; `[4,5]` starts at `4 >= 4`, opening block 3.\n- Three blocks on y, so lines at `y = 2` and `y = 4` work and the answer is `true`.\n\n## Complexity\n\n- Time: O(m log m) for `m` rectangles: sorting the spans of each axis dominates the linear scan.\n- Space: O(m) for the list of spans.\n\n## Pitfalls\n\n- Touching spans are separate blocks: test `start >= reach`, not `start > reach`.\n- Keep `reach` as the largest end so far, not the end of the latest span: one long span can cover several short ones that sort after it.\n- Check both axes; many grids split only one way.\n- `n` plays no part: the rectangles alone decide.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `countBlocks(from, to)` | number of merged blocks on the axis whose coordinates sit at those indices |\n| `spans` | each rectangle's `[start, end]` on that axis, sorted by start |\n| `blocks` | blocks opened so far |\n| `reach` | furthest end among the spans scanned so far |\n| `start`, `end` | the span being scanned |",
+  "narration": {
+    "2": "countBlocks merges the rectangles' spans on one axis and counts the separate blocks.",
+    "3": "Project every rectangle onto the axis: rect[from] is where it starts and rect[to] where it ends.",
+    "4": "Sort the spans by their start so each block is scanned in one piece.",
+    "5": "No block has been opened yet.",
+    "6": "reach is the furthest end of any span seen so far.",
+    "7": "Visit the spans in order of their start.",
+    "8": "A span starting at or past reach shares no block with the earlier spans, so a line fits right before it.",
+    "9": "Count the new block.",
+    "11": "Grow reach to cover this span, keeping the largest end seen.",
+    "13": "Report how many blocks this axis has.",
+    "16": "Three or more blocks on the x-axis (vertical lines) or on the y-axis (horizontal lines) make the two cuts possible."
+  }
+}

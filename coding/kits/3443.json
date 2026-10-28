@@ -1,0 +1,63 @@
+{
+  "number": 3443,
+  "title": "Maximum Manhattan Distance After K Changes",
+  "spec": "leetcode",
+  "statement": "A walk starts at `(0, 0)` on an infinite grid and performs the moves of the string `s` one after another: `'N'` adds 1 to y, `'S'` subtracts 1 from y, `'E'` adds 1 to x and `'W'` subtracts 1 from x. Before the walk you may rewrite at most `k` characters of `s`, each to any of the four letters.\n\nReturn the largest Manhattan distance from the origin, `|x| + |y|`, that the walk can reach at any moment, over all ways of choosing the rewrites.",
+  "constraints": [
+    "1 <= s.length <= 10^5",
+    "0 <= k <= s.length",
+    "s contains only 'N', 'S', 'E' and 'W'"
+  ],
+  "signature": "int maxDistance(String s, int k)",
+  "entry": "maxDistance",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "k"
+  ],
+  "validator": "function validate([s, k]) {\n  if (s.length < 1 || s.length > 100000) return 's needs 1 to 100,000 moves.';\n  if (!/^[NSEW]+$/.test(s)) return \"s may contain only 'N', 'S', 'E' and 'W'.\";\n  if (!Number.isInteger(k) || k < 0 || k > s.length) return 'k is between 0 and the length of s.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxDistance(s, k) {\n  let x = 0;\n  let y = 0;\n  let best = 0;\n\n  for (let i = 0; i < s.length; i++) {\n    if (s[i] === 'N') {\n      y++;\n    } else if (s[i] === 'S') {\n      y--;\n    } else if (s[i] === 'E') {\n      x++;\n    } else {\n      x--;\n    }\n    const distance = Math.abs(x) + Math.abs(y);\n    const reachable = Math.min(distance + 2 * k, i + 1);\n    best = Math.max(best, reachable);\n  }\n  return best;\n}",
+  "brute": "function maxDistance(s, k) {\n  // Follow every walk that rewrites at most k moves, one move at a time. For each point reached keep the most\n  // rewrites left, since standing at the same point with more rewrites in hand can only reach more.\n  const steps = { N: [0, 1], S: [0, -1], E: [1, 0], W: [-1, 0] };\n  const n = s.length, width = 2 * n + 1;\n  let states = new Map([[n * width + n, k]]);\n  let best = 0;\n  for (const original of s) {\n    const next = new Map();\n    for (const [key, left] of states) {\n      const x = Math.floor(key / width) - n, y = key % width - n;\n      for (const move of 'NSEW') {\n        const rest = move === original ? left : left - 1;\n        if (rest < 0) continue;\n        const nx = x + steps[move][0], ny = y + steps[move][1];\n        best = Math.max(best, Math.abs(nx) + Math.abs(ny));\n        const nkey = (nx + n) * width + (ny + n);\n        if (!next.has(nkey) || next.get(nkey) < rest) next.set(nkey, rest);\n      }\n    }\n    states = next;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 10000 : 1 + Math.floor(rand() * 8);\n  // Uneven letter weights make some walks drift far and others keep doubling back.\n  const weights = [rand(), rand(), rand(), rand()].map(w => w * w + 0.05);\n  const total = weights.reduce((a, b) => a + b, 0);\n  let s = '';\n  for (let i = 0; i < n; i++) {\n    let r = rand() * total, d = 0;\n    while (d < 3 && r >= weights[d]) { r -= weights[d]; d++; }\n    s += 'NSEW'[d];\n  }\n  // On long walks a small k is the interesting range, so favour it there; k = n is still possible.\n  const k = Math.floor((size === 'large' ? rand() ** 3 : rand()) * (n + 1));\n  return [s, Math.min(n, k)];\n}",
+  "examples": [
+    {"name":"Example 1","input":["NWSE",1],"expected":3},
+    {"name":"Example 2","input":["NSWWEW",3],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["N",0]},
+    {"name":"Test 2","input":["S",1]},
+    {"name":"Test 3","input":["NS",0]},
+    {"name":"Test 4","input":["EWEWEWEWEW",10]},
+    {"name":"Test 5","input":["NSNSNSNSNSNS",2]},
+    {"name":"Test 6","input":["NNNNEEEE",3]},
+    {"name":"Test 7","input":["SSSSWWWWNNNN",2]},
+    {"name":"Test 8","input":["WWWWWWWWEEEEEEEEEEEE",0]},
+    {"name":"Test 9","input":["NESWNESWNESWSSWWNNEESWSWSWNENENWWWSEEN",4]},
+    {"name":"Test 10","input":["ENENSWSWSSSSWNWNENNNEESESWWW",28]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every way to rewrite at most `k` letters is exponential. Instead, look at one moment: after the first `i + 1` moves the walk stands at `(x, y)`. Some of those moves cancel others (an `S` against an `N`, a `W` against an `E`). Rewriting one cancelling move to point the other way turns a step back into a step forward, so the distance grows by exactly 2, and no single rewrite can do better. With `k` rewrites the distance grows by `2k`, but it can never exceed `i + 1`, the number of moves made. So the best distance at that moment is `min(|x| + |y| + 2k, i + 1)`, and the answer is the largest such value over all moments.\n\n## Approach\n\n1. Track the position `(x, y)` of the original walk and the answer `best`.\n2. For each index `i`, apply the move `s[i]`.\n3. Compute `distance = |x| + |y|` after the first `i + 1` moves.\n4. Spending the rewrites on cancelling moves adds `2k`, capped at `i + 1`: that is `reachable`.\n5. Keep the largest `reachable` in `best` and return it.\n\n## Example 1, step by step\n\n`s = \"NWSE\"`, `k = 1`, so each moment can gain up to 2.\n\n| i | move | (x, y) | distance | reachable |\n|---|---|---|---|---|\n| 0 | N | (0, 1) | 1 | min(3, 1) = 1 |\n| 1 | W | (-1, 1) | 2 | min(4, 2) = 2 |\n| 2 | S | (-1, 0) | 1 | min(3, 3) = 3 |\n| 3 | E | (0, 0) | 0 | min(2, 4) = 2 |\n\nThe answer is 3, reached at `i = 2` by rewriting the `S` to `N`, which puts the walk at `(-1, 2)`.\n\n## Complexity\n\n- Time: O(n), one pass over `s`.\n- Space: O(1), a few counters.\n\n## Pitfalls\n\n- The farthest point can come midway: the walk may end closer to the origin than it was earlier, so check every prefix, not only the end.\n- Cap at `i + 1`: with a large `k` the distance still cannot exceed the number of moves made.\n- A rewrite gains 2, not 1: it removes a step back and adds a step forward.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `x`, `y` | position after the moves so far, without rewrites |\n| `i` | index of the current move |\n| `distance` | Manhattan distance of `(x, y)` from the origin |\n| `reachable` | best distance at this moment using up to `k` rewrites |\n| `best` | largest `reachable` so far |",
+  "narration": {
+    "2": "x is the east-west coordinate of the walk as written.",
+    "3": "y is the north-south coordinate.",
+    "4": "best holds the largest distance found at any moment so far.",
+    "6": "Process the moves in order; after move i the walk has made i + 1 moves.",
+    "7": "Read the move and update the matching coordinate.",
+    "8": "N moves one step north, raising y.",
+    "10": "S moves one step south, lowering y.",
+    "12": "E moves one step east, raising x.",
+    "14": "Otherwise the move is W, one step west, lowering x.",
+    "16": "How far the unchanged walk is from the origin right now.",
+    "17": "Each rewrite of a cancelling move adds 2, but the distance cannot exceed the i + 1 moves made.",
+    "18": "Keep the best moment seen so far.",
+    "20": "The largest distance over all moments is the answer."
+  }
+}

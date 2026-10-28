@@ -1,0 +1,74 @@
+{
+  "number": 3419,
+  "title": "Minimize the Maximum Edge Weight of Graph",
+  "spec": "leetcode",
+  "statement": "A directed graph has `n` nodes labelled `0` to `n - 1`; each `edges[i] = [A_i, B_i, W_i]` is an edge from `A_i` to `B_i` with weight `W_i`. You may delete any number of edges, including none. The edges you keep must meet two conditions:\n\n- every node can get to node `0` by following kept edges in their direction;\n- no node is the start of more than `threshold` kept edges.\n\nOver all choices that meet both conditions, the largest weight among the kept edges should be as small as possible: return that smallest possible largest weight, or `-1` if no choice meets the conditions. Several edges may join the same two nodes, but such edges always have different weights.",
+  "constraints": [
+    "2 <= n <= 10^5",
+    "1 <= threshold <= n - 1",
+    "1 <= edges.length <= min(10^5, n * (n - 1) / 2)",
+    "edges[i] = [A_i, B_i, W_i]",
+    "0 <= A_i, B_i < n",
+    "A_i != B_i",
+    "1 <= W_i <= 10^6",
+    "Edges joining the same two nodes have different weights"
+  ],
+  "signature": "int minMaxWeight(int n, int[][] edges, int threshold)",
+  "entry": "minMaxWeight",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges",
+    "threshold"
+  ],
+  "validator": "function validate([n, edges, threshold]) {\n  if (n < 2 || n > 100000) return 'n is between 2 and 10^5.';\n  if (threshold < 1 || threshold > n - 1) return 'threshold is between 1 and n - 1.';\n  if (edges.length < 1 || edges.length > Math.min(100000, n * (n - 1) / 2)) return 'edges needs between 1 and min(10^5, n * (n - 1) / 2) entries.';\n  const seen = new Set();\n  for (const edge of edges) {\n    if (edge.length !== 3) return 'Each edge is [A, B, W].';\n    const [a, b, w] = edge;\n    if (a < 0 || a >= n || b < 0 || b >= n) return 'Edge endpoints are nodes 0 to n - 1.';\n    if (a === b) return 'An edge cannot start and end at the same node.';\n    if (w < 1 || w > 1000000) return 'Each weight is between 1 and 10^6.';\n    const key = Math.min(a, b) + ',' + Math.max(a, b) + ',' + w;\n    if (seen.has(key)) return 'Edges joining the same two nodes need different weights.';\n    seen.add(key);\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minMaxWeight(n, edges, threshold) {\n  const incoming = Array.from({ length: n }, () => []);\n  for (const [from, to, weight] of edges) {\n    incoming[to].push([from, weight]);\n  }\n  const allReachZero = (limit) => {\n    const seen = new Array(n).fill(false);\n    seen[0] = true;\n    const queue = [0];\n    for (let head = 0; head < queue.length; head++) {\n      for (const [from, weight] of incoming[queue[head]]) {\n        if (weight <= limit && !seen[from]) {\n          seen[from] = true;\n          queue.push(from);\n        }\n      }\n    }\n    return queue.length === n;\n  };\n  const weights = [...new Set(edges.map(edge => edge[2]))].sort((a, b) => a - b);\n  let left = 0;\n  let right = weights.length - 1;\n  if (!allReachZero(weights[right])) {\n    return -1;\n  }\n  while (left < right) {\n    const mid = Math.floor((left + right) / 2);\n    if (allReachZero(weights[mid])) {\n      right = mid;\n    } else {\n      left = mid + 1;\n    }\n  }\n  return weights[left];\n}",
+  "brute": "function minMaxWeight(n, edges, threshold) {\n  // Try every subset of edges; keep those that obey threshold and let every node reach 0, and take the lightest top weight.\n  let best = -1;\n  for (let mask = 1; mask < 2 ** edges.length; mask++) {\n    const kept = edges.filter((_, i) => Math.floor(mask / 2 ** i) % 2 === 1);\n    const out = new Array(n).fill(0);\n    for (const [a] of kept) out[a]++;\n    if (out.some(count => count > threshold)) continue;\n    const reaches = new Array(n).fill(false);\n    reaches[0] = true;\n    for (let changed = true; changed; ) {\n      changed = false;\n      for (const [a, b] of kept) if (reaches[b] && !reaches[a]) { reaches[a] = true; changed = true; }\n    }\n    if (!reaches.every(Boolean)) continue;\n    const top = Math.max(...kept.map(edge => edge[2]));\n    if (best === -1 || top < best) best = top;\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 800 + pick(400) : 2 + pick(5);\n  const limit = size === 'large' ? 2000 : Math.min(10, n * (n - 1) / 2);\n  const top = size === 'large' ? [1000, 1000000][pick(2)] : [3, 6, 1000000][pick(3)];\n  const edges = [];\n  const used = new Set();\n  // Edges joining the same two nodes need different weights.\n  const add = (a, b) => {\n    const weight = 1 + pick(top), key = Math.min(a, b) + ',' + Math.max(a, b) + ',' + weight;\n    if (!used.has(key)) { used.add(key); edges.push([a, b, weight]); }\n  };\n  // Usually give every node a path to 0 first (a random tree pointing at 0), so the answer is not always -1.\n  if (size === 'large' || rand() < 0.6) {\n    const order = Array.from({ length: n }, (_, i) => i);\n    for (let i = n - 1; i > 1; i--) { const j = 1 + pick(i); [order[i], order[j]] = [order[j], order[i]]; }\n    for (let i = 1; i < n; i++) while (edges.length < i) add(order[i], order[pick(i)]);\n  }\n  const target = size === 'large' ? limit : Math.max(edges.length, 1 + pick(limit));\n  while (edges.length < target) {\n    const a = pick(n);\n    let b = pick(n - 1);\n    if (b >= a) b++;\n    add(a, b);\n  }\n  return [n, edges, 1 + pick(n - 1)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[5,[[1,0,1],[2,0,2],[3,0,1],[4,3,1],[2,1,1]],2],"expected":1},
+    {"name":"Example 2","input":[5,[[0,1,1],[0,2,2],[0,3,1],[0,4,1],[1,2,1],[1,4,1]],1],"expected":-1},
+    {"name":"Example 3","input":[5,[[1,2,1],[1,3,3],[1,4,5],[2,3,2],[3,4,2],[4,0,1]],1],"expected":2},
+    {"name":"Example 4","input":[5,[[1,2,1],[1,3,3],[1,4,5],[2,3,2],[4,0,1]],1],"expected":-1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[2,[[1,0,7]],1]},
+    {"name":"Test 2","input":[2,[[0,1,3]],1]},
+    {"name":"Test 3","input":[3,[[1,0,5],[1,0,2],[2,1,4]],1]},
+    {"name":"Test 4","input":[5,[[4,3,3],[3,2,1],[2,1,4],[1,0,1]],2]},
+    {"name":"Test 5","input":[4,[[1,0,10],[2,0,10],[3,0,10],[1,2,1],[2,3,1],[3,0,1]],3]},
+    {"name":"Test 6","input":[5,[[1,0,1],[2,0,1],[3,0,1],[4,0,1]],1]},
+    {"name":"Test 7","input":[3,[[1,0,1000000],[2,1,1],[2,0,999999]],2]},
+    {"name":"Test 8","input":[4,[[0,1,1],[0,2,1],[0,3,1],[1,2,2]],3]},
+    {"name":"Test 9","input":[4,[[1,2,1],[2,3,1],[3,1,1],[3,0,9],[1,0,5]],1]},
+    {"name":"Test 10","input":[6,[[1,0,8],[2,0,3],[3,2,6],[4,3,2],[5,4,7],[5,0,9],[1,2,4],[3,0,5],[4,1,1],[5,3,6]],2]},
+    {"name":"Test 11","input":[3,[[1,2,1],[1,0,5],[2,1,2]],1]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\n`threshold` looks like the hard part, but it never binds. If every node can reach 0, a search from 0 along reversed edges reaches each other node through one edge leading one step closer to 0. Keeping only those edges leaves every node with one outgoing edge, and `threshold` is at least 1. So the question is the smallest limit `W` such that, with only edges of weight at most `W`, every node still reaches 0.\n\nRaising the limit only adds edges, so once a limit works, every larger one does too. That monotone test is what binary search on the answer needs, and the answer is always one of the edge weights.\n\n## Approach\n\n1. Build `incoming`: for every node, the `[from, weight]` pairs of the edges that end there.\n2. `allReachZero(limit)` runs a BFS from 0 over those reversed edges, using only edges with `weight <= limit`, and reports whether all `n` nodes were reached.\n3. Sort the distinct weights into `weights`. If even the largest fails, return -1.\n4. Binary search for the first index that passes: if `weights[mid]` works, set `right = mid`; otherwise set `left = mid + 1`.\n5. Return `weights[left]`.\n\n## Example 1, step by step\n\nThe edges are `1→0 (1)`, `2→0 (2)`, `3→0 (1)`, `4→3 (1)`, `2→1 (1)`, so `weights = [1, 2]`. With limit 2 every node reaches 0, so an answer exists. Then `mid = 0`, limit 1: the BFS from 0 finds 1 and 3, then 2 through `2→1` and 4 through `4→3`, all five nodes, so `right = 0` and the answer is `weights[0] = 1`.\n\n## Complexity\n\n- Time: O((n + m) log m) for m edges: about log m searches of O(n + m) each, plus sorting the weights.\n- Space: O(n + m) for the reversed lists, `seen` and the queue.\n\n## Pitfalls\n\n- The paths must end at 0, so search from 0 over reversed edges; a forward search from 0 answers a different question.\n- Do not try to enforce `threshold`: a single outgoing edge per node is always enough.\n- Picking each node's cheapest outgoing edge fails when it leads nowhere: with edges `[[1,2,1],[1,0,5],[2,1,2]]`, node 1's weight-1 edge goes to node 2, which can only come back, so the answer is 5.\n- Check the largest weight before searching; otherwise an impossible graph returns its largest weight instead of -1.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `incoming` | for each node, `[from, weight]` of the edges that end at it |\n| `allReachZero` | whether every node reaches 0 using edges of weight at most `limit` |\n| `seen`, `queue`, `head` | BFS state: nodes found, the order they were found in, and the next one to expand |\n| `weights` | the distinct edge weights in increasing order |\n| `left`, `right`, `mid` | the binary search range over `weights` |",
+  "narration": {
+    "1": "threshold is never read: one outgoing edge per node is enough to reach 0, and threshold is at least 1.",
+    "2": "For each node, collect the edges that end at it, so a search from 0 can walk them backwards.",
+    "4": "Store the edge reversed: from its end node we can step back to its start node.",
+    "6": "allReachZero(limit) tells whether every node can reach 0 when only edges of weight at most limit are kept.",
+    "10": "Breadth-first search from node 0 over reversed edges; head moves through the queue.",
+    "12": "Follow an edge only when it is light enough and its start node has not been found yet.",
+    "14": "That node reaches 0 through the node being expanded, so it joins the queue.",
+    "18": "The limit works exactly when the queue ended up holding all n nodes.",
+    "20": "The answer is always one of the edge weights, so search the distinct ones in increasing order.",
+    "23": "Even with every edge kept, some node may be cut off from 0...",
+    "24": "...and then no choice of edges works.",
+    "27": "Try the middle candidate weight.",
+    "28": "Does that limit already let every node reach 0?",
+    "29": "Yes: the answer is this weight or a smaller one, so keep mid in the range.",
+    "31": "No: the answer is a larger weight.",
+    "34": "left and right meet at the smallest weight that works."
+  }
+}
