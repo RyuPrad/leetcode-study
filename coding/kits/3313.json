@@ -1,0 +1,70 @@
+{
+  "number": 3313,
+  "title": "Find the Last Marked Nodes in Tree",
+  "spec": "recalled",
+  "statement": "An undirected tree has `n = edges.length + 1` nodes labelled `0` to `n - 1`, and each `edges[i] = [u, v]` joins nodes `u` and `v`. Suppose node `i` alone is marked at second 0. In every following second, each unmarked node that has at least one marked neighbour becomes marked, all of them at once, until the whole tree is marked.\n\nReturn an array `nodes` of length `n` in which `nodes[i]` is a node that gets marked last when the process starts from node `i`. If several nodes are marked in that final second, any one of them is accepted.",
+  "constraints": [
+    "2 <= n <= 10^5, where n = edges.length + 1",
+    "edges[i].length == 2",
+    "0 <= edges[i][0], edges[i][1] <= n - 1",
+    "edges describes a valid tree"
+  ],
+  "signature": "int[] lastMarkedNodes(int[][] edges)",
+  "entry": "lastMarkedNodes",
+  "kind": "function",
+  "parameters": [
+    "edges"
+  ],
+  "compare": "checker",
+  "checker": "function check(input, actual, expected) {\n  const [edges] = input;\n  const n = edges.length + 1;\n  if (!Array.isArray(actual) || actual.length !== n) return false;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) { graph[u].push(v); graph[v].push(u); }\n  // Root the tree at 0; parents, depths and binary-lifting ancestors give any distance in O(log n).\n  const parent = new Array(n).fill(0), depth = new Array(n).fill(-1), order = [0];\n  depth[0] = 0;\n  for (let h = 0; h < order.length; h++) for (const v of graph[order[h]]) if (depth[v] < 0) { depth[v] = depth[order[h]] + 1; parent[v] = order[h]; order.push(v); }\n  const up = [parent];\n  while ((1 << up.length) < n) { const prev = up[up.length - 1]; up.push(prev.map(p => prev[p])); }\n  const lca = (a, b) => {\n    if (depth[a] < depth[b]) [a, b] = [b, a];\n    for (let j = up.length - 1; j >= 0; j--) if (depth[a] - (1 << j) >= depth[b]) a = up[j][a];\n    if (a === b) return a;\n    for (let j = up.length - 1; j >= 0; j--) if (up[j][a] !== up[j][b]) { a = up[j][a]; b = up[j][b]; }\n    return parent[a];\n  };\n  const dist = (a, b) => depth[a] + depth[b] - 2 * depth[lca(a, b)];\n  // Both ends of a longest path: the deepest node, then the node farthest from it.\n  let endA = 0;\n  for (let v = 0; v < n; v++) if (depth[v] > depth[endA]) endA = v;\n  let endB = endA;\n  for (let v = 0; v < n; v++) if (dist(endA, v) > dist(endA, endB)) endB = v;\n  // nodes[i] must be as far from i as possible, and one of the two ends always is.\n  for (let i = 0; i < n; i++) {\n    const x = actual[i];\n    if (!Number.isInteger(x) || x < 0 || x >= n) return false;\n    if (dist(i, x) !== Math.max(dist(i, endA), dist(i, endB))) return false;\n  }\n  return true;\n}",
+  "validator": "function validate([edges]) {\n  const n = edges.length + 1;\n  if (n < 2 || n > 100000) return 'The tree has 2 to 100,000 nodes, so edges holds 1 to 99,999 pairs.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = (x) => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (edge.length !== 2) return 'Each edge is a pair [u, v].';\n    const [u, v] = edge;\n    if (u < 0 || u >= n || v < 0 || v >= n) return 'Edge ends are nodes 0 to n - 1, where n = edges.length + 1.';\n    const a = find(u), b = find(v);\n    if (a === b) return 'The edges must form a tree: no cycles, self-loops or repeated edges.';\n    root[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript"
+  ],
+  "reference": "function lastMarkedNodes(edges) {\n  const n = edges.length + 1;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) {\n    graph[u].push(v);\n    graph[v].push(u);\n  }\n\n  // Iterative depth-first search: every node's distance from start.\n  const distancesFrom = (start) => {\n    const dist = new Array(n).fill(-1);\n    dist[start] = 0;\n    const stack = [start];\n    while (stack.length > 0) {\n      const node = stack.pop();\n      for (const next of graph[node]) {\n        if (dist[next] === -1) {\n          dist[next] = dist[node] + 1;\n          stack.push(next);\n        }\n      }\n    }\n    return dist;\n  };\n\n  // The node with the largest distance (the first one on a tie).\n  const farthest = (dist) => {\n    let best = 0;\n    for (let node = 1; node < n; node++) {\n      if (dist[node] > dist[best]) {\n        best = node;\n      }\n    }\n    return best;\n  };\n\n  // Two searches find both ends of a diameter (a longest path).\n  const endA = farthest(distancesFrom(0));\n  const distA = distancesFrom(endA);\n  const endB = farthest(distA);\n  const distB = distancesFrom(endB);\n\n  // From every node, one of the two ends is a farthest node.\n  const answer = [];\n  for (let i = 0; i < n; i++) {\n    answer.push(distA[i] > distB[i] ? endA : endB);\n  }\n  return answer;\n}",
+  "brute": "function lastMarkedNodes(edges) {\n  const n = edges.length + 1;\n  const neighbours = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) { neighbours[u].push(v); neighbours[v].push(u); }\n  const answer = [];\n  // Simulate the marking second by second from each start and keep the final batch.\n  for (let start = 0; start < n; start++) {\n    const marked = new Set([start]);\n    let lastBatch = [start];\n    while (marked.size < n) {\n      const batch = [];\n      for (let v = 0; v < n; v++) if (!marked.has(v) && neighbours[v].some(u => marked.has(u))) batch.push(v);\n      for (const v of batch) marked.add(v);\n      lastBatch = batch;\n    }\n    answer.push(lastBatch[lastBatch.length - 1]);\n  }\n  return answer;\n}",
+  "generator": "function generate(rand, size) {\n  const n = size === 'large' ? 2001 : 2 + Math.floor(rand() * 10);\n  const shape = rand();\n  const parent = [];\n  for (let v = 1; v < n; v++) {\n    if (shape < 0.2) parent.push(v - 1); // a path\n    else if (shape < 0.35) parent.push(0); // a star\n    else if (shape < 0.65) parent.push(Math.max(0, v - 1 - Math.floor(rand() * 3))); // long and thin\n    else parent.push(Math.floor(rand() * v)); // random\n  }\n  // Relabel the nodes and shuffle the edges so that labels say nothing about the shape.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [label[i], label[j]] = [label[j], label[i]]; }\n  const edges = parent.map((p, i) => rand() < 0.5 ? [label[p], label[i + 1]] : [label[i + 1], label[p]]);\n  for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  return [edges];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1],[0,2]]],"expected":[2,2,1]},
+    {"name":"Example 2","input":[[[0,1]]],"expected":[1,0]},
+    {"name":"Example 3","input":[[[0,1],[0,2],[2,3],[2,4]]],"expected":[3,3,1,1,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,0]]]},
+    {"name":"Test 2","input":[[[3,4],[1,2],[0,1],[2,3]]]},
+    {"name":"Test 3","input":[[[3,0],[3,1],[3,2],[3,4],[3,5]]]},
+    {"name":"Test 4","input":[[[5,2],[2,7],[7,0],[0,3],[3,6],[6,1],[1,4]]]},
+    {"name":"Test 5","input":[[[0,1],[1,2],[2,3],[0,4],[4,5],[0,6]]]},
+    {"name":"Test 6","input":[[[0,1],[1,2],[2,3],[3,4],[3,5],[3,6],[3,7]]]},
+    {"name":"Test 7","input":[[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6],[3,7],[3,8],[4,9],[4,10],[5,11],[5,12],[6,13],[6,14]]]},
+    {"name":"Test 8","input":[[[0,1],[0,2],[0,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[11,13],[11,14]]]},
+    {"name":"Test 9","input":[[[23,3],[18,32],[28,0],[37,38],[23,4],[31,15],[15,9],[4,1],[33,21],[19,7],[18,37],[33,35],[36,33],[14,11],[2,1],[16,33],[30,18],[3,34],[36,13],[36,39],[24,28],[7,29],[28,4],[5,20],[17,36],[3,18],[6,14],[4,8],[16,27],[1,25],[22,27],[10,4],[7,5],[26,17],[5,15],[12,23],[15,8],[27,14],[15,27]]]},
+    {"name":"Test 10","input":[[[66,93],[112,104],[28,47],[32,72],[48,79],[41,24],[33,62],[9,39],[117,95],[116,65],[51,92],[103,84],[101,43],[36,53],[59,113],[65,11],[107,28],[105,62],[99,12],[27,72],[67,70],[106,23],[49,81],[111,118],[24,66],[19,52],[88,18],[40,39],[22,72],[25,68],[109,97],[75,86],[1,104],[76,73],[100,19],[85,11],[113,53],[22,35],[6,82],[69,97],[10,52],[111,62],[59,82],[74,43],[4,18],[6,89],[96,11],[55,81],[23,71],[15,50],[47,46],[20,37],[56,19],[66,37],[44,30],[42,8],[95,6],[76,69],[7,114],[8,25],[77,53],[103,94],[115,118],[3,33],[107,58],[56,40],[102,66],[86,5],[45,54],[45,27],[77,104],[102,83],[70,15],[98,44],[105,89],[13,73],[75,40],[79,8],[36,68],[71,38],[83,13],[63,25],[38,21],[91,110],[113,17],[111,80],[35,58],[53,67],[114,11],[10,3],[34,40],[57,76],[119,60],[114,108],[48,64],[108,47],[28,103],[2,32],[31,34],[87,29],[63,0],[33,16],[0,78],[75,85],[109,29],[106,27],[3,4],[14,26],[64,119],[12,23],[51,98],[32,14],[44,55],[65,101],[32,41],[91,31],[113,61],[76,55],[90,112]]]},
+    {"name":"Test 11","generate":{"seed":10,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":26,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThe marks spread one edge per second, so node `v` is marked exactly `dist(i, v)` seconds after the start: the last node marked is a node **farthest** from `i`. A search from every node would find them all in O(n²). A classic fact about trees does better: take a diameter (a longest path) with ends `endA` and `endB`; from any node, one of those two ends is at the largest distance. Three depth-first searches are enough.\n\n## Approach\n\n1. Build the adjacency list `graph` from `edges`.\n2. `distancesFrom(start)` runs a depth-first search with an explicit `stack`. A node reached for the first time gets its neighbour's distance plus 1; in a tree, that first visit always comes along the only path from `start`.\n3. `farthest(dist)` returns the node with the largest distance. Seen from node 0, it is one end of a diameter: `endA`.\n4. Distances from `endA` give `distA`, whose farthest node is the other end, `endB`; distances from it give `distB`.\n5. For each node `i`, answer `endA` if `distA[i] > distB[i]`, otherwise `endB`.\n\n## Example 1, step by step\n\n`edges = [[0,1],[0,2]]`. From node 0 the distances are `[0, 1, 1]`, so `endA = 1` (the first of the tied nodes). `distA = [1, 0, 2]` makes `endB = 2`, and `distB = [1, 2, 0]`. Node 0: `1 > 1` is false, so `2`. Node 1: `0 > 2` is false, so `2`. Node 2: `2 > 0`, so `1`. The answer is `[2, 2, 1]`.\n\n## Complexity\n\n- Time: O(n): three traversals and one pass over the nodes.\n- Space: O(n) for the graph, the distance arrays and the stack.\n\n## Pitfalls\n\n- A search from every node is O(n²), far too slow for 10^5 nodes.\n- A recursive search can overflow the call stack on a long path; the explicit `stack` cannot.\n- One diameter end is not enough: from nodes near `endA`, the farthest node is `endB`.\n- On a tie (`distA[i] === distB[i]`) both ends are marked in the last second, and either is correct.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | the neighbours of each node |\n| `dist` | each node's distance from `start` (-1 until reached) |\n| `stack` | nodes reached but not yet expanded |\n| `best` | the farthest node found so far in `farthest` |\n| `endA`, `endB` | the two ends of a diameter |\n| `distA`, `distB` | distances from `endA` and from `endB` |\n| `answer` | a last-marked node for each start |",
+  "narration": {
+    "2": "A tree with edges.length edges has one more node than edges.",
+    "3": "Start an empty neighbour list for every node.",
+    "5": "The tree is undirected, so record each edge in both directions...",
+    "6": "...so either end can reach the other.",
+    "10": "distancesFrom(start) measures how far every node is from start.",
+    "11": "Every node starts unreached, marked with -1.",
+    "13": "The stack holds nodes that are reached but not yet expanded.",
+    "15": "Take the most recently reached node: this makes the search depth-first.",
+    "17": "Only a node seen for the first time gets a distance.",
+    "18": "In a tree the first visit comes along the only path, so the distance is one more than its neighbour's.",
+    "27": "farthest(dist) picks the node with the largest distance.",
+    "30": "A strictly larger distance replaces the best node, so the first of several tied nodes wins.",
+    "38": "The node farthest from node 0 is always one end of a longest path.",
+    "39": "Measure every node's distance from that end.",
+    "40": "The node farthest from the first end is the other end of a longest path.",
+    "41": "Measure every node's distance from the second end as well.",
+    "45": "Visit every possible starting node i.",
+    "46": "Whichever end is farther from i is marked last, because no node is farther from i than both ends.",
+    "48": "Return a last-marked node for every start."
+  }
+}

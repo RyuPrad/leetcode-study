@@ -1,0 +1,72 @@
+{
+  "number": 3286,
+  "title": "Find a Safe Walk Through a Grid",
+  "spec": "leetcode",
+  "statement": "You stand on the top-left cell `(0, 0)` of an `m x n` matrix `grid` of 0s and 1s, holding `health` points, and want to get to the bottom-right cell `(m - 1, n - 1)`. Each move takes you to a cell that shares a side with your current one (up, down, left or right), and you may keep moving only while your health is positive.\n\nA cell whose value is `1` drains one point every time you occupy it, the starting cell included; cells holding `0` cost nothing. Return `true` if some walk brings you to the bottom-right cell with at least `1` point left, and `false` if none does.",
+  "constraints": [
+    "m == grid.length and n == grid[i].length",
+    "1 <= m, n <= 50",
+    "2 <= m * n",
+    "1 <= health <= m + n",
+    "grid[i][j] is 0 or 1"
+  ],
+  "signature": "boolean findSafeWalk(List<List<Integer>> grid, int health)",
+  "entry": "findSafeWalk",
+  "kind": "function",
+  "parameters": [
+    "grid",
+    "health"
+  ],
+  "validator": "function validate([grid, health]) {\n  const m = grid.length;\n  if (m < 1 || m > 50) return 'grid needs 1 to 50 rows.';\n  const n = grid[0].length;\n  if (n < 1 || n > 50) return 'Each row needs 1 to 50 cells.';\n  if (grid.some(row => row.length !== n)) return 'All rows must have the same length.';\n  if (m * n < 2) return 'The grid needs at least 2 cells.';\n  if (grid.some(row => row.some(v => v !== 0 && v !== 1))) return 'Every cell is 0 or 1.';\n  if (health < 1 || health > m + n) return 'health is between 1 and m + n.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function findSafeWalk(grid, health) {\n  const m = grid.length;\n  const n = grid[0].length;\n  const lost = Array.from({ length: m }, () => new Array(n).fill(Infinity));\n  const moves = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  lost[0][0] = grid[0][0];\n  let current = [[0, 0]];\n  while (current.length > 0) {\n    const next = [];\n    for (let i = 0; i < current.length; i++) {\n      const [row, col] = current[i];\n      for (const [dr, dc] of moves) {\n        const r = row + dr;\n        const c = col + dc;\n        if (r < 0 || r >= m || c < 0 || c >= n) {\n          continue;\n        }\n        const cost = lost[row][col] + grid[r][c];\n        if (cost < lost[r][c]) {\n          lost[r][c] = cost;\n          if (grid[r][c] === 0) {\n            current.push([r, c]);\n          } else {\n            next.push([r, c]);\n          }\n        }\n      }\n    }\n    current = next;\n  }\n  return lost[m - 1][n - 1] < health;\n}",
+  "brute": "function findSafeWalk(grid, health) {\n  // Follow the rules literally: search every state (row, column, health left) that a walk can reach.\n  const m = grid.length, n = grid[0].length;\n  const start = health - grid[0][0];\n  if (start <= 0) return false;\n  const seen = new Set(['0,0,' + start]);\n  const stack = [[0, 0, start]];\n  while (stack.length) {\n    const [r, c, h] = stack.pop();\n    if (r === m - 1 && c === n - 1) return true;\n    for (const [a, b] of [[r + 1, c], [r - 1, c], [r, c + 1], [r, c - 1]]) {\n      if (a < 0 || b < 0 || a >= m || b >= n) continue;\n      const left = h - grid[a][b];\n      const key = a + ',' + b + ',' + left;\n      if (left >= 1 && !seen.has(key)) {\n        seen.add(key);\n        stack.push([a, b, left]);\n      }\n    }\n  }\n  return false;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const m = large ? 35 + Math.floor(rand() * 16) : 1 + Math.floor(rand() * 5);\n  const n = large ? 35 + Math.floor(rand() * 16) : (m === 1 ? 2 : 1) + Math.floor(rand() * (m === 1 ? 4 : 5));\n  const shape = rand();\n  let grid;\n  if (shape < 0.3 && m >= 3) {\n    // Safe rows joined at alternating ends make a long winding corridor through unsafe walls.\n    grid = Array.from({ length: m }, (_, r) => Array.from({ length: n }, (_, c) => r % 2 === 0 || c === (r % 4 === 1 ? n - 1 : 0) ? 0 : 1));\n    if (rand() < 0.5) grid[1 + Math.floor(rand() * (m - 1))][Math.floor(rand() * n)] = 1;\n  } else {\n    const density = shape < 0.45 ? 0.9 : 0.15 + rand() * 0.6;\n    grid = Array.from({ length: m }, () => Array.from({ length: n }, () => (rand() < density ? 1 : 0)));\n  }\n  // The least possible loss, by relaxation sweeps in alternating directions, puts health on the boundary half the time.\n  const loss = grid.map(row => row.map(() => Infinity));\n  loss[0][0] = grid[0][0];\n  for (let pass = 0, changed = true; changed; pass++) {\n    changed = false;\n    for (let k = 0; k < m * n; k++) {\n      const cell = pass % 2 === 0 ? k : m * n - 1 - k, r = Math.floor(cell / n), c = cell % n;\n      for (const [a, b] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {\n        if (a >= 0 && b >= 0 && a < m && b < n && loss[a][b] + grid[r][c] < loss[r][c]) { loss[r][c] = loss[a][b] + grid[r][c]; changed = true; }\n      }\n    }\n  }\n  const need = loss[m - 1][n - 1];\n  const health = rand() < 0.5 ? Math.min(m + n, Math.max(1, need + (rand() < 0.5 ? 0 : 1))) : 1 + Math.floor(rand() * (m + n));\n  return [grid, health];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,0,0,0],[0,1,0,1,0],[0,0,0,1,0]],1],"expected":true},
+    {"name":"Example 2","input":[[[0,1,1,0,0,0],[1,0,1,0,0,0],[0,1,1,1,0,1],[0,0,1,0,1,0]],3],"expected":false},
+    {"name":"Example 3","input":[[[1,1,1],[1,0,1],[1,1,1]],5],"expected":true}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,0]],1]},
+    {"name":"Test 2","input":[[[0],[1]],1]},
+    {"name":"Test 3","input":[[[1,0]],1]},
+    {"name":"Test 4","input":[[[1,1],[1,1]],3]},
+    {"name":"Test 5","input":[[[1,1],[1,1]],4]},
+    {"name":"Test 6","input":[[[0,0,0,0,0],[1,1,1,1,0],[0,0,0,0,0],[0,1,1,1,1],[0,0,0,0,0]],1]},
+    {"name":"Test 7","input":[[[0,0,0,0,0],[1,1,1,1,0],[0,0,0,0,0],[0,1,1,1,1],[0,0,1,0,0]],1]},
+    {"name":"Test 8","input":[[[0,0,0,0,0,0],[0,1,1,1,1,1],[0,1,0,0,0,1],[0,1,0,1,0,1],[0,0,0,1,0,1],[1,1,1,1,0,0]],1]},
+    {"name":"Test 9","input":[[[0,1,0,1,1,0,0,1,0,0]],4]},
+    {"name":"Test 10","input":[[[0,1,0,1,1,0,0,1,0,0]],5]},
+    {"name":"Test 11","input":[[[0,1,1,0,0,0],[1,0,1,0,0,0],[0,1,1,1,0,1],[0,0,1,0,1,0]],4]},
+    {"name":"Test 12","input":[[[1,1,1,1],[1,1,1,1],[1,1,1,1]],6]},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMoving itself is free; health drops only for the unsafe cells a walk occupies, the first one included. So the question is: what is the least health any walk must lose to stand on the bottom-right cell? If that least loss is below `health`, you arrive with at least 1 point. Trying every walk is exponential, and plain BFS minimises steps, not loss. This is a shortest path where each step weighs 0 (onto a `0` cell) or 1 (onto a `1` cell), which **0-1 BFS** solves in linear time.\n\n## Approach\n\n1. `lost[r][c]` is the least loss found so far for standing on `(r, c)`: `Infinity` everywhere, except `lost[0][0] = grid[0][0]`, because the starting cell counts.\n2. Expand cells in waves of equal loss: `current` holds cells with the current loss, `next` collects cells that cost one more.\n3. For each cell `(row, col)` of `current` and each neighbour `(r, c)` inside the grid, let `cost = lost[row][col] + grid[r][c]`.\n4. If `cost` beats `lost[r][c]`, store it. A safe neighbour has the same loss, so it joins `current` and is expanded in this wave; an unsafe one waits in `next`.\n5. When `current` is exhausted, `next` becomes the new wave. Once no cells remain, every loss is final.\n6. Return `lost[m - 1][n - 1] < health`.\n\n## Example 1, step by step\n\n`health = 1` and `grid[0][0] = 0`, so the first wave has loss 0. From `(0, 0)` it spreads through safe cells only: down to `(2, 0)`, right to `(2, 2)`, up to `(0, 2)`, right to `(0, 4)` and down to `(2, 4)`, all with loss 0. Unsafe neighbours such as `(0, 1)` wait in `next` with loss 1. The final cell ends with `lost[2][4] = 0`, and `0 < 1`, so the answer is `true`.\n\n## Complexity\n\n- Time: O(m · n): each cell joins a wave at most once and checks its four neighbours.\n- Space: O(m · n) for `lost` and the waves.\n\n## Pitfalls\n\n- The starting cell drains health too: with `grid[0][0] = 1` you begin one point down.\n- You must arrive with at least 1 point, so test `lost < health`, not `<=`.\n- Walks may go up and left (Example 1 does), so a DP that only moves down and right is wrong.\n- A safe neighbour must be expanded before every cell of `next`; pushing all neighbours to one queue turns this into plain BFS and gives wrong losses.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `m`, `n` | number of rows and columns |\n| `lost` | least health lost to stand on each cell, so far |\n| `moves` | the four directions |\n| `current` | cells whose loss equals the current wave's |\n| `next` | cells entered through an unsafe cell: one more loss |\n| `row`, `col` | the cell being expanded |\n| `r`, `c` | one of its neighbours |\n| `cost` | loss of standing on the neighbour when coming from `(row, col)` |",
+  "narration": {
+    "4": "lost[r][c] will hold the least health lost to stand on (r, c); Infinity means not reached yet.",
+    "5": "The four directions: down, up, right, left.",
+    "6": "The starting cell counts too: it costs 1 if it is unsafe.",
+    "7": "The first wave holds only the starting cell.",
+    "8": "Process waves in order of increasing loss until no cells are left.",
+    "9": "next collects cells that cost one more than the current wave.",
+    "10": "current may grow while we loop, since safe neighbours join this same wave.",
+    "11": "Take the next cell of the wave.",
+    "12": "Look at its four neighbours.",
+    "15": "Skip positions outside the grid.",
+    "18": "Entering (r, c) from here costs this cell's loss plus 1 if (r, c) is unsafe.",
+    "19": "Only act if this is cheaper than anything found before.",
+    "20": "Record the better loss.",
+    "21": "A safe cell has the same loss as the current wave...",
+    "22": "...so it is expanded in this wave.",
+    "24": "An unsafe cell costs one more, so it waits for the next wave.",
+    "29": "This wave is finished; the cells one loss higher come next.",
+    "31": "Arriving with at least 1 point means the least loss is below health."
+  }
+}
