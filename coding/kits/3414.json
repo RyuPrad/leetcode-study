@@ -1,0 +1,51 @@
+{
+  "number": 3414,
+  "title": "Maximum Score of Non-overlapping Intervals",
+  "spec": "leetcode",
+  "statement": "Each entry `intervals[i] = [l_i, r_i, weight_i]` describes the closed range of points from `l_i` to `r_i` (both ends included) and is worth `weight_i`. Pick at most 4 of the intervals so that no point lies in two picked intervals; an interval that ends at `x` and another that starts at `x` therefore conflict. A pick scores the total weight of its intervals.\n\nReturn the 0-based indices of a pick with the highest possible score, in increasing order. When several picks reach that score, return the one whose index list is lexicographically smallest: two lists are compared at the first position where they differ, and the list holding the smaller index there comes first (if one list is a prefix of the other, the shorter one comes first).",
+  "constraints": [
+    "1 <= intervals.length <= 5 * 10^4",
+    "intervals[i].length == 3",
+    "intervals[i] = [l_i, r_i, weight_i]",
+    "1 <= l_i <= r_i <= 10^9",
+    "1 <= weight_i <= 10^9"
+  ],
+  "signature": "int[] maximumWeight(List<List<Integer>> intervals)",
+  "entry": "maximumWeight",
+  "kind": "function",
+  "parameters": [
+    "intervals"
+  ],
+  "validator": "function validate([intervals]) {\n  if (!Array.isArray(intervals) || intervals.length < 1 || intervals.length > 50000) return 'intervals needs 1 to 5 * 10^4 entries.';\n  for (const item of intervals) {\n    if (!Array.isArray(item) || item.length !== 3 || !item.every(Number.isInteger)) return 'Each interval is three integers [l, r, weight].';\n    const [l, r, weight] = item;\n    if (l < 1 || l > r || r > 1e9) return 'Each interval needs 1 <= l <= r <= 10^9.';\n    if (weight < 1 || weight > 1e9) return 'Each weight is between 1 and 10^9.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maximumWeight(intervals) {\n  const n = intervals.length;\n  const order = intervals.map((_, index) => index);\n  order.sort((a, b) => intervals[a][1] - intervals[b][1]);\n  // before[i]: how many sorted intervals end strictly before the i-th sorted one starts.\n  const before = new Array(n).fill(0);\n  for (let i = 0; i < n; i++) {\n    const start = intervals[order[i]][0];\n    let low = 0;\n    let high = i;\n    while (low < high) {\n      const mid = (low + high) >> 1;\n      if (intervals[order[mid]][1] < start) {\n        low = mid + 1;\n      } else {\n        high = mid;\n      }\n    }\n    before[i] = low;\n  }\n  // Is the sorted index list a lexicographically smaller than b?\n  const smaller = (a, b) => {\n    for (let p = 0; p < a.length && p < b.length; p++) {\n      if (a[p] !== b[p]) return a[p] < b[p];\n    }\n    return a.length < b.length;\n  };\n  // score[k][i], picks[k][i]: best total and its smallest index list using at most k of the first i sorted intervals.\n  const score = Array.from({ length: 5 }, () => new Array(n + 1).fill(0));\n  const picks = Array.from({ length: 5 }, () => Array.from({ length: n + 1 }, () => []));\n  for (let k = 1; k <= 4; k++) {\n    for (let i = 1; i <= n; i++) {\n      const index = order[i - 1];\n      const j = before[i - 1];\n      const takeScore = score[k - 1][j] + intervals[index][2];\n      const takePicks = [...picks[k - 1][j], index].sort((a, b) => a - b);\n      score[k][i] = score[k][i - 1];\n      picks[k][i] = picks[k][i - 1];\n      if (takeScore > score[k][i] || (takeScore === score[k][i] && smaller(takePicks, picks[k][i]))) {\n        score[k][i] = takeScore;\n        picks[k][i] = takePicks;\n      }\n    }\n  }\n  return picks[4][n];\n}",
+  "brute": "function maximumWeight(intervals) {\n  // Try every set of at most 4 pairwise disjoint intervals, listed by increasing index.\n  const n = intervals.length;\n  const clash = (a, b) => intervals[a][0] <= intervals[b][1] && intervals[b][0] <= intervals[a][1];\n  let best = [];\n  let bestScore = 0;\n  const beats = (list, total) => {\n    if (total !== bestScore) return total > bestScore;\n    for (let p = 0; p < Math.max(list.length, best.length); p++) {\n      if (p >= list.length) return true;\n      if (p >= best.length) return false;\n      if (list[p] !== best[p]) return list[p] < best[p];\n    }\n    return false;\n  };\n  const chosen = [];\n  const extend = (from, total) => {\n    if (beats(chosen, total)) {\n      best = chosen.slice();\n      bestScore = total;\n    }\n    if (chosen.length === 4) return;\n    for (let i = from; i < n; i++) {\n      if (chosen.some(c => clash(c, i))) continue;\n      chosen.push(i);\n      extend(i + 1, total + intervals[i][2]);\n      chosen.pop();\n    }\n  };\n  extend(0, 0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  if (size === 'small') {\n    // Few positions and few weights make overlaps, touching ends and tied scores common.\n    const n = 1 + pick(9);\n    const span = [6, 12, 25][pick(3)];\n    const top = [1, 3, 10][pick(3)];\n    return [Array.from({ length: n }, () => {\n      const l = 1 + pick(span);\n      return [l, l + pick(5), 1 + pick(top)];\n    })];\n  }\n  const n = 1500 + pick(501);\n  const limit = rand() < 0.5 ? 5000 : 1e9;\n  const longest = Math.floor(limit * [0.001, 0.05, 0.4][pick(3)]);\n  const top = rand() < 0.5 ? 3 : 1e9;\n  return [Array.from({ length: n }, () => {\n    const len = pick(longest + 1);\n    const l = 1 + pick(limit - len);\n    return [l, l + len, 1 + pick(top)];\n  })];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,3,2],[4,5,2],[1,5,5],[6,9,3],[6,7,1],[8,9,1]]],"expected":[2,3]},
+    {"name":"Example 2","input":[[[5,8,1],[6,7,7],[4,7,3],[9,10,6],[7,8,2],[11,14,3],[3,5,5]]],"expected":[1,3,5,6]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,1,1]]]},
+    {"name":"Test 2","input":[[[2,5,3],[2,5,3],[2,5,3]]]},
+    {"name":"Test 3","input":[[[1,2,1],[2,3,1],[3,4,1],[4,5,1]]]},
+    {"name":"Test 4","input":[[[1,5,5],[5,9,5],[1,4,4],[6,9,4]]]},
+    {"name":"Test 5","input":[[[9,10,1],[7,8,1],[5,6,1],[3,4,1],[1,2,1]]]},
+    {"name":"Test 6","input":[[[1,1,3],[3,3,1],[5,5,4],[7,7,1],[9,9,5],[11,11,9]]]},
+    {"name":"Test 7","input":[[[1,100,100],[2,3,10],[5,6,10],[8,9,10],[11,12,10]]]},
+    {"name":"Test 8","input":[[[1,100,50],[2,3,15],[5,6,15],[8,9,15],[11,12,15],[14,15,15]]]},
+    {"name":"Test 9","input":[[[1,2,2],[5,6,2],[1,10,4]]]},
+    {"name":"Test 10","input":[[[1,1000000000,1000000000],[1,1,1000000000],[2,2,1000000000],[3,3,1000000000],[4,4,1000000000]]]},
+    {"name":"Test 11","input":[[[3,7,4],[1,2,3],[8,8,2],[2,6,4],[9,12,5],[4,4,1],[13,20,6],[10,11,2],[5,9,4],[14,15,3],[16,18,3],[1,20,15]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThis is weighted interval scheduling with a cap of four picks. Sort the intervals by right end: then the intervals that finish strictly before a given one starts form a prefix of the sorted order, and binary search finds its length. A table indexed by \"how many picks are still allowed\" and \"how long a sorted prefix may be used\" covers every decision: the last interval of the prefix is either skipped, or taken together with the best pick from the prefix that ends before it. Because the answer is a list of indices, each cell keeps the smallest sorted index list for its best score, and equal scores are settled by comparing those lists. Trying every set of up to four intervals also works, but costs O(n⁴).\n\n## Approach\n\n1. Sort the original indices by right end into `order`.\n2. For each sorted position `i`, binary search `before[i]`: how many sorted intervals end strictly before `intervals[order[i]]` starts.\n3. `score[k][i]` and `picks[k][i]` are the best total and its smallest index list using at most `k` of the first `i` sorted intervals; row 0 and column 0 are empty picks worth 0.\n4. For `k` from 1 to 4 and each `i`, skipping keeps `score[k][i - 1]` and `picks[k][i - 1]`. Taking `index = order[i - 1]` adds its weight to `score[k - 1][j]` with `j = before[i - 1]`, and adds `index` to `picks[k - 1][j]`, sorted.\n5. Keep the taking option if its total is larger, or equal with a smaller list (`smaller`).\n6. Return `picks[4][n]`.\n\n## Example 1, step by step\n\nSorted by right end, `order = [0, 1, 2, 4, 3, 5]` (ends 3, 5, 5, 7, 9, 9) and `before = [0, 1, 0, 3, 3, 4]`. With `k = 1` the best single interval is index 2 (weight 5). With `k = 2`, taking interval 4 (`[6, 7]`, weight 1) after the first three sorted ones gives `5 + 1 = 6` and `[2, 4]`; taking interval 3 (`[6, 9]`, weight 3) gives `5 + 3 = 8` and `[2, 3]`. Interval 5 adds only `5 + 1 = 6`. Rows `k = 3` and `k = 4` find nothing above 8 (the four light intervals 0, 1, 4, 5 total 6), so the answer is `[2, 3]`.\n\n## Complexity\n\n- Time: O(n log n): the sort and one binary search per interval, then 4·n cells, each building a list of at most 4 indices.\n- Space: O(n): five rows of n + 1 cells, each list holding at most 4 indices.\n\n## Pitfalls\n\n- Touching intervals overlap: the binary search counts only ends strictly less than the start.\n- The answer uses original indices, so sort `order`, not the intervals, and keep every list in increasing order.\n- On equal totals compare the lists; comparing scores alone returns a pick with the right score but possibly the wrong indices.\n- More picks are not always better: one heavy interval can beat four light ones, which is why each cell allows at most `k` picks, not exactly `k`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `order` | original indices sorted by right end |\n| `before` | `before[i]`: sorted intervals ending before the `i`-th sorted one starts |\n| `low`, `high`, `mid` | the binary search range and probe |\n| `smaller` | whether one sorted index list is lexicographically smaller |\n| `score`, `picks` | best total and smallest index list per `(k, i)` |\n| `index`, `j` | the interval being considered and the prefix that stays free before it |\n| `takeScore`, `takePicks` | the total and list when that interval is taken |",
+  "narration": {}
+}

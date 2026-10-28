@@ -1,0 +1,66 @@
+{
+  "number": 3389,
+  "title": "Minimum Operations to Make Character Frequencies Equal",
+  "spec": "leetcode",
+  "statement": "Call a string *good* when every letter that appears in it appears the same number of times. Starting from the lowercase string `s`, you may apply these operations as often as you like, and each application counts as one operation:\n\n- remove one character;\n- add one lowercase character anywhere;\n- turn one character into the letter right after it in the alphabet (`'a'` becomes `'b'`, and so on). There is no wrap-around: a `'z'` cannot be turned into `'a'`.\n\nReturn the fewest operations needed to make `s` good.",
+  "constraints": [
+    "3 <= s.length <= 2 * 10^4",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "int makeStringGood(String s)",
+  "entry": "makeStringGood",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (s.length < 3 || s.length > 20000) return 's must have 3 to 20,000 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function makeStringGood(s) {\n  const count = new Array(26).fill(0);\n  for (const ch of s) count[ch.charCodeAt(0) - 97]++;\n  const most = Math.max(...count);\n  let best = s.length;\n  for (let target = 1; target <= most; target++) {\n    const dp = new Array(27).fill(0);\n    for (let i = 1; i <= 26; i++) {\n      const have = count[i - 1];\n      const alone = have >= target ? have - target : Math.min(have, target - have);\n      dp[i] = dp[i - 1] + alone;\n      if (i >= 2 && have < target) {\n        const before = count[i - 2];\n        const spare = before >= target ? before - target : before;\n        dp[i] = Math.min(dp[i], dp[i - 2] + Math.max(spare, target - have));\n      }\n    }\n    best = Math.min(best, dp[26]);\n  }\n  return best;\n}",
+  "brute": "function makeStringGood(s) {\n  const n = s.length;\n  const count = new Array(26).fill(0);\n  for (const ch of s) count[ch.charCodeAt(0) - 97]++;\n  let best = Infinity;\n  // Every final count is 0 or t. For each t, search every way of pushing copies forward letter by letter:\n  // cost[m] is the cheapest cost so far when m copies are being turned into the next letter.\n  for (let t = 1; t <= n; t++) {\n    let cost = new Array(n + 1).fill(Infinity);\n    cost[0] = 0;\n    for (let letter = 0; letter < 26; letter++) {\n      const next = new Array(n + 1).fill(Infinity);\n      for (let incoming = 0; incoming <= n; incoming++) {\n        if (cost[incoming] === Infinity) continue;\n        const available = count[letter] + incoming;\n        const limit = letter === 25 ? 0 : available;\n        for (let moved = 0; moved <= limit; moved++) {\n          const kept = available - moved;\n          const settle = Math.min(kept, Math.abs(kept - t));\n          next[moved] = Math.min(next[moved], cost[incoming] + moved + settle);\n        }\n      }\n      cost = next;\n    }\n    best = Math.min(best, cost[0]);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const n = large ? 8000 + Math.floor(rand() * 2001) : 3 + Math.floor(rand() * 10);\n  // A run of neighbouring letters with uneven weights, sometimes ending at 'z'.\n  const width = 1 + Math.floor(rand() * (large ? 26 : 5));\n  const first = rand() < 0.2 ? 26 - width : Math.floor(rand() * (27 - width));\n  const weights = Array.from({ length: width }, () => rand() * rand() + 0.05);\n  const total = weights.reduce((a, b) => a + b, 0);\n  let s = '';\n  for (let k = 0; k < n; k++) {\n    let r = rand() * total, letter = 0;\n    while (letter < width - 1 && r >= weights[letter]) r -= weights[letter++];\n    s += String.fromCharCode(97 + first + letter);\n  }\n  return [s];\n}",
+  "examples": [
+    {"name":"Example 1","input":["acab"],"expected":1},
+    {"name":"Example 2","input":["wddw"],"expected":0},
+    {"name":"Example 3","input":["aaabbc"],"expected":2}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["aaabc"]},
+    {"name":"Test 2","input":["abc"]},
+    {"name":"Test 3","input":["abbccc"]},
+    {"name":"Test 4","input":["aaaaaaaabbccccc"]},
+    {"name":"Test 5","input":["yyyyzz"]},
+    {"name":"Test 6","input":["zzzzzaaa"]},
+    {"name":"Test 7","input":["abcdefghijklmnopqrstuvwxyz"]},
+    {"name":"Test 8","input":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+    {"name":"Test 9","input":["aaaacc"]},
+    {"name":"Test 10","input":["abbcccddddeeeee"]},
+    {"name":"Test 11","input":["qqqqqqqrrsssssssttu"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nOrder is irrelevant: only the 26 letter counts matter, and the string is good when every count is 0 or one shared value, `target`. So try each `target` and settle the letters from `'a'` to `'z'`. Alone, a letter with `have` copies deletes its extras, or when short either deletes everything or tops up to `target`. A change pays off only when a letter has spare copies and the next letter is short: one change replaces a deletion plus an insertion. Pushing a copy two letters ahead costs two changes, no better than deleting and inserting, so changes only link neighbours, and a letter that receives copies never gives any. Each letter is settled alone or paired with the one before it: a 1-D DP.\n\n## Approach\n\n1. Count the letters in `count`; `most` is the largest count, and `best` starts at `s.length`.\n2. For each `target` from 1 to `most`, `dp[i]` is the fewest operations that settle the first `i` letters, with `dp[0] = 0`.\n3. Settling letter `i - 1` alone gives `dp[i] = dp[i - 1] + alone`.\n4. If that letter is short (`have < target`), it can take the `spare` copies of the letter before it: `before - target` if that letter keeps `target`, or all `before` if it drops to 0. Each change fills one gap and the rest are deleted or inserted, so the pair costs `max(spare, target - have)` on top of `dp[i - 2]`.\n5. Keep the smallest `dp[26]` over all targets in `best`.\n\n## Example 1, step by step\n\n`\"acab\"` has counts a = 2, b = 1, c = 1, so `most = 2`. With `target = 1`, a costs `alone = 1` (delete one a) and every other letter costs 0, so `dp[26] = 1`. With `target = 2`, a costs 0 and b alone costs 1, but c can take b's copy: `spare = 1` and c needs 1, so `dp[3] = dp[1] + max(1, 1) = 1` (turn the b into a c, giving `\"acac\"`). Both targets give 1, so the answer is 1.\n\n## Complexity\n\n- Time: O(n + 26 · most): one counting pass, then 26 DP steps per target, and `most <= n`.\n- Space: O(26) for the counts and the DP row.\n\n## Pitfalls\n\n- Final counts are 0 or `target`: dropping a rare letter entirely is often cheapest (`\"aaaaaaaaab\"` costs 1).\n- A short letter can still give away all of its copies; then `spare` is `before`, not 0.\n- `'z'` has no next letter, so nothing wraps around to `'a'`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `count` | how many times each letter occurs |\n| `most` | the largest count, the highest target worth trying |\n| `target` | the count every kept letter must end with |\n| `dp[i]` | fewest operations that settle the first `i` letters |\n| `have`, `alone` | the current letter's count and its cost on its own |\n| `before`, `spare` | the previous letter's count and the copies it can pass on |\n| `best` | the fewest operations over the targets tried so far |",
+  "narration": {
+    "2": "Keep one counter per letter of the alphabet.",
+    "3": "Count how often each letter occurs; their order in s does not matter.",
+    "4": "No target above the largest count is worth trying.",
+    "5": "Deleting every character is always possible, so s.length is an upper bound.",
+    "6": "Try every count that the kept letters could share at the end.",
+    "7": "dp[i] will hold the fewest operations that settle the first i letters, and dp[0] is 0.",
+    "8": "Settle the letters from 'a' to 'z', one at a time.",
+    "9": "have is the count of the letter being settled.",
+    "10": "Alone, it deletes its extra copies, or when short it either deletes everything or tops up to target, whichever is cheaper.",
+    "11": "First option: settle this letter alone after the letters before it.",
+    "12": "A short letter may instead take copies from the letter just before it.",
+    "13": "before is that previous letter's count.",
+    "14": "It can pass on the copies above target, or every copy if it drops to 0.",
+    "15": "Each change saves a deletion plus an insertion, so the pair costs the larger of what is spare and what is missing.",
+    "18": "Keep the cheapest total over all targets tried so far.",
+    "20": "Return the fewest operations found."
+  }
+}

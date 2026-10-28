@@ -1,0 +1,75 @@
+{
+  "number": 3425,
+  "title": "Longest Special Path",
+  "spec": "leetcode",
+  "statement": "A tree has `n` nodes labelled `0` to `n - 1` and is rooted at node `0`. Each of the `n - 1` entries `edges[i] = [u_i, v_i, length_i]` joins nodes `u_i` and `v_i` with an edge of length `length_i`, and node `i` carries the value `nums[i]`.\n\nA *special path* runs straight down the tree from a node to one of its descendants, or is a single node on its own, and never contains two nodes with the same value. Its length is the sum of its edge lengths.\n\nReturn `[longest, fewest]`, where `longest` is the greatest length of any special path and `fewest` is the smallest number of nodes among the special paths of that length.",
+  "constraints": [
+    "2 <= n <= 5 * 10^4",
+    "edges.length == n - 1",
+    "edges[i].length == 3",
+    "0 <= u_i, v_i < n",
+    "1 <= length_i <= 10^3",
+    "nums.length == n",
+    "0 <= nums[i] <= 5 * 10^4",
+    "edges forms a valid tree"
+  ],
+  "signature": "int[] longestSpecialPath(int[][] edges, int[] nums)",
+  "entry": "longestSpecialPath",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "nums"
+  ],
+  "validator": "function validate([edges, nums]) {\n  const n = nums.length;\n  if (n < 2 || n > 50000) return 'nums needs 2 to 50000 values.';\n  if (edges.length !== n - 1) return 'edges needs exactly n - 1 entries.';\n  if (nums.some(v => !Number.isInteger(v) || v < 0 || v > 50000)) return 'Each value in nums is between 0 and 50000.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3) return 'Each edge is [u, v, length].';\n    const [u, v, w] = edge;\n    if (!Number.isInteger(u) || !Number.isInteger(v) || u < 0 || v < 0 || u >= n || v >= n) return 'Edge ends must be nodes 0 to n - 1.';\n    if (!Number.isInteger(w) || w < 1 || w > 1000) return 'Edge lengths are between 1 and 1000.';\n    const a = find(u), b = find(v);\n    if (a === b) return 'The edges must form a tree: no cycles or repeated edges.';\n    root[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function longestSpecialPath(edges, nums) {\n  const graph = Array.from({ length: nums.length }, () => []);\n  for (const [u, v, length] of edges) {\n    graph[u].push([v, length]);\n    graph[v].push([u, length]);\n  }\n  // dist[d]: distance from the root to the node at depth d of the current root path.\n  const dist = [0];\n  // lastDepth: value -> depth of the deepest node on the current root path holding it.\n  const lastDepth = new Map();\n  let best = [0, 1];\n  const dfs = (node, parent, depth, parentTop) => {\n    const previous = lastDepth.get(nums[node]) ?? -1;\n    // The window of depths top..depth must not reach the earlier node with this value.\n    const top = Math.max(parentTop, previous + 1);\n    const length = dist[depth] - dist[top];\n    const count = depth - top + 1;\n    if (length > best[0] || (length === best[0] && count < best[1])) {\n      best = [length, count];\n    }\n    lastDepth.set(nums[node], depth);\n    for (const [next, weight] of graph[node]) {\n      if (next === parent) continue;\n      dist[depth + 1] = dist[depth] + weight;\n      dfs(next, node, depth + 1, top);\n    }\n    lastDepth.set(nums[node], previous);\n  };\n  dfs(0, -1, 0, 0);\n  return best;\n}",
+  "brute": "function longestSpecialPath(edges, nums) {\n  const n = nums.length;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v, w] of edges) {\n    graph[u].push([v, w]);\n    graph[v].push([u, w]);\n  }\n  // Root the tree at 0 with a BFS, remembering each node's parent and the length of the edge up to it.\n  const up = new Array(n).fill(-1), upLength = new Array(n).fill(0), seen = new Array(n).fill(false);\n  const queue = [0];\n  seen[0] = true;\n  for (let i = 0; i < queue.length; i++)\n    for (const [next, w] of graph[queue[i]])\n      if (!seen[next]) { seen[next] = true; up[next] = queue[i]; upLength[next] = w; queue.push(next); }\n  // From every node, climb toward the root while the values stay distinct; each step is a special path.\n  let best = [0, 1];\n  for (let end = 0; end < n; end++) {\n    const values = new Set([nums[end]]);\n    let length = 0, count = 1;\n    for (let node = end; up[node] !== -1 && !values.has(nums[up[node]]); node = up[node]) {\n      length += upLength[node];\n      count++;\n      values.add(nums[up[node]]);\n      if (length > best[0] || (length === best[0] && count < best[1])) best = [length, count];\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 1500 + pick(502) : 2 + pick(9);\n  const shape = ['random', 'random', 'path', 'star', 'deep'][pick(5)];\n  // Shuffle the labels; half the time node 0 stays at the top of the shape, otherwise it may sit in the middle.\n  const order = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [order[i], order[j]] = [order[j], order[i]]; }\n  if (rand() < 0.5) { const z = order.indexOf(0); [order[0], order[z]] = [order[z], order[0]]; }\n  // Small weights make equal lengths common, which exercises the fewest-nodes tie-break.\n  const maxWeight = [3, 1000][pick(2)];\n  const edges = [];\n  for (let i = 1; i < n; i++) {\n    const p = shape === 'path' ? i - 1 : shape === 'star' ? 0 : shape === 'deep' ? Math.max(0, i - 1 - pick(3)) : pick(i);\n    const w = 1 + pick(maxWeight);\n    edges.push(rand() < 0.5 ? [order[p], order[i], w] : [order[i], order[p], w]);\n  }\n  for (let i = edges.length - 1; i > 0; i--) { const j = pick(i + 1); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const distinct = size === 'large' ? [2, 20, 500, 50001][pick(4)] : [1, 2, 3, 10][pick(4)];\n  return [edges, Array.from({ length: n }, () => pick(distinct))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,2],[1,2,3],[1,3,5],[1,4,4],[2,5,6]],[2,1,2,1,3,1]],"expected":[6,2]},
+    {"name":"Example 2","input":[[[1,0,8]],[2,2]],"expected":[0,1]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1,5]],[1,2]]},
+    {"name":"Test 2","input":[[[0,1,1],[1,2,1],[2,3,1]],[0,1,2,3]]},
+    {"name":"Test 3","input":[[[0,1,4],[1,2,1],[2,3,7],[3,4,2]],[1,2,1,2,1]]},
+    {"name":"Test 4","input":[[[0,1,3],[0,2,9],[0,3,9],[0,4,1]],[7,7,7,7,7]]},
+    {"name":"Test 5","input":[[[0,1,3],[2,0,9],[0,3,2],[4,0,9],[0,5,4]],[0,1,2,3,4,5]]},
+    {"name":"Test 6","input":[[[0,1,4],[0,2,1],[2,3,1],[3,4,2]],[10,20,30,40,50]]},
+    {"name":"Test 7","input":[[[3,2,6],[1,0,2],[2,1,5],[4,3,8],[5,4,1]],[9,8,7,9,6,7]]},
+    {"name":"Test 8","input":[[[0,1,1000],[1,2,1000],[2,3,1000],[3,4,1000],[4,5,1000],[5,6,1000],[6,7,1000],[7,8,1000],[8,9,1000]],[50000,0,49999,1,49998,2,49997,3,49996,4]]},
+    {"name":"Test 9","input":[[[0,1,2],[1,2,2],[2,3,2],[1,4,3],[4,5,3],[0,6,1],[6,7,1],[7,8,1],[8,9,1],[9,10,1],[10,11,1]],[5,6,5,7,8,6,1,2,3,4,1,2]]},
+    {"name":"Test 10","input":[[[2,0,1],[2,1,1]],[4,4,5]]},
+    {"name":"Test 11","input":[[[0,1,5],[1,2,5],[0,3,10],[3,4,1],[4,5,3],[5,6,1]],[1,2,3,2,4,1,3]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery downward path is a stretch of a root-to-node path, so a DFS only needs the paths ending at the current node. Edges have positive lengths, so the best of those starts as high as allowed: just below the nearest node above with a repeated value. That is a variable-size sliding window over the root path: when the new node's value already sits at depth `previous`, the window's top moves to `previous + 1`. Prefix sums of the edge lengths give the window's length in O(1). A brute force that climbs from every node until a value repeats is O(n²) on a long chain.\n\n## Approach\n\n1. Build an undirected adjacency list `graph` of `[neighbour, length]` pairs.\n2. Keep `dist[d]`, the distance from the root to the node at depth `d` of the current root path, and `lastDepth`, the depth of the deepest node on that path holding each value.\n3. On entering `node`, look up `previous`, the depth of the last node above with the same value (or -1), and set `top = max(parentTop, previous + 1)`.\n4. The window from depth `top` to `depth` has length `dist[depth] - dist[top]` and `depth - top + 1` nodes; it replaces `best` when it is longer, or equally long with fewer nodes.\n5. Record `lastDepth[nums[node]] = depth`, visit each child with `dist[depth + 1] = dist[depth] + weight`, then restore `previous` on the way back up.\n6. Return `best`.\n\n## Example 1, step by step\n\n`nums = [2, 1, 2, 1, 3, 1]`. Node 0 (value 2) gives `[0, 1]`. Node 1 (value 1, distance 2) extends the window to depths 0..1, so `best = [2, 2]`. Node 2 (value 2, distance 5) repeats the root's value, so `top = 1`: length `5 - 2 = 3` with 2 nodes, `best = [3, 2]`. Node 5 (value 1, distance 11) repeats node 1 at depth 1, so `top = 2`: length `11 - 5 = 6` with 2 nodes, `best = [6, 2]`. Node 3 repeats its parent's value and is alone in its window. Node 4 (value 3, distance 6) keeps the window from the root: length 6 again but with 3 nodes, so it loses the tie. The answer is `[6, 2]`.\n\n## Complexity\n\n- Time: O(n): each node is entered once and does constant work besides scanning its edges.\n- Space: O(n) for the graph, `dist`, `lastDepth` and the recursion.\n\n## Pitfalls\n\n- Restore `lastDepth` when leaving a node, or a value from a finished branch wrongly blocks its siblings.\n- The top never moves back up: take the max with `parentTop`, not just `previous + 1`.\n- Equal lengths go to the path with fewer nodes. A single node is a special path of length 0, so the answer is never below `[0, 1]`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of `[neighbour, length]` pairs |\n| `dist` | `dist[d]`: root distance of the node at depth `d` on the current path |\n| `lastDepth` | value → depth of its deepest node on the current path |\n| `best` | `[longest length, fewest nodes]` found so far |\n| `node`, `parent`, `depth` | node being visited, its parent and its depth |\n| `parentTop`, `top` | window top inherited from the parent, and this node's window top |\n| `previous` | depth of the last node above with the same value, or -1 |\n| `length`, `count` | length and node count of the best special path ending at `node` |\n| `next`, `weight` | a neighbour and the length of the edge to it |",
+  "narration": {
+    "2": "One adjacency list per node; each entry will hold a neighbour and the edge length.",
+    "4": "Edges come in either orientation, so store each one in both directions.",
+    "8": "dist holds prefix sums of edge lengths along the current root path, indexed by depth.",
+    "10": "lastDepth remembers, for each value, the depth of its deepest node on the current root path.",
+    "11": "A single node is a special path of length 0 with 1 node, so start from [0, 1].",
+    "13": "How deep is the last node above with the same value? -1 means there is none.",
+    "15": "The window of allowed depths starts just below that node, and never above the parent's window top.",
+    "16": "Prefix sums give the window's length: the root distance here minus the root distance at the top.",
+    "17": "The window holds depth - top + 1 nodes.",
+    "18": "Is this path longer than the best, or just as long with fewer nodes?",
+    "19": "Yes: it becomes the new best.",
+    "21": "This node is now the deepest holder of its value on the path.",
+    "22": "Visit every neighbour of the node...",
+    "23": "...except the parent we came from.",
+    "24": "The child's root distance is this node's plus the edge length.",
+    "25": "Recurse into the child, handing down this node's window top.",
+    "27": "Leaving the node: restore the earlier depth so sibling branches do not see this node's value.",
+    "29": "Start at the root with depth 0 and window top 0.",
+    "30": "Return the longest length and the fewest nodes among paths of that length."
+  }
+}

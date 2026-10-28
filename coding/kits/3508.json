@@ -1,0 +1,111 @@
+{
+  "number": 3508,
+  "title": "Implement Router",
+  "spec": "leetcode",
+  "statement": "Write a class `Router` that holds network packets in a limited memory. A packet is three integers: `source`, `destination`, and `timestamp` (when it reached the router).\n\n- `Router(memoryLimit)` makes an empty router that can keep at most `memoryLimit` packets at a time.\n- `addPacket(source, destination, timestamp)` stores the packet and returns `true`, except when a packet with the same three values is already stored: then nothing changes and it returns `false`. Packets that were forwarded or discarded are no longer stored. If storing the new packet would leave more than `memoryLimit` packets in the router, the packet that has been stored the longest is discarded first.\n- `forwardPacket()` removes the packet that has been stored the longest and returns it as `[source, destination, timestamp]`, or returns an empty array when nothing is stored.\n- `getCount(destination, startTime, endTime)` returns how many stored packets have this `destination` and a `timestamp` with `startTime <= timestamp <= endTime`.\n\nThe timestamps passed to `addPacket` never decrease from one call to the next.",
+  "constraints": [
+    "2 <= memoryLimit <= 10^5",
+    "1 <= source, destination <= 2 * 10^5",
+    "1 <= timestamp <= 10^9",
+    "1 <= startTime <= endTime <= 10^9",
+    "At most 10^5 calls in total to addPacket, forwardPacket and getCount",
+    "addPacket is called with non-decreasing timestamps"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "Router",
+    "constructor": "Router(int memoryLimit)",
+    "methods": [
+      "boolean addPacket(int source, int destination, int timestamp)",
+      "int[] forwardPacket()",
+      "int getCount(int destination, int startTime, int endTime)"
+    ]
+  },
+  "entry": "Router",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "memoryLimit"
+    ],
+    "addPacket": [
+      "source",
+      "destination",
+      "timestamp"
+    ],
+    "forwardPacket": [],
+    "getCount": [
+      "destination",
+      "startTime",
+      "endTime"
+    ]
+  },
+  "validator": "function validate([operations, args]) {\n  const memoryLimit = args[0][0];\n  if (memoryLimit < 2 || memoryLimit > 100000) return 'memoryLimit is between 2 and 10^5.';\n  if (operations.length - 1 > 100000) return 'At most 10^5 calls after the constructor.';\n  let last = 0;\n  for (let i = 1; i < operations.length; i++) {\n    if (operations[i] === 'addPacket') {\n      const [source, destination, timestamp] = args[i];\n      if (source < 1 || source > 200000 || destination < 1 || destination > 200000) return 'source and destination are between 1 and 2 * 10^5.';\n      if (timestamp < 1 || timestamp > 1000000000) return 'timestamp is between 1 and 10^9.';\n      if (timestamp < last) return 'addPacket timestamps must never decrease.';\n      last = timestamp;\n    } else if (operations[i] === 'getCount') {\n      const [destination, startTime, endTime] = args[i];\n      if (destination < 1 || destination > 200000) return 'destination is between 1 and 2 * 10^5.';\n      if (!(1 <= startTime && startTime <= endTime && endTime <= 1000000000)) return 'getCount needs 1 <= startTime <= endTime <= 10^9.';\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class Router {\n  constructor(memoryLimit) {\n    this.memoryLimit = memoryLimit;\n    this.queue = [];\n    this.head = 0;\n    this.stored = new Set();\n    this.byDestination = new Map();\n  }\n\n  addPacket(source, destination, timestamp) {\n    const packet = [source, destination, timestamp];\n    const key = packet.join(',');\n    if (this.stored.has(key)) {\n      return false;\n    }\n    if (this.queue.length - this.head === this.memoryLimit) {\n      this.forwardPacket();\n    }\n    this.queue.push(packet);\n    this.stored.add(key);\n    if (!this.byDestination.has(destination)) {\n      this.byDestination.set(destination, { times: [], first: 0 });\n    }\n    this.byDestination.get(destination).times.push(timestamp);\n    return true;\n  }\n\n  forwardPacket() {\n    if (this.head === this.queue.length) {\n      return [];\n    }\n    const packet = this.queue[this.head];\n    this.head++;\n    this.stored.delete(packet.join(','));\n    this.byDestination.get(packet[1]).first++;\n    return packet;\n  }\n\n  getCount(destination, startTime, endTime) {\n    const group = this.byDestination.get(destination);\n    if (group === undefined) {\n      return 0;\n    }\n    return this.lowerBound(group, endTime + 1) - this.lowerBound(group, startTime);\n  }\n\n  lowerBound(group, value) {\n    let low = group.first;\n    let high = group.times.length;\n    while (low < high) {\n      const mid = (low + high) >> 1;\n      if (group.times[mid] < value) {\n        low = mid + 1;\n      } else {\n        high = mid;\n      }\n    }\n    return low;\n  }\n}",
+  "brute": "class Router {\n  // A plain list of stored packets, oldest first, scanned in full on every call.\n  constructor(memoryLimit) {\n    this.limit = memoryLimit;\n    this.packets = [];\n  }\n  addPacket(source, destination, timestamp) {\n    if (this.packets.some(p => p[0] === source && p[1] === destination && p[2] === timestamp)) return false;\n    if (this.packets.length === this.limit) this.packets.shift();\n    this.packets.push([source, destination, timestamp]);\n    return true;\n  }\n  forwardPacket() {\n    return this.packets.length > 0 ? this.packets.shift() : [];\n  }\n  getCount(destination, startTime, endTime) {\n    return this.packets.filter(p => p[1] === destination && startTime <= p[2] && p[2] <= endTime).length;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  const memoryLimit = large ? (rand() < 0.3 ? 100000 : int(2, 300)) : int(2, 5);\n  const ids = large ? (rand() < 0.5 ? 20 : 200000) : 3;\n  const calls = large ? 499 : int(1, 25);\n  const operations = ['Router'];\n  const args = [[memoryLimit]];\n  const added = [];\n  let time = large ? int(1, 999000000) : int(1, 5);\n  for (let c = 0; c < calls; c++) {\n    const pick = rand();\n    if (pick < 0.55) {\n      if (rand() < 0.5) time += int(1, large ? 1000 : 2);\n      let source = int(1, ids), destination = int(1, ids);\n      // Sometimes resend a recent packet with the current timestamp, which may be a duplicate.\n      const recent = added[added.length - 1 - int(0, 2)];\n      if (recent && recent[2] === time && rand() < 0.4) [source, destination] = recent;\n      operations.push('addPacket');\n      args.push([source, destination, time]);\n      added.push([source, destination, time]);\n    } else if (pick < 0.75) {\n      operations.push('forwardPacket');\n      args.push([]);\n    } else {\n      const destination = added.length && rand() < 0.85 ? added[int(0, added.length - 1)][1] : int(1, ids);\n      const wide = rand() < 0.15;\n      const startTime = wide ? 1 : Math.max(1, time - int(0, large ? 5000 : 6));\n      const endTime = wide ? 1000000000 : Math.min(1000000000, startTime + int(0, large ? 5000 : 6));\n      operations.push('getCount');\n      args.push([destination, startTime, endTime]);\n    }\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["Router","addPacket","addPacket","addPacket","addPacket","addPacket","forwardPacket","addPacket","getCount"],[[3],[1,4,90],[2,5,90],[1,4,90],[3,5,95],[4,5,105],[],[5,2,110],[5,100,110]]],"expected":[null,true,true,false,true,true,[2,5,90],true,1]},
+    {"name":"Example 2","input":[["Router","addPacket","forwardPacket","forwardPacket"],[[2],[7,4,90],[],[]]],"expected":[null,true,[7,4,90],[]]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["Router","addPacket","forwardPacket","addPacket","getCount"],[[2],[1,2,5],[],[1,2,5],[2,5,5]]]},
+    {"name":"Test 2","input":[["Router","addPacket","addPacket","addPacket","addPacket","getCount","forwardPacket"],[[2],[1,1,5],[2,1,5],[3,1,5],[1,1,5],[1,5,5],[]]]},
+    {"name":"Test 3","input":[["Router","addPacket","addPacket","addPacket","forwardPacket","forwardPacket","forwardPacket"],[[2],[1,2,3],[4,5,3],[1,2,3],[],[],[]]]},
+    {"name":"Test 4","input":[["Router","addPacket","addPacket","addPacket","getCount","getCount","getCount","getCount","getCount"],[[5],[1,7,10],[2,7,20],[3,7,30],[7,10,30],[7,11,29],[7,31,40],[8,1,100],[7,20,20]]]},
+    {"name":"Test 5","input":[["Router","forwardPacket","forwardPacket","addPacket","getCount","forwardPacket","getCount"],[[2],[],[],[3,3,3],[3,1,5],[],[3,1,5]]]},
+    {"name":"Test 6","input":[["Router","addPacket","addPacket","addPacket","addPacket","getCount","getCount"],[[10],[1,2,10],[2,2,10],[1,3,10],[1,2,10],[2,10,10],[3,1,100]]]},
+    {"name":"Test 7","input":[["Router","addPacket","addPacket","addPacket","addPacket","addPacket","getCount","getCount","getCount"],[[3],[1,1,1],[2,1,2],[3,1,3],[4,1,4],[5,1,5],[1,1,5],[1,1,2],[1,3,3]]]},
+    {"name":"Test 8","input":[["Router","addPacket","addPacket","getCount","forwardPacket","getCount"],[[100000],[200000,200000,1000000000],[1,200000,1000000000],[200000,1,1000000000],[],[200000,1000000000,1000000000]]]},
+    {"name":"Test 9","input":[["Router","addPacket","addPacket","addPacket","addPacket","forwardPacket","getCount","getCount","addPacket","forwardPacket","getCount"],[[4],[1,9,1],[2,8,1],[3,9,2],[4,8,2],[],[9,1,2],[8,1,2],[5,9,2],[],[8,1,2]]]},
+    {"name":"Test 10","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 11","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nThree questions must be quick: is this exact packet stored, which stored packet is oldest, and how many stored packets for a destination fall in a time window. A hash set of keys answers the first and a FIFO queue the second. For the third, packets arrive with non-decreasing timestamps and leave oldest first, so each destination's timestamps, kept in arrival order, are sorted and lose entries only at the front. A list of timestamps plus the index of its first stored entry, per destination, turns the count into two binary searches. Scanning every stored packet, as the brute force does, costs O(memoryLimit) per call.\n\n## Approach\n\n1. `queue` holds packets in arrival order and `head` points at the oldest stored one; `stored` holds the keys `\"source,destination,timestamp\"` of stored packets; `byDestination` maps each destination to `{ times, first }`.\n2. `addPacket`: if the key is in `stored`, return `false`. If the router is full, drop the oldest packet by forwarding it. Then append the packet to `queue`, its key to `stored` and its timestamp to its destination's `times`.\n3. `forwardPacket`: if `head` has reached the end of `queue`, return `[]`. Otherwise take `queue[head]`, advance `head`, delete its key and advance its destination's `first`.\n4. `getCount`: within that destination's `times` from index `first` on, the answer is `lowerBound(endTime + 1) - lowerBound(startTime)`.\n\n## Example 1, step by step\n\nWith `memoryLimit = 3`, `[1,4,90]` and `[2,5,90]` are added. The second `[1,4,90]` is found in `stored`, so it returns `false`. `[3,5,95]` fills the router, so adding `[4,5,105]` first drops `[1,4,90]`. `forwardPacket` returns `[2,5,90]` and moves destination 5's `first` from 0 to 1. `[5,2,110]` is added. Destination 5 now has `times = [90, 95, 105]` with `first = 1`, so the window `[100, 110]` gives `3 - 2 = 1`.\n\n## Complexity\n\n- Time: O(1) on average for `addPacket` and `forwardPacket`; O(log m) for `getCount`, where m is the number of packets ever added for that destination.\n- Space: O(total packets added), since departed entries stay in the arrays behind `head` and `first`.\n\n## Pitfalls\n\n- Check for a duplicate before making room: a rejected duplicate must not push out the oldest packet.\n- A forwarded or dropped packet is no longer stored, so adding the same packet again succeeds.\n- Both ends of the window are inclusive; `lowerBound(endTime + 1)` counts every timestamp up to and including `endTime`.\n- Start each binary search at `first`, not 0, or departed packets are counted.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `memoryLimit` | most packets stored at once |\n| `queue`, `head` | packets in arrival order, and the index of the oldest stored one |\n| `stored` | keys of the packets stored right now |\n| `byDestination` | destination to `{ times, first }` |\n| `times`, `first` | a destination's timestamps in arrival order, and the index of its oldest stored one |\n| `low`, `high`, `mid` | binary search bounds in `lowerBound` |",
+  "narration": {
+    "3": "Remember how many packets the router may hold at once.",
+    "4": "queue keeps every packet in arrival order...",
+    "5": "...and head is the index of the oldest packet still stored.",
+    "6": "stored holds a text key for each stored packet, for duplicate checks.",
+    "7": "byDestination keeps, per destination, its timestamps and where its stored ones begin.",
+    "11": "Bundle the three values as the packet to store.",
+    "12": "The key joins source, destination and timestamp, such as 1,4,90.",
+    "13": "Is the very same packet already stored?",
+    "14": "Then it is a duplicate and nothing changes.",
+    "16": "The stored count is length minus head; is the router full?",
+    "17": "Make room by dropping the oldest packet, exactly as forwarding does.",
+    "19": "Put the new packet at the back of the queue.",
+    "20": "Record its key so a duplicate can be spotted.",
+    "21": "Is this the first packet for this destination?",
+    "22": "Start its timestamp list, whose stored part begins at index 0.",
+    "24": "Timestamps arrive in non-decreasing order, so this list stays sorted.",
+    "25": "The packet was added.",
+    "29": "head has reached the end, so nothing is stored.",
+    "30": "Return an empty array.",
+    "32": "The oldest stored packet sits at head.",
+    "33": "Move head past it, removing it from the queue.",
+    "34": "It is no longer stored, so an identical packet may be added later.",
+    "35": "It was also its destination's oldest stored packet, so that list's stored part starts one later.",
+    "36": "Return the packet as [source, destination, timestamp].",
+    "40": "Find this destination's timestamps.",
+    "41": "No packet ever went to this destination.",
+    "44": "Stored timestamps below endTime + 1, minus those below startTime, are exactly those in the window.",
+    "48": "Search only the stored part of the list, from first...",
+    "49": "...to its end.",
+    "50": "Shrink the range until low is the first timestamp that is at least value.",
+    "52": "Is the middle timestamp still too small?",
+    "53": "Then the answer lies to its right.",
+    "55": "Otherwise mid may be the answer; keep it in range.",
+    "58": "low is the first stored index whose timestamp is at least value, or the end of the list."
+  }
+}

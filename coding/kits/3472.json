@@ -1,0 +1,66 @@
+{
+  "number": 3472,
+  "title": "Longest Palindromic Subsequence After at Most K Operations",
+  "spec": "leetcode",
+  "statement": "You get a string `s` of lowercase letters and an integer `k`. One operation picks a position of `s` and moves its letter one step forward or one step back in the alphabet, which is circular: one step forward from `'z'` is `'a'`, and one step back from `'a'` is `'z'`. You may perform at most `k` operations in total, on any positions (the same position may be changed several times).\n\nReturn the greatest possible length of a palindromic subsequence of the string after the operations. A subsequence keeps some of the characters in their original order; they need not be next to each other.",
+  "constraints": [
+    "1 <= s.length <= 200",
+    "1 <= k <= 200",
+    "s consists only of lowercase English letters"
+  ],
+  "signature": "int longestPalindromicSubsequence(String s, int k)",
+  "entry": "longestPalindromicSubsequence",
+  "kind": "function",
+  "parameters": [
+    "s",
+    "k"
+  ],
+  "validator": "function validate([s, k]) {\n  if (s.length < 1 || s.length > 200) return 's needs 1 to 200 letters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  if (k < 1 || k > 200) return 'k is between 1 and 200.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function longestPalindromicSubsequence(s, k) {\n  const n = s.length;\n  // prev[j][c]: the answer for s[i + 1..j] with at most c operations (the previous start's row).\n  let prev = Array.from({ length: n }, () => new Array(k + 1).fill(0));\n  for (let i = n - 1; i >= 0; i--) {\n    // dp[j][c]: longest palindromic subsequence of s[i..j] using at most c operations.\n    const dp = Array.from({ length: n }, () => new Array(k + 1).fill(0));\n    dp[i].fill(1);\n    for (let j = i + 1; j < n; j++) {\n      const gap = Math.abs(s.charCodeAt(i) - s.charCodeAt(j));\n      const cost = Math.min(gap, 26 - gap);\n      const dropFirst = prev[j];\n      const dropLast = dp[j - 1];\n      const inside = prev[j - 1];\n      for (let c = 0; c <= k; c++) {\n        dp[j][c] = Math.max(dropFirst[c], dropLast[c]);\n        if (cost <= c) {\n          dp[j][c] = Math.max(dp[j][c], inside[c - cost] + 2);\n        }\n      }\n    }\n    prev = dp;\n  }\n  return prev[n - 1][k];\n}",
+  "brute": "function longestPalindromicSubsequence(s, k) {\n  // Try every subsequence: it can be made a palindrome by changing one letter of each mirrored pair\n  // into the other, walking the shorter way around the alphabet.\n  const steps = (from, to) => Math.min((to - from + 26) % 26, (from - to + 26) % 26);\n  const n = s.length;\n  let best = 0;\n  for (let mask = 1; mask < 1 << n; mask++) {\n    const picked = [];\n    for (let i = 0; i < n; i++) if (mask & (1 << i)) picked.push(s.charCodeAt(i) - 97);\n    let used = 0;\n    for (let a = 0, b = picked.length - 1; a < b; a++, b--) used += steps(picked[a], picked[b]);\n    if (used <= k) best = Math.max(best, picked.length);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = m => Math.floor(rand() * m);\n  const n = size === 'large' ? 200 : 1 + pick(12);\n  // Few distinct letters give many equal pairs; letters near both ends of the alphabet exercise the wrap-around.\n  const alphabet = ['abcdefghijklmnopqrstuvwxyz', 'abcdefghijklmnopqrstuvwxyz', 'ab', 'abc', 'ayz', 'abyz', 'amz', 'aeiou', 'xyzab'][pick(9)];\n  const s = Array.from({ length: n }, () => alphabet[pick(alphabet.length)]).join('');\n  // Large budgets stay at most 100, so an O(n^2 * k) solution runs comfortably within the local time limit.\n  const k = size === 'large' ? [100, 1 + pick(100), 1 + pick(20)][pick(3)] : [1, 1 + pick(4), 1 + pick(20), 1 + pick(200)][pick(4)];\n  return [s, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abced",2],"expected":3},
+    {"name":"Example 2","input":["aaazzz",4],"expected":6}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a",1]},
+    {"name":"Test 2","input":["az",1]},
+    {"name":"Test 3","input":["an",12]},
+    {"name":"Test 4","input":["an",13]},
+    {"name":"Test 5","input":["zzzzzz",1]},
+    {"name":"Test 6","input":["abcba",1]},
+    {"name":"Test 7","input":["abcmxyz",1]},
+    {"name":"Test 8","input":["abcdef",200]},
+    {"name":"Test 9","input":["abcdef",8]},
+    {"name":"Test 10","input":["yazb",2]},
+    {"name":"Test 11","input":["leetcodeisgreat",3]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nWithout operations this is the classic longest palindromic subsequence, an interval DP: for `s[i..j]`, drop `s[i]`, drop `s[j]`, or wrap both ends around the best answer for `s[i + 1..j - 1]`. Trying all 2^n subsequences is hopeless for 200 letters.\n\nOnly kept letters need operations. A middle letter is free, and a pair becomes equal after `min(gap, 26 - gap)` operations, where `gap` is their alphabet distance (the short way may wrap past `'z'`). So the budget becomes a third dimension: the best length in `s[i..j]` with at most `c` operations.\n\n## Approach\n\n1. Fill the starts `i` from right to left. Row `i` needs only row `i + 1`, kept in `prev`.\n2. `dp[i][c] = 1` for every budget: one letter is a palindrome.\n3. For each end `j > i`, compute `cost`, the operations that make `s[i]` and `s[j]` equal.\n4. For each budget `c`, take the better of `dropFirst[c]` (for `s[i + 1..j]`) and `dropLast[c]` (for `s[i..j - 1]`); if `cost <= c`, pairing the ends gives `inside[c - cost] + 2`.\n5. After the last row, `prev[n - 1][k]` is the answer for the whole string.\n\n## Example 1, step by step\n\n`s = \"abced\"`, `k = 2`; each row lists `dp[j][0..2]`.\n\n- `i = 3`: `\"ed\"` costs 1 to pair, so `dp[4] = [1, 2, 2]`.\n- `i = 2`: `\"ce\"` costs 2: `[1, 1, 2]`. In `\"ced\"` the ends `'c'`, `'d'` cost 1 and surround `'e'`, so `inside[0] + 2 = 3` and `dp[4] = [1, 3, 3]`.\n- `i = 1`: `\"bced\"` pairs `'b'`, `'d'` for 2, but `inside[0] + 2` is only 3, the same as `dropFirst`: `[1, 3, 3]`.\n- `i = 0`: `'a'` and `'d'` are 3 apart, too many, so `dp[4] = [1, 3, 3]` again.\n\nThe answer is `prev[4][2] = 3`.\n\n## Complexity\n\n- Time: O(n² · k): each pair `i < j` handles every budget once.\n- Space: O(n · k): two rows instead of a full `n × n × (k + 1)` table.\n\n## Pitfalls\n\n- The alphabet wraps: `'a'` and `'z'` are 1 apart, so the cost is `min(gap, 26 - gap)`, not `gap`.\n- Only pairs cost operations; the middle letter of an odd-length palindrome is free.\n- When `j = i + 1` the inside is empty; `prev[i]` holds zeros for it.\n- `dp[j - 1]` belongs to the row being built, so `j` must grow upward.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | length of `s` |\n| `i`, `j` | start and end of the interval `s[i..j]` |\n| `dp` | row `i`: `dp[j][c]` is the best length in `s[i..j]` with at most `c` operations |\n| `prev` | the same row for start `i + 1` |\n| `gap`, `cost` | alphabet distance of `s[i]` and `s[j]`, and the operations that make them equal |\n| `dropFirst`, `dropLast`, `inside` | the answers for `s[i + 1..j]`, `s[i..j - 1]` and `s[i + 1..j - 1]` |\n| `c` | the operation budget |",
+  "narration": {
+    "4": "Before the first start every interval s[i + 1..j] is empty, so the previous row is all zeros.",
+    "5": "Fill the starts from right to left, so the row for start i + 1 is ready when start i needs it.",
+    "7": "A fresh row for start i.",
+    "8": "The single letter s[i] is a palindrome of length 1, whatever the budget.",
+    "9": "Grow the interval to each end j after i, left to right, so dp[j - 1] is ready.",
+    "11": "Making s[i] and s[j] equal costs their distance the short way round the circular alphabet.",
+    "12": "The answers for s[i + 1..j], which leaves out s[i]...",
+    "13": "...for s[i..j - 1], which leaves out s[j]...",
+    "14": "...and for s[i + 1..j - 1], the part strictly inside the pair.",
+    "15": "Work out the answer for every budget c from 0 to k.",
+    "16": "Without pairing the ends, drop one of them and keep the better answer.",
+    "17": "Is the budget big enough to make s[i] and s[j] equal?",
+    "18": "Then pair them around the best palindrome inside, paid for with the budget that is left.",
+    "22": "This row becomes the previous row for the next start.",
+    "24": "The whole string s[0..n - 1] with the full budget k."
+  }
+}

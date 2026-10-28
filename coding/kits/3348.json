@@ -1,0 +1,79 @@
+{
+  "number": 3348,
+  "title": "Smallest Divisible Digit Product II",
+  "spec": "leetcode",
+  "statement": "`num` is the decimal form of a positive integer, written without leading zeros, and `t` is a positive integer.\n\nReturn, as a string, the smallest number that meets all three conditions:\n\n- it is greater than or equal to `num` (so it may have more digits than `num`);\n- none of its digits is `0`;\n- the product of its digits is a multiple of `t`.\n\nReturn `\"-1\"` when no number meets them all.",
+  "constraints": [
+    "2 <= num.length <= 2 * 10^5",
+    "num contains only the digits 0 to 9",
+    "num has no leading zeros",
+    "1 <= t <= 10^14"
+  ],
+  "signature": "String smallestNumber(String num, long t)",
+  "entry": "smallestNumber",
+  "kind": "function",
+  "parameters": [
+    "num",
+    "t"
+  ],
+  "validator": "function validate([num, t]) {\n  if (num.length < 2 || num.length > 200000) return 'num needs 2 to 2 * 10^5 digits.';\n  if (!/^[0-9]+$/.test(num)) return 'num may contain only digits.';\n  if (num[0] === '0') return 'num must not start with 0.';\n  if (t < 1 || t > 1e14) return 't is a whole number from 1 to 10^14.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function smallestNumber(num, t) {\n  const primes = [2, 3, 5, 7];\n  const need = [0, 0, 0, 0];\n  for (let p = 0; p < 4; p++) {\n    while (t % primes[p] === 0) {\n      t /= primes[p];\n      need[p]++;\n    }\n  }\n  if (t > 1) {\n    return \"-1\";\n  }\n  const factors = [[0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [2, 0, 0, 0], [0, 0, 1, 0], [1, 1, 0, 0], [0, 0, 0, 1], [3, 0, 0, 0], [0, 2, 0, 0]];\n  const cover = (counts, digit) => counts.map((count, p) => Math.max(0, count - factors[digit][p]));\n  const smallestTail = ([twos, threes, fives, sevens]) => {\n    let tail = \"8\".repeat(Math.floor(twos / 3)) + \"9\".repeat(Math.floor(threes / 2)) + \"7\".repeat(sevens) + \"5\".repeat(fives);\n    twos %= 3;\n    threes %= 2;\n    if (twos > 0 && threes > 0) {\n      tail += \"6\";\n      twos--;\n      threes--;\n    }\n    tail += [\"\", \"2\", \"4\"][twos] + (threes > 0 ? \"3\" : \"\");\n    return [...tail].sort().join(\"\");\n  };\n\n  const n = num.length;\n  const missing = [need];\n  for (let i = 0; i < n && num[i] !== \"0\"; i++) {\n    missing.push(cover(missing[i], Number(num[i])));\n  }\n  if (missing.length === n + 1 && missing[n].every(count => count === 0)) {\n    return num;\n  }\n  for (let i = Math.min(missing.length - 1, n - 1); i >= 0; i--) {\n    for (let digit = Number(num[i]) + 1; digit <= 9; digit++) {\n      const tail = smallestTail(cover(missing[i], digit));\n      const free = n - i - 1;\n      if (tail.length <= free) {\n        return num.slice(0, i) + digit + \"1\".repeat(free - tail.length) + tail;\n      }\n    }\n  }\n  const tail = smallestTail(need);\n  return \"1\".repeat(Math.max(0, n + 1 - tail.length)) + tail;\n}",
+  "brute": "function smallestNumber(num, t) {\n  // Exhaustive cross-check without the greedy digit formula: the fewest digits that cover what is\n  // still missing come from trying every digit (memoised), every filler is built one digit at a time\n  // (the smallest digit that still leaves a way to finish), and all candidates are compared numerically.\n  const primes = [2, 3, 5, 7];\n  const need = primes.map(p => { let e = 0; while (t % p === 0) { t /= p; e++; } return e; });\n  if (t !== 1) return '-1'; // a product of digits has no prime factor above 7\n  const cover = (rest, d) => rest.map((e, i) => { let x = d; while (e > 0 && x % primes[i] === 0) { x /= primes[i]; e--; } return e; });\n  const fewest = new Map();\n  const minDigits = rest => {\n    if (rest.every(e => e === 0)) return 0;\n    const key = rest.join();\n    if (!fewest.has(key)) {\n      let best = Infinity;\n      for (let d = 2; d <= 9; d++) { const next = cover(rest, d); if (next.join() !== key) best = Math.min(best, 1 + minDigits(next)); }\n      fewest.set(key, best);\n    }\n    return fewest.get(key);\n  };\n  const fill = (k, rest) => { let out = ''; while (k-- > 0) { let d = 1; while (minDigits(cover(rest, d)) > k) d++; out += d; rest = cover(rest, d); } return out; };\n  const less = (a, b) => a.length !== b.length ? a.length < b.length : a < b;\n  // A longer number always works; then try keeping num's first i digits and raising digit i.\n  let len = num.length + 1;\n  while (minDigits(need) > len) len++;\n  let best = fill(len, need);\n  let rest = need;\n  for (let i = 0; i < num.length; i++) {\n    for (let d = Number(num[i]) + 1; d <= 9; d++) {\n      const after = cover(rest, d);\n      if (minDigits(after) > num.length - i - 1) continue;\n      const candidate = num.slice(0, i) + d + fill(num.length - i - 1, after);\n      if (less(candidate, best)) best = candidate;\n      break; // a larger digit here only gives larger candidates\n    }\n    if (num[i] === '0') return best; // no candidate may keep this zero\n    rest = cover(rest, Number(num[i]));\n  }\n  return rest.every(e => e === 0) ? num : best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = n => Math.floor(rand() * n);\n  const large = size === 'large';\n  const primes = [2, 3, 5, 7];\n  // A random product of at most `count` primes from 2, 3, 5 and 7 that stays within `limit`.\n  const product = (count, limit) => {\n    let value = 1;\n    for (let k = 0; k < count; k++) {\n      const p = primes[pick(4)];\n      if (value * p <= limit) value *= p;\n    }\n    return value;\n  };\n  const style = pick(5);\n  const digit = () => {\n    if (style === 0) return pick(10);\n    if (style === 1) return rand() < 0.85 ? 9 : pick(10);\n    if (style === 2) return rand() < 0.85 ? 1 : pick(10);\n    return 1 + pick(9);\n  };\n  const n = large ? 10000 - pick(200) : 2 + pick(4);\n  let num = String(1 + pick(9));\n  while (num.length < n) num += String(digit());\n  const kind = pick(8);\n  let t;\n  if (kind === 0) t = 1;\n  else if (kind === 1) t = [11, 13, 17, 19, 23][pick(5)] * product(large ? 40 : 3, large ? 1e12 : 100);\n  else if (kind === 2 && !large) t = 1 + pick(60);\n  else t = product(large ? 1 + pick(50) : 1 + pick(7), large ? 1e14 : 1e6);\n  return [num, t];\n}",
+  "examples": [
+    {"name":"Example 1","input":["1234",256],"expected":"1488"},
+    {"name":"Example 2","input":["12355",50],"expected":"12355"},
+    {"name":"Example 3","input":["11111",26],"expected":"-1"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["10",1]},
+    {"name":"Test 2","input":["99",7]},
+    {"name":"Test 3","input":["78",49]},
+    {"name":"Test 4","input":["77777777777777777",33232930569601]},
+    {"name":"Test 5","input":["101",13]},
+    {"name":"Test 6","input":["11",100000000000000]},
+    {"name":"Test 7","input":["2000000000",1024]},
+    {"name":"Test 8","input":["5555",3125]},
+    {"name":"Test 9","input":["1999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",61917364224]},
+    {"name":"Test 10","input":["123456789012345",210]},
+    {"name":"Test 11","input":["4444",567]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA product of digits has only the primes 2, 3, 5 and 7, so if `t` has any other prime factor the answer is `\"-1\"`. Otherwise the digits must supply at least the 2s, 3s, 5s and 7s of `t`, and an answer always exists: a longer number can hold any digits needed. Counting upwards from `num` is hopeless, so build the answer. Keep `num`'s first `i` digits (no zero among them), raise digit `i`, and fill the rest as small as possible; a longer kept prefix, then a smaller raised digit, gives a smaller number. The smallest filler is 1s followed by the fewest covering digits in increasing order: an 8 per three 2s, a 9 per two 3s, one 7 or 5 each, then a 6, 4, 3 or 2 for the leftovers.\n\n## Approach\n\n1. Divide `t` by 2, 3, 5 and 7 while possible, counting exponents in `need`. If more than 1 remains, return `\"-1\"`.\n2. `missing[i]` is what `need` still lacks after `num`'s first `i` digits; stop at the first `0`.\n3. If `num` has no zero and nothing is missing, return `num`.\n4. Walk `i` back from the last allowed position (the first zero, or the last digit). For each `digit` above `num[i]`, if `smallestTail` of what remains fits in the `free` positions, return prefix + `digit` + 1s + tail.\n5. Otherwise return 1s followed by `smallestTail(need)`, with at least `n + 1` digits.\n\n## Example 1, step by step\n\n`num = \"1234\"`, `t = 256 = 2^8`. \"1234\" supplies only three 2s, so `num` fails. At `i = 3` one digit cannot add the seven missing 2s; at `i = 2` the best raise (8) leaves four 2s for one free position. At `i = 1`, digit 3 needs the tail \"288\" (too long), but digit 4 leaves six 2s, covered by \"88\": `\"1488\"`.\n\n## Complexity\n\n- Time: O(n): one pass builds `missing`; the scan tries at most 9 digits per position, and a tail never exceeds about 20 digits.\n- Space: O(n) for `missing` and the answer.\n\n## Pitfalls\n\n- Divisibility, not equality: a digit may supply extra factors, so clamp missing counts at zero.\n- Any answer that keeps a `0` from `num` fails, so never raise a position after the first zero.\n- Two 2s and a 3 need two digits: \"26\" beats \"34\", which is why a 2 and a 3 merge into a 6 first.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `need` | exponents of 2, 3, 5 and 7 in `t` |\n| `factors` | the same exponents for each digit 0 to 9 |\n| `cover` | counts still missing after one more digit |\n| `smallestTail` | fewest covering digits, ascending |\n| `missing[i]` | still missing after `num`'s first `i` digits |\n| `i`, `digit` | the raised position and its new digit |\n| `free`, `tail` | positions after `i`, and the digits they must hold |",
+  "narration": {
+    "2": "A product of digits can only contain the primes 2, 3, 5 and 7.",
+    "4": "Split t into powers of 2, 3, 5 and 7, recording each exponent in need.",
+    "5": "Divide out this prime as long as it divides t...",
+    "7": "...counting how many times it did.",
+    "10": "Anything left is a prime factor above 7...",
+    "11": "...which no digit can supply, so no number qualifies.",
+    "13": "factors[d] lists how many 2s, 3s, 5s and 7s digit d contains.",
+    "14": "After one more digit, each missing count drops by what the digit supplies, never below zero.",
+    "15": "Builds the fewest digits that cover a missing set, in their smallest order.",
+    "16": "Each 8 covers three 2s and each 9 two 3s; every 7 and 5 needs its own digit.",
+    "17": "At most two 2s and one 3 are left over.",
+    "19": "A leftover 2 and 3 fit together in a single 6.",
+    "24": "Finish with a 2 or 4 for the remaining 2s and a 3 for a remaining 3.",
+    "25": "Sorted ascending, these digits form the smallest possible tail.",
+    "29": "missing[i] is what is still missing after keeping num's first i digits.",
+    "30": "Extend the prefix only up to the first 0: no answer may keep a zero.",
+    "33": "num has no zero and its digits already cover t...",
+    "34": "...so num itself is the answer.",
+    "36": "Scan for the position to raise, latest first, because a longer kept prefix means a smaller number.",
+    "37": "Try each digit larger than num[i], smallest first.",
+    "38": "The smallest digits that still cover whatever is missing after this digit.",
+    "39": "Every position after i is free to choose.",
+    "40": "Does the tail fit into the free positions?",
+    "41": "Keep the prefix, place the raised digit, pad with 1s, then append the sorted tail.",
+    "45": "No answer has n digits, so use more digits.",
+    "46": "At least n + 1 digits: 1s followed by the smallest tail covering all of t."
+  }
+}

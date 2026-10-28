@@ -1,0 +1,65 @@
+{
+  "number": 3495,
+  "title": "Minimum Operations to Make Array Elements Zero",
+  "spec": "leetcode",
+  "statement": "Every entry `[l, r]` of `queries` stands for its own array that holds each integer from `l` through `r` exactly once. One operation chooses two elements at different positions of that array (an element that is already `0` may be chosen) and replaces each of them by itself divided by 4, rounded down.\n\nFor every query, work out the fewest operations that leave all of its elements equal to `0`. Return the total of these minimums over all the queries.",
+  "constraints": [
+    "1 <= queries.length <= 10^5",
+    "Each query is [l, r]",
+    "1 <= l < r <= 10^9"
+  ],
+  "signature": "long minOperations(int[][] queries)",
+  "entry": "minOperations",
+  "kind": "function",
+  "parameters": [
+    "queries"
+  ],
+  "validator": "function validate([queries]) {\n  if (queries.length < 1 || queries.length > 100000) return 'queries needs 1 to 10^5 entries.';\n  for (const query of queries) {\n    if (query.length !== 2) return 'Each query is [l, r].';\n    const [l, r] = query;\n    if (!(1 <= l && l < r && r <= 1000000000)) return 'Each query needs 1 <= l < r <= 10^9.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minOperations(queries) {\n  let total = 0;\n  for (const [l, r] of queries) {\n    let steps = 0;\n    let low = 1;\n    let divisions = 1;\n    while (low <= r) {\n      const high = low * 4 - 1;\n      const from = Math.max(l, low);\n      const to = Math.min(r, high);\n      if (from <= to) {\n        steps += (to - from + 1) * divisions;\n      }\n      low *= 4;\n      divisions++;\n    }\n    total += Math.ceil(steps / 2);\n  }\n  return total;\n}",
+  "brute": "function minOperations(queries) {\n  let total = 0;\n  for (const [l, r] of queries) {\n    // count[s] = how many elements still need s more divisions by 4.\n    const count = new Array(17).fill(0);\n    for (let x = l; x <= r; x++) {\n      let s = 0;\n      for (let v = x; v > 0; v = Math.floor(v / 4)) s++;\n      count[s]++;\n    }\n    // Simulate: each operation divides the two elements that still need the most divisions.\n    let ops = 0;\n    for (;;) {\n      let top = 16;\n      while (top > 0 && count[top] === 0) top--;\n      if (top === 0) break;\n      count[top]--;\n      let second = top;\n      while (second > 0 && count[second] === 0) second--;\n      count[top - 1]++;\n      if (second > 0) { count[second]--; count[second - 1]++; }\n      ops++;\n    }\n    total += ops;\n  }\n  return total;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const LIMIT = 1000000000;\n  const query = () => {\n    const kind = rand();\n    let l, r;\n    if (kind < 0.3) {\n      l = int(1, 70);\n      r = l + int(1, size === 'large' ? 100000 : 8);\n    } else if (kind < 0.6) {\n      // Straddle a power of 4, where the number of divisions changes.\n      const boundary = 4 ** int(1, 14);\n      l = Math.max(1, boundary - int(1, size === 'large' ? 5000 : 6));\n      r = Math.min(LIMIT, boundary + int(0, size === 'large' ? 5000 : 6));\n    } else if (kind < 0.75) {\n      r = LIMIT - int(0, 5);\n      l = r - int(1, size === 'large' ? 900000000 : 8);\n    } else {\n      l = int(1, size === 'large' ? LIMIT - 1 : 5000);\n      r = size === 'large' ? int(l + 1, LIMIT) : l + int(1, 300);\n    }\n    if (r <= l) r = l + 1;\n    return [l, r];\n  };\n  const q = size === 'large' ? 2000 : int(1, 3);\n  return [Array.from({ length: q }, query)];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,2],[2,4]]],"expected":3},
+    {"name":"Example 2","input":[[[2,6]]],"expected":4}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,2]]]},
+    {"name":"Test 2","input":[[[3,4]]]},
+    {"name":"Test 3","input":[[[1,3]]]},
+    {"name":"Test 4","input":[[[4,15]]]},
+    {"name":"Test 5","input":[[[999999999,1000000000]]]},
+    {"name":"Test 6","input":[[[1,2],[1,2],[1,2]]]},
+    {"name":"Test 7","input":[[[15,16],[63,64],[255,256],[1023,1024]]]},
+    {"name":"Test 8","input":[[[1,20000]]]},
+    {"name":"Test 9","input":[[[268435455,268435460]]]},
+    {"name":"Test 10","input":[[[5,9],[2,6],[10,1000],[4095,4100]]]},
+    {"name":"Test 11","input":[[[1,100000],[999990000,1000000000]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA number reaches 0 after a fixed count of divisions by 4: the numbers from 4^(d-1) to 4^d - 1 need exactly d of them. If a query's numbers need `steps` divisions in total, each operation performs at most two, so at least ceil(steps / 2) operations are required. That bound can always be met: keep pairing the two numbers that need the most remaining divisions (a finished 0 can serve as a partner). No single number can hold things up, because `r - 1` is in the array too and needs at most one division fewer than `r`. So the task is to add up the divisions over a range quickly; simulating the pairing, as the brute force does, only works for short ranges.\n\n## Approach\n\n1. For each query `[l, r]`, start `steps` at 0 with the first block `low = 1`, whose numbers need `divisions = 1`.\n2. The block runs from `low` to `high = 4 * low - 1`; overlap it with `[l, r]` as `from` to `to`.\n3. If the overlap is not empty, add `(to - from + 1) * divisions` to `steps`.\n4. Move to the next block (multiply `low` by 4, add one to `divisions`) and stop once `low > r`.\n5. Add `ceil(steps / 2)` to `total`; after all queries, return `total`.\n\n## Example 1, step by step\n\nQuery `[1, 2]`: block 1 to 3 (`divisions = 1`) overlaps it in 1 to 2, so `steps = 2` and the query needs 1 operation. Query `[2, 4]`: block 1 to 3 overlaps in 2 to 3, adding 2; block 4 to 15 overlaps in 4 to 4, adding 1 * 2 = 2. Now `steps = 4`, so this query needs 2 operations, and `total = 1 + 2 = 3`.\n\n## Complexity\n\n- Time: O(q · log₄ R), where R is the largest `r`: at most 15 blocks per query.\n- Space: O(1).\n\n## Pitfalls\n\n- Looping over every number from `l` to `r`, or simulating the operations, is far too slow when ranges reach 10^9.\n- Block bounds are easy to shift by one: 3 needs one division, 4 needs two.\n- Round up for each query separately; rounding the grand total once undercounts when several queries have an odd `steps`.\n- The total can pass 2^31 (up to about 7 · 10^14), so Java and C need 64-bit arithmetic.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | sum of the per-query answers |\n| `l`, `r` | the current query's range |\n| `steps` | divisions by 4 that the range's numbers need in total |\n| `low`, `high` | the current block of numbers that need the same count of divisions |\n| `divisions` | how many divisions each number of the block needs |\n| `from`, `to` | the part of the block inside `[l, r]` |",
+  "narration": {
+    "2": "Start the sum of all the queries' answers at 0.",
+    "3": "Handle each query's range [l, r] on its own.",
+    "4": "steps will count the divisions by 4 that the range's numbers need in total.",
+    "5": "The first block of numbers starts at 1...",
+    "6": "...and its numbers, 1 to 3, need one division each.",
+    "7": "Keep going while the current block starts at or below r.",
+    "8": "The block ends just below the next power of 4.",
+    "9": "The overlap with [l, r] starts at the larger of the two left ends...",
+    "10": "...and ends at the smaller of the two right ends.",
+    "11": "Does part of this block lie inside the range?",
+    "12": "Each number in the overlap needs exactly this block's count of divisions.",
+    "14": "The next block starts at the next power of 4...",
+    "15": "...and its numbers need one more division.",
+    "17": "An operation does two divisions and pairing the neediest numbers wastes none but maybe the last, so this query needs half of steps, rounded up.",
+    "19": "Return the sum over all queries."
+  }
+}
