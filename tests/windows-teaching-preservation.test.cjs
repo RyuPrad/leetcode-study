@@ -1,6 +1,8 @@
 /* The fixes must retain the current Windows shared UI and instruction contracts.
  * These protected fragments are pinned to 560c7403e6891ef35a1343e3ea29fc389c20ab53;
  * the pinned shared links are followed only by 0.10.0's reference-code language includes.
+ * Permutation in String's reference code is pinned after its dictionaries became Maps; its CSS,
+ * bridge and instruction helpers still match that commit.
  * Run: node tests/windows-teaching-preservation.test.cjs [--source <vault>]
  */
 'use strict';
