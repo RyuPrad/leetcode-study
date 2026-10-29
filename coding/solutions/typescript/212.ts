@@ -1,5 +1,5 @@
 class TrieNode {
-  children: Record<string, TrieNode> = {};
+  children = new Map<string, TrieNode>();
   word: string | null = null;
 }
 
@@ -8,8 +8,8 @@ function findWords(board: string[][], words: string[]): string[] {
   for (const word of words) {
     let node = root;
     for (const ch of word) {
-      if (!node.children[ch]) node.children[ch] = new TrieNode();
-      node = node.children[ch];
+      if (!node.children.has(ch)) node.children.set(ch, new TrieNode());
+      node = node.children.get(ch)!;
     }
     node.word = word;
   }
@@ -20,7 +20,7 @@ function findWords(board: string[][], words: string[]): string[] {
 
   const dfs = (r: number, c: number, node: TrieNode): void => {
     const ch = board[r][c];
-    const child = node.children[ch];
+    const child = node.children.get(ch);
     if (!child) return;
     if (child.word !== null) {
       res.push(child.word);

@@ -19,7 +19,7 @@
 
 ## Idea
 
-Roman numerals are almost purely additive — except for the six subtractive pairs (`IV`, `IX`, `XL`, `XC`, `CD`, `CM`). The trick: a symbol is subtractive exactly when its value is **less than the value of the symbol immediately to its right**. So scan left to right and for each symbol, peek at the next one: if `map[s[i]] < map[s[i+1]]`, subtract; otherwise add.
+Roman numerals are almost purely additive — except for the six subtractive pairs (`IV`, `IX`, `XL`, `XC`, `CD`, `CM`). The trick: a symbol is subtractive exactly when its value is **less than the value of the symbol immediately to its right**. So scan left to right and for each symbol, peek at the next one: if `map.get(s[i]) < map.get(s[i + 1])`, subtract; otherwise add.
 
 - Time: `O(n)` — one pass over the string.
 - Space: `O(1)` — fixed-size value map.

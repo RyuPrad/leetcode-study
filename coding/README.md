@@ -30,6 +30,8 @@ Java and C run in the desktop main process (`desktop/native-runner.ts`) with the
 
 `solutions/{typescript,java,c}/<number>.{ts,java,c}` translate each problem's JavaScript `reference`, keeping its algorithm and variable names so they match the Visualizer. `npm run check:solutions` judges all 1,317 on their full submission suites, and must stay Accepted. The Code tab loads them lazily (`src/coding/solutions.ts`); `scripts/content.mjs` appends them, with the JavaScript reference, to each bundled note.
 
+A dictionary in a JavaScript reference or TypeScript solution is a `Map` (a set of keys is a `Set`), never a plain object; objects are only records with fixed fields or JSON values a problem takes or returns. Generated kits' references and brute forces follow the same rule.
+
 The Visualizer and Learn tabs can show these solutions instead of the JavaScript reference, highlighting the line that matches each step. `visualizer-ui/code-maps.json` maps every highlighted JavaScript line to a line of each solution; `0` marks a line with no counterpart, and `reviewed` lists the mappings a person checked. After changing a solution, run `node scripts/code-maps.mjs --author --refresh=<number>:<language>` to derive its new map, review it, and list the checked lines in `reviewed`. `npm run check:code-maps` fails until every line is mapped and every dissimilar or contested mapping is reviewed; the build writes the maps and solutions to `visualizer-ui/code-languages.js`.
 
 ## Is Graph Bipartite? (785)

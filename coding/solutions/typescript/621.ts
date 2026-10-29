@@ -1,8 +1,8 @@
 function leastInterval(tasks: string[], n: number): number {
-  const freq: Record<string, number> = {};
-  for (const t of tasks) freq[t] = (freq[t] || 0) + 1;
+  const freq = new Map<string, number>();
+  for (const t of tasks) freq.set(t, (freq.get(t) || 0) + 1);
   const heap = new Heap<number>((a, b) => a > b);
-  for (const key in freq) heap.push(freq[key]);
+  for (const key of freq.keys()) heap.push(freq.get(key)!);
   let time = 0;
   const queue: [number, number][] = [];
   while (heap.size() || queue.length) {

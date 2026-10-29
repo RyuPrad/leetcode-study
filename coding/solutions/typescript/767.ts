@@ -1,9 +1,9 @@
 function reorganizeString(s: string): string {
-  const freq: Record<string, number> = {};
-  for (const c of s) freq[c] = (freq[c] || 0) + 1;
+  const freq = new Map<string, number>();
+  for (const c of s) freq.set(c, (freq.get(c) || 0) + 1);
   // Larger count first; ties go to the larger character.
   const heap = new Heap<[number, string]>((a, b) => a[0] !== b[0] ? a[0] > b[0] : a[1] > b[1]);
-  for (const c in freq) heap.push([freq[c], c]);
+  for (const c of freq.keys()) heap.push([freq.get(c)!, c]);
   let res = "";
   let prev: [number, string] | null = null;
   while (heap.size()) {

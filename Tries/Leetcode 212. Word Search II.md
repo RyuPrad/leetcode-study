@@ -16,7 +16,7 @@
 | `words` | The list of target words; each is stored in the trie so the grid is scanned only once. |
 | `root` | Root `TrieNode` of the trie built from `words`. |
 | `node` | The current `TrieNode` (the DFS parameter) before descending to a child. |
-| `child` | `node.children[ch]` — the trie node for the current cell's letter; if absent, the path is a dead end. |
+| `child` | `node.children.get(ch)` — the trie node for the current cell's letter; if absent, the path is a dead end. |
 | `ch` | The letter at the current cell, `board[r][c]`. |
 | `rows` | Number of board rows, `board.length`. |
 | `cols` | Number of board columns, `board[0].length`. |

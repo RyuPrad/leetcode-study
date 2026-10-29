@@ -1,6 +1,6 @@
 function letterCombinations(digits: string): string[] {
   if (digits.length === 0) return [];
-  const map: Record<string, string> = { '2': 'abc', '3': 'def', '4': 'ghi', '5': 'jkl', '6': 'mno', '7': 'pqrs', '8': 'tuv', '9': 'wxyz' };
+  const map = new Map<string, string>([['2', 'abc'], ['3', 'def'], ['4', 'ghi'], ['5', 'jkl'], ['6', 'mno'], ['7', 'pqrs'], ['8', 'tuv'], ['9', 'wxyz']]);
   const res: string[] = [];
   const path: string[] = [];
   function dfs(i: number): void {
@@ -8,7 +8,7 @@ function letterCombinations(digits: string): string[] {
       res.push(path.join(''));
       return;
     }
-    for (const c of map[digits[i]]) {
+    for (const c of map.get(digits[i])!) {
       path.push(c);
       dfs(i + 1);
       path.pop();

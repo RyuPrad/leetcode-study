@@ -19,5 +19,5 @@
 | left | left bound of the current window |
 | right | right bound of the current window |
 | have | number of distinct chars whose required count is currently met |
-| needCount | number of distinct chars required (Object.keys(need).length) |
+| needCount | number of distinct chars required (need.size) |
 | ans | smallest valid window substring found so far |

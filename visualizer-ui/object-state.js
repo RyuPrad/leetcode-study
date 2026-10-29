@@ -57,10 +57,10 @@
   }
   function trie(snapshot,prefix='trie'){
     const nodes=new Map();
-    const walk=(node,path)=>{if(!node)return null;const id=node.id??path,result=identify({children:{}},`${prefix}:${id}`);nodes.set(String(id),result);
+    const walk=(node,path)=>{if(!node)return null;const id=node.id??path,result=identify({children:new Map()},`${prefix}:${id}`);nodes.set(String(id),result);
       if(own(node,'word'))result.word=node.word;else result.isEnd=!!node.isEnd;
-      if(Array.isArray(node.children))for(const child of node.children){const ch=child.ch??child.letter??String(child.id).split('>').at(-1);result.children[ch]=walk(child.node??child,`${path}>${ch}`);}
-      else for(const [ch,child]of Object.entries(node.children||{}))result.children[ch]=walk(child,`${path}>${ch}`);return result;};
+      if(Array.isArray(node.children))for(const child of node.children){const ch=child.ch??child.letter??String(child.id).split('>').at(-1);result.children.set(ch,walk(child.node??child,`${path}>${ch}`));}
+      else for(const [ch,child]of Object.entries(node.children||{}))result.children.set(ch,walk(child,`${path}>${ch}`));return result;};
     return {root:walk(snapshot,'R'),nodes,get:id=>id===null?null:id===undefined?absent():nodes.get(String(id))??unavailable()};
   }
   const aliases={
@@ -262,13 +262,13 @@
     "7":{"names":["x","sign","res"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "10":{"names":["s","p","m","n","dp","j","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "11":{"names":["height","left","right","ans","width","currentHeight","area"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "13":{"names":["s","map","res","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "13":{"names":["s","map","res","i"],"fields":[],"maps":["map"],"sets":[],"heaps":{}},
     "14":{"names":["strs","i","char","j"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "15":{"names":["nums","a","b","res","i","left","right","sum"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "17":{"names":["digits","map","res","path","i","c"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "17":{"names":["digits","map","res","path","i","c"],"fields":[],"maps":["map"],"sets":[],"heaps":{}},
     "18":{"names":["nums","target","a","b","res","n","i","j","left","right","sum"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "19":{"names":["head","n","dummy","fast","slow","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "20":{"names":["s","stack","map","c"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "20":{"names":["s","stack","map","c"],"fields":[],"maps":["map"],"sets":[],"heaps":{}},
     "21":{"names":["list1","list2","dummy","tail"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "22":{"names":["n","res","stack","open","close"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "23":{"names":["lists","merged","i","l1","l2","dummy","curr"],"fields":[],"maps":[],"sets":[],"heaps":{}},
@@ -309,7 +309,7 @@
     "73":{"names":["matrix","m","n","rows","cols","i","j"],"fields":[],"maps":[],"sets":["rows","cols"],"heaps":{}},
     "74":{"names":["matrix","target","m","n","left","right","mid","val"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "75":{"names":["nums","low","mid","high"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "76":{"names":["s","t","need","c","needCount","window","have","left","resLen","resStart","right","d"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "76":{"names":["s","t","need","c","needCount","window","have","left","resLen","resStart","right","d"],"fields":[],"maps":["need","window"],"sets":[],"heaps":{}},
     "77":{"names":["n","k","res","path","start","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "78":{"names":["nums","res","path","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "79":{"names":["board","word","rows","cols","r","c","i","temp","found"],"fields":[],"maps":[],"sets":[],"heaps":{}},
@@ -417,7 +417,7 @@
     "410":{"names":["nums","k","left","right","a","b","ans","mid","pieces","cur","num"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "416":{"names":["nums","total","a","b","target","dp","num","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "417":{"names":["heights","rows","cols","pac","atl","dirs","r","c","ocean","prev","dr","dc","res"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "424":{"names":["s","k","freq","left","maxFreq","ans","right"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "424":{"names":["s","k","freq","left","maxFreq","ans","right"],"fields":[],"maps":["freq"],"sets":[],"heaps":{}},
     "427":{"names":["grid","r","c","n","same","i","j","half"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "435":{"names":["intervals","a","b","count","prevEnd","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "450":{"names":["root","key","min"],"fields":[],"maps":[],"sets":[],"heaps":{}},
@@ -429,9 +429,9 @@
     "518":{"names":["amount","coins","n","dp","i","a"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "543":{"names":["root","ans","node","left","right"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "560":{"names":["nums","k","freq","sum","count","num"],"fields":[],"maps":["freq"],"sets":[],"heaps":{}},
-    "567":{"names":["s1","s2","need","c","window","left","right","d"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "567":{"names":["s1","s2","need","c","window","left","right","d"],"fields":[],"maps":["need","window"],"sets":[],"heaps":{}},
     "572":{"names":["root","subRoot","p","q"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "621":{"names":["tasks","n","freq","t","heap","key","time","queue","cnt"],"fields":[],"maps":[],"sets":[],"heaps":{"heap":"MaxHeap"},"heapField":"data"},
+    "621":{"names":["tasks","n","freq","t","heap","key","time","queue","cnt"],"fields":[],"maps":["freq"],"sets":[],"heaps":{"heap":"MaxHeap"},"heapField":"data"},
     "622":{"names":["k","value"],"fields":["queue","head","count","capacity"],"maps":[],"sets":[],"heaps":{}},
     "647":{"names":["s","count","l","r","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "649":{"names":["senate","n","radiant","dire","i","r","d"],"fields":[],"maps":[],"sets":[],"heaps":{}},
@@ -453,8 +453,8 @@
     "743":{"names":["item","h","i","p","top","last","l","r","s","times","n","k","adj","u","v","w","dist","heap","d","node","nei","ans"],"fields":["heap"],"maps":[],"sets":[],"heaps":{"heap":"MinHeap"},"heapField":"heap"},
     "746":{"names":["cost","n","dp","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "752":{"names":["deadends","target","dead","visited","queue","turns","next","state","i","d","digit","nextState"],"fields":[],"maps":[],"sets":["dead","visited"],"heaps":{}},
-    "763":{"names":["s","last","i","res","start","end"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "767":{"names":["s","freq","c","heap","res","prev","cnt","ch"],"fields":[],"maps":[],"sets":[],"heaps":{"heap":"MaxHeap"},"heapField":"data"},
+    "763":{"names":["s","last","i","res","start","end"],"fields":[],"maps":["last"],"sets":[],"heaps":{}},
+    "767":{"names":["s","freq","c","heap","res","prev","cnt","ch"],"fields":[],"maps":["freq"],"sets":[],"heaps":{"heap":"MaxHeap"},"heapField":"data"},
     "778":{"names":["item","h","i","p","top","last","l","r","s","grid","n","time","heap","dirs","t","c","dr","dc","nr","nc","nt"],"fields":["heap"],"maps":[],"sets":[],"heaps":{"heap":"MinHeap"},"heapField":"heap"},
     "787":{"names":["n","flights","src","dst","k","dist","i","tmp","u","v","w"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "846":{"names":["hand","groupSize","count","card","keys","a","b","start","need"],"fields":[],"maps":["count"],"sets":[],"heaps":{}},
@@ -468,7 +468,7 @@
     "901":{"names":["price","span"],"fields":["stack"],"maps":[],"sets":[],"heaps":{}},
     "912":{"names":["nums","left","mid","right","temp","i","j","k"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "918":{"names":["nums","total","curMax","maxSum","curMin","minSum","num"],"fields":[],"maps":[],"sets":[],"heaps":{}},
-    "953":{"names":["words","order","rank","i","w1","w2","j"],"fields":[],"maps":[],"sets":[],"heaps":{}},
+    "953":{"names":["words","order","rank","i","w1","w2","j"],"fields":[],"maps":["rank"],"sets":[],"heaps":{}},
     "973":{"names":["points","k","heap","x","y","res","i","dist"],"fields":[],"maps":[],"sets":[],"heaps":{"heap":"MinHeap"},"heapField":"data"},
     "978":{"names":["arr","ans","inc","dec","i"],"fields":[],"maps":[],"sets":[],"heaps":{}},
     "981":{"names":["key","value","timestamp","arr","left","right","res","mid"],"fields":["store"],"maps":["store"],"sets":[],"heaps":{}},

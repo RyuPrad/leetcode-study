@@ -1,5 +1,5 @@
 class TrieNode {
-  children: Record<string, TrieNode> = {};
+  children = new Map<string, TrieNode>();
   isEnd = false;
 }
 
@@ -13,8 +13,8 @@ class Trie {
   insert(word: string): void {
     let node = this.root;
     for (const ch of word) {
-      if (!node.children[ch]) node.children[ch] = new TrieNode();
-      node = node.children[ch];
+      if (!node.children.has(ch)) node.children.set(ch, new TrieNode());
+      node = node.children.get(ch)!;
     }
     node.isEnd = true;
   }
@@ -31,8 +31,8 @@ class Trie {
   private find(str: string): TrieNode | null {
     let node = this.root;
     for (const ch of str) {
-      if (!node.children[ch]) return null;
-      node = node.children[ch];
+      if (!node.children.has(ch)) return null;
+      node = node.children.get(ch)!;
     }
     return node;
   }

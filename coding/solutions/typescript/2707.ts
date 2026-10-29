@@ -1,5 +1,5 @@
 class TrieNode {
-  children: Record<string, TrieNode> = {};
+  children = new Map<string, TrieNode>();
   isEnd = false;
 }
 
@@ -8,8 +8,8 @@ function minExtraChar(s: string, dictionary: string[]): number {
   for (const word of dictionary) {
     let node = root;
     for (const ch of word) {
-      if (!node.children[ch]) node.children[ch] = new TrieNode();
-      node = node.children[ch];
+      if (!node.children.has(ch)) node.children.set(ch, new TrieNode());
+      node = node.children.get(ch)!;
     }
     node.isEnd = true;
   }
@@ -21,8 +21,8 @@ function minExtraChar(s: string, dictionary: string[]): number {
     let node = root;
     for (let j = i; j < n; j++) {
       const ch = s[j];
-      if (!node.children[ch]) break;
-      node = node.children[ch];
+      if (!node.children.has(ch)) break;
+      node = node.children.get(ch)!;
       if (node.isEnd) dp[i] = Math.min(dp[i], dp[j + 1]);
     }
   }
