@@ -22,6 +22,9 @@ import initSqlJs from 'sql.js';
 import { cteSteps, judgeSql, runSql, sameTable, sqlInvalid, type SqlResult, type SqlTables } from '../coding/sql-engine';
 
 const FUZZ = 60;
+// A brute force may need several seconds on a stored edge case (507 on n near 10^8 took 5 to 10 here) and about
+// twice that on a slower machine; this keeps its verdict on stored cases independent of the machine.
+const BRUTE_TIMEOUT = 30000;
 const sync = await getQuickJS(), asyncModule = await newQuickJSAsyncWASMModule(), SQL = await initSqlJs();
 const numbers = process.argv.filter(a => /^\d+$/.test(a)).map(Number);
 const report = process.argv.find(a => a.startsWith('--json='))?.slice(7);
@@ -63,7 +66,7 @@ async function check(number: number): Promise<string[]> {
     if (test.expected !== undefined && !accepted(sync, problem, test.input, run.actual, test.expected)) errors.push(`The reference answers ${show(run.actual)} on ${test.name}, but the stated answer is ${show(test.expected)}.`);
     if (problem.compare === 'checker' && !accepted(sync, problem, test.input, run.actual, run.actual)) errors.push(`The checker rejects the reference's own answer on ${test.name}.`);
     if (record.brute && !largeNames.has(test.name)) {
-      const brute = evaluate(sync, problem, record.brute, test.input, 10000);
+      const brute = evaluate(sync, problem, record.brute, test.input, BRUTE_TIMEOUT);
       // A small generated test may still be beyond the brute force, as generated inputs are in the fuzzing below.
       if (brute.verdict === 'Time limit exceeded' && generatedNames.has(test.name)) continue;
       if (brute.verdict !== 'Accepted') errors.push(`The brute force fails ${test.name}: ${brute.verdict} ${brute.error ?? ''}`.trim());
