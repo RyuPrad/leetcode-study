@@ -35,7 +35,9 @@ window.study = {
   activity() {}, openExternal: async url => { window.fixture.external.push(url); },
   onData: f => { listeners.data.push(f); return () => {}; }, onTimer: f => { listeners.timer.push(f); return () => {}; },
   onPlaybackPause: () => () => {}, onError: () => () => {}, onNativeProgress: () => () => {},
-  nativeAvailability: async () => ({java: false, c: false})
+  nativeAvailability: async () => ({java: false, c: false}),
+  // A neighbor on the ladder may be a generated kit; main reads its record from coding/kits.
+  loadKit: async id => (await fetch('/coding/kits/' + id.split(':')[1] + '.json')).json()
 };
 const {default: App} = await import('/src/App.tsx');
 await import('/src/styles.css');
@@ -66,7 +68,9 @@ try {
   report.all = `All LeetCode lists ${all.length} problems, 500 rows at a time`;
 
   // The method filter shows one ladder in its stored easiest-to-hardest order.
-  const method = catalog.methods.find(m => m.key === 'sliding-window-variable') ?? catalog.methods[0];
+  // Generated kits keep filling the index, so take a ladder that still has an index-only problem below its top.
+  const indexOnly = id => byId.get(id).indexOnly && !byId.get(id).premium && !byId.get(id).kit;
+  const method = [catalog.methods.find(m => m.key === 'sliding-window-variable'), ...catalog.methods].find(m => m?.ladder.slice(0, -1).some(indexOnly));
   await page.getByRole('combobox', {name: 'Filter by method'}).selectOption(method.key);
   await page.getByRole('heading', {name: `${method.name} ladder`}).waitFor();
   assert.equal(await page.getByRole('combobox', {name: 'Sort problems'}).inputValue(), 'ladder');
@@ -79,7 +83,7 @@ try {
   report.filter = `the ${method.name} filter lists its ${method.ladder.length} problems from easiest to hardest`;
 
   // An index-only problem: Overview, Ladders and History, with a LeetCode link and no local judge.
-  const indexEntry = byId.get(method.ladder.find(id => byId.get(id).indexOnly && !byId.get(id).premium));
+  const indexEntry = byId.get(method.ladder.slice(0, -1).find(indexOnly));
   await page.getByRole('button', {name: `Open ${indexEntry.title}`, exact: true}).click();
   await page.getByRole('heading', {name: indexEntry.title, exact: true}).waitFor();
   const tabs = await page.getByRole('tab').allTextContents();
