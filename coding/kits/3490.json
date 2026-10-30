@@ -1,0 +1,64 @@
+{
+  "number": 3490,
+  "title": "Count Beautiful Numbers",
+  "spec": "leetcode",
+  "statement": "Call a positive integer *beautiful* if, written in decimal, the sum of its digits divides the product of its digits evenly. A product of `0` (from any zero digit) always counts, since `0` is a multiple of every positive sum.\n\nGiven two positive integers `l` and `r`, return how many beautiful integers lie in the range from `l` to `r`, both ends included.",
+  "constraints": [
+    "1 <= l <= r < 10^9"
+  ],
+  "signature": "int beautifulNumbers(int l, int r)",
+  "entry": "beautifulNumbers",
+  "kind": "function",
+  "parameters": [
+    "l",
+    "r"
+  ],
+  "validator": "function validate([l, r]) {\n  if (l < 1) return 'l must be at least 1.';\n  if (r < l) return 'r must be at least l.';\n  if (r >= 1e9) return 'r must be below 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function beautifulNumbers(l, r) {\n  // memo: \"free positions,sum,product\" -> beautiful ways to fill the free positions.\n  const memo = new Map();\n  const countUpTo = (limit) => {\n    const digits = String(limit).split('').map(Number);\n    const dfs = (pos, sum, product, tight, started) => {\n      if (pos === digits.length) {\n        return started && product % sum === 0 ? 1 : 0;\n      }\n      const key = `${digits.length - pos},${sum},${product}`;\n      const reusable = started && !tight;\n      if (reusable && memo.has(key)) {\n        return memo.get(key);\n      }\n      const top = tight ? digits[pos] : 9;\n      let count = 0;\n      for (let d = 0; d <= top; d++) {\n        if (started || d > 0) {\n          count += dfs(pos + 1, sum + d, product * d, tight && d === top, true);\n        } else {\n          count += dfs(pos + 1, 0, 1, tight && d === top, false);\n        }\n      }\n      if (reusable) {\n        memo.set(key, count);\n      }\n      return count;\n    };\n    return dfs(0, 0, 1, true, false);\n  };\n  return countUpTo(r) - countUpTo(l - 1);\n}",
+  "brute": "function beautifulNumbers(l, r) {\n  // Check every number in the range directly.\n  let count = 0;\n  for (let x = l; x <= r; x++) {\n    let sum = 0;\n    let product = 1;\n    for (let rest = x; rest > 0; rest = Math.floor(rest / 10)) {\n      sum += rest % 10;\n      product *= rest % 10;\n    }\n    if (product % sum === 0) count++;\n  }\n  return count;\n}",
+  "generator": "function generate(rand, size) {\n  if (size === 'large') {\n    const l = 1 + Math.floor(rand() * (rand() < 0.5 ? 1000 : 999999999));\n    return [l, l + Math.floor(rand() * (1e9 - l))];\n  }\n  // A short range starting anywhere from 1-digit to 9-digit numbers.\n  const digits = 1 + Math.floor(rand() * 9);\n  const l = 1 + Math.floor(rand() * (10 ** digits - 1));\n  return [l, Math.min(999999999, l + Math.floor(rand() * 300))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[10,20],"expected":2},
+    {"name":"Example 2","input":[1,15],"expected":10}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,1]},
+    {"name":"Test 2","input":[1,9]},
+    {"name":"Test 3","input":[11,19]},
+    {"name":"Test 4","input":[22,22]},
+    {"name":"Test 5","input":[100,1000]},
+    {"name":"Test 6","input":[987654321,987654321]},
+    {"name":"Test 7","input":[111111111,111111111]},
+    {"name":"Test 8","input":[999999000,999999999]},
+    {"name":"Test 9","input":[1,100000]},
+    {"name":"Test 10","input":[123456,223456]},
+    {"name":"Test 11","input":[500000000,500050000]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTesting every number in `[l, r]` means up to 10^9 checks. But whether a number is beautiful depends only on the sum and product of its digits, and huge groups of numbers share those. So count the beautiful numbers in `[1, limit]` with a digit DP that picks digits from left to right while carrying the running sum and product, and answer `countUpTo(r) - countUpTo(l - 1)`.\n\n## Approach\n\n1. Split `limit` into `digits`. `dfs(pos, sum, product, tight, started)` counts the beautiful ways to fill positions `pos` onward.\n   - `tight`: the digits so far equal `limit`'s prefix, so the next digit may not exceed `digits[pos]`.\n   - `started`: a nonzero digit has been placed; leading zeros must not touch the sum or the product.\n2. After the last position, a started number counts when `product % sum === 0`.\n3. Once a state is started and not tight, its count depends only on the number of free positions, `sum` and `product`. Store it in the `memo` map under that key; both `countUpTo` calls share it.\n4. Return `countUpTo(r) - countUpTo(l - 1)`.\n\n## Example 1, step by step\n\n`l = 10`, `r = 20`. In `countUpTo(20)`, `digits = [2, 0]`:\n\n- First digit `0` keeps the number unstarted, leaving the one-digit numbers 1 to 9. Each has product equal to sum, so all 9 count.\n- First digit `1`: the second digit `0` gives 10 (product 0, counts), while 11 to 19 have product `d` and sum `d + 1`, never divisible. That adds 1.\n- First digit `2` stays tight, so only `0` may follow: 20 has product 0 and counts. `countUpTo(20) = 11`.\n\n`countUpTo(9) = 9`, so the answer is `11 - 9 = 2`.\n\n## Complexity\n\n- Time: O(D · S · P · 10), with D ≤ 9 positions, S ≤ 81 sums and P distinct digit products. Products have the form 2^a·3^b·5^c·7^d, so P is small; the full range needs about 23,000 memo entries.\n- Space: O(D · S · P) for the memo.\n\n## Pitfalls\n\n- Leading zeros must not zero the product: keep `product = 1` until the first nonzero digit.\n- Only states that are started and not tight may be memoized; tight states depend on `limit`.\n- `l - 1` can be `0`, and `countUpTo(0)` must return 0.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `memo` | map from free positions, sum and product to the number of beautiful completions |\n| `limit`, `digits` | the upper end being counted to, and its decimal digits |\n| `pos` | the position being filled |\n| `sum`, `product` | sum and product of the digits placed since the number started |\n| `tight`, `started` | whether the prefix equals `limit`'s, and whether a nonzero digit was placed |\n| `key`, `reusable` | the memo key, and whether this state may use the memo (started and not tight) |\n| `top`, `d` | the largest digit allowed here and the digit being tried |\n| `count` | beautiful completions found from this state |",
+  "narration": {
+    "3": "One memo map serves both counts: free positions, sum and product decide how many completions are beautiful.",
+    "4": "countUpTo(limit) counts the beautiful numbers from 1 to limit.",
+    "5": "Split limit into its decimal digits so they can be chosen from left to right.",
+    "7": "Every position is filled, so the number is complete.",
+    "8": "It counts if it really started and its digit sum divides its digit product.",
+    "10": "Describe the remaining work by free positions, sum and product.",
+    "11": "Only a started state that is already below limit's prefix can reuse or store a memo result.",
+    "12": "This state was solved before: reuse its count.",
+    "15": "While tight, the digit here may not exceed limit's digit; otherwise any digit up to 9 is allowed.",
+    "17": "Try every allowed digit at this position.",
+    "18": "Once the number has started, or this digit starts it...",
+    "19": "...the digit joins the sum and the product, and the prefix stays tight only by matching limit's digit.",
+    "21": "A leading zero leaves the number unstarted, with sum 0 and product 1.",
+    "25": "Store the count for this reusable state.",
+    "29": "Begin at the first position with nothing placed, tight against limit.",
+    "31": "Beautiful numbers up to r minus those up to l - 1 leaves exactly those in [l, r]."
+  }
+}

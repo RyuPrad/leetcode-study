@@ -1,0 +1,71 @@
+{
+  "number": 3535,
+  "title": "Unit Conversion II",
+  "spec": "recalled",
+  "statement": "Units come in `n` kinds, labelled `0` to `n - 1`. Each of the `n - 1` entries `conversions[i] = [sourceUnit_i, targetUnit_i, conversionFactor_i]` says that one unit of kind `sourceUnit_i` is worth exactly `conversionFactor_i` units of kind `targetUnit_i`; read backwards, one unit of kind `targetUnit_i` is worth `1 / conversionFactor_i` units of kind `sourceUnit_i`. Starting at kind `0` and applying conversions only from source to target, every other kind can be reached, and in exactly one way: the conversions form a tree rooted at kind `0` whose links all point away from the root.\n\nEach query `queries[i] = [unitA_i, unitB_i]` asks how many units of kind `unitB_i` one unit of kind `unitA_i` is worth. That amount is a positive fraction `p / q`; report it as `(p * q^-1) mod (10^9 + 7)`, where `q^-1` is the inverse of `q` modulo `10^9 + 7` (the number `x` from `1` to `10^9 + 6` with `q * x mod (10^9 + 7) = 1`). Return the answers in query order.",
+  "constraints": [
+    "2 <= n <= 10^5",
+    "conversions.length == n - 1",
+    "conversions[i].length == 3",
+    "0 <= sourceUnit_i, targetUnit_i < n",
+    "1 <= conversionFactor_i <= 10^9",
+    "1 <= queries.length <= 10^5",
+    "queries[i].length == 2",
+    "0 <= unitA_i, unitB_i < n",
+    "Applying conversions forward from unit 0 reaches every unit in exactly one way"
+  ],
+  "signature": "int[] queryConversions(int[][] conversions, int[][] queries)",
+  "entry": "queryConversions",
+  "kind": "function",
+  "parameters": [
+    "conversions",
+    "queries"
+  ],
+  "validator": "function validate([conversions, queries]) {\n  const n = conversions.length + 1;\n  if (n < 2 || n > 100000) return 'conversions needs 1 to 99999 entries.';\n  if (queries.length < 1 || queries.length > 100000) return 'queries needs 1 to 10^5 entries.';\n  const children = Array.from({ length: n }, () => []);\n  for (const conversion of conversions) {\n    if (conversion.length !== 3) return 'Each conversion is [sourceUnit, targetUnit, conversionFactor].';\n    const [source, target, factor] = conversion;\n    if (source < 0 || source >= n || target < 0 || target >= n) return 'Units are numbered 0 to n - 1, where n = conversions.length + 1.';\n    if (factor < 1 || factor > 1000000000) return 'Each conversionFactor is between 1 and 10^9.';\n    children[source].push(target);\n  }\n  // Following conversions forward from unit 0 must reach every unit exactly once.\n  const reached = new Array(n).fill(false);\n  reached[0] = true;\n  const queue = [0];\n  for (let k = 0; k < queue.length; k++) {\n    for (const next of children[queue[k]]) {\n      if (reached[next]) return 'Each unit must be reachable from unit 0 in exactly one way.';\n      reached[next] = true;\n      queue.push(next);\n    }\n  }\n  if (queue.length !== n) return 'Every unit must be reachable from unit 0 by forward conversions.';\n  for (const query of queries) {\n    if (query.length !== 2) return 'Each query is [unitA, unitB].';\n    if (query.some(unit => unit < 0 || unit >= n)) return 'Query units are numbered 0 to n - 1.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function queryConversions(conversions, queries) {\n  const MOD = 1000000007n;\n  const power = (base, exponent) => {\n    let result = 1n;\n    while (exponent > 0n) {\n      if (exponent & 1n) result = (result * base) % MOD;\n      base = (base * base) % MOD;\n      exponent >>= 1n;\n    }\n    return result;\n  };\n\n  const n = conversions.length + 1;\n  const children = Array.from({ length: n }, () => []);\n  for (const [source, target, factor] of conversions) {\n    children[source].push([target, BigInt(factor)]);\n  }\n  const amount = new Array(n).fill(0n);\n  amount[0] = 1n;\n  const queue = [0];\n  for (let head = 0; head < queue.length; head++) {\n    const unit = queue[head];\n    for (const [next, factor] of children[unit]) {\n      amount[next] = (amount[unit] * factor) % MOD;\n      queue.push(next);\n    }\n  }\n\n  const answer = [];\n  for (const [unitA, unitB] of queries) {\n    const inverseA = power(amount[unitA], MOD - 2n);\n    answer.push(Number((amount[unitB] * inverseA) % MOD));\n  }\n  return answer;\n}",
+  "brute": "function queryConversions(conversions, queries) {\n  const MOD = 1000000007n;\n  const n = conversions.length + 1;\n  // Links go both ways: forward multiplies by the factor, backward divides by it.\n  const links = Array.from({ length: n }, () => []);\n  for (const [source, target, factor] of conversions) {\n    links[source].push([target, BigInt(factor), 1n]);\n    links[target].push([source, 1n, BigInt(factor)]);\n  }\n  // Inverse modulo MOD by the extended Euclidean algorithm.\n  const inverse = value => {\n    let [a, b, x, y] = [value % MOD, MOD, 1n, 0n];\n    while (b !== 0n) { const k = a / b; [a, b] = [b, a - k * b]; [x, y] = [y, x - k * y]; }\n    return ((x % MOD) + MOD) % MOD;\n  };\n  // Walk the tree from unitA, carrying the exact fraction top / bottom of units of the current kind per unit of unitA.\n  return queries.map(([unitA, unitB]) => {\n    const stack = [[unitA, -1, 1n, 1n]];\n    while (stack.length) {\n      const [unit, from, top, bottom] = stack.pop();\n      if (unit === unitB) return Number((top % MOD) * inverse(bottom) % MOD);\n      for (const [next, times, per] of links[unit]) if (next !== from) stack.push([next, unit, top * times, bottom * per]);\n    }\n    return -1;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = k => Math.floor(rand() * k);\n  const n = size === 'large' ? 1500 + pick(501) : 2 + pick(8);\n  const shape = ['random', 'random', 'chain', 'star', 'deep'][pick(5)];\n  // Unit 0 stays the root; the other labels are shuffled so children are not always numbered after their parents.\n  const order = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 1; i--) { const j = 1 + pick(i); [order[i], order[j]] = [order[j], order[i]]; }\n  const bigFactors = rand() < 0.6;\n  const conversions = [];\n  for (let i = 1; i < n; i++) {\n    const parent = shape === 'chain' ? i - 1 : shape === 'star' ? 0 : shape === 'deep' ? Math.max(0, i - 1 - pick(3)) : pick(i);\n    conversions.push([order[parent], order[i], bigFactors ? 1 + pick(1000000000) : 1 + pick(6)]);\n  }\n  // List the conversions in random order, so a child may come before its parent.\n  for (let i = conversions.length - 1; i > 0; i--) { const j = pick(i + 1); [conversions[i], conversions[j]] = [conversions[j], conversions[i]]; }\n  const q = size === 'large' ? 1500 + pick(501) : 1 + pick(8);\n  const queries = Array.from({ length: q }, () => [pick(n), pick(n)]);\n  return [conversions, queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,2],[0,2,6]],[[1,2],[1,0]]],"expected":[3,500000004]},
+    {"name":"Example 2","input":[[[0,1,2],[0,2,6],[0,3,8],[2,4,2],[2,5,4],[3,6,3]],[[1,2],[0,4],[6,5],[4,6],[6,1]]],"expected":[3,12,1,2,83333334]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1,5]],[[0,1],[1,0],[0,0],[1,1]]]},
+    {"name":"Test 2","input":[[[0,1,1000000000],[1,2,1000000000]],[[0,2],[2,0],[2,1],[1,2]]]},
+    {"name":"Test 3","input":[[[0,1,3],[0,2,7]],[[1,2],[2,1]]]},
+    {"name":"Test 4","input":[[[2,3,4],[1,2,3],[0,1,2]],[[3,0],[0,3],[1,3],[3,1],[2,2]]]},
+    {"name":"Test 5","input":[[[0,1,1],[0,2,1],[1,3,1],[2,4,1]],[[3,4],[4,0],[1,2]]]},
+    {"name":"Test 6","input":[[[0,1,2],[1,2,2],[2,3,2],[3,4,2],[4,5,2],[5,6,2],[6,7,2],[7,8,2],[8,9,2],[9,10,2],[10,11,2],[11,12,2],[12,13,2],[13,14,2],[14,15,2],[15,16,2],[16,17,2],[17,18,2],[18,19,2],[19,20,2],[20,21,2],[21,22,2],[22,23,2],[23,24,2],[24,25,2],[25,26,2],[26,27,2],[27,28,2],[28,29,2],[29,30,2]],[[30,0],[0,30],[10,20],[20,10],[15,15]]]},
+    {"name":"Test 7","input":[[[0,4,3],[4,2,5],[2,6,2],[0,1,9],[1,5,4],[5,3,1000000000]],[[6,3],[3,6],[2,1],[5,4],[0,6]]]},
+    {"name":"Test 8","input":[[[0,1,999999999],[0,2,1000000000],[1,3,999999937],[2,4,123456789]],[[3,4],[4,3],[1,2],[3,0]]]},
+    {"name":"Test 9","input":[[[0,1,6],[1,2,10],[0,3,15]],[[2,3],[2,3],[3,2],[1,3],[3,1],[0,2],[2,0]]]},
+    {"name":"Test 10","input":[[[0,1,2],[0,2,3],[0,3,5],[0,4,7],[0,5,11]],[[1,2],[2,3],[3,4],[4,5],[5,1]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nUse unit 0 as a common yardstick, the way prices in many currencies can all be quoted in one base currency. Let `amount[u]` be how many units of kind `u` one unit of kind 0 is worth; a breadth-first search down the tree computes all of them, exactly as in Unit Conversion I. One unit of kind A is worth `1 / amount[A]` units of kind 0, and each of those is worth `amount[B]` units of kind B, so every answer is `amount[B] / amount[A]`. Modulo the prime 10^9 + 7, dividing by `amount[A]` means multiplying by its inverse, which Fermat's little theorem gives as `amount[A]^(MOD - 2)`. Searching the tree from A to B for every query instead (the brute force) costs O(n) per query.\n\n## Approach\n\n1. Build `children` from the conversions as `[next, factor]` pairs, with BigInt factors.\n2. Search from unit 0: `amount[0] = 1`, and each child gets `amount[unit] * factor` modulo `MOD`.\n3. For each query `[unitA, unitB]`, compute `inverseA = power(amount[unitA], MOD - 2)` by fast exponentiation.\n4. Push `amount[unitB] * inverseA` modulo `MOD` onto `answer`, and return `answer` at the end.\n\n## Example 1, step by step\n\n`conversions = [[0,1,2],[0,2,6]]` gives `amount = [1, 2, 6]`. Query `[1, 2]`: the inverse of 2 is 500000004 (because `2 * 500000004 = 10^9 + 8`, which leaves 1), and `6 * 500000004 mod (10^9 + 7) = 3`. Query `[1, 0]`: `1 * 500000004 = 500000004`, the modular form of 1/2. The answer is `[3, 500000004]`.\n\n## Complexity\n\n- Time: O(n + q log MOD): the search reads each conversion once, and each of the q queries does one exponentiation of about 30 squarings.\n- Space: O(n) for `children`, `amount` and the queue, plus the answer.\n\n## Pitfalls\n\n- Division cannot be done with `/` on residues: 1/2 must become 500000004, not 0.\n- Every inverse exists because `MOD` is prime and each amount is a product of factors between 1 and 10^9, none of them a multiple of `MOD`.\n- Products reach about 10^18, past the 2^53 a JavaScript number holds exactly; use BigInt (`long` in Java and C) before reducing.\n- A query may name the same kind twice; the formula gives 1 with no special case.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `MOD` | 10^9 + 7 as a BigInt |\n| `power` | fast modular exponentiation of `base` to `exponent`, built up in `result` |\n| `children` | for each unit, its `[next, factor]` conversions |\n| `amount` | units of each kind that one unit of kind 0 is worth, modulo `MOD` |\n| `queue`, `head`, `unit`, `next` | the breadth-first search state |\n| `inverseA` | the modular inverse of `amount[unitA]` |\n| `answer` | the query results |",
+  "narration": {
+    "2": "Answers live modulo the prime 10^9 + 7, kept as a BigInt so products stay exact.",
+    "3": "power(base, exponent) raises base to exponent modulo MOD by repeated squaring.",
+    "6": "When the exponent's lowest bit is set, multiply the current power of base into the result.",
+    "7": "Square base for the next bit.",
+    "8": "Drop the bit just used.",
+    "13": "There is one more unit kind than there are conversions.",
+    "16": "File each conversion under its source as [target, factor].",
+    "19": "One unit of kind 0 is worth exactly one unit of kind 0; the search starts there.",
+    "21": "Expand units in breadth-first order, so every parent is finished before its children.",
+    "24": "A child is worth its parent's amount times the factor between them.",
+    "25": "Queue the child so that its own children are filled in later.",
+    "30": "Answer the queries one at a time.",
+    "31": "Dividing by amount[unitA] means multiplying by its inverse, amount[unitA]^(MOD - 2) by Fermat's little theorem.",
+    "32": "One unit of kind A is worth amount[unitB] / amount[unitA] units of kind B.",
+    "34": "Return the answers in query order."
+  }
+}

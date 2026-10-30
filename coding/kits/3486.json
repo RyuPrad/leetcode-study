@@ -1,0 +1,78 @@
+{
+  "number": 3486,
+  "title": "Longest Special Path II",
+  "spec": "leetcode",
+  "statement": "A tree has `n` nodes labelled `0` to `n - 1` and is rooted at node `0`. Each entry `edges[i] = [u_i, v_i, length_i]` connects nodes `u_i` and `v_i` by an edge of length `length_i`, and node `i` carries the value `nums[i]`.\n\nA *special path* runs straight down the tree from a node to one of its descendants (a single node also counts). Among its nodes, at most one value may be carried by two nodes, and every other value by at most one node; in particular no value may appear three times. The length of a path is the sum of its edge lengths.\n\nReturn `[longest, fewest]`, where `longest` is the greatest length of any special path and `fewest` is the smallest number of nodes among the special paths with that length.",
+  "constraints": [
+    "2 <= n <= 5 * 10^4",
+    "edges.length == n - 1",
+    "edges[i].length == 3",
+    "0 <= u_i, v_i < n",
+    "1 <= length_i <= 10^3",
+    "nums.length == n",
+    "0 <= nums[i] <= 5 * 10^4",
+    "edges forms a valid tree"
+  ],
+  "signature": "int[] longestSpecialPath(int[][] edges, int[] nums)",
+  "entry": "longestSpecialPath",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "nums"
+  ],
+  "validator": "function validate([edges, nums]) {\n  const n = nums.length;\n  if (n < 2 || n > 50000) return 'nums needs 2 to 5 * 10^4 values.';\n  if (edges.length !== n - 1) return 'edges needs exactly n - 1 entries.';\n  if (nums.some(v => v < 0 || v > 50000)) return 'Each value in nums is between 0 and 5 * 10^4.';\n  const leader = Array.from({ length: n }, (_, i) => i);\n  const find = (x) => {\n    while (leader[x] !== x) {\n      leader[x] = leader[leader[x]];\n      x = leader[x];\n    }\n    return x;\n  };\n  for (const edge of edges) {\n    if (edge.length !== 3) return 'Each edge is [u, v, length].';\n    const [u, v, w] = edge;\n    if (u < 0 || v < 0 || u >= n || v >= n) return 'Edge ends are nodes 0 to n - 1.';\n    if (w < 1 || w > 1000) return 'Edge lengths are between 1 and 1000.';\n    const a = find(u), b = find(v);\n    if (a === b) return 'The edges must form a tree: no cycles or repeated edges.';\n    leader[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function longestSpecialPath(edges, nums) {\n  const graph = Array.from({ length: nums.length }, () => []);\n  for (const [u, v, length] of edges) {\n    graph[u].push([v, length]);\n    graph[v].push([u, length]);\n  }\n  // dist[d]: distance from the root to the node at depth d of the current root path.\n  const dist = [0];\n  // lastDepth: value -> depth of its deepest node on the current root path.\n  const lastDepth = new Map();\n  let best = [0, 1];\n  // A node's cut is one below the previous node with its value: a window starting there drops that repeat.\n  // One repeat may stay, so the window's top is the second-deepest cut on the path; deepest is the deepest one.\n  const dfs = (node, parent, depth, parentTop, parentDeepest) => {\n    const previous = lastDepth.get(nums[node]) ?? -1;\n    const cut = previous + 1;\n    const top = Math.max(parentTop, Math.min(parentDeepest, cut));\n    const deepest = Math.max(parentDeepest, cut);\n    const length = dist[depth] - dist[top];\n    const count = depth - top + 1;\n    if (length > best[0] || (length === best[0] && count < best[1])) {\n      best = [length, count];\n    }\n    lastDepth.set(nums[node], depth);\n    for (const [next, weight] of graph[node]) {\n      if (next === parent) continue;\n      dist[depth + 1] = dist[depth] + weight;\n      dfs(next, node, depth + 1, top, deepest);\n    }\n    lastDepth.set(nums[node], previous);\n  };\n  dfs(0, -1, 0, 0, 0);\n  return best;\n}",
+  "brute": "function longestSpecialPath(edges, nums) {\n  const n = nums.length;\n  const neighbours = Array.from({ length: n }, () => []);\n  for (const [u, v, w] of edges) {\n    neighbours[u].push([v, w]);\n    neighbours[v].push([u, w]);\n  }\n  // Root the tree with a BFS: up[x] is the parent of x and upLength[x] the length of the edge to it.\n  const up = new Array(n).fill(-1);\n  const upLength = new Array(n).fill(0);\n  const seen = new Array(n).fill(false);\n  const queue = [0];\n  seen[0] = true;\n  for (let i = 0; i < queue.length; i++) {\n    for (const [next, w] of neighbours[queue[i]]) {\n      if (!seen[next]) { seen[next] = true; up[next] = queue[i]; upLength[next] = w; queue.push(next); }\n    }\n  }\n  // From every node climb toward the root, counting values, until a third copy or a second repeated value.\n  let best = [0, 1];\n  for (let end = 0; end < n; end++) {\n    const counts = new Map([[nums[end], 1]]);\n    let repeats = 0, length = 0, count = 1;\n    for (let node = end; up[node] !== -1; node = up[node]) {\n      const times = counts.get(nums[up[node]]) ?? 0;\n      if (times === 2 || (times === 1 && repeats === 1)) break;\n      if (times === 1) repeats++;\n      counts.set(nums[up[node]], times + 1);\n      length += upLength[node];\n      count++;\n      if (length > best[0] || (length === best[0] && count < best[1])) best = [length, count];\n    }\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (k) => Math.floor(rand() * k);\n  const large = size === 'large';\n  const n = large ? 1500 + pick(501) : 2 + pick(9);\n  const shape = ['random', 'random', 'path', 'star', 'broom'][pick(5)];\n  // label[i] is the node placed at position i of the shape; position 0 is the top of the shape.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [label[i], label[j]] = [label[j], label[i]];\n  }\n  // Usually node 0, the root, sits at the top of the shape, so long downward paths exist.\n  if (rand() < 0.7) {\n    const z = label.indexOf(0);\n    [label[0], label[z]] = [label[z], label[0]];\n  }\n  // Short edges make equal lengths common, which exercises the fewest-nodes tie-break.\n  const maxLength = [2, 1000][pick(2)];\n  const edges = [];\n  for (let i = 1; i < n; i++) {\n    const p = shape === 'path' ? i - 1 : shape === 'star' ? 0 : shape === 'broom' && i < n / 2 ? i - 1 : pick(i);\n    const w = 1 + pick(maxLength);\n    edges.push(rand() < 0.5 ? [label[p], label[i], w] : [label[i], label[p], w]);\n  }\n  for (let i = edges.length - 1; i > 0; i--) {\n    const j = pick(i + 1);\n    [edges[i], edges[j]] = [edges[j], edges[i]];\n  }\n  const distinct = large ? [3, 30, 1000, 50001][pick(4)] : [1, 2, 3, 5][pick(4)];\n  return [edges, Array.from({ length: n }, () => pick(distinct))];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,1],[1,2,3],[1,3,1],[2,4,6],[4,7,2],[3,5,2],[3,6,5],[6,8,3]],[1,1,0,3,1,2,1,1,0]],"expected":[9,3]},
+    {"name":"Example 2","input":[[[1,0,3],[0,2,4],[0,3,5]],[1,1,0,2]],"expected":[5,2]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1,5]],[7,7]]},
+    {"name":"Test 2","input":[[[0,1,2],[1,2,3],[2,3,4]],[4,4,4,4]]},
+    {"name":"Test 3","input":[[[0,1,1],[1,2,1],[2,3,1]],[1,2,1,2]]},
+    {"name":"Test 4","input":[[[0,1,1],[1,2,1],[2,3,1]],[0,1,2,3]]},
+    {"name":"Test 5","input":[[[0,1,3],[0,2,9],[3,0,9],[0,4,1]],[7,7,7,7,7]]},
+    {"name":"Test 6","input":[[[0,1,6],[0,2,3],[2,3,3]],[0,1,2,3]]},
+    {"name":"Test 7","input":[[[0,1,10],[1,2,1]],[5,5,5]]},
+    {"name":"Test 8","input":[[[0,1,1],[1,2,1],[2,3,1],[3,4,1],[4,5,1],[5,6,1]],[1,2,3,1,4,2,5]]},
+    {"name":"Test 9","input":[[[0,1,1],[1,2,10],[2,3,10],[3,4,10],[1,5,2],[5,6,2]],[9,9,1,1,1,3,3]]},
+    {"name":"Test 10","input":[[[3,2,6],[1,0,2],[2,1,5],[4,3,8],[5,4,1],[6,5,7]],[9,8,7,9,8,7,9]]},
+    {"name":"Test 11","input":[[[0,1,1000],[1,2,1000],[2,3,1000],[3,4,1000],[4,5,1000],[5,6,1000],[6,7,1000]],[50000,0,50000,0,1,2,3,0]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":19,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nEvery downward path is a stretch of some root-to-node path, so a DFS from the root only needs, at each node, the special paths that end there. They form a window of depths `top..depth` on the current root path, and since edge lengths are positive, the best one starts as high as the rules allow.\n\nIf the node's value already appeared above at depth `previous`, a window that starts at `cut = previous + 1` or lower no longer contains that repeat. One repeat may stay, so the window must start at or below every cut on the path **except the deepest**: `top` is the second-deepest cut, and passing down the two deepest cuts keeps it up to date in O(1). Prefix sums of edge lengths along the path give the window's length. A brute force that climbs from every node is O(n²) on a long chain.\n\n## Approach\n\n1. Build an adjacency list `graph` of `[neighbour, length]` pairs.\n2. Keep `dist[d]`, the distance from the root to the node at depth `d` of the current path, and the map `lastDepth` from a value to the depth of its deepest node on that path.\n3. Entering `node`, read `previous` from `lastDepth` (or -1) and set `cut = previous + 1`.\n4. The new second-deepest cut is `top = max(parentTop, min(parentDeepest, cut))`; the deepest is `deepest = max(parentDeepest, cut)`.\n5. The window `top..depth` has length `dist[depth] - dist[top]` and `depth - top + 1` nodes; it replaces `best` when longer, or equally long with fewer nodes.\n6. Record `depth` in `lastDepth`, visit the children with `dist[depth + 1] = dist[depth] + weight`, then restore `previous` on the way out.\n\n## Example 1, step by step\n\nFollow the branch 0 → 1 → 2 → 4 → 7, with values `1, 1, 0, 1, 1` and root distances `0, 1, 4, 10, 12`:\n\n- Node 0: `cut = 0`, so `top = 0` and `deepest = 0`.\n- Node 1 repeats value 1 from depth 0: `cut = 1`, `top = max(0, min(0, 1)) = 0`, `deepest = 1`. The window 0..1 has length 1.\n- Node 2 (value 0) is new: `cut = 0` changes nothing. The window 0..2 has length 4 and 3 nodes.\n- Node 4 repeats value 1 from depth 1: `cut = 2`, so `top = max(0, min(1, 2)) = 1` and `deepest = 2`. The window holds nodes 1, 2, 4 with length `10 - 1 = 9`, so `best = [9, 3]`.\n- Node 7 repeats value 1 from depth 3: `cut = 4`, so `top = 2`, and nodes 2, 4, 7 give only length 8.\n\nOn the branch 0 → 1 → 3 → 6 → 8, node 8 ends the window 1, 3, 6, 8, also of length 9 but with 4 nodes, so it loses the tie. The answer is `[9, 3]`.\n\n## Complexity\n\n- Time: O(n): each node is entered once and does constant work besides scanning its edges.\n- Space: O(n) for `graph`, `dist`, `lastDepth` and the recursion.\n\n## Pitfalls\n\n- Two different repeated values cannot both stay, and neither can three copies of one value: either way two cuts fall inside the window, and only one may. On a path with values `[1, 2, 1, 2]` the whole path is not special.\n- The top never moves back up: always take the max with `parentTop`.\n- Restore `lastDepth` when leaving a node, or a value from a finished branch wrongly cuts its siblings' windows.\n- On LeetCode a chain of 5 * 10^4 nodes makes the recursion that deep; in languages with small stacks, use an explicit stack.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency list of `[neighbour, length]` pairs |\n| `dist` | `dist[d]`: root distance of the node at depth `d` on the current path |\n| `lastDepth` | value → depth of its deepest node on the current path |\n| `best` | `[longest length, fewest nodes]` found so far |\n| `node`, `parent`, `depth` | node being visited, its parent and its depth |\n| `previous`, `cut` | depth of the last node above with the same value (or -1), and one below it |\n| `parentTop`, `top` | window top handed down by the parent, and this node's window top (the second-deepest cut) |\n| `parentDeepest`, `deepest` | the deepest cut on the path before and after this node |\n| `length`, `count` | length and node count of the best special path ending at `node` |\n| `next`, `weight` | a neighbour and the length of the edge to it |",
+  "narration": {
+    "2": "One adjacency list per node; each entry will hold a neighbour and an edge length.",
+    "4": "Edges come in either direction, so store each one at both ends.",
+    "8": "dist holds prefix sums of edge lengths along the current root path, indexed by depth.",
+    "10": "lastDepth maps each value to the depth of its deepest node on the current root path.",
+    "11": "A single node is a special path of length 0 with 1 node, so start from [0, 1].",
+    "14": "Visit node at this depth; parentTop and parentDeepest describe the cuts on the path above it.",
+    "15": "Find the depth of the last node above with the same value, or -1 if there is none.",
+    "16": "A window that starts at cut or lower no longer holds that earlier copy.",
+    "17": "Only the deepest cut may be ignored, so the top becomes the second-deepest cut so far.",
+    "18": "Keep the deepest cut for the children.",
+    "19": "Prefix sums give the window's length: the root distance here minus the one at the top.",
+    "20": "The window holds depth - top + 1 nodes.",
+    "21": "Is this path longer than the best, or just as long with fewer nodes?",
+    "22": "Yes: it becomes the new best.",
+    "24": "This node is now the deepest holder of its value on the path.",
+    "25": "Visit each neighbour...",
+    "26": "...except the parent we came from.",
+    "27": "The child's root distance is this node's plus the edge length.",
+    "28": "Recurse into the child, handing down this node's top and deepest cut.",
+    "30": "Leaving the node: restore the earlier depth so sibling branches do not see this value.",
+    "32": "Start at the root, at depth 0, with no cuts yet.",
+    "33": "Return the longest length and the fewest nodes among paths of that length."
+  }
+}

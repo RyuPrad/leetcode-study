@@ -1,0 +1,75 @@
+{
+  "number": 3454,
+  "title": "Separate Squares II",
+  "spec": "leetcode",
+  "statement": "Each entry `squares[i] = [x_i, y_i, l_i]` describes a square with sides parallel to the axes, lower-left corner at `(x_i, y_i)` and side length `l_i`. The squares may overlap; look only at the region they cover together, where a point inside several squares still counts once.\n\nReturn the smallest `y` such that the horizontal line at height `y` cuts this region into two parts of equal area: the covered area below the line equals the covered area above it. An answer within `10^-5` of the true value is accepted.",
+  "constraints": [
+    "1 <= squares.length <= 5 * 10^4",
+    "squares[i] = [x_i, y_i, l_i]",
+    "0 <= x_i, y_i <= 10^9",
+    "1 <= l_i <= 10^9",
+    "The areas of all squares add up to at most 10^15"
+  ],
+  "signature": "double separateSquares(int[][] squares)",
+  "entry": "separateSquares",
+  "kind": "function",
+  "parameters": [
+    "squares"
+  ],
+  "compare": "float",
+  "validator": "function validate([squares]) {\n  if (!Array.isArray(squares) || squares.length < 1 || squares.length > 50000) return 'squares holds 1 to 5 * 10^4 squares.';\n  let total = 0;\n  for (const square of squares) {\n    if (!Array.isArray(square) || square.length !== 3 || !square.every(Number.isInteger)) return 'Each square is [x, y, l] with whole numbers.';\n    const [x, y, l] = square;\n    if (x < 0 || x > 1e9 || y < 0 || y > 1e9) return 'x and y are between 0 and 10^9.';\n    if (l < 1 || l > 1e9) return 'l is between 1 and 10^9.';\n    total += l * l;\n  }\n  if (total > 1e15) return 'The areas of the squares add up to more than 10^15.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function separateSquares(squares) {\n  const xs = [...new Set(squares.flatMap((square) => [square[0], square[0] + square[2]]))].sort((a, b) => a - b);\n  const index = new Map(xs.map((x, i) => [x, i]));\n  const events = [];\n  for (const [x, y, side] of squares) {\n    events.push([y, 1, x, x + side]);\n    events.push([y + side, -1, x, x + side]);\n  }\n  events.sort((a, b) => a[0] - b[0]);\n  const count = new Array(4 * xs.length).fill(0);\n  const covered = new Array(4 * xs.length).fill(0);\n\n  function update(node, low, high, from, to, delta) {\n    if (to < low || high < from) return;\n    if (from <= low && high <= to) {\n      count[node] += delta;\n    } else {\n      const mid = (low + high) >> 1;\n      update(2 * node, low, mid, from, to, delta);\n      update(2 * node + 1, mid + 1, high, from, to, delta);\n    }\n    if (count[node] > 0) covered[node] = xs[high + 1] - xs[low];\n    else if (low === high) covered[node] = 0;\n    else covered[node] = covered[2 * node] + covered[2 * node + 1];\n  }\n\n  const strips = [];\n  let total = 0;\n  for (let i = 0; i + 1 < events.length; i++) {\n    const [y, delta, left, right] = events[i];\n    update(1, 0, xs.length - 2, index.get(left), index.get(right) - 1, delta);\n    const area = covered[1] * (events[i + 1][0] - y);\n    strips.push([y, covered[1], area]);\n    total += area;\n  }\n\n  const half = total / 2;\n  let below = 0;\n  let k = 0;\n  while (below + strips[k][2] < half) {\n    below += strips[k][2];\n    k++;\n  }\n  const [bottom, width] = strips[k];\n  return bottom + (half - below) / width;\n}",
+  "brute": "function separateSquares(squares) {\n  // Cut the plane at every square edge; each grid cell is either inside some square or outside all of them.\n  const xs = [...new Set(squares.flatMap(([x, , l]) => [x, x + l]))].sort((a, b) => a - b);\n  const ys = [...new Set(squares.flatMap(([, y, l]) => [y, y + l]))].sort((a, b) => a - b);\n  const widths = [];\n  for (let j = 0; j + 1 < ys.length; j++) {\n    let width = 0;\n    for (let i = 0; i + 1 < xs.length; i++) {\n      if (squares.some(([x, y, l]) => x <= xs[i] && xs[i + 1] <= x + l && y <= ys[j] && ys[j + 1] <= y + l)) width += xs[i + 1] - xs[i];\n    }\n    widths.push(width);\n  }\n  const areaBelow = (t) => {\n    let area = 0;\n    for (let j = 0; j + 1 < ys.length; j++) area += widths[j] * Math.max(0, Math.min(ys[j + 1], t) - ys[j]);\n    return area;\n  };\n  const total = areaBelow(ys[ys.length - 1]);\n  // The area below a line never decreases as the line rises, so bisect for the lowest line with half below it.\n  let low = ys[0];\n  let high = ys[ys.length - 1];\n  for (let step = 0; step < 200 && low < high; step++) {\n    const mid = (low + high) / 2;\n    if (mid === low || mid === high) break;\n    if (2 * areaBelow(mid) >= total) high = mid;\n    else low = mid;\n  }\n  return high;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const squares = [];\n  if (size === 'small') {\n    const n = int(1, 6);\n    const span = int(1, 4) * 3;\n    const maxSide = int(1, 5);\n    const copies = rand() < 0.25;\n    for (let i = 0; i < n; i++) {\n      // Some inputs repeat earlier squares exactly, which must not add any area.\n      if (copies && i > 0 && rand() < 0.5) squares.push([...squares[int(0, i - 1)]]);\n      else squares.push([int(0, span), int(0, span), int(1, maxSide)]);\n    }\n    return [squares];\n  }\n  const n = int(1500, 2000);\n  // Every side is at most sqrt(10^15 / n), so the areas add up to at most 10^15.\n  const maxSide = Math.floor(Math.sqrt(1e15 / n));\n  const mode = int(0, 2);\n  if (mode === 0) {\n    // Spread over the whole range: few overlaps, wide gaps.\n    for (let i = 0; i < n; i++) squares.push([int(0, 1e9), int(0, 1e9), int(1, maxSide)]);\n  } else if (mode === 1) {\n    // Packed into a small corner: heavy overlaps.\n    for (let i = 0; i < n; i++) squares.push([int(0, 2 * maxSide), int(0, 2 * maxSide), int(1, maxSide)]);\n  } else {\n    // A few horizontal bands with empty space between them.\n    const bands = Array.from({ length: int(2, 6) }, () => int(0, 1e9 - maxSide));\n    for (let i = 0; i < n; i++) squares.push([int(0, 1e9), bands[int(0, bands.length - 1)] + int(0, 1000), int(1, maxSide)]);\n  }\n  return [squares];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,0,1],[2,2,1]]],"expected":1},
+    {"name":"Example 2","input":[[[0,0,2],[1,1,1]]],"expected":1}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[5,7,4]]]},
+    {"name":"Test 2","input":[[[0,0,4],[1,1,2]]]},
+    {"name":"Test 3","input":[[[3,3,2],[3,3,2],[3,3,2]]]},
+    {"name":"Test 4","input":[[[0,0,2],[5,10,2]]]},
+    {"name":"Test 5","input":[[[0,0,2],[2,1,2]]]},
+    {"name":"Test 6","input":[[[1000000000,1000000000,31622776]]]},
+    {"name":"Test 7","input":[[[0,0,3],[1,2,3]]]},
+    {"name":"Test 8","input":[[[0,0,1],[1,1,1],[2,2,1],[3,3,1],[4,4,1]]]},
+    {"name":"Test 9","input":[[[0,0,1],[1,0,1],[2,0,1],[3,0,9]]]},
+    {"name":"Test 10","input":[[[0,0,5],[2,1,4],[6,0,1],[1,7,2],[4,4,3],[0,9,1]]]},
+    {"name":"Test 11","input":[[[0,0,1000000],[999999,999999,1000000],[500000000,0,10],[500000000,2000000,7]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":18,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nLet A(t) be the covered area below height t. Between two consecutive horizontal edges, every horizontal cut meets the union in the same width, so A grows linearly inside each such *strip*. A brute force finds each strip's width by testing every cell of the grid formed by all the edges against every square, which is O(n³). Instead, sweep upward while a segment tree over the compressed x-coordinates keeps the union's width (as in Rectangle Area II), then walk the strips until half of the total area is reached and interpolate inside that strip.\n\n## Approach\n\n1. `xs` holds the sorted distinct x-edges and `index` maps each to its position, so elementary segment i is `[xs[i], xs[i + 1]]`.\n2. Each square opens its x-range at its bottom (`+1`) and closes it at its top (`-1`); sort these `events` by y.\n3. `update` adds `delta` to `count` on the nodes that exactly tile segments `from..to`, then refreshes `covered` on the way back: the node's full length while its `count` is positive, otherwise its children's sum (0 at a leaf). So `covered[1]` is the union's width.\n4. After applying event i, the strip up to the next event has width `covered[1]`; store `[y, width, area]` in `strips` and add the area to `total`.\n5. Skip strips while `below + area < half`, adding each area to `below`. The first strip that reaches `half` holds the lowest answer, `bottom + (half - below) / width`.\n\n## Example 1, step by step\n\n`xs = [0, 1, 2, 3]`. The strips are `[0, 1, 1]` (the first square), `[1, 0, 0]` (the gap) and `[2, 1, 1]`, so `total = 2` and `half = 1`. Strip 0 already reaches 1 (`0 + 1 >= 1`), so the answer is `0 + (1 - 0) / 1 = 1`. Every line between 1 and 2 also splits the area evenly, but 1 is the lowest.\n\n## Complexity\n\n- Time: O(n log n): sorting 2n events, and each update touches O(log n) nodes.\n- Space: O(n) for the edges, events, strips and tree.\n\n## Pitfalls\n\n- Overlapping parts count once; adding up `l * l` solves a different problem.\n- Return the lowest line: when half is reached exactly at the top of a strip followed by a gap, the answer is that top, which stopping at the first strip that reaches `half` gives.\n- Take the width after applying event i and the height up to the next event; equal heights give harmless empty strips.\n- Edges reach 2 * 10^9 and areas 10^15: fine for JavaScript numbers, too big for 32-bit integers in Java or C.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `xs`, `index` | sorted distinct x-edges, and a map from each edge to its position |\n| `events` | `[y, delta, left, right]`: a square's x-range opening or closing at height y |\n| `count`, `covered` | per tree node: squares covering its whole range, and its covered length |\n| `strips` | `[bottom, width, area]` for each band between consecutive events |\n| `total`, `half` | the union's area and half of it |\n| `below`, `k` | the area under strip k, and the strip being checked |",
+  "narration": {
+    "2": "Collect every left and right edge once, in increasing order: the x-coordinates the segment tree is built on.",
+    "3": "Map each edge to its position in xs, so a square's x-range becomes a range of elementary segments.",
+    "5": "Each square creates two events...",
+    "6": "...one that opens its x-range at its bottom edge...",
+    "7": "...and one that closes it at its top edge.",
+    "9": "Sort the events by height so the sweep goes from bottom to top.",
+    "14": "The node's segments lie outside the update range, so nothing changes here.",
+    "15": "The node lies fully inside the range: record the change in its count and stop descending.",
+    "18": "Otherwise split the node's segments in half and update both children.",
+    "22": "Some square covers this node's whole range, so its full length is covered.",
+    "23": "A leaf that no square covers fully has nothing covered.",
+    "24": "Otherwise the covered length is whatever the two children cover.",
+    "29": "Visit every event but the last; the strip after event i reaches up to event i + 1.",
+    "31": "Apply the event: add or remove the square's x-range in the tree.",
+    "32": "The strip's area is the union's current width, covered[1], times the strip's height.",
+    "33": "Remember where the strip starts, how wide it is and its area.",
+    "34": "Add the strip to the union's total area.",
+    "37": "The line must leave exactly half of the total area below it.",
+    "40": "Is half the area still out of reach at the top of strip k?",
+    "41": "Then the whole strip lies below the line: count its area and move up.",
+    "44": "Strip k is the first to reach half, so the lowest line lies inside it.",
+    "45": "The area grows by width per unit of height inside the strip, so rise just enough to collect the missing area."
+  }
+}

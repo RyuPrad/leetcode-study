@@ -1,0 +1,70 @@
+{
+  "number": 3481,
+  "title": "Apply Substitutions",
+  "spec": "recalled",
+  "statement": "`replacements` is a list of `[key, value]` pairs. Each `key` is one uppercase letter and appears in only one pair; each `value` is a short string of lowercase letters that may also contain *placeholders*. A placeholder is a key wrapped in percent signs, such as `%A%`, and it stands for that key's value. No key depends on itself, either directly or through a chain of other keys.\n\n`text` is made of the placeholders of all the keys, each used exactly once and in any order, separated by underscores. Replace each placeholder in `text` by its key's value, keep replacing the placeholders that the inserted values bring in, and return the final string once no placeholder is left.",
+  "constraints": [
+    "1 <= replacements.length <= 10",
+    "replacements[i] == [key, value]",
+    "key is a single uppercase English letter, and all keys are distinct",
+    "1 <= value.length <= 8",
+    "value consists of lowercase English letters and placeholders %<key>%",
+    "text joins the placeholders of all keys, each exactly once, with underscores",
+    "text.length == 4 * replacements.length - 1",
+    "Every placeholder names a key of replacements",
+    "No key depends on itself, directly or through other keys"
+  ],
+  "signature": "String applySubstitutions(List<List<String>> replacements, String text)",
+  "entry": "applySubstitutions",
+  "kind": "function",
+  "parameters": [
+    "replacements",
+    "text"
+  ],
+  "validator": "function validate([replacements, text]) {\n  if (replacements.length < 1 || replacements.length > 10) return 'replacements needs 1 to 10 pairs.';\n  const values = new Map();\n  for (const pair of replacements) {\n    if (pair.length !== 2) return 'Each replacement is a [key, value] pair.';\n    const [key, value] = pair;\n    if (!/^[A-Z]$/.test(key)) return 'Each key is a single uppercase letter.';\n    if (values.has(key)) return 'Each key appears in only one pair.';\n    if (value.length < 1 || value.length > 8) return 'Each value has 1 to 8 characters.';\n    if (!/^([a-z]|%[A-Z]%)+$/.test(value)) return 'A value holds lowercase letters and %X% placeholders only.';\n    values.set(key, value);\n  }\n  const mentions = value => (value.match(/%[A-Z]%/g) || []).map(placeholder => placeholder[1]);\n  for (const value of values.values()) if (mentions(value).some(key => !values.has(key))) return 'Every placeholder must name a key of replacements.';\n  const parts = text.split('_');\n  if (text.length !== 4 * values.size - 1 || parts.length !== values.size || new Set(parts).size !== parts.length || parts.some(part => !/^%[A-Z]%$/.test(part) || !values.has(part[1]))) return 'text lists the placeholder of every key once, joined by underscores.';\n  // A depth-first search that meets a key still in progress has found a cycle.\n  const state = new Map();\n  const cyclic = key => {\n    if (state.get(key) === 'done') return false;\n    if (state.get(key) === 'open') return true;\n    state.set(key, 'open');\n    if (mentions(values.get(key)).some(cyclic)) return true;\n    state.set(key, 'done');\n    return false;\n  };\n  if ([...values.keys()].some(cyclic)) return 'No key may depend on itself.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function applySubstitutions(replacements, text) {\n  const values = new Map(replacements);\n  const done = new Map();\n  function expand(s) {\n    let result = '';\n    let i = 0;\n    while (i < s.length) {\n      if (s[i] === '%') {\n        const end = s.indexOf('%', i + 1);\n        const key = s.slice(i + 1, end);\n        if (!done.has(key)) {\n          done.set(key, expand(values.get(key)));\n        }\n        result += done.get(key);\n        i = end + 1;\n      } else {\n        result += s[i];\n        i++;\n      }\n    }\n    return result;\n  }\n  return expand(text);\n}",
+  "brute": "function applySubstitutions(replacements, text) {\n  // Replace the first placeholder by its raw value, again and again, until none is left.\n  const values = new Map(replacements);\n  let current = text;\n  for (;;) {\n    const start = current.indexOf('%');\n    if (start === -1) return current;\n    const end = current.indexOf('%', start + 1);\n    current = current.slice(0, start) + values.get(current.slice(start + 1, end)) + current.slice(end + 1);\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const shuffle = list => {\n    for (let i = list.length - 1; i > 0; i--) {\n      const j = int(0, i);\n      [list[i], list[j]] = [list[j], list[i]];\n    }\n    return list;\n  };\n  const letters = 'abcdefghijklmnopqrstuvwxyz';\n  const keys = shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).slice(0, size === 'large' ? 10 : int(1, 5));\n  // A key only mentions keys listed after it, so there is no cycle. Large inputs mostly mention the next one or two\n  // keys, so the placeholders nest deeply and the answer grows long.\n  const nest = size === 'large' ? 0.85 : rand();\n  const stop = size === 'large' ? 0.1 : 0.35;\n  const replacements = keys.map((key, index) => {\n    let value = '';\n    while (value.length < 8) {\n      const last = size === 'large' ? Math.min(index + 2, keys.length - 1) : keys.length - 1;\n      if (index < keys.length - 1 && value.length <= 5 && rand() < nest) value += `%${keys[int(index + 1, last)]}%`;\n      else value += letters[int(0, 25)];\n      if (rand() < stop) break;\n    }\n    return [key, value];\n  });\n  // Neither the pairs nor the text follow the dependency order.\n  const text = shuffle(keys.slice()).map(key => `%${key}%`).join('_');\n  return [shuffle(replacements), text];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[["A","abc"],["B","def"]],"%A%_%B%"],"expected":"abc_def"},
+    {"name":"Example 2","input":[[["A","bce"],["B","ace"],["C","abc%B%"]],"%A%_%B%_%C%"],"expected":"bce_ace_abcace"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[["Z","q"]],"%Z%"]},
+    {"name":"Test 2","input":[[["A","abcdefgh"]],"%A%"]},
+    {"name":"Test 3","input":[[["A","%B%"],["B","%C%"],["C","x"]],"%C%_%A%_%B%"]},
+    {"name":"Test 4","input":[[["E","%F%%F%"],["J","abcdefgh"],["A","%B%%B%"],["G","%H%%H%"],["C","%D%%D%"],["I","%J%%J%"],["B","%C%%C%"],["H","%I%%I%"],["D","%E%%E%"],["F","%G%%G%"]],"%D%_%J%_%A%_%G%_%B%_%I%_%E%_%C%_%H%_%F%"]},
+    {"name":"Test 5","input":[[["A","a%B%b"],["B","c%C%d"],["C","e"]],"%B%_%A%_%C%"]},
+    {"name":"Test 6","input":[[["D","yz"],["A","%B%%C%"],["C","%D%x"],["B","%D%"]],"%A%_%D%_%B%_%C%"]},
+    {"name":"Test 7","input":[[["Q","%X%m"],["X","n"],["M","%Q%%X%"]],"%M%_%Q%_%X%"]},
+    {"name":"Test 8","input":[[["P","a%R%%S%b"],["R","c%S%"],["S","de"]],"%S%_%R%_%P%"]},
+    {"name":"Test 9","input":[[["K","k"],["L","ll"],["M","mmm"],["N","nnnn"],["O","ooooo"],["P","pppppp"],["Q","qqqqqqq"],["R","rrrrrrrr"],["S","s"],["T","tt"]],"%T%_%K%_%S%_%L%_%R%_%M%_%Q%_%N%_%P%_%O%"]},
+    {"name":"Test 10","input":[[["W","%H%%H%"],["V","v%H%"],["H","hi"],["U","%W%%V%"]],"%U%_%H%_%V%_%W%"]},
+    {"name":"Test 11","input":[[["A","%B%%C%"],["B","%C%%D%"],["C","%D%%E%"],["D","%E%%F%"],["E","%F%%G%"],["F","%G%%H%"],["G","%H%%I%"],["H","%I%%J%"],["I","%J%a"],["J","b"]],"%J%_%I%_%H%_%G%_%F%_%E%_%D%_%C%_%B%_%A%"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTreat every key as a node of a graph, with an edge to each key its value mentions. To expand a key, first expand the keys it points to and paste their results into its value: a depth-first search. Because no key depends on itself, the graph has no cycle and the search always finishes. A key can be reached many times, from the text and from several values, so each finished expansion is stored in a map and reused. Simply replacing placeholders in the text until none is left gives the same string, but it rebuilds a shared key's expansion at every use.\n\n## Approach\n\n1. Load the pairs into a map `values` from key to raw value, and start an empty map `done` for finished expansions.\n2. `expand(s)` scans `s` from left to right while building `result`.\n3. A plain character is copied. At a `%`, find the closing `%` at `end` and read the `key` between them.\n4. If `key` is not in `done` yet, expand `values.get(key)` first (the depth-first step) and store the result.\n5. Append `done.get(key)` and continue just after the closing `%`.\n6. Return `expand(text)`.\n\n## Example 1, step by step\n\n`values` maps A to \"abc\" and B to \"def\". `expand(\"%A%_%B%\")` sees `%` at index 0, finds its partner at 2 and reads key A. A is not done, so `expand(\"abc\")` copies three letters and `done` stores A → \"abc\". `result` becomes \"abc\" and `i` jumps to 3, where `_` is copied. At index 4 it reads key B, expands \"def\" and stores it, so `result` is \"abc_def\", the answer.\n\n## Complexity\n\n- Time: O(L), where L is the answer's length. Each key is expanded once, and because the text names every key exactly once, the expansions stored in `done` add up to less than L.\n- Space: O(L) for `done` and the answer, plus a recursion depth of at most the number of keys.\n\n## Pitfalls\n\n- One pass is not enough: an inserted value can bring new placeholders (in Example 2, `%C%` becomes \"abc%B%\"), so it must be expanded too.\n- After appending an expansion, continue after the closing `%`; reading it again would open a bogus placeholder.\n- Without `done`, a key used by many others is rebuilt at every use: with values like \"%B%%B%\" chained through 10 keys, the deepest key is rebuilt hundreds of times.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `values` | map from each key to its raw value |\n| `done` | map from a key to its fully expanded value |\n| `expand` | returns `s` with every placeholder replaced |\n| `s`, `result` | the string being expanded and its expansion so far |\n| `i`, `end` | the scan position and the closing `%` of the current placeholder |\n| `key` | the key named by the current placeholder |",
+  "narration": {
+    "2": "Index the raw values by key in a map, so each placeholder's value is one lookup away.",
+    "3": "done remembers each key's fully expanded value, so every key is expanded only once.",
+    "4": "expand returns s with every placeholder replaced, however deeply they nest.",
+    "7": "Scan s from left to right.",
+    "8": "A percent sign opens a placeholder.",
+    "9": "Find the percent sign that closes it.",
+    "10": "The key is the text between the two percent signs.",
+    "11": "Has this key been expanded before?",
+    "12": "No: this is the depth-first step. Expand the key's own value, placeholders included, and remember the result.",
+    "14": "Append the key's fully expanded value.",
+    "15": "Continue just after the closing percent sign.",
+    "17": "Any other character is copied unchanged.",
+    "21": "s is now free of placeholders.",
+    "23": "Expanding the text itself gives the answer."
+  }
+}

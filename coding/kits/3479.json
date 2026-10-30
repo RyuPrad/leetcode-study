@@ -1,0 +1,66 @@
+{
+  "number": 3479,
+  "title": "Fruits Into Baskets III",
+  "spec": "leetcode",
+  "statement": "There are `n` kinds of fruit and `n` baskets: kind `i` comes in a quantity of `fruits[i]`, and basket `j` can hold up to `baskets[j]`. Handle the kinds one at a time in index order. Each kind goes into the leftmost basket that is still empty and has room for its whole quantity (`baskets[j] >= fruits[i]`); that basket then holds this kind and takes nothing else. A kind that fits no remaining basket is skipped, and the next kind is handled as usual.\n\nReturn how many kinds end up skipped.",
+  "constraints": [
+    "n == fruits.length == baskets.length",
+    "1 <= n <= 10^5",
+    "1 <= fruits[i], baskets[i] <= 10^9"
+  ],
+  "signature": "int numOfUnplacedFruits(int[] fruits, int[] baskets)",
+  "entry": "numOfUnplacedFruits",
+  "kind": "function",
+  "parameters": [
+    "fruits",
+    "baskets"
+  ],
+  "validator": "function validate([fruits, baskets]) {\n  if (fruits.length < 1 || fruits.length > 100000) return 'fruits needs 1 to 100,000 values.';\n  if (baskets.length !== fruits.length) return 'fruits and baskets have the same length.';\n  if (fruits.some(v => v < 1 || v > 1e9) || baskets.some(v => v < 1 || v > 1e9)) return 'Every quantity and capacity is between 1 and 10^9.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function numOfUnplacedFruits(fruits, baskets) {\n  const n = baskets.length;\n  let size = 1;\n  while (size < n) {\n    size *= 2;\n  }\n  const tree = new Array(2 * size).fill(0);\n  for (let i = 0; i < n; i++) {\n    tree[size + i] = baskets[i];\n  }\n  for (let node = size - 1; node >= 1; node--) {\n    tree[node] = Math.max(tree[2 * node], tree[2 * node + 1]);\n  }\n  let unplaced = 0;\n  for (const fruit of fruits) {\n    if (tree[1] < fruit) {\n      unplaced++;\n      continue;\n    }\n    let node = 1;\n    while (node < size) {\n      if (tree[2 * node] >= fruit) {\n        node = 2 * node;\n      } else {\n        node = 2 * node + 1;\n      }\n    }\n    tree[node] = 0;\n    node = Math.floor(node / 2);\n    while (node >= 1) {\n      tree[node] = Math.max(tree[2 * node], tree[2 * node + 1]);\n      node = Math.floor(node / 2);\n    }\n  }\n  return unplaced;\n}",
+  "brute": "function numOfUnplacedFruits(fruits, baskets) {\n  // Simulate directly: scan the baskets from the left for each kind.\n  const used = baskets.map(() => false);\n  let unplaced = 0;\n  for (const fruit of fruits) {\n    let placed = false;\n    for (let j = 0; j < baskets.length && !placed; j++) {\n      if (!used[j] && baskets[j] >= fruit) {\n        used[j] = true;\n        placed = true;\n      }\n    }\n    if (!placed) unplaced++;\n  }\n  return unplaced;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const n = size === 'large' ? 2000 : int(1, 8);\n  // A narrow range makes ties and near misses; the full range checks big quantities.\n  const top = rand() < 0.6 ? int(1, 10) : 1000000000;\n  const fruits = Array.from({ length: n }, () => int(1, top));\n  const baskets = Array.from({ length: n }, () => int(1, top));\n  return [fruits, baskets];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[4,2,5],[3,5,4]],"expected":1},
+    {"name":"Example 2","input":[[3,6,1],[6,4,7]],"expected":0}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[1],[1]]},
+    {"name":"Test 2","input":[[2],[1]]},
+    {"name":"Test 3","input":[[5,5,5],[5,5,5]]},
+    {"name":"Test 4","input":[[6,6,6],[5,5,5]]},
+    {"name":"Test 5","input":[[1,2,3,4],[4,3,2,1]]},
+    {"name":"Test 6","input":[[4,3,2,1],[1,2,3,4]]},
+    {"name":"Test 7","input":[[1000000000,1,1000000000],[1,1000000000,1]]},
+    {"name":"Test 8","input":[[2,9],[10,3]]},
+    {"name":"Test 9","input":[[1,5,1,1,1],[5,1,1,1,1]]},
+    {"name":"Test 10","input":[[3,1,4,1,5,9,2,6],[2,7,1,8,2,8,1,8]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nScanning the baskets from the left for every kind (the brute force) is O(n²), about 10^10 steps at n = 10^5. Each kind asks one question: which is the leftmost free basket with capacity at least `fruit`? A segment tree that stores the **maximum** free capacity of each range answers it in O(log n): from the root, go into the left child whenever its maximum fits (the leftmost fitting basket is then there), otherwise go right. A used basket gets capacity 0, which no quantity fits, and its ancestors are recomputed.\n\n## Approach\n\n1. Round `n` up to a power of two `size` and store basket `i` in the leaf `tree[size + i]` (spare leaves stay 0).\n2. Fill each inner node `tree[node]` with the larger of its children `tree[2 * node]` and `tree[2 * node + 1]`.\n3. For each `fruit`: if the root `tree[1]` is smaller, no basket fits, so add one to `unplaced`.\n4. Otherwise descend from the root, taking the left child whenever its maximum is at least `fruit`, until `node` is a leaf.\n5. Set that leaf to 0 and recompute every ancestor on the way back up.\n6. Return `unplaced`.\n\n## Example 1, step by step\n\n`fruits = [4, 2, 5]`, `baskets = [3, 5, 4]`, so `size = 4` and the leaves are `[3, 5, 4, 0]`. Their parents hold 5 and 4, and the root holds 5.\n\n- Fruit 4: the root's 5 is enough. The left child holds 5, so go left; its left leaf (3) is too small, so go right to basket 1. That leaf becomes 0 and the root drops to 4.\n- Fruit 2: the left child now holds 3, and its left leaf (basket 0, capacity 3) fits. Basket 0 becomes 0; the root stays 4.\n- Fruit 5: the root's 4 is smaller than 5, so `unplaced = 1`.\n\nThe answer is 1.\n\n## Complexity\n\n- Time: O(n log n): an O(n) build, then one descent and one climb of height log n per kind.\n- Space: O(n) for the tree.\n\n## Pitfalls\n\n- The rule is the leftmost basket that fits, not the tightest fit: sorting the baskets and taking the smallest one that fits fails Test 9.\n- A used basket must never be chosen again: write 0 into its leaf and update all its ancestors.\n- A skipped kind does not end the process; later, smaller kinds may still fit.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `size` | number of leaves: the smallest power of two that is at least `n` |\n| `tree` | `tree[node]` = largest free capacity among the baskets under `node`; leaf `size + i` is basket `i` |\n| `node` | current position in the tree (the root is 1, the children of `node` are `2 * node` and `2 * node + 1`) |\n| `fruit` | quantity of the kind being placed |\n| `unplaced` | how many kinds fit no basket |",
+  "narration": {
+    "3": "size becomes the number of leaves: the smallest power of two that is at least n.",
+    "7": "tree[node] will hold the largest free capacity among the baskets below node; spare leaves stay 0.",
+    "9": "Leaf size + i stands for basket i.",
+    "11": "Fill the inner nodes from the bottom up...",
+    "12": "...each one keeps the larger capacity of its two children.",
+    "15": "Place the kinds in their given order.",
+    "16": "The root holds the largest free capacity of all; if even that is too small, no basket fits.",
+    "17": "This kind stays unplaced.",
+    "20": "Otherwise walk down from the root to the leftmost basket that fits.",
+    "22": "If some basket in the left half fits, the leftmost fitting one is there...",
+    "23": "...so go left.",
+    "25": "Otherwise the right half must hold it, since this node's maximum fits.",
+    "28": "The basket is now taken; capacity 0 never fits again, because every quantity is at least 1.",
+    "29": "Climb to the leaf's parent...",
+    "31": "...and recompute each ancestor's maximum without the used basket.",
+    "35": "Every kind has been handled; return how many were left out."
+  }
+}

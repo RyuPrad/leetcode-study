@@ -1,0 +1,69 @@
+{
+  "number": 3563,
+  "title": "Lexicographically Smallest String After Adjacent Removals",
+  "spec": "leetcode",
+  "statement": "You may repeatedly delete two side-by-side characters of `s` whenever their letters are next to each other in the alphabet, in either order (for example `\"cd\"` or `\"dc\"`). The alphabet wraps around, so `'z'` and `'a'` also count as next to each other. After a deletion the remaining characters close up, so new neighbours can form. You may stop at any time, even before the first deletion.\n\nReturn the lexicographically smallest string you can end up with. Strings compare in dictionary order, and a proper prefix of a string is smaller than it, so the empty string is the smallest possible result.",
+  "constraints": [
+    "1 <= s.length <= 250",
+    "s contains only lowercase English letters"
+  ],
+  "signature": "String lexicographicallySmallestString(String s)",
+  "entry": "lexicographicallySmallestString",
+  "kind": "function",
+  "parameters": [
+    "s"
+  ],
+  "validator": "function validate([s]) {\n  if (typeof s !== 'string' || s.length < 1 || s.length > 250) return 's needs 1 to 250 characters.';\n  if (!/^[a-z]+$/.test(s)) return 's may contain only lowercase English letters.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function lexicographicallySmallestString(s) {\n  const n = s.length;\n  const linked = (a, b) => {\n    const gap = Math.abs(s.charCodeAt(a) - s.charCodeAt(b));\n    return gap === 1 || gap === 25;\n  };\n  const removable = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(false));\n  for (let i = 0; i <= n; i++) {\n    removable[i][i] = true;\n  }\n  for (let length = 2; length <= n; length += 2) {\n    for (let i = 0; i + length <= n; i++) {\n      const j = i + length;\n      for (let k = i + 1; k < j; k += 2) {\n        if (linked(i, k) && removable[i + 1][k] && removable[k + 1][j]) {\n          removable[i][j] = true;\n          break;\n        }\n      }\n    }\n  }\n  const best = new Array(n + 1).fill('');\n  for (let i = n - 1; i >= 0; i--) {\n    best[i] = s[i] + best[i + 1];\n    for (let j = i + 2; j <= n; j += 2) {\n      if (removable[i][j] && best[j] < best[i]) {\n        best[i] = best[j];\n      }\n    }\n  }\n  return best[0];\n}",
+  "brute": "function lexicographicallySmallestString(s) {\n  // Explore every string reachable by deletions and keep the smallest one seen.\n  const seen = new Set([s]);\n  const stack = [s];\n  let smallest = s;\n  while (stack.length > 0) {\n    const current = stack.pop();\n    if (current < smallest) smallest = current;\n    for (let p = 0; p + 1 < current.length; p++) {\n      const gap = Math.abs(current.charCodeAt(p) - current.charCodeAt(p + 1));\n      if (gap !== 1 && gap !== 25) continue;\n      const next = current.slice(0, p) + current.slice(p + 2);\n      if (!seen.has(next)) {\n        seen.add(next);\n        stack.push(next);\n      }\n    }\n  }\n  return smallest;\n}",
+  "generator": "function generate(rand, size) {\n  // Letters from a narrow window of the circular alphabet are often neighbours, so many deletions are possible.\n  const n = size === 'large' ? 220 + Math.floor(rand() * 31) : 1 + Math.floor(rand() * 12);\n  const base = Math.floor(rand() * 26);\n  const width = rand() < 0.15 ? 26 : 2 + Math.floor(rand() * 3);\n  let s = '';\n  for (let i = 0; i < n; i++) s += String.fromCharCode(97 + (base + Math.floor(rand() * width)) % 26);\n  return [s];\n}",
+  "examples": [
+    {"name":"Example 1","input":["abc"],"expected":"a"},
+    {"name":"Example 2","input":["bcda"],"expected":""},
+    {"name":"Example 3","input":["zdce"],"expected":"zdce"}
+  ],
+  "tests": [
+    {"name":"Test 1","input":["a"]},
+    {"name":"Test 2","input":["ab"]},
+    {"name":"Test 3","input":["za"]},
+    {"name":"Test 4","input":["aaaa"]},
+    {"name":"Test 5","input":["cba"]},
+    {"name":"Test 6","input":["zab"]},
+    {"name":"Test 7","input":["acbd"]},
+    {"name":"Test 8","input":["abcdefghijklmnop"]},
+    {"name":"Test 9","input":["azzyzzyyyyyyzaz"]},
+    {"name":"Test 10","input":["ddcbbcaabdcb"]},
+    {"name":"Test 11","input":["mkllmmmkkllm"]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA deletion never reaches across a character that stays: letters on opposite sides of it can never become neighbours. So a final string is fixed by choosing which characters stay, and each gap between them must be a block that can vanish on its own. Trying every sequence of deletions explodes; instead, an interval DP finds which blocks can vanish completely, and a suffix DP builds the smallest result from them.\n\n## Approach\n\n1. `removable[i][j]` says whether the block `s[i..j-1]` can vanish. Empty blocks can.\n2. For each even `length`, the first letter `s[i]` must leave together with some `s[k]`: the two must be `linked`, the block between them must vanish first, and the rest `[k + 1, j)` must vanish on its own. `k` moves in steps of 2 so both parts have even length.\n3. `best[i]` is the smallest string the suffix from `i` can become, with `best[n] = \"\"`. Going right to left, either keep `s[i]` (giving `s[i] + best[i + 1]`) or delete a removable block `[i, j)` and continue with `best[j]`; keep the smallest candidate.\n4. Return `best[0]`.\n\n## Example 1, step by step\n\n`s = \"abc\"`. The blocks `\"ab\"` (`removable[0][2]`) and `\"bc\"` (`removable[1][3]`) can vanish. Then `best[2] = \"c\"`. For `i = 1`, keeping `b` gives `\"bc\"`, but deleting `\"bc\"` gives `best[3] = \"\"`, so `best[1] = \"\"`. For `i = 0`, keeping `a` gives `\"a\" + best[1] = \"a\"`, while deleting `\"ab\"` gives `best[2] = \"c\"`. The answer is `\"a\"`.\n\n## Complexity\n\n- Time: O(n³): the interval DP tries up to n/2 partners `k` for each of O(n²) blocks, and the suffix DP compares O(n²) strings of length up to n.\n- Space: O(n²) for `removable` and the n strings in `best`.\n\n## Pitfalls\n\n- Deleting whenever possible is wrong: in `\"zdce\"`, removing `\"dc\"` leaves `\"ze\"`, which is larger than `\"zdce\"`. Shorter is not always smaller.\n- `'a'` and `'z'` are neighbours too, so a character-code gap of 25 also links two letters.\n- Pairs nest: in `\"bcda\"`, `b` and `a` meet only after `\"cd\"` is gone, which is why the block between `i` and `k` must vanish first.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | length of `s` |\n| `linked(a, b)` | whether the letters at positions `a` and `b` are next to each other in the circular alphabet |\n| `removable[i][j]` | whether the block `s[i..j-1]` can be deleted completely |\n| `length` | length of the block being decided |\n| `i`, `j` | start and end (exclusive) of a block |\n| `k` | the position deleted together with `s[i]` |\n| `best[i]` | smallest string reachable from the suffix starting at `i` |",
+  "narration": {
+    "2": "n is the length of the string.",
+    "3": "linked tells whether the letters at two positions may be deleted as a pair.",
+    "4": "Measure how far apart the two letters are in the alphabet.",
+    "5": "Neighbours differ by 1, or by 25 for the wrap-around pair a and z.",
+    "7": "removable[i][j] will say whether the block s[i..j-1] can vanish completely.",
+    "9": "An empty block vanishes trivially.",
+    "11": "Decide blocks from short to long, since a block depends on shorter ones; odd lengths can never vanish.",
+    "13": "j is the end (exclusive) of the block that starts at i.",
+    "14": "Try every partner k that s[i] could be deleted with; k - i is odd so both parts left over have even length.",
+    "15": "s[i] and s[k] must be neighbours, the letters between them must vanish first, and the rest of the block must vanish on its own.",
+    "16": "Then the whole block can be deleted.",
+    "17": "One working partner is enough.",
+    "22": "best[i] will hold the smallest string the suffix from i can become; best[n] is empty.",
+    "23": "Fill best from the last position to the first.",
+    "24": "Option one: keep s[i] and make the rest as small as possible.",
+    "25": "Option two: delete a block starting at i; only even lengths can vanish.",
+    "26": "If the block s[i..j-1] can vanish and what follows it is smaller, prefer that.",
+    "27": "Take the smaller result.",
+    "31": "best[0] is the smallest string the whole input can become."
+  }
+}

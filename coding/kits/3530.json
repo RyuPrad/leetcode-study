@@ -1,0 +1,74 @@
+{
+  "number": 3530,
+  "title": "Maximum Profit from Valid Topological Order in DAG",
+  "spec": "leetcode",
+  "statement": "You get a directed acyclic graph with `n` nodes labeled `0` to `n - 1`. Each `edges[i] = [u, v]` is an edge from `u` to `v`, and node `i` carries the value `score[i]`.\n\nArrange all `n` nodes in a topological order: a sequence in which, for every edge `[u, v]`, node `u` appears earlier than node `v`. Positions are counted from 1, and node `i` placed at position `p` earns `score[i] * p`. The profit of an order is the total earned by all its nodes. Return the largest profit that any topological order achieves.",
+  "constraints": [
+    "1 <= n <= 22",
+    "score.length == n",
+    "1 <= score[i] <= 10^5",
+    "0 <= edges.length <= n * (n - 1) / 2",
+    "edges[i] == [u, v] is a directed edge from u to v",
+    "0 <= u, v < n",
+    "u != v",
+    "The graph has no cycle",
+    "No edge appears twice"
+  ],
+  "signature": "int maxProfit(int n, int[][] edges, int[] score)",
+  "entry": "maxProfit",
+  "kind": "function",
+  "parameters": [
+    "n",
+    "edges",
+    "score"
+  ],
+  "validator": "function validate([n, edges, score]) {\n  if (!Number.isInteger(n) || n < 1 || n > 22) return 'n is an integer between 1 and 22.';\n  if (!Array.isArray(score) || score.length !== n) return 'score needs exactly n values.';\n  if (score.some(v => !Number.isInteger(v) || v < 1 || v > 100000)) return 'Each score is between 1 and 10^5.';\n  if (!Array.isArray(edges) || edges.length > n * (n - 1) / 2) return 'edges has at most n * (n - 1) / 2 pairs.';\n  const seen = new Set();\n  const indegree = new Array(n).fill(0);\n  const next = Array.from({ length: n }, () => []);\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [u, v].';\n    const [u, v] = edge;\n    if (!Number.isInteger(u) || !Number.isInteger(v) || u < 0 || u >= n || v < 0 || v >= n) return 'Nodes are labeled 0 to n - 1.';\n    if (u === v) return 'An edge cannot join a node to itself.';\n    if (seen.has(u * 32 + v)) return 'Each edge may appear only once.';\n    seen.add(u * 32 + v);\n    next[u].push(v);\n    indegree[v]++;\n  }\n  // Kahn's algorithm removes every node exactly when the graph has no cycle.\n  const queue = [];\n  for (let i = 0; i < n; i++) if (indegree[i] === 0) queue.push(i);\n  for (let q = 0; q < queue.length; q++) {\n    for (const v of next[queue[q]]) if (--indegree[v] === 0) queue.push(v);\n  }\n  if (queue.length !== n) return 'The graph must not contain a cycle.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function maxProfit(n, edges, score) {\n  const before = new Array(n).fill(0);\n  for (const [from, to] of edges) {\n    before[to] |= 1 << from;\n  }\n\n  const full = (1 << n) - 1;\n  const dp = new Array(full + 1).fill(-1);\n  dp[0] = 0;\n  for (let mask = 0; mask < full; mask++) {\n    if (dp[mask] < 0) continue;\n    let position = 1;\n    for (let rest = mask; rest > 0; rest &= rest - 1) {\n      position++;\n    }\n    for (let node = 0; node < n; node++) {\n      const placed = (mask >> node) & 1;\n      if (!placed && (before[node] & mask) === before[node]) {\n        const next = mask | (1 << node);\n        dp[next] = Math.max(dp[next], dp[mask] + score[node] * position);\n      }\n    }\n  }\n  return dp[full];\n}",
+  "brute": "function maxProfit(n, edges, score) {\n  // Build every topological order: fill the positions one by one with any node whose parents are all placed.\n  const parents = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) parents[v].push(u);\n  const placed = new Array(n).fill(false);\n  let best = 0;\n  const extend = (position, profit) => {\n    if (position > n) {\n      best = Math.max(best, profit);\n      return;\n    }\n    for (let v = 0; v < n; v++) {\n      if (placed[v] || parents[v].some(p => !placed[p])) continue;\n      placed[v] = true;\n      extend(position + 1, profit + score[v] * position);\n      placed[v] = false;\n    }\n  };\n  extend(1, 0);\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  // Up to 16 nodes keeps the 2^n table well inside the local time limit even with no edges at all.\n  const n = size === 'large' ? 14 + Math.floor(rand() * 3) : 1 + Math.floor(rand() * 8);\n  // Shuffle the labels; edges only go forward in this order, so the graph never has a cycle.\n  const order = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [order[i], order[j]] = [order[j], order[i]];\n  }\n  const density = rand() < 0.15 ? 0 : rand() * (size === 'large' ? 0.3 : 0.7);\n  const edges = [];\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      if (rand() < density) edges.push([order[i], order[j]]);\n    }\n  }\n  for (let i = edges.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [edges[i], edges[j]] = [edges[j], edges[i]];\n  }\n  const top = size === 'large' || rand() < 0.4 ? 100000 : 10;\n  const score = Array.from({ length: n }, () => 1 + Math.floor(rand() * top));\n  return [n, edges, score];\n}",
+  "examples": [
+    {"name":"Example 1","input":[2,[[0,1]],[2,3]],"expected":8},
+    {"name":"Example 2","input":[3,[[0,1],[0,2]],[1,6,3]],"expected":25}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[1,[],[7]]},
+    {"name":"Test 2","input":[5,[],[5,1,4,2,3]]},
+    {"name":"Test 3","input":[3,[[0,1]],[5,1,4]]},
+    {"name":"Test 4","input":[3,[[2,0],[2,1]],[1,1,100]]},
+    {"name":"Test 5","input":[6,[[5,4],[4,3],[3,2],[2,1],[1,0]],[1,2,3,4,5,6]]},
+    {"name":"Test 6","input":[6,[[0,5],[1,5],[2,5],[3,5],[4,5]],[3,9,1,7,5,2]]},
+    {"name":"Test 7","input":[7,[[3,0],[3,1],[3,2],[3,4],[3,5],[3,6]],[8,2,6,100000,4,1,9]]},
+    {"name":"Test 8","input":[6,[[0,1],[1,2],[3,4],[4,5]],[9,1,1,1,1,9]]},
+    {"name":"Test 9","input":[5,[[0,1],[0,2],[1,3],[2,3],[3,4]],[4,10,2,7,1]]},
+    {"name":"Test 10","input":[10,[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[0,9],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[2,3],[2,4],[2,5],[2,6],[2,7],[2,8],[2,9],[3,4],[3,5],[3,6],[3,7],[3,8],[3,9],[4,5],[4,6],[4,7],[4,8],[4,9],[5,6],[5,7],[5,8],[5,9],[6,7],[6,8],[6,9],[7,8],[7,9],[8,9]],[100000,90000,80000,70000,60000,50000,40000,30000,20000,10000]]},
+    {"name":"Test 11","input":[22,[[21,20],[20,19],[19,18],[18,17],[17,16],[16,15],[15,14],[14,13],[13,12],[12,11],[11,10],[10,9],[9,8],[8,7],[7,6],[6,5],[5,4],[4,3],[3,2],[2,1],[1,0]],[100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000,100000]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTrying every topological order works but can mean `n!` orders. Once some set of nodes fills the first positions, the next node takes position (size of the set) + 1, and which nodes may go next depends only on which nodes are placed, not on their order. So the best profit for \"these nodes come first\" depends on the set alone, and with `n <= 22` a set fits in a bitmask: at most 2^22 states.\n\n## Approach\n\n1. Build `before[node]`, the bitmask of nodes that have an edge into `node`.\n2. `dp[mask]` is the best profit when exactly the nodes in `mask` occupy positions 1 to |mask|. Set `dp[0] = 0` and the rest to `-1` (not reachable).\n3. Visit masks in increasing order: adding a node makes a mask larger, so each state is final before it is extended. Skip masks at `-1`.\n4. Count the bits of `mask` to get `position`, the slot the next node takes.\n5. For each `node` not in `mask` whose `before[node]` lies entirely inside `mask`, update `dp[mask | 1 << node]` with `dp[mask] + score[node] * position`.\n6. Return `dp[full]`, the state with every node placed.\n\n## Example 1, step by step\n\n`edges = [[0,1]]`, `score = [2,3]`, so `before = [0, 1]`.\n\n- `mask = 0`: `position = 1`. Node 0 has no parents: `dp[1] = 0 + 2·1 = 2`. Node 1 still needs node 0.\n- `mask = 1` (node 0 placed): `position = 2`. Node 1 is allowed now: `dp[3] = 2 + 3·2 = 8`.\n- `mask = 2` stays `-1`: node 1 can never come first.\n\nThe answer is `dp[3] = 8`.\n\n## Complexity\n\n- Time: O(2^n · n): each mask counts its bits and tries every node once.\n- Space: O(2^n) for `dp`.\n\n## Pitfalls\n\n- Placing the smallest available score first is not optimal: with the edge `0 → 1` and `score = [5, 1, 4]` it builds 2, 0, 1 for 17, but 0, 1, 2 earns 19 (Test 3).\n- A node may go next only when **all** its parents are placed: compare `before[node] & mask` with the whole `before[node]`.\n- Starting every state at `0` instead of `-1` lets the DP extend sets no valid order produces; in Test 4 it would place node 2 after its own children and report 300 instead of 105.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `before[node]` | bitmask of the nodes with an edge into `node` |\n| `full` | mask with all `n` nodes placed |\n| `dp[mask]` | best profit with exactly `mask` in the first positions, or `-1` |\n| `mask` | the set of nodes already placed |\n| `position` | 1-based position the next node takes |\n| `rest` | `mask` with its bits cleared one at a time while counting |\n| `node`, `placed` | candidate for the next position, and whether it is already in `mask` |\n| `next` | the set after placing `node` |",
+  "narration": {
+    "2": "before[node] will be a bitmask of the nodes that must appear earlier than node.",
+    "3": "Read every edge from → to.",
+    "4": "Set from's bit in to's mask: from has to be placed before to.",
+    "7": "The mask with all n nodes placed.",
+    "8": "dp[mask] is the best profit when exactly the nodes in mask fill the first positions; -1 means no valid order does that.",
+    "9": "Placing no nodes earns nothing.",
+    "10": "Adding a node always makes the mask larger, so increasing order finishes each state before it is extended.",
+    "11": "No valid order puts exactly these nodes first; skip this set.",
+    "12": "The next node takes position (number of placed nodes) + 1.",
+    "13": "Clear the lowest set bit each time, counting one placed node per step.",
+    "16": "Try every node as the one that goes next.",
+    "17": "Read node's bit: 1 if it is already placed.",
+    "18": "It can go next only if it is unplaced and every node with an edge into it is already in mask.",
+    "19": "The set of placed nodes after adding node.",
+    "20": "node earns score[node] × position; keep the better of this and any other way to reach next.",
+    "24": "Every node is placed: this is the best profit over all topological orders."
+  }
+}

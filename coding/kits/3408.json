@@ -1,0 +1,106 @@
+{
+  "number": 3408,
+  "title": "Design Task Manager",
+  "spec": "leetcode",
+  "statement": "Build a class `TaskManager` that holds a pool of tasks. Each task has an id, an owner `userId` and a priority, and one user may own any number of tasks.\n\n- `TaskManager(tasks)` fills the pool from `tasks`, where each entry `[userId, taskId, priority]` describes one task. The ids in `tasks` are all different.\n- `add(userId, taskId, priority)` puts a new task into the pool. No task currently in the pool has the id `taskId`.\n- `edit(taskId, newPriority)` sets the priority of task `taskId`, which is in the pool, to `newPriority`.\n- `rmv(taskId)` takes task `taskId`, which is in the pool, out of it.\n- `execTop()` runs the task with the largest priority (on a tie, the one with the largest `taskId`), takes it out of the pool, and returns its owner's `userId`. When the pool is empty it returns `-1`.\n\nAn id that has left the pool, by `rmv` or `execTop`, may be added again later, possibly for a different user.",
+  "constraints": [
+    "1 <= tasks.length <= 10^5",
+    "0 <= userId <= 10^5",
+    "0 <= taskId <= 10^5",
+    "0 <= priority <= 10^9",
+    "0 <= newPriority <= 10^9",
+    "The task ids in tasks are distinct",
+    "add is only called with an id that is not in the pool; edit and rmv only with an id that is",
+    "At most 2 * 10^5 calls in total are made to add, edit, rmv and execTop"
+  ],
+  "signature": {
+    "kind": "design",
+    "name": "TaskManager",
+    "constructor": "TaskManager(List<List<Integer>> tasks)",
+    "methods": [
+      "void add(int userId, int taskId, int priority)",
+      "void edit(int taskId, int newPriority)",
+      "void rmv(int taskId)",
+      "int execTop()"
+    ]
+  },
+  "entry": "TaskManager",
+  "kind": "design",
+  "parameters": [
+    "operations",
+    "arguments"
+  ],
+  "methods": {
+    "constructor": [
+      "tasks"
+    ],
+    "add": [
+      "userId",
+      "taskId",
+      "priority"
+    ],
+    "edit": [
+      "taskId",
+      "newPriority"
+    ],
+    "rmv": [
+      "taskId"
+    ],
+    "execTop": []
+  },
+  "validator": "function validate([operations, args]) {\n  if (!Array.isArray(operations) || !Array.isArray(args) || operations.length !== args.length) return 'operations and arguments need the same length.';\n  if (operations[0] !== 'TaskManager' || !Array.isArray(args[0]) || args[0].length !== 1) return 'Start with TaskManager(tasks).';\n  const tasks = args[0][0];\n  if (!Array.isArray(tasks) || tasks.length < 1 || tasks.length > 100000) return 'tasks holds 1 to 10^5 tasks.';\n  if (operations.length - 1 > 200000) return 'At most 2 * 10^5 calls follow the constructor.';\n  const isId = (v) => Number.isInteger(v) && v >= 0 && v <= 100000;\n  const isPriority = (v) => Number.isInteger(v) && v >= 0 && v <= 1000000000;\n  // The pool is a map from id to priority plus its (priority, id) keys kept sorted, so execTop is the last key.\n  const live = new Map();\n  const keys = [];\n  const key = (taskId) => live.get(taskId) * 131072 + taskId;\n  const find = (value) => { let low = 0, high = keys.length; while (low < high) { const mid = (low + high) >> 1; if (keys[mid] < value) low = mid + 1; else high = mid; } return low; };\n  const insert = (taskId, priority) => { live.set(taskId, priority); const value = key(taskId); keys.splice(find(value), 0, value); };\n  const remove = (taskId) => { keys.splice(find(key(taskId)), 1); live.delete(taskId); };\n  for (const task of tasks) {\n    if (!Array.isArray(task) || task.length !== 3) return 'Each task is [userId, taskId, priority].';\n    if (!isId(task[0]) || !isId(task[1])) return 'userId and taskId are between 0 and 10^5.';\n    if (!isPriority(task[2])) return 'priority is between 0 and 10^9.';\n    if (live.has(task[1])) return 'The task ids in tasks must be different.';\n    insert(task[1], task[2]);\n  }\n  for (let i = 1; i < operations.length; i++) {\n    const a = args[i];\n    if (!Array.isArray(a)) return 'Each call needs an argument list.';\n    if (operations[i] === 'add') {\n      if (a.length !== 3 || !isId(a[0]) || !isId(a[1]) || !isPriority(a[2])) return 'add takes userId and taskId (0 to 10^5) and priority (0 to 10^9).';\n      if (live.has(a[1])) return `add uses task ${a[1]}, which is already in the pool.`;\n      insert(a[1], a[2]);\n    } else if (operations[i] === 'edit') {\n      if (a.length !== 2 || !isId(a[0]) || !isPriority(a[1])) return 'edit takes taskId (0 to 10^5) and newPriority (0 to 10^9).';\n      if (!live.has(a[0])) return `edit needs task ${a[0]} to be in the pool.`;\n      remove(a[0]);\n      insert(a[0], a[1]);\n    } else if (operations[i] === 'rmv') {\n      if (a.length !== 1 || !isId(a[0])) return 'rmv takes one taskId (0 to 10^5).';\n      if (!live.has(a[0])) return `rmv needs task ${a[0]} to be in the pool.`;\n      remove(a[0]);\n    } else if (operations[i] === 'execTop') {\n      if (a.length !== 0) return 'execTop takes no arguments.';\n      if (keys.length > 0) remove(keys[keys.length - 1] % 131072);\n    } else {\n      return 'Only add, edit, rmv and execTop can follow the constructor.';\n    }\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "class TaskManager {\n  constructor(tasks) {\n    this.tasks = new Map();\n    this.heap = [];\n    for (const [userId, taskId, priority] of tasks) {\n      this.add(userId, taskId, priority);\n    }\n  }\n\n  add(userId, taskId, priority) {\n    this.tasks.set(taskId, { userId, priority });\n    this.push([priority, taskId]);\n  }\n\n  edit(taskId, newPriority) {\n    this.tasks.get(taskId).priority = newPriority;\n    this.push([newPriority, taskId]);\n  }\n\n  rmv(taskId) {\n    this.tasks.delete(taskId);\n  }\n\n  execTop() {\n    while (this.heap.length > 0) {\n      const [priority, taskId] = this.pop();\n      const task = this.tasks.get(taskId);\n      if (task !== undefined && task.priority === priority) {\n        this.tasks.delete(taskId);\n        return task.userId;\n      }\n    }\n    return -1;\n  }\n\n  before(a, b) {\n    return a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);\n  }\n\n  push(entry) {\n    const heap = this.heap;\n    heap.push(entry);\n    let index = heap.length - 1;\n    while (index > 0) {\n      const parent = (index - 1) >> 1;\n      if (!this.before(heap[index], heap[parent])) break;\n      [heap[parent], heap[index]] = [heap[index], heap[parent]];\n      index = parent;\n    }\n  }\n\n  pop() {\n    const heap = this.heap;\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length === 0) return top;\n    heap[0] = last;\n    let index = 0;\n    for (;;) {\n      const left = 2 * index + 1;\n      const right = left + 1;\n      let best = index;\n      if (left < heap.length && this.before(heap[left], heap[best])) best = left;\n      if (right < heap.length && this.before(heap[right], heap[best])) best = right;\n      if (best === index) return top;\n      [heap[best], heap[index]] = [heap[index], heap[best]];\n      index = best;\n    }\n  }\n}",
+  "brute": "class TaskManager {\n  constructor(tasks) {\n    this.list = tasks.map(([userId, taskId, priority]) => ({ userId, taskId, priority }));\n  }\n  add(userId, taskId, priority) {\n    this.list.push({ userId, taskId, priority });\n  }\n  edit(taskId, newPriority) {\n    this.list.find(task => task.taskId === taskId).priority = newPriority;\n  }\n  rmv(taskId) {\n    this.list = this.list.filter(task => task.taskId !== taskId);\n  }\n  execTop() {\n    if (this.list.length === 0) return -1;\n    // Sort by priority, then by task id, both from high to low, and run the first task.\n    this.list.sort((a, b) => b.priority - a.priority || b.taskId - a.taskId);\n    return this.list.shift().userId;\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const int = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const large = size === 'large';\n  // A crowded large case starts small and runs many tasks, so the pool empties and -1 appears.\n  const crowded = large && rand() < 0.3;\n  // Small cases use few ids, users and priorities, so ties and reused ids are common.\n  const maxId = large ? 100000 : int(2, 8);\n  const maxUser = large ? 100000 : int(0, 4);\n  const maxPriority = large ? [5, 1000, 1000000000][int(0, 2)] : [1, 3, 1000000000][int(0, 2)];\n  const n = large ? (crowded ? int(1, 60) : int(1500, 2000)) : int(1, Math.min(4, maxId + 1));\n  // Distinct ids without a retry loop (the seeded generator can repeat itself): every small id, or a large\n  // increasing run with random gaps, shuffled and cut to n.\n  const ids = [];\n  if (large) for (let id = int(0, 999); ids.length < 2000; id += 1 + int(0, 48)) ids.push(id);\n  else for (let id = 0; id <= maxId; id++) ids.push(id);\n  for (let i = ids.length - 1; i > 0; i--) {\n    const j = int(0, i);\n    [ids[i], ids[j]] = [ids[j], ids[i]];\n  }\n  const live = new Map();\n  const retired = [];\n  const tasks = [];\n  for (const taskId of ids.slice(0, n)) {\n    const userId = int(0, maxUser);\n    const priority = int(0, maxPriority);\n    live.set(taskId, priority);\n    tasks.push([userId, taskId, priority]);\n  }\n  const operations = ['TaskManager'];\n  const args = [[tasks]];\n  const calls = large ? 499 : int(1, 12);\n  const weights = crowded ? [0.2, 0.2, 0.1] : [0.25, 0.25, 0.15];\n  for (let i = 0; i < calls; i++) {\n    const roll = rand();\n    let kind = roll < weights[0] ? 'add' : roll < weights[0] + weights[1] ? 'edit' : roll < weights[0] + weights[1] + weights[2] ? 'rmv' : 'execTop';\n    if ((kind === 'edit' || kind === 'rmv') && live.size === 0) kind = 'add';\n    if (kind === 'add') {\n      let taskId = -1;\n      for (let tries = 0; tries < 20 && taskId === -1; tries++) {\n        const pick = retired.length > 0 && rand() < 0.4 ? retired[int(0, retired.length - 1)] : int(0, maxId);\n        if (!live.has(pick)) taskId = pick;\n      }\n      if (taskId === -1) kind = 'execTop';\n      else {\n        const priority = int(0, maxPriority);\n        live.set(taskId, priority);\n        operations.push('add');\n        args.push([int(0, maxUser), taskId, priority]);\n      }\n    }\n    if (kind === 'edit' || kind === 'rmv') {\n      const ids = [...live.keys()];\n      const taskId = ids[int(0, ids.length - 1)];\n      if (kind === 'edit') {\n        // Sometimes keep the same priority, which leaves two identical entries in a lazy heap.\n        const priority = rand() < 0.15 ? live.get(taskId) : int(0, maxPriority);\n        live.set(taskId, priority);\n        operations.push('edit');\n        args.push([taskId, priority]);\n      } else {\n        live.delete(taskId);\n        retired.push(taskId);\n        operations.push('rmv');\n        args.push([taskId]);\n      }\n    }\n    if (kind === 'execTop') {\n      let top = -1;\n      for (const [taskId, priority] of live) {\n        if (top === -1 || priority > live.get(top) || (priority === live.get(top) && taskId > top)) top = taskId;\n      }\n      if (top !== -1) {\n        live.delete(top);\n        retired.push(top);\n      }\n      operations.push('execTop');\n      args.push([]);\n    }\n  }\n  return [operations, args];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["TaskManager","add","edit","execTop","rmv","add","execTop"],[[[[1,101,10],[2,102,20],[3,103,15]]],[4,104,5],[102,8],[],[101],[5,105,15],[]]],"expected":[null,null,null,3,null,null,5]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["TaskManager","execTop","execTop"],[[[[7,0,0]]],[],[]]]},
+    {"name":"Test 2","input":[["TaskManager","execTop","execTop","execTop","execTop"],[[[[1,5,10],[2,9,10],[3,7,10]]],[],[],[],[]]]},
+    {"name":"Test 3","input":[["TaskManager","edit","edit","execTop","execTop","execTop"],[[[[1,1,5],[2,2,6]]],[1,9],[1,5],[],[],[]]]},
+    {"name":"Test 4","input":[["TaskManager","rmv","add","execTop","execTop"],[[[[1,3,8]]],[3],[2,3,8],[],[]]]},
+    {"name":"Test 5","input":[["TaskManager","execTop","add","execTop","execTop","execTop"],[[[[4,10,1],[5,11,1]]],[],[6,11,0],[],[],[]]]},
+    {"name":"Test 6","input":[["TaskManager","execTop","edit","add","execTop","execTop","execTop"],[[[[100000,100000,0],[0,0,1000000000]]],[],[100000,1000000000],[5,50,1000000000],[],[],[]]]},
+    {"name":"Test 7","input":[["TaskManager","edit","execTop","edit","execTop","execTop","execTop"],[[[[1,1,10],[2,2,9],[3,3,8]]],[1,7],[],[3,1],[],[],[]]]},
+    {"name":"Test 8","input":[["TaskManager","rmv","rmv","execTop","add","execTop"],[[[[1,1,1],[2,2,2]]],[2],[1],[],[9,2,0],[]]]},
+    {"name":"Test 9","input":[["TaskManager","edit","execTop","edit","execTop","execTop","add","execTop","execTop"],[[[[3,20,4],[3,21,4],[8,22,3]]],[22,4],[],[20,5],[],[],[1,22,4],[],[]]]},
+    {"name":"Test 10","input":[["TaskManager","edit","edit","execTop","add","execTop","execTop"],[[[[1,4,6]]],[4,6],[4,6],[],[2,4,6],[],[]]]},
+    {"name":"Test 11","input":[["TaskManager","add","execTop","edit","rmv","add","edit","execTop","execTop","add","execTop","execTop","execTop"],[[[[2,6,3],[0,1,3],[4,8,1],[1,3,2]]],[3,5,3],[],[1,0],[3],[0,6,2],[8,3],[],[],[2,3,3],[],[],[]]]},
+    {"name":"Test 12","generate":{"seed":25,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":26,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":37,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nScanning every task on each `execTop` costs O(n) per call. A max-heap of `[priority, taskId]` entries keeps the next task to run on top, but a heap cannot cheaply find and change an arbitrary entry, as `edit` and `rmv` would need. So they leave the heap alone: a map `tasks` holds the true owner and priority of every task in the pool, `edit` pushes a fresh entry, and `rmv` only deletes from the map. An entry that disagrees with the map is *stale*, and `execTop` discards stale entries as they reach the top.\n\n## Approach\n\n1. `tasks` maps each task id in the pool to its `{ userId, priority }` record; `heap` holds `[priority, taskId]` entries. The constructor calls `add` for each starting task.\n2. `add` records the task and pushes `[priority, taskId]`.\n3. `edit` changes the record's priority and pushes `[newPriority, taskId]`.\n4. `rmv` deletes the task from `tasks` only.\n5. `execTop` pops entries until one names a task still in `tasks` with exactly that priority, deletes that task and returns its `userId`. If the heap runs out first, it returns `-1`.\n6. `before(a, b)` orders the heap: higher priority first, then higher task id. `push` sifts a new entry up; `pop` moves the last entry to the root and sifts it down.\n\n## Example 1, step by step\n\nThe constructor pushes `[10, 101]`, `[20, 102]` and `[15, 103]`, and `add(4, 104, 5)` pushes `[5, 104]`. `edit(102, 8)` pushes `[8, 102]`. The first `execTop` pops `[20, 102]`, stale because task 102 now has priority 8, then `[15, 103]`, which is live: task 103 leaves the pool and user `3` is returned. `rmv(101)` makes `[10, 101]` stale. `add(5, 105, 15)` pushes `[15, 105]`, the new top, so the last `execTop` returns user `5`.\n\n## Complexity\n\n- Time: O(n log n) to build, O(log m) per `add` and `edit`, O(1) per `rmv`, and amortized O(log m) per `execTop`, where m counts every entry ever pushed: each is popped at most once.\n- Space: O(m), one entry per added task and per edit.\n\n## Pitfalls\n\n- On equal priorities the larger task id runs first, not the task added first.\n- Checking only that the task exists is not enough: after an edit, the old entry names a task in the pool with an outdated priority.\n- Read the owner from the map, not from a heap entry: a removed id can come back with a different user.\n- Stale entries can remain when the pool is empty, so pop until the heap is empty before returning `-1`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `tasks` | map from each task id in the pool to its `{ userId, priority }` record |\n| `heap` | max-heap of `[priority, taskId]` entries, some stale |\n| `task` | the record a popped entry names, or `undefined` if that task left the pool |\n| `before` | true when entry `a` belongs above entry `b` |\n| `top`, `last` | the root being popped and the last entry moved into its place |\n| `index`, `parent`, `left`, `right`, `best` | positions used while sifting |",
+  "narration": {
+    "3": "Map each task id in the pool to its owner and current priority: the truth every heap entry is checked against.",
+    "4": "The max-heap of [priority, taskId] entries, some of which may go stale.",
+    "5": "Load each starting task...",
+    "6": "...through add, exactly as if it were added later.",
+    "11": "Record the task's owner and priority under its id.",
+    "12": "Push its entry so execTop can find it.",
+    "16": "Change the priority in the record; the task's older heap entry is now stale.",
+    "17": "Push a fresh entry instead of hunting for the old one inside the heap.",
+    "21": "Deleting from the map is enough: every heap entry of this task becomes stale.",
+    "25": "Keep looking while the heap still has entries.",
+    "26": "Take the highest entry: the largest priority, then the largest task id.",
+    "27": "Look up the task the entry names; it may have left the pool.",
+    "28": "The entry is live only if its task is still in the pool with exactly this priority.",
+    "29": "Run the task: it leaves the pool.",
+    "30": "Return the owner from the map, which is always current.",
+    "33": "Only stale entries were left, so the pool is empty.",
+    "37": "A higher priority sits higher; on equal priorities the larger task id does.",
+    "46": "Stop sifting up once the new entry no longer beats its parent.",
+    "47": "Otherwise swap it with its parent and continue from there.",
+    "56": "The heap had a single entry, so there is nothing left to sift.",
+    "57": "Move the last entry to the root and sift it down.",
+    "63": "Pick whichever child should sit above the current entry...",
+    "65": "Neither child beats it, so the heap is in order again: return the old root."
+  }
+}

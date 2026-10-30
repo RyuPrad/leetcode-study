@@ -1,0 +1,72 @@
+{
+  "number": 3552,
+  "title": "Grid Teleportation Traversal",
+  "spec": "leetcode",
+  "statement": "`matrix` is a grid of `m` rows and `n` columns given as `m` strings of length `n`; `matrix[i][j]` is the cell in row `i`, column `j`. A cell is `'.'` (open), `'#'` (a wall) or an uppercase letter `'A'` to `'Z'` (a portal, which is also open).\n\nStarting on cell `(0, 0)`, you want to reach `(m - 1, n - 1)`. A move steps to the cell above, below, left or right of you, which must be inside the grid and not a wall. While on a portal, the starting cell included, you may also jump to any other cell with the same letter. Jumps are free, since only moves are counted, but each letter allows only one jump over the whole trip.\n\nReturn the fewest moves needed to reach `(m - 1, n - 1)`, or `-1` if that is impossible.",
+  "constraints": [
+    "1 <= m == matrix.length <= 1000",
+    "1 <= n == matrix[i].length <= 1000",
+    "matrix[i][j] is '#', '.' or an uppercase English letter",
+    "matrix[0][0] is not '#'"
+  ],
+  "signature": "int minMoves(String[] matrix)",
+  "entry": "minMoves",
+  "kind": "function",
+  "parameters": [
+    "matrix"
+  ],
+  "validator": "function validate([matrix]) {\n  if (matrix.length < 1 || matrix.length > 1000) return 'matrix needs 1 to 1000 rows.';\n  const n = matrix[0].length;\n  if (n < 1 || n > 1000) return 'Each row needs 1 to 1000 cells.';\n  for (const row of matrix) {\n    if (row.length !== n) return 'Every row must have the same length.';\n    if (!/^[.#A-Z]+$/.test(row)) return \"Cells are '.', '#' or an uppercase letter.\";\n  }\n  if (matrix[0][0] === '#') return 'The top-left cell cannot be a wall.';\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minMoves(matrix) {\n  const rows = matrix.length;\n  const cols = matrix[0].length;\n  const portals = new Map();\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      const cell = matrix[r][c];\n      if (cell === '.' || cell === '#') continue;\n      if (!portals.has(cell)) portals.set(cell, []);\n      portals.get(cell).push([r, c]);\n    }\n  }\n\n  const seen = Array.from({ length: rows }, () => new Array(cols).fill(false));\n  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  seen[0][0] = true;\n  let frontier = [[0, 0]];\n  for (let moves = 0; frontier.length > 0; moves++) {\n    for (let i = 0; i < frontier.length; i++) {\n      const [r, c] = frontier[i];\n      const letter = matrix[r][c];\n      if (!portals.has(letter)) continue;\n      for (const [pr, pc] of portals.get(letter)) {\n        if (seen[pr][pc]) continue;\n        seen[pr][pc] = true;\n        frontier.push([pr, pc]);\n      }\n      portals.delete(letter);\n    }\n    const next = [];\n    for (const [r, c] of frontier) {\n      if (r === rows - 1 && c === cols - 1) return moves;\n      for (const [dr, dc] of directions) {\n        const nr = r + dr;\n        const nc = c + dc;\n        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;\n        if (matrix[nr][nc] === '#' || seen[nr][nc]) continue;\n        seen[nr][nc] = true;\n        next.push([nr, nc]);\n      }\n    }\n    frontier = next;\n  }\n  return -1;\n}",
+  "brute": "function minMoves(matrix) {\n  // Dijkstra over states (row, column, set of letters already jumped with), following the rules\n  // literally, with a linear scan for the closest unfinished state.\n  const rows = matrix.length, cols = matrix[0].length;\n  const letters = [...new Set(matrix.join('').replace(/[.#]/g, ''))];\n  const key = (r, c, used) => `${r},${c},${used}`;\n  const best = new Map([[key(0, 0, 0), 0]]);\n  const done = new Set();\n  const relax = (r, c, used, d) => {\n    const k = key(r, c, used);\n    if (!best.has(k) || d < best.get(k)) best.set(k, d);\n  };\n  for (;;) {\n    let current = null, distance = Infinity;\n    for (const [k, d] of best) if (!done.has(k) && d < distance) { current = k; distance = d; }\n    if (current === null) return -1;\n    done.add(current);\n    const [r, c, used] = current.split(',').map(Number);\n    if (r === rows - 1 && c === cols - 1) return distance;\n    for (const [dr, dc] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {\n      const x = r + dr, y = c + dc;\n      if (x >= 0 && x < rows && y >= 0 && y < cols && matrix[x][y] !== '#') relax(x, y, used, distance + 1);\n    }\n    const bit = letters.indexOf(matrix[r][c]);\n    if (bit >= 0 && (used & (1 << bit)) === 0)\n      for (let x = 0; x < rows; x++)\n        for (let y = 0; y < cols; y++)\n          if ((x !== r || y !== c) && matrix[x][y] === matrix[r][c]) relax(x, y, used | (1 << bit), distance);\n  }\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = list => list[Math.floor(rand() * list.length)];\n  const letters = large ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' : 'ABCD'.slice(0, 1 + Math.floor(rand() * 3));\n  if (large && rand() < 0.4) {\n    // A winding corridor: wall rows with one gap at alternating ends, plus a few portal pairs.\n    const rows = 99, cols = 100;\n    const grid = [];\n    for (let r = 0; r < rows; r++) {\n      if (r % 2 === 0) grid.push(Array(cols).fill('.'));\n      else grid.push(Array.from({ length: cols }, (_, c) => (c === (r % 4 === 1 ? cols - 1 : 0) ? '.' : '#')));\n    }\n    const pairs = Math.floor(rand() * 6);\n    for (let p = 0; p < pairs; p++)\n      for (let k = 0; k < 2; k++) grid[2 * Math.floor(rand() * 50)][Math.floor(rand() * cols)] = letters[p];\n    return [grid.map(row => row.join(''))];\n  }\n  const rows = large ? 60 + Math.floor(rand() * 41) : pick([1, 2, 3, 3, 4, 4, 5]);\n  const cols = large ? 60 + Math.floor(rand() * 41) : pick([1, 2, 3, 4, 4, 5, 5]);\n  const wall = rand() * 0.4;\n  const portal = large ? 0.01 + rand() * 0.05 : rand() * 0.4;\n  const grid = [];\n  for (let r = 0; r < rows; r++) {\n    let row = '';\n    for (let c = 0; c < cols; c++) {\n      const x = rand();\n      if (x < wall) row += r + c === 0 ? '.' : '#';\n      else if (x < wall + portal) row += pick(letters);\n      else row += '.';\n    }\n    grid.push(row);\n  }\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[["A..",".A.","..."]],"expected":2},
+    {"name":"Example 2","input":[[".#...",".#.#.",".#.#.","...#."]],"expected":13}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[["."]]},
+    {"name":"Test 2","input":[["AA"]]},
+    {"name":"Test 3","input":[[".A","BA"]]},
+    {"name":"Test 4","input":[["..",".#"]]},
+    {"name":"Test 5","input":[[".#","#."]]},
+    {"name":"Test 6","input":[["A#...","##.#.","..A#.","####."]]},
+    {"name":"Test 7","input":[[".A#B.","###..","A.B#.","####.","....."]]},
+    {"name":"Test 8","input":[["C.#..","#.#.C","..#..","C##.#","...C."]]},
+    {"name":"Test 9","input":[["A..","...","##.","A#."]]},
+    {"name":"Test 10","input":[[".","A","#","A","."]]},
+    {"name":"Test 11","input":[[".....P....","#########.","..........",".#########","..........","#########.","..........",".#########","...P......","#########."]]},
+    {"name":"Test 12","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":15,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA move costs 1 and a jump costs 0, so this is a shortest-path search in which all cells sharing a letter are linked for free. A breadth-first search by number of moves works if each level first takes in every cell that a jump reaches at the same count.\n\nThe once-per-letter rule never hurts a shortest route: a route that jumped with letter `L` twice could have jumped once, from the first `L` cell straight to where the second jump landed, skipping the moves in between. So the search spends each letter the first time a frontier cell shows it. (A brute force would keep the set of used letters in its state, with up to 2^26 times as many states.)\n\n## Approach\n\n1. Record in the map `portals` the cells of every letter.\n2. Start with `frontier = [[0, 0]]` and `moves = 0`; mark cells in `seen` when they join a frontier.\n3. Jump pass: for each frontier cell whose letter is still in `portals`, append that letter's unseen cells to the frontier, then delete the letter.\n4. Step pass: if a frontier cell is the corner `(rows - 1, cols - 1)`, return `moves`; otherwise collect its unseen, non-wall neighbours in `next`.\n5. Make `next` the frontier and add 1 to `moves`. An empty frontier means the answer is `-1`.\n\n## Example 1, step by step\n\n`portals` maps `'A'` to `[[0, 0], [1, 1]]`. At `moves = 0` the frontier `[[0, 0]]` appends `[1, 1]` and `'A'` is deleted; the step pass collects `[1, 0]`, `[0, 1]`, `[2, 1]` and `[1, 2]`. At `moves = 1` none of them is the corner, and they add `[2, 0]`, `[0, 2]` and `[2, 2]`. At `moves = 2` the step pass meets `(2, 2)` and returns `2`.\n\n## Complexity\n\n- Time: O(m·n): each cell joins a frontier at most once, and each letter's list is walked once.\n- Space: O(m·n) for `seen`, `portals` and the frontiers.\n\n## Pitfalls\n\n- Finish the jump pass before any step. Otherwise a step can claim a portal cell for `moves + 1` that a later jump in the same level reaches with `moves`: in `[\".A\", \"BA\"]` the corner is 1 move away, not 2.\n- The start may be a portal (Example 1 jumps before moving), and the corner may be a wall, which makes the answer `-1`.\n- Delete each letter after its first use; otherwise a letter on many cells rescans its list once per cell.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `rows`, `cols` | the grid's height `m` and width `n` |\n| `portals` | map from a letter to its cells; used letters are deleted |\n| `seen` | whether a cell has already joined a frontier |\n| `directions` | the four row and column offsets of a move |\n| `frontier` | the cells reachable with exactly `moves` moves |\n| `next` | the cells first reached with `moves + 1` moves |\n| `r`, `c` | a frontier cell |\n| `pr`, `pc` | a cell with the same letter as `(r, c)` |\n| `nr`, `nc` | a neighbour of `(r, c)` |",
+  "narration": {
+    "4": "A map from each portal letter to the list of cells that show it.",
+    "8": "Open cells and walls are not portals, so skip them.",
+    "9": "The first cell with this letter starts an empty list for it.",
+    "10": "Remember where this portal is.",
+    "14": "seen marks every cell that has already joined a frontier, so no cell is handled twice.",
+    "17": "Level 0 of the search holds only the starting cell.",
+    "18": "Each round handles all cells reachable with exactly moves moves.",
+    "19": "Jump pass: look at every frontier cell, including the ones appended during this pass.",
+    "22": "A plain cell, or a letter that was already used, offers no jump.",
+    "23": "A jump is free, so every other cell with this letter belongs to the same level.",
+    "24": "A cell that already joined a frontier keeps its earlier move count.",
+    "26": "Add the jump's landing cell to the current frontier.",
+    "28": "The letter is used up, so later cells with it will not scan the list again.",
+    "30": "next collects the cells that are one more move away.",
+    "32": "The first level that contains the bottom-right corner gives the fewest moves.",
+    "33": "Try a move in each of the four directions.",
+    "36": "A move may not leave the grid.",
+    "37": "Walls cannot be entered, and seen cells already have a level.",
+    "38": "Mark the neighbour now so it is added to next only once.",
+    "42": "Advance to the next level; the loop header then adds 1 to moves.",
+    "44": "The frontier ran out without reaching the corner, so it cannot be reached."
+  }
+}

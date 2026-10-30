@@ -1,0 +1,71 @@
+{
+  "number": 3548,
+  "title": "Equal Sum Grid Partition II",
+  "spec": "leetcode",
+  "statement": "Every cell of the `m x n` matrix `grid` holds a positive integer. Decide whether one straight cut, either between two neighbouring rows or between two neighbouring columns, can split it into two non-empty parts that balance:\n\n- the two parts have the same sum, or\n- they reach the same sum once a single cell is left out of one of the parts (at most one cell overall), provided the cells that remain in that part are still connected.\n\nConnected means that any cell of the part can be reached from any other through a chain of side-by-side neighbours (up, down, left, right) that all belong to the part. Return `true` if some cut balances this way, otherwise `false`.",
+  "constraints": [
+    "1 <= m == grid.length <= 10^5",
+    "1 <= n == grid[i].length <= 10^5",
+    "2 <= m * n <= 10^5",
+    "1 <= grid[i][j] <= 10^5"
+  ],
+  "signature": "boolean canPartitionGrid(int[][] grid)",
+  "entry": "canPartitionGrid",
+  "kind": "function",
+  "parameters": [
+    "grid"
+  ],
+  "validator": "function validate([grid]) {\n  if (!Array.isArray(grid) || grid.length < 1 || grid.length > 100000) return 'grid needs 1 to 10^5 rows.';\n  const n = Array.isArray(grid[0]) ? grid[0].length : 0;\n  if (n < 1 || n > 100000) return 'Each row needs 1 to 10^5 cells.';\n  if (grid.length * n < 2 || grid.length * n > 100000) return 'grid has 2 to 10^5 cells.';\n  for (const row of grid) {\n    if (!Array.isArray(row) || row.length !== n) return 'All rows must have the same length.';\n    if (row.some(v => !Number.isInteger(v) || v < 1 || v > 100000)) return 'Each value is an integer from 1 to 10^5.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function canPartitionGrid(grid) {\n  let total = 0;\n  for (const row of grid) {\n    for (const value of row) total += value;\n  }\n\n  function check(matrix) {\n    const rows = matrix.length;\n    const cols = matrix[0].length;\n    const seen = new Set();\n    let topSum = 0;\n    for (let k = 1; k < rows; k++) {\n      for (const value of matrix[k - 1]) {\n        topSum += value;\n        seen.add(value);\n      }\n      const diff = topSum - (total - topSum);\n      if (diff === 0) return true;\n      if (diff < 0) continue;\n      if (k > 1 && cols > 1 && seen.has(diff)) return true;\n      if (cols === 1 && (matrix[0][0] === diff || matrix[k - 1][0] === diff)) return true;\n      if (k === 1 && (matrix[0][0] === diff || matrix[0][cols - 1] === diff)) return true;\n    }\n    return false;\n  }\n\n  const transposed = grid[0].map((_, c) => grid.map(row => row[c]));\n  return check(grid) || check([...grid].reverse()) || check(transposed) || check([...transposed].reverse());\n}",
+  "brute": "function canPartitionGrid(grid) {\n  const m = grid.length, n = grid[0].length;\n  // Whether the given cells form one 4-connected piece (found by a flood fill from the first cell).\n  const connected = cells => {\n    if (cells.length === 0) return false;\n    const inside = new Set(cells.map(([r, c]) => r * n + c));\n    const reached = new Set([cells[0][0] * n + cells[0][1]]), todo = [cells[0]];\n    while (todo.length) {\n      const [r, c] = todo.pop();\n      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {\n        const key = (r + dr) * n + (c + dc);\n        if (r + dr < 0 || r + dr >= m || c + dc < 0 || c + dc >= n || !inside.has(key) || reached.has(key)) continue;\n        reached.add(key);\n        todo.push([r + dr, c + dc]);\n      }\n    }\n    return reached.size === inside.size;\n  };\n  const sum = cells => cells.reduce((s, [r, c]) => s + grid[r][c], 0);\n  const cuts = [];\n  for (let k = 1; k < m; k++) cuts.push((r, c) => r < k);\n  for (let k = 1; k < n; k++) cuts.push((r, c) => c < k);\n  for (const inFirst of cuts) {\n    const first = [], second = [];\n    for (let r = 0; r < m; r++) for (let c = 0; c < n; c++) (inFirst(r, c) ? first : second).push([r, c]);\n    if (sum(first) === sum(second)) return true;\n    // Try leaving out each cell of either part, then check the sums and that part's connectivity.\n    for (const [part, other] of [[first, second], [second, first]]) {\n      for (let i = 0; i < part.length; i++) {\n        const rest = part.filter((_, j) => j !== i);\n        if (sum(rest) === sum(other) && connected(rest)) return true;\n      }\n    }\n  }\n  return false;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  const shape = rand();\n  let m, n;\n  if (shape < 0.2) { m = 1; n = large ? int(60, 100) : int(2, 6); }\n  else if (shape < 0.4) { m = large ? int(60, 100) : int(2, 6); n = 1; }\n  else { m = large ? int(40, 100) : int(1, 4); n = large ? int(40, 100) : int(2, 4); }\n  const limit = 100000, top = large ? (rand() < 0.5 ? limit : int(2, 60)) : int(1, 6);\n  const grid = Array.from({ length: m }, () => Array.from({ length: n }, () => int(1, top)));\n  const mode = rand();\n  if (mode < 0.3) return [grid];\n  // Pick a cut, then shift values so that the parts balance exactly or after leaving out one chosen cell.\n  const horizontal = m > 1 && (n === 1 || rand() < 0.5);\n  const k = horizontal ? int(1, m - 1) : int(1, n - 1);\n  const first = [], second = [];\n  for (let r = 0; r < m; r++) for (let c = 0; c < n; c++) ((horizontal ? r < k : c < k) ? first : second).push([r, c]);\n  const [big, small] = rand() < 0.5 ? [first, second] : [second, first];\n  const skip = mode < 0.55 ? null : big[int(0, big.length - 1)];\n  const removed = skip ? grid[skip[0]][skip[1]] : 0;\n  const sum = cells => cells.reduce((s, [r, c]) => s + grid[r][c], 0);\n  // Moves the part's total by up to delta, keeping every value in [1, limit] and the chosen cell unchanged.\n  const shift = (part, delta) => {\n    const start = int(0, part.length - 1);\n    for (let t = 0; t < part.length && delta !== 0; t++) {\n      const [r, c] = part[(start + t) % part.length];\n      if (skip && r === skip[0] && c === skip[1]) continue;\n      const step = delta > 0 ? Math.min(delta, limit - grid[r][c]) : Math.max(delta, 1 - grid[r][c]);\n      grid[r][c] += step;\n      delta -= step;\n    }\n    return delta;\n  };\n  const gap = sum(big) - removed - sum(small);\n  if (gap > 0) shift(big, -shift(small, gap));\n  else if (gap < 0) shift(small, shift(big, -gap));\n  return [grid];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[1,4],[2,3]]],"expected":true},
+    {"name":"Example 2","input":[[[1,2],[3,4]]],"expected":true},
+    {"name":"Example 3","input":[[[1,2,4],[2,3,5]]],"expected":false},
+    {"name":"Example 4","input":[[[4,1,8],[3,2,6]]],"expected":false}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[1,1]]]},
+    {"name":"Test 2","input":[[[1],[2]]]},
+    {"name":"Test 3","input":[[[100000,100000],[100000,100000]]]},
+    {"name":"Test 4","input":[[[4,5,1,5]]]},
+    {"name":"Test 5","input":[[[2,1],[1,2],[2,1]]]},
+    {"name":"Test 6","input":[[[5,3,3]]]},
+    {"name":"Test 7","input":[[[2,3],[1,3],[1,3]]]},
+    {"name":"Test 8","input":[[[3,4],[1,2]]]},
+    {"name":"Test 9","input":[[[1,2,1],[2,1,2]]]},
+    {"name":"Test 10","input":[[[2,1,2],[2,1,2],[2,1,2],[1,2,1]]]},
+    {"name":"Test 11","input":[[[4],[4],[4],[5],[4]]]},
+    {"name":"Test 12","generate":{"seed":17,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":28,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":11,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA brute force tries every cut and every cell to leave out, with a flood fill to test connectivity. Two facts make it fast. Each part is a rectangle: with at least 2 rows and 2 columns it stays connected without any one cell, but a single row or column stays connected only without one of its two ends. And as a cut moves down, the part above it grows by one row, so a running prefix sum gives both part sums, and a set of the values above the cut tells at once whether some cell is worth exactly the surplus. Values are positive, so the left-out cell comes from the heavier part.\n\n## Approach\n\n1. Add up every cell into `total`.\n2. `check(matrix)` moves a cut down `matrix`: for the cut below the first `k` rows it adds row `k - 1` to `topSum` and its values to `seen`.\n3. `diff = topSum - (total - topSum)` is the top part's surplus. 0 means the parts balance; a negative surplus is left to the upside-down pass.\n4. Leave out a cell worth `diff`: any value in `seen` when the top part has at least 2 rows and 2 columns, only `matrix[0][0]` or `matrix[k - 1][0]` when it is one column, only `matrix[0][0]` or `matrix[0][cols - 1]` when it is one row.\n5. Run `check` on `grid`, on `grid` upside down (the bottom part becomes the top), and likewise on `transposed` for the vertical cuts.\n\n## Example 1, step by step\n\n`grid = [[1, 4], [2, 3]]`, so `total = 10`. In `check(grid)` the cut with `k = 1` gives `topSum = 1 + 4 = 5` and `diff = 5 - 5 = 0`: the parts already balance, so the answer is `true`. (Example 2 is found by the upside-down pass: on `[[3, 4], [1, 2]]`, `diff = 7 - 3 = 4`, and 4 is the last cell of that one-row part.)\n\n## Complexity\n\n- Time: O(m·n): the total, the transpose and the four sweeps each visit every cell once.\n- Space: O(m·n) for the flipped and transposed copies and `seen`.\n\n## Pitfalls\n\n- Leaving out a middle cell of a one-row or one-column part splits it (Example 3), even when the grid itself has many rows.\n- The heavier part may lie on either side of a horizontal or vertical cut: check all four orientations.\n- In a part with at least 2 rows and 2 columns any cell may go, inner ones included.\n- Under LeetCode's limits sums reach 10^10; in Java or C use a 64-bit `long`.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `total` | sum of all cells |\n| `matrix` | the grid in the orientation being checked |\n| `rows`, `cols` | its numbers of rows and columns |\n| `k` | the cut lies below the first `k` rows |\n| `topSum` | prefix sum of the rows above the cut |\n| `seen` | set of the values above the cut |\n| `diff` | how much heavier the top part is than the bottom part |\n| `transposed` | the grid with rows and columns swapped, for vertical cuts |",
+  "narration": {
+    "2": "total is the sum of every cell; each part's sum will be derived from it.",
+    "4": "Add every value of the grid to total.",
+    "7": "check tries only cuts between rows of matrix and only leaves out a cell above the cut; flipped copies cover the other cases.",
+    "10": "seen holds every value in the rows above the cut.",
+    "11": "topSum is the prefix sum of the rows above the cut.",
+    "12": "Try the cut below the first k rows, which keeps both parts non-empty.",
+    "13": "Row k - 1 moves above the cut...",
+    "14": "...so its values join the prefix sum...",
+    "15": "...and the set of values that could be left out.",
+    "17": "diff is how much heavier the top part is than the bottom part.",
+    "18": "Equal sums: this cut works without leaving anything out.",
+    "19": "The bottom part is heavier; the upside-down pass handles that case.",
+    "20": "A block with at least 2 rows and 2 columns stays connected without any one cell, so any cell worth diff will do.",
+    "21": "A single column stays connected only without its top or bottom cell.",
+    "22": "A single row stays connected only without its first or last cell.",
+    "24": "No cut in this orientation works.",
+    "27": "Swap rows and columns so that vertical cuts become cuts between rows.",
+    "28": "Try the grid, the grid upside down, and the same two for the transposed grid."
+  }
+}

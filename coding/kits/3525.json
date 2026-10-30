@@ -1,0 +1,82 @@
+{
+  "number": 3525,
+  "title": "Find X Value of Array II",
+  "spec": "leetcode",
+  "statement": "The array `nums` holds positive integers, `k` is a positive integer, and every entry of `queries` has the form `[index, value, start, x]`. Process the queries one after another. For each query:\n\n1. Overwrite `nums[index]` with `value`. This change stays in place for all later queries.\n2. For every `end` from `start` to `nums.length - 1`, take the product `nums[start] * nums[start + 1] * ... * nums[end]` (so each product begins exactly at `start` and has at least one factor). Count how many of these products leave remainder `x` when divided by `k`. Nothing is removed from `nums` by this step.\n\nReturn the counts as an array, one per query, in the order the queries were given.",
+  "constraints": [
+    "1 <= nums.length <= 10^5",
+    "1 <= nums[i] <= 10^9",
+    "1 <= k <= 5",
+    "1 <= queries.length <= 2 * 10^4",
+    "Each query is [index, value, start, x]",
+    "0 <= index <= nums.length - 1",
+    "1 <= value <= 10^9",
+    "0 <= start <= nums.length - 1",
+    "0 <= x <= k - 1"
+  ],
+  "signature": "int[] resultArray(int[] nums, int k, int[][] queries)",
+  "entry": "resultArray",
+  "kind": "function",
+  "parameters": [
+    "nums",
+    "k",
+    "queries"
+  ],
+  "validator": "function validate([nums, k, queries]) {\n  const n = nums.length;\n  if (n < 1 || n > 100000) return 'nums needs 1 to 10^5 values.';\n  if (nums.some(v => !Number.isInteger(v) || v < 1 || v > 1e9)) return 'Each nums[i] is an integer from 1 to 10^9.';\n  if (!Number.isInteger(k) || k < 1 || k > 5) return 'k is between 1 and 5.';\n  if (queries.length < 1 || queries.length > 20000) return 'queries needs 1 to 2 * 10^4 entries.';\n  for (const query of queries) {\n    if (!Array.isArray(query) || query.length !== 4) return 'Each query is [index, value, start, x].';\n    const [index, value, start, x] = query;\n    if (!Number.isInteger(index) || index < 0 || index >= n) return 'Each index must be a position in nums.';\n    if (!Number.isInteger(value) || value < 1 || value > 1e9) return 'Each value is an integer from 1 to 10^9.';\n    if (!Number.isInteger(start) || start < 0 || start >= n) return 'Each start must be a position in nums.';\n    if (!Number.isInteger(x) || x < 0 || x >= k) return 'Each x is between 0 and k - 1.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function resultArray(nums, k, queries) {\n  const n = nums.length;\n  const tree = new Array(4 * n);\n  const leaf = (value) => {\n    const counts = new Array(k).fill(0);\n    counts[value % k] = 1;\n    return { product: value % k, counts };\n  };\n  const combine = (left, right) => {\n    const counts = [...left.counts];\n    for (let r = 0; r < k; r++) {\n      counts[(left.product * r) % k] += right.counts[r];\n    }\n    return { product: (left.product * right.product) % k, counts };\n  };\n  const build = (node, low, high) => {\n    if (low === high) {\n      tree[node] = leaf(nums[low]);\n      return;\n    }\n    const mid = (low + high) >> 1;\n    build(2 * node, low, mid);\n    build(2 * node + 1, mid + 1, high);\n    tree[node] = combine(tree[2 * node], tree[2 * node + 1]);\n  };\n  const update = (node, low, high, index, value) => {\n    if (low === high) {\n      tree[node] = leaf(value);\n      return;\n    }\n    const mid = (low + high) >> 1;\n    if (index <= mid) {\n      update(2 * node, low, mid, index, value);\n    } else {\n      update(2 * node + 1, mid + 1, high, index, value);\n    }\n    tree[node] = combine(tree[2 * node], tree[2 * node + 1]);\n  };\n  const suffix = (node, low, high, start) => {\n    if (low >= start) {\n      return tree[node];\n    }\n    const mid = (low + high) >> 1;\n    if (start > mid) {\n      return suffix(2 * node + 1, mid + 1, high, start);\n    }\n    return combine(suffix(2 * node, low, mid, start), tree[2 * node + 1]);\n  };\n  build(1, 0, n - 1);\n  const result = [];\n  for (const [index, value, start, x] of queries) {\n    update(1, 0, n - 1, index, value);\n    result.push(suffix(1, 0, n - 1, start).counts[x]);\n  }\n  return result;\n}",
+  "brute": "function resultArray(nums, k, queries) {\n  // Apply each update to a copy, then multiply from start to the end, counting the matching remainders.\n  const arr = nums.slice();\n  return queries.map(([index, value, start, x]) => {\n    arr[index] = value;\n    let product = 1;\n    let ways = 0;\n    for (let end = start; end < arr.length; end++) {\n      product = (product * (arr[end] % k)) % k;\n      if (product === x) ways++;\n    }\n    return ways;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const large = size === 'large';\n  const pick = (low, high) => low + Math.floor(rand() * (high - low + 1));\n  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));\n  const n = large ? 2000 : pick(1, 6);\n  const k = pick(1, 5);\n  // Values coprime to k keep products away from 0, so every remainder shows up.\n  const coprime = k > 1 && rand() < 0.5;\n  const number = () => {\n    for (;;) {\n      const v = large ? pick(1, 1e9) : pick(1, 12);\n      if (!coprime || gcd(v, k) === 1) return v;\n    }\n  };\n  const nums = Array.from({ length: n }, number);\n  const queries = Array.from({ length: large ? 2000 : pick(1, 5) }, () => [pick(0, n - 1), number(), pick(0, n - 1), pick(0, k - 1)]);\n  return [nums, k, queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[1,2,3,4,5],3,[[2,2,0,2],[3,3,3,0],[0,1,0,1]]],"expected":[2,2,2]},
+    {"name":"Example 2","input":[[1,2,4,8,16,32],4,[[0,2,0,2],[0,2,0,1]]],"expected":[1,0]},
+    {"name":"Example 3","input":[[1,1,2,1,1],2,[[2,1,0,1]]],"expected":[5]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[7],1,[[0,5,0,0]]]},
+    {"name":"Test 2","input":[[5,5,5],5,[[1,10,0,0],[2,3,0,0],[0,1,1,0]]]},
+    {"name":"Test 3","input":[[2,2,2,2],4,[[0,2,0,0],[0,2,0,2],[3,1,0,0],[1,3,1,2]]]},
+    {"name":"Test 4","input":[[1,1,1],5,[[0,1,0,3]]]},
+    {"name":"Test 5","input":[[1,1,1,1,1],3,[[2,2,0,2],[2,1,0,2],[2,2,0,1],[4,2,0,1]]]},
+    {"name":"Test 6","input":[[2,3,4],5,[[0,4,1,2],[2,1,0,4]]]},
+    {"name":"Test 7","input":[[1,2,3,4,5,6,7,8],5,[[7,9,7,4],[0,4,0,4],[4,1,2,1],[2,8,0,0]]]},
+    {"name":"Test 8","input":[[1000000000,999999999,999999998,999999997],3,[[1,1000000000,0,1],[3,999999999,0,0],[0,2,2,2]]]},
+    {"name":"Test 9","input":[[3,1,4,1,5,9,2,6],2,[[2,7,0,1],[7,1,0,1],[5,2,3,0]]]},
+    {"name":"Test 10","input":[[3,5,7,9,11,13],4,[[1,1,0,1],[0,3,2,3],[5,1,0,3]]]},
+    {"name":"Test 11","input":[[2,3,4,1,3,2,4,1,2,3,4,1,3,2,4,1,2,3,4,1],5,[[0,1,0,1],[19,4,5,4],[10,2,0,3],[3,3,12,2],[7,4,0,1],[15,1,9,4],[1,2,1,2],[18,3,0,4],[12,1,6,1],[5,4,0,3]]]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nMultiplying from `start` to the end for every query costs O(n) each, up to 2·10^9 steps in total. Since `k <= 5`, a block of the array has a tiny summary: its `product` modulo `k`, and `counts[r]`, how many prefixes of the block have product `r` modulo `k`. Neighbouring blocks combine in O(k): the left block's prefixes keep their remainders, and a prefix reaching into the right block is the whole left block times a prefix of the right one. A segment tree keeps this summary for every node, so an update and a query each touch O(log n) nodes.\n\n## Approach\n\n1. `leaf(value)` summarises one element: product `value % k` and one prefix with that remainder.\n2. `combine(left, right)` copies `left.counts`, then adds each `right.counts[r]` to slot `(left.product * r) % k`; the product is `left.product * right.product` modulo `k`.\n3. `build` fills the tree from `nums`; `update` replaces one leaf and recombines its ancestors.\n4. Every query asks about a suffix, so `suffix(node, low, high, start)` returns the node itself when `low >= start`, only the right child's suffix when `start > mid`, and otherwise the left child's suffix combined with the whole right child.\n5. For each query, update, then push `counts[x]` of the summary of `nums[start..n - 1]`.\n\n## Example 1, step by step\n\nAfter the first update the remainders of `nums` modulo 3 are `[1, 2, 2, 1, 2]`. The node for indices 0..2 has prefix products 1, 2, 1, so `counts = [0, 2, 1]` and `product = 1`; the node for 3..4 has `counts = [0, 1, 1]` and `product = 2`. Combining multiplies the right block's remainders by 1, so the root has `counts = [0, 3, 2]`, and with `start = 0` the answer is `counts[2] = 2`. The second query sets `nums[3] = 3`; `start = 3` is past the root's middle, so `suffix` returns the node for 3..4, now `counts = [2, 0, 0]`, giving 2. The third query finds `counts[1] = 2` at the root.\n\n## Complexity\n\n- Time: O(n·k + q·k·log n): building combines each node once, and every update or query combines O(log n) nodes in O(k) each.\n- Space: O(n·k) for the summaries.\n\n## Pitfalls\n\n- Multiply remainders, not raw values: `10^9 · 10^9` loses precision in JavaScript and overflows in Java and C.\n- Multiply the right block's remainders by the left block's whole product before adding its counts.\n- The update persists, but `start` only limits the current query; the next query sees the whole array again.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `tree[node]` | summary `{ product, counts }` of the node's range |\n| `product` | product of the range modulo `k` |\n| `counts[r]` | number of prefixes of the range with product `r` modulo `k` |\n| `node`, `low`, `high`, `mid` | a tree node, the range it covers, and where its children split |\n| `result` | the answer for each query |",
+  "narration": {
+    "3": "The tree lives in an array: node 1 is the root, and node i has children 2i and 2i + 1.",
+    "4": "leaf summarises a single element.",
+    "6": "Its only prefix is the element itself, with remainder value % k.",
+    "9": "combine summarises two neighbouring blocks, the left block first.",
+    "10": "Prefixes that end inside the left block keep their remainders.",
+    "11": "Every prefix of the right block, with remainder r...",
+    "12": "...extended by the whole left block has remainder left.product * r modulo k.",
+    "14": "The joined block's product is the product of both blocks.",
+    "17": "A range of one index is a leaf.",
+    "21": "Split the range in the middle...",
+    "24": "...and summarise it from its two halves.",
+    "26": "update replaces one element and refreshes every summary above it.",
+    "32": "Go down into the half that contains index.",
+    "37": "On the way back up, recombine this node from its children.",
+    "39": "suffix summarises nums[start..high], the part of this node's range from start on.",
+    "40": "The whole node lies at or after start, so its stored summary is exactly what is needed.",
+    "44": "start is in the right half, so the left half is skipped entirely.",
+    "47": "start is in the left half: its suffix comes first, followed by the whole right half.",
+    "49": "Summarise the initial array.",
+    "51": "Handle the queries in order.",
+    "52": "The update is permanent, so it goes straight into the tree.",
+    "53": "Summarise nums[start..n - 1] and read how many of its prefixes have remainder x.",
+    "55": "One count per query, in query order."
+  }
+}

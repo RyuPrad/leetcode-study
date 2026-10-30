@@ -1,0 +1,77 @@
+{
+  "number": 3553,
+  "title": "Minimum Weighted Subgraph With the Required Paths II",
+  "spec": "leetcode",
+  "statement": "A tree has `n = edges.length + 1` nodes labelled `0` to `n - 1`. Each `edges[i] = [u_i, v_i, w_i]` joins `u_i` and `v_i` by an undirected edge of weight `w_i`.\n\nEach `queries[j] = [src1_j, src2_j, dest_j]` names three different nodes. For that query, pick a connected part of the tree (a set of its nodes and edges that is itself a tree) in which `src1_j` can travel to `dest_j` and `src2_j` can travel to `dest_j` along the picked edges only, and make the sum of the picked edge weights as small as possible.\n\nReturn an array `answer` of the same length as `queries`, where `answer[j]` is that smallest weight sum for `queries[j]`.",
+  "constraints": [
+    "3 <= n <= 10^5, where n = edges.length + 1",
+    "edges[i].length == 3",
+    "0 <= u_i, v_i < n",
+    "1 <= w_i <= 10^4",
+    "edges form a valid tree",
+    "1 <= queries.length <= 10^5",
+    "queries[j].length == 3",
+    "0 <= src1_j, src2_j, dest_j < n",
+    "src1_j, src2_j and dest_j are pairwise distinct"
+  ],
+  "signature": "int[] minimumWeight(int[][] edges, int[][] queries)",
+  "entry": "minimumWeight",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "queries"
+  ],
+  "validator": "function validate([edges, queries]) {\n  if (!Array.isArray(edges)) return 'edges must be a list of [u, v, w] edges.';\n  const n = edges.length + 1;\n  if (n < 3 || n > 100000) return 'The tree has 3 to 10^5 nodes, so edges has 2 to 10^5 - 1 entries.';\n  const parent = Array.from({ length: n }, (_, i) => i);\n  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 3 || !edge.every(Number.isInteger)) return 'Each edge is [u, v, w] with integers.';\n    const [u, v, w] = edge;\n    if (u < 0 || v < 0 || u >= n || v >= n) return 'Edge endpoints are between 0 and n - 1, where n = edges.length + 1.';\n    if (w < 1 || w > 10000) return 'Edge weights are between 1 and 10^4.';\n    const ru = find(u), rv = find(v);\n    if (ru === rv) return 'edges must form a tree (no cycles or repeated edges).';\n    parent[ru] = rv;\n  }\n  if (!Array.isArray(queries) || queries.length < 1 || queries.length > 100000) return 'queries has 1 to 10^5 entries.';\n  for (const query of queries) {\n    if (!Array.isArray(query) || query.length !== 3 || !query.every(x => Number.isInteger(x) && x >= 0 && x < n)) return 'Each query is [src1, src2, dest] with nodes between 0 and n - 1.';\n    const [src1, src2, dest] = query;\n    if (src1 === src2 || src2 === dest || dest === src1) return 'The three nodes of a query must be different.';\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function minimumWeight(edges, queries) {\n  const n = edges.length + 1;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v, w] of edges) {\n    graph[u].push([v, w]);\n    graph[v].push([u, w]);\n  }\n\n  const LOG = Math.max(1, Math.ceil(Math.log2(n)));\n  const up = Array.from({ length: LOG }, () => new Array(n).fill(0));\n  const depth = new Array(n).fill(0);\n  const dist = new Array(n).fill(0);\n  const visited = new Array(n).fill(false);\n  const queue = [0];\n  visited[0] = true;\n\n  for (let head = 0; head < queue.length; head++) {\n    const node = queue[head];\n    for (const [next, w] of graph[node]) {\n      if (visited[next]) continue;\n      visited[next] = true;\n      up[0][next] = node;\n      depth[next] = depth[node] + 1;\n      dist[next] = dist[node] + w;\n      queue.push(next);\n    }\n  }\n\n  for (let j = 1; j < LOG; j++) {\n    for (let v = 0; v < n; v++) {\n      up[j][v] = up[j - 1][up[j - 1][v]];\n    }\n  }\n\n  const lca = (a, b) => {\n    if (depth[a] < depth[b]) [a, b] = [b, a];\n    for (let j = LOG - 1; j >= 0; j--) {\n      if (depth[a] - (1 << j) >= depth[b]) a = up[j][a];\n    }\n    if (a === b) return a;\n    for (let j = LOG - 1; j >= 0; j--) {\n      if (up[j][a] !== up[j][b]) {\n        a = up[j][a];\n        b = up[j][b];\n      }\n    }\n    return up[0][a];\n  };\n\n  const distance = (a, b) => dist[a] + dist[b] - 2 * dist[lca(a, b)];\n\n  return queries.map(([src1, src2, dest]) => {\n    const total = distance(src1, src2) + distance(src2, dest) + distance(dest, src1);\n    return total / 2;\n  });\n}",
+  "brute": "function minimumWeight(edges, queries) {\n  // For each query, walk the two tree paths into dest and add every edge they use exactly once.\n  const n = edges.length + 1;\n  const neighbours = Array.from({ length: n }, () => []);\n  edges.forEach(([u, v], id) => { neighbours[u].push([v, id]); neighbours[v].push([u, id]); });\n  return queries.map(([src1, src2, dest]) => {\n    const parent = new Array(n).fill(-1);\n    const parentEdge = new Array(n).fill(-1);\n    const seen = new Array(n).fill(false);\n    seen[dest] = true;\n    const stack = [dest];\n    while (stack.length) {\n      const x = stack.pop();\n      for (const [y, id] of neighbours[x]) if (!seen[y]) { seen[y] = true; parent[y] = x; parentEdge[y] = id; stack.push(y); }\n    }\n    const used = new Set();\n    for (const start of [src1, src2]) for (let x = start; x !== dest; x = parent[x]) used.add(parentEdge[x]);\n    let total = 0;\n    for (const id of used) total += edges[id][2];\n    return total;\n  });\n}",
+  "generator": "function generate(rand, size) {\n  const pick = (k) => Math.floor(rand() * k);\n  const n = size === 'large' ? 2000 : 3 + pick(8);\n  const shape = rand();\n  const maxWeight = size === 'large' || rand() < 0.5 ? 10000 : 1 + pick(4);\n  // Build a tree on positions 0..n-1 (each joins an earlier one), then relabel the nodes at random.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 0; i--) { const j = pick(i + 1); [label[i], label[j]] = [label[j], label[i]]; }\n  const edges = [];\n  for (let i = 1; i < n; i++) {\n    // Paths make deep trees, stars shallow ones, and a recent parent gives long branches.\n    const parent = shape < 0.25 ? i - 1 : shape < 0.4 ? 0 : shape < 0.7 ? Math.max(0, i - 1 - pick(3)) : pick(i);\n    const edge = [label[parent], label[i], 1 + pick(maxWeight)];\n    if (rand() < 0.5) [edge[0], edge[1]] = [edge[1], edge[0]];\n    edges.push(edge);\n  }\n  for (let i = edges.length - 1; i > 0; i--) { const j = pick(i + 1); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const m = size === 'large' ? 2000 : 1 + pick(6);\n  // Each query takes three different nodes.\n  const queries = Array.from({ length: m }, () => {\n    const a = pick(n);\n    let b = pick(n - 1);\n    if (b >= a) b++;\n    let c = pick(n);\n    while (c === a || c === b) c = pick(n);\n    return [a, b, c];\n  });\n  return [edges, queries];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1,2],[1,2,3],[1,3,5],[1,4,4],[2,5,6]],[[2,3,4],[0,2,5]]],"expected":[12,11]},
+    {"name":"Example 2","input":[[[1,0,8],[0,2,7]],[[0,1,2]]],"expected":[15]}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1,1],[1,2,1]],[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]]]},
+    {"name":"Test 2","input":[[[1,0,10000],[2,1,10000]],[[0,2,1],[1,0,2]]]},
+    {"name":"Test 3","input":[[[0,1,1],[0,2,2],[0,3,3],[0,4,4],[0,5,5]],[[1,2,3],[1,2,0],[4,5,1],[0,3,5],[2,4,5]]]},
+    {"name":"Test 4","input":[[[0,1,3],[1,2,1],[2,3,4],[3,4,1],[4,5,5],[5,6,9],[6,7,2]],[[0,7,3],[0,3,7],[2,3,4],[5,6,0],[7,6,5],[1,6,2]]]},
+    {"name":"Test 5","input":[[[0,1,5],[1,2,5],[2,3,5],[2,4,7]],[[0,1,3],[3,2,0],[4,3,0],[1,4,3]]]},
+    {"name":"Test 6","input":[[[0,1,38],[0,2,75],[1,3,12],[1,4,49],[2,5,86],[2,6,23],[3,7,60],[3,8,97],[4,9,34],[4,10,71],[5,11,8],[5,12,45],[6,13,82],[6,14,19]],[[7,14,0],[7,8,3],[11,12,5],[7,14,13],[3,4,9],[10,13,1],[0,1,2]]]},
+    {"name":"Test 7","input":[[[3,5,4],[8,3,2],[1,8,7],[9,1,1],[0,9,3],[2,5,6],[4,8,5],[9,6,8],[7,3,9]],[[2,7,4],[6,0,2],[4,6,7],[5,2,0],[1,4,6]]]},
+    {"name":"Test 8","input":[[[19,8,10000],[21,12,10000],[12,10,10000],[23,5,10000],[18,0,10000],[6,29,10000],[27,26,10000],[18,22,10000],[6,14,10000],[11,13,10000],[25,14,10000],[20,15,10000],[16,4,10000],[24,9,10000],[16,27,10000],[24,2,10000],[21,1,10000],[25,15,10000],[3,9,10000],[7,11,10000],[23,1,10000],[20,4,10000],[26,17,10000],[17,8,10000],[29,3,10000],[22,7,10000],[5,13,10000],[28,0,10000],[2,10,10000]],[[28,19,9],[28,9,19],[22,7,11],[19,8,28],[21,25,18]]]},
+    {"name":"Test 9","input":[[[6,13,3901],[10,3,2187],[7,39,3449],[12,25,3136],[3,21,6836],[39,18,5905],[14,39,7833],[32,37,1218],[16,34,9312],[0,36,2882],[12,27,7104],[4,11,2130],[32,35,6471],[6,11,1188],[9,5,2949],[11,8,3764],[22,2,7695],[11,32,4882],[11,22,6822],[22,17,4938],[20,3,3559],[3,34,3457],[23,24,7452],[23,17,9909],[30,4,2496],[33,30,2536],[1,39,7275],[5,31,9758],[4,27,4787],[6,7,8001],[36,7,6985],[32,15,4035],[28,25,6694],[10,11,3208],[19,6,7006],[37,26,3782],[8,29,8190],[2,38,5598],[39,5,8854]],[[32,17,25],[24,12,4],[23,21,31],[16,1,39],[31,32,9],[7,27,37],[16,19,38],[26,18,27],[21,19,28],[28,11,10],[1,7,34],[19,12,0],[4,39,32],[23,39,31],[28,33,39],[25,27,5],[31,13,26],[19,36,18],[1,27,4],[6,39,16]]]},
+    {"name":"Test 10","input":[[[0,1,1],[1,2,1],[2,3,1],[3,4,1],[4,5,100],[4,6,100],[4,7,100],[4,8,100]],[[5,6,7],[5,6,0],[0,8,4],[1,2,8],[3,0,1]]]},
+    {"name":"Test 11","generate":{"seed":11,"size":"large"}},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nA tree joins any two nodes by exactly one simple path, so every valid choice must contain the whole path from `src1` to `dest` and the whole path from `src2` to `dest`. Their union is already connected and acyclic, so it is the answer. Walking both paths for every query costs O(n) each, too slow for 10^5 queries.\n\nThe union is a \"Y\" joining the three nodes (one arm may be empty), and each of its edges lies on exactly two of the three pairwise paths `src1–src2`, `src2–dest` and `dest–src1`. So the answer is half the sum of those three distances. A distance is `dist[a] + dist[b] - 2 * dist[lca(a, b)]`, where `dist` is the weight from the root, and binary lifting finds the lowest common ancestor in O(log n).\n\n## Approach\n\n1. Build `graph` for `n = edges.length + 1` nodes and run a BFS from node 0, recording each node's parent `up[0]`, its `depth` and its root distance `dist`.\n2. Fill the lifting table: `up[j][v] = up[j - 1][up[j - 1][v]]` is the ancestor `2^j` levels above `v`.\n3. `lca(a, b)`: lift the deeper node to the other's depth; if they meet, that node is the answer. Otherwise lift both by every power of two that keeps them apart; their parent is the ancestor.\n4. `distance(a, b)` removes twice the ancestor's root distance from `dist[a] + dist[b]`.\n5. For each query, add the three pairwise distances into `total` and return `total / 2`.\n\n## Example 1, step by step\n\nRooted at 0, `dist = [0, 2, 5, 7, 6, 11]`. In query `[2, 3, 4]` every pair meets at node 1 (`dist[1] = 2`), so the distances are `5 + 7 - 4 = 8`, `7 + 6 - 4 = 9` and `6 + 5 - 4 = 7`; `total = 24` and the answer is `12` (edges 1–2, 1–3 and 1–4). Query `[0, 2, 5]` lies on one root path: the distances are `5`, `6` and `11`, `total = 22`, answer `11`. The result is `[12, 11]`.\n\n## Complexity\n\n- Time: O((n + q) log n): the BFS is O(n), the table O(n log n), and each query runs three O(log n) ancestor searches.\n- Space: O(n log n) for `up`, plus O(n) for the graph and the per-node arrays.\n\n## Pitfalls\n\n- `n` is not passed in; it is `edges.length + 1`.\n- `distance(src1, dest) + distance(src2, dest)` counts the stretch the two paths share near `dest` twice.\n- Use a BFS, not a recursive DFS: a path-shaped tree of 10^5 nodes overflows the call stack.\n- The halving is exact, because the three distances always sum to twice the answer.\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `n` | number of nodes, `edges.length + 1` |\n| `graph` | adjacency list of `[neighbour, weight]` pairs |\n| `LOG` | number of levels in the lifting table |\n| `up[j][v]` | the ancestor `2^j` levels above `v` (the root points to itself) |\n| `depth`, `dist` | edges and total weight from node 0 to each node |\n| `queue`, `head` | BFS queue and its read position |\n| `total` | sum of a query's three pairwise distances |",
+  "narration": {
+    "2": "The tree has one more node than it has edges.",
+    "3": "Build an adjacency list where each entry keeps the neighbour and the edge weight.",
+    "9": "Enough levels that any climb of up to n - 1 steps can be written as a sum of powers of two.",
+    "10": "up[j][v] will be the ancestor 2^j levels above v; the root points to itself.",
+    "12": "dist[v] will be the total edge weight on the path from node 0 to v.",
+    "17": "Breadth-first search from node 0 reaches every parent before its children.",
+    "19": "Look at each neighbour together with the weight of the edge leading to it.",
+    "20": "Skip the parent, which was reached already.",
+    "22": "Record the direct parent: the first level of the lifting table.",
+    "23": "A child is one edge deeper than its parent.",
+    "24": "Its root distance is the parent's plus the weight of the edge just crossed.",
+    "29": "Fill each higher level of the table from the level below it.",
+    "31": "A jump of 2^j levels is two jumps of 2^(j-1) levels.",
+    "36": "Make a the deeper of the two nodes.",
+    "38": "Lift a by 2^j levels whenever that keeps it no higher than b, until both are at the same depth.",
+    "40": "If b was an ancestor of a, the two now coincide.",
+    "42": "Jump both nodes only while they would still land on different ancestors.",
+    "47": "Both are now children of the lowest common ancestor, so return their parent.",
+    "50": "The path weight between a and b: both root distances minus twice the stretch above their common ancestor.",
+    "53": "Add the three pairwise distances; every edge of the smallest connecting subtree lies on exactly two of these paths.",
+    "54": "Halve the sum to get the weight of that subtree."
+  }
+}

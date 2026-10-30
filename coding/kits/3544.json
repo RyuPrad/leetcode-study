@@ -1,0 +1,77 @@
+{
+  "number": 3544,
+  "title": "Subtree Inversion Sum",
+  "spec": "leetcode",
+  "statement": "A tree has `n` nodes labelled `0` to `n - 1` and is rooted at node `0`. Each `edges[i] = [u_i, v_i]` is an undirected edge, `nums[i]` is the value of node `i`, and `n` equals `nums.length`.\n\nYou may pick any set of nodes to **invert**, including none. Inverting a node multiplies the value of every node in its subtree, the node itself included, by `-1`; a node that lies in several picked subtrees is negated once per picked subtree. The picked set must obey a spacing rule: whenever one picked node is an ancestor of another picked node, the path between them has at least `k` edges. Return the largest sum of all node values that some allowed set of inversions produces.",
+  "constraints": [
+    "2 <= n <= 5 * 10^4",
+    "edges.length == n - 1",
+    "edges[i] = [u_i, v_i] with 0 <= u_i, v_i < n",
+    "nums.length == n",
+    "-5 * 10^4 <= nums[i] <= 5 * 10^4",
+    "1 <= k <= 50",
+    "edges form a valid tree"
+  ],
+  "signature": "long subtreeInversionSum(int[][] edges, int[] nums, int k)",
+  "entry": "subtreeInversionSum",
+  "kind": "function",
+  "parameters": [
+    "edges",
+    "nums",
+    "k"
+  ],
+  "validator": "function validate([edges, nums, k]) {\n  const n = nums.length;\n  if (n < 2 || n > 50000) return 'nums needs 2 to 5 * 10^4 values.';\n  if (edges.length !== n - 1) return 'edges needs exactly n - 1 edges.';\n  if (nums.some(v => !Number.isInteger(v) || v < -50000 || v > 50000)) return 'Each value is between -5 * 10^4 and 5 * 10^4.';\n  if (!Number.isInteger(k) || k < 1 || k > 50) return 'k is between 1 and 50.';\n  const root = Array.from({ length: n }, (_, i) => i);\n  const find = x => { while (root[x] !== x) { root[x] = root[root[x]]; x = root[x]; } return x; };\n  for (const edge of edges) {\n    if (!Array.isArray(edge) || edge.length !== 2) return 'Each edge is a pair [u, v].';\n    const [u, v] = edge;\n    if (!Number.isInteger(u) || !Number.isInteger(v) || u < 0 || v < 0 || u >= n || v >= n) return 'Edge ends are nodes 0 to n - 1.';\n    const a = find(u), b = find(v);\n    if (a === b) return 'The edges must form a tree (no cycles).';\n    root[a] = b;\n  }\n  return null;\n}",
+  "languages": [
+    "javascript",
+    "typescript",
+    "java",
+    "c"
+  ],
+  "reference": "function subtreeInversionSum(edges, nums, k) {\n  const n = nums.length;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) {\n    graph[u].push(v);\n    graph[v].push(u);\n  }\n  const children = Array.from({ length: n }, () => []);\n  const visited = new Array(n).fill(false);\n  visited[0] = true;\n  const order = [0];\n  for (let i = 0; i < order.length; i++) {\n    const node = order[i];\n    for (const next of graph[node]) {\n      if (!visited[next]) {\n        visited[next] = true;\n        children[node].push(next);\n        order.push(next);\n      }\n    }\n  }\n  // best[node][flip][dist]: largest sum of node's subtree when the inversions above it negate it (flip = 1) or not,\n  // and the nearest inverted ancestor is dist edges up (dist = k: far enough away, or there is none).\n  const best = Array.from({ length: n }, () => [new Array(k + 1).fill(0), new Array(k + 1).fill(0)]);\n  for (let i = n - 1; i >= 0; i--) {\n    const node = order[i];\n    for (const flip of [0, 1]) {\n      const value = flip === 1 ? -nums[node] : nums[node];\n      for (let dist = 1; dist <= k; dist++) {\n        let keep = value;\n        for (const child of children[node]) {\n          keep += best[child][flip][Math.min(dist + 1, k)];\n        }\n        best[node][flip][dist] = keep;\n      }\n      let invert = -value;\n      for (const child of children[node]) {\n        invert += best[child][1 - flip][1];\n      }\n      best[node][flip][k] = Math.max(best[node][flip][k], invert);\n    }\n  }\n  return best[0][0][k];\n}",
+  "brute": "function subtreeInversionSum(edges, nums, k) {\n  // Try every set of inverted nodes and keep the sets that respect the spacing rule.\n  const n = nums.length;\n  const graph = Array.from({ length: n }, () => []);\n  for (const [u, v] of edges) { graph[u].push(v); graph[v].push(u); }\n  const parent = new Array(n).fill(-1);\n  const stack = [0];\n  const visited = new Set([0]);\n  while (stack.length) {\n    const node = stack.pop();\n    for (const next of graph[node]) if (!visited.has(next)) { visited.add(next); parent[next] = node; stack.push(next); }\n  }\n  let best = -Infinity;\n  for (let mask = 0; mask < 1 << n; mask++) {\n    let valid = true, total = 0;\n    for (let node = 0; node < n; node++) {\n      // Walk up to the root, counting inverted nodes on the way and checking their distance to an inverted node.\n      let flips = 0;\n      for (let up = node, dist = 0; up !== -1; up = parent[up], dist++) {\n        if (!(mask >> up & 1)) continue;\n        flips++;\n        if (dist > 0 && dist < k && (mask >> node & 1)) valid = false;\n      }\n      total += flips % 2 === 1 ? -nums[node] : nums[node];\n    }\n    if (valid) best = Math.max(best, total);\n  }\n  return best;\n}",
+  "generator": "function generate(rand, size) {\n  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));\n  const large = size === 'large';\n  const n = large ? 2000 : int(2, 10);\n  // Node i hangs below one of the `reach` nodes created just before it: reach 1 gives a path, a big reach a bushy tree.\n  // Large trees stay a few hundred levels deep at most.\n  const reach = large ? (rand() < 0.3 ? n : int(8, 30)) : (rand() < 0.3 ? n : int(1, 4));\n  const parentOf = [-1];\n  for (let i = 1; i < n; i++) parentOf.push(i - 1 - Math.floor(rand() * Math.min(i, reach)));\n  // Shuffle the labels of every node except the root.\n  const label = Array.from({ length: n }, (_, i) => i);\n  for (let i = n - 1; i > 1; i--) { const j = int(1, i); [label[i], label[j]] = [label[j], label[i]]; }\n  const edges = [];\n  for (let i = 1; i < n; i++) edges.push(rand() < 0.5 ? [label[parentOf[i]], label[i]] : [label[i], label[parentOf[i]]]);\n  for (let i = edges.length - 1; i > 0; i--) { const j = int(0, i); [edges[i], edges[j]] = [edges[j], edges[i]]; }\n  const limit = large ? 50000 : int(2, 10);\n  const nums = Array.from({ length: n }, () => int(-limit, limit));\n  const k = large ? int(1, 50) : int(1, 5);\n  return [edges, nums, k];\n}",
+  "examples": [
+    {"name":"Example 1","input":[[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]],[4,-8,-6,3,7,-2,5],2],"expected":27},
+    {"name":"Example 2","input":[[[0,1],[1,2],[2,3],[3,4]],[-1,3,-2,4,-5],2],"expected":9},
+    {"name":"Example 3","input":[[[0,1],[0,2]],[0,-1,-2],3],"expected":3}
+  ],
+  "tests": [
+    {"name":"Test 1","input":[[[0,1]],[-5,-7],1]},
+    {"name":"Test 2","input":[[[1,0]],[-5,7],50]},
+    {"name":"Test 3","input":[[[0,1],[0,2],[0,3],[0,4]],[1,2,3,4,5],3]},
+    {"name":"Test 4","input":[[[0,1],[1,2],[2,3],[3,4]],[-1,-2,-3,-4,-5],1]},
+    {"name":"Test 5","input":[[[0,1],[1,2],[2,3],[3,4],[4,5]],[3,-4,5,-6,7,-8],1]},
+    {"name":"Test 6","input":[[[0,1],[1,2],[2,3],[3,4],[4,5]],[3,-4,5,-6,7,-8],2]},
+    {"name":"Test 7","input":[[[0,1],[1,2],[2,3],[3,4],[4,5]],[3,-4,5,-6,7,-8],6]},
+    {"name":"Test 8","input":[[[0,1],[0,2],[2,3]],[0,0,0,0],4]},
+    {"name":"Test 9","input":[[[0,1],[1,2]],[50000,-50000,50000],2]},
+    {"name":"Test 10","input":[[[0,1],[0,2],[0,3],[1,4],[1,5],[2,6],[3,7],[3,8],[7,9],[8,10],[8,11]],[-3,5,-9,2,-4,-6,8,-1,7,-5,-2,6],2]},
+    {"name":"Test 11","input":[[[5,3],[0,5],[3,9],[9,1],[1,11],[11,2],[2,7],[7,4],[4,10],[10,6],[6,8]],[2,-6,8,-4,-1,3,-3,-9,-4,-5,-2,7],3]},
+    {"name":"Test 12","generate":{"seed":12,"size":"large"}},
+    {"name":"Test 13","generate":{"seed":13,"size":"large"}},
+    {"name":"Test 14","generate":{"seed":14,"size":"large"}}
+  ],
+  "notes": "## Intuition\n\nTwo facts decide everything below a node, and both come from above: whether the inversions on its ancestors leave it negated (only the parity of their number matters), and how many edges up the nearest inverted ancestor sits (it may be inverted itself only when that is at least `k`). So the best total of a subtree depends only on its root, that parity and that distance, and the distance can be capped at `k`, since every larger distance (or no inverted ancestor at all) means \"free to invert\". Trying all 2^n sets of nodes would also work, but only for tiny trees.\n\n## Approach\n\n1. Build adjacency lists `graph`, then run a BFS from node `0` that fills `children` and an `order` in which every parent comes before its children.\n2. Let `best[node][flip][dist]` be the largest sum of `node`'s subtree when the ancestors' inversions negate it (`flip = 1`) or not, and the nearest inverted ancestor is `dist` edges up (`dist = k` also covers \"farther\" and \"none\").\n3. Go through `order` backwards, so children are finished before their parent. Under `flip` the node shows `value`, which is `nums[node]` or its negation.\n4. Keeping the node: `keep = value` plus each child's `best[child][flip][min(dist + 1, k)]`.\n5. Inverting is allowed only when `dist = k`: `invert = -value` plus each child's `best[child][1 - flip][1]`; the larger of `keep` and `invert` goes in `best[node][flip][k]`.\n6. The root starts unflipped and free, so return `best[0][0][k]`.\n\n## Example 1, step by step\n\n`k = 2`. A leaf right below an inversion must keep its shown value, so `best[3][1][1] = -3` and `best[4][1][1] = -7`, while a free leaf picks the better sign. If the root is inverted, node 1 (`flip = 1`, `dist = 1`) shows `8` and its children are now two edges away, free to flip back: `8 + 3 + 7 = 18`. Node 2 likewise gives `6 + 2 + 5 = 13`. Without inverting the root, its children's best totals are `best[1][0][2] = 2` and `best[2][0][2] = 3`, so `keep = 4 + 2 + 3 = 9`; inverting it gives `invert = -4 + 18 + 13 = 27`, the answer (nodes 0, 3, 4 and 6 are inverted).\n\n## Complexity\n\n- Time: O(n · k): each node combines its children for 2 · k states.\n- Space: O(n · k) for `best`.\n\n## Pitfalls\n\n- Inversions stack: a node under two inverted ancestors is back to its original sign, so track the parity, not just \"some ancestor was inverted\".\n- The spacing rule only constrains ancestor and descendant pairs; inverted nodes in different branches may be any distance apart.\n- Cap the distance at `k`, or the table grows with the tree's depth for no benefit.\n- Sums can reach about 2.5 · 10^9 on LeetCode's limits, beyond 32-bit range (the return type is `long`).\n\n## Variables\n\n| Name | Meaning |\n|---|---|\n| `graph` | adjacency lists of the tree |\n| `children` | each node's children when the tree hangs from node 0 |\n| `order` | the nodes in BFS order from the root |\n| `best` | the table described in the approach |\n| `node` | the node being solved |\n| `flip` | 1 when the inversions above negate `node` |\n| `dist` | edges up to the nearest inverted ancestor, capped at `k` |\n| `value` | `node`'s value as the inversions above leave it |\n| `keep`, `invert` | the subtree's total without and with inverting `node` |",
+  "narration": {
+    "3": "One adjacency list per node.",
+    "4": "Store each undirected edge in both directions.",
+    "8": "children[node] will list the nodes directly below node when the tree hangs from node 0.",
+    "11": "BFS from the root: order will list every parent before its children.",
+    "12": "order grows while it is read, so it doubles as the BFS queue.",
+    "15": "A neighbour not seen yet is a child; the only seen neighbour is the parent.",
+    "17": "Record it as a child of node.",
+    "18": "Queue it so its own children are found later.",
+    "24": "For every node, two parities and distances 1 to k (index 0 is unused).",
+    "25": "Walk the BFS order backwards so every child is solved before its parent.",
+    "27": "Solve both cases: the inversions above leave node as it is (0) or negate it (1).",
+    "28": "The value node shows if it is not inverted itself.",
+    "29": "Each distance to the nearest inverted ancestor, where k means far enough or none.",
+    "30": "Keep node as it is: its shown value counts.",
+    "32": "Each child is one edge farther from that inverted ancestor, capped at k.",
+    "34": "Without inverting node, this is the best total for this distance.",
+    "36": "Inverting node negates its shown value...",
+    "38": "...and flips each child's parity, with the new inversion one edge above the child.",
+    "40": "Inverting is only allowed when the nearest inverted ancestor is k or more edges away.",
+    "43": "The root has no inversions above it: unflipped and free to invert."
+  }
+}
