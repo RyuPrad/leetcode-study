@@ -6,7 +6,7 @@ Browse and search the bundled library, step through algorithms, inspect live var
 
 ## Download and install (Windows)
 
-1. Open the **[latest release](https://github.com/RyuPrad/leetcode-study/releases/latest)**. The repo is private, so sign in to GitHub first.
+1. Open the **[latest release](https://github.com/RyuPrad/leetcode-study/releases/latest)** (no sign-in needed: the repo is public).
 2. Under **Assets**, download `LeetCode-Study-<version>-Setup.exe`.
 3. Run it. It installs for your Windows account only (no administrator prompt) into `%LOCALAPPDATA%\Programs\leetcode-study`, adds a **LeetCode Study** shortcut to the desktop and the Start menu (a manual reinstall restores a deleted desktop shortcut), and opens the app.
 
