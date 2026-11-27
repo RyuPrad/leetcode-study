@@ -4,9 +4,15 @@ An offline Windows workspace for understanding algorithms, with **439 problem no
 
 Browse and search the bundled library, step through algorithms, inspect live variables, and keep a private practice history. No Obsidian, account, Git, or Node installation is needed to use the packaged app.
 
-## Using the app
+## Download and install (Windows)
 
-Install `LeetCode-Study-0.12.0-Setup.exe` from the build's Windows artifact. The installer is per-user, restores the desktop shortcut during a manual reinstall, and opens the app when installation finishes. This build is unsigned; code signing and automatic updates are not configured. Install a newer version over the old one to update. Progress stays in your Windows user profile, independently of the installed content, and uninstalling retains it.
+1. Open the **[latest release](https://github.com/RyuPrad/leetcode-study/releases/latest)**. The repo is private, so sign in to GitHub first.
+2. Under **Assets**, download `LeetCode-Study-<version>-Setup.exe`.
+3. Run it. It installs for your Windows account only (no administrator prompt) into `%LOCALAPPDATA%\Programs\leetcode-study`, adds a **LeetCode Study** shortcut to the desktop and the Start menu (a manual reinstall restores a deleted desktop shortcut), and opens the app.
+
+The installer isn't code-signed, so Windows may show *"Windows protected your PC"*: choose **More info**, then **Run anyway**. There are no automatic updates: install a newer version over the old one to update. Progress lives in `%APPDATA%\LeetCode Study`, separately from the installed content, so updating, reinstalling and uninstalling (*Settings → Apps*) all keep it.
+
+## Using the app
 
 - **Library:** search by number, title, topic, or note text; filter by progress or difficulty; browse bookmarks and the review queue. Every problem shows LeetCode's Easy, Medium or Hard label in the list and beside its title, and the Easy/Medium/Hard cards count completed problems at each level (for the selected topic). Select a card to show only that level. Difficulties are maintained in `coding/difficulty.json`.
 - **Learn:** all 439 visualizers have a fixed guided example with three authored predictions (1,317 in total). Read the question beside the diagram and reference code, choose an answer or an outlined diagram item, ask for either of two hints, or choose Show me. Watch each intervening instruction in order and read why it works. Basics explanations cover the actual code being used, in the reference language you choose. Answers and position save automatically; returning starts paused. Guided completion is separate from solving the coding problem.
@@ -155,6 +161,17 @@ npm run test:all -- --jobs=12 --desktop-jobs=1
 Suites that spread their own work (`test:visualizers`, `test:lessons`, `test:guided`, `test:code-languages`, `check:native`, `check:solutions` and others) size themselves the same way when run alone; set `STUDY_TEST_WORKERS=N` to fix the number of pages or processes.
 
 The installer is written to `release/`. The Windows CI workflow runs validation and uploads an installer artifact; it does not publish releases. `npm start` launches the most recent build.
+
+### Publishing a new version
+
+1. Raise `version` in `package.json`, then run `npm run test:all` and `npm run dist:win`.
+2. Commit and push, then attach the installer to a new release (the tag is created on the pushed commit):
+
+```powershell
+gh release create v0.14.0 release/LeetCode-Study-0.14.0-Setup.exe --title "LeetCode Study 0.14.0" --notes "What changed"
+```
+
+The *latest release* link above always points at the newest one. To publish a CI build instead, download its installer with `gh run download <run-id> -n LeetCode-Study-Windows-x64` and attach that file.
 
 ## Project structure
 
